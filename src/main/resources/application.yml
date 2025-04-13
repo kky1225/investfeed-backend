@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: InvestFeed
+
+kiwoom:
+  app-key: ENoqH8oL9GF9Xt651kcNTfDpLXtTYwuGxjbvnOkCFWc
+  secret-key: P3NIlTVvvicHXGcDumxMRCHO4skMCQjAjLMX8khoMJg
