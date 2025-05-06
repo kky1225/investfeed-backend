@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.auth.model
+package com.example.investfeed.kiwoom.auth.dto.req
 
 data class AccessTokenReq (
     var grant_type: String = "client_credentials",

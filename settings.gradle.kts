@@ -1,1 +1,1 @@
-rootProject.name = "InvestFeed"
+rootProject.name = "investfeed-backend"

@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.auth.model
+package com.example.investfeed.kiwoom.auth.dto.res
 
 data class AccessTokenRes (
     var expires_dt: String,

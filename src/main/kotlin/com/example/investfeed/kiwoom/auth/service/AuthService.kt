@@ -1,15 +1,18 @@
 package com.example.investfeed.kiwoom.auth.service
 
-import com.example.investfeed.kiwoom.auth.model.AccessTokenReq
-import com.example.investfeed.kiwoom.auth.model.AccessTokenRes
+import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
+import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import java.time.Duration
 
 @Service
 class AuthService(
-    private val webClient: WebClient
+    private val webClient: WebClient,
+    private val redisTemplate: RedisTemplate<String, String>
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -19,10 +22,31 @@ class AuthService(
     @Value("\${kiwoom.secret-key}")
     private lateinit var SECRET_KEY: String
 
-    fun accessToken(): AccessTokenRes? {
+    @Value("\${kiwoom.default-url}")
+    private lateinit var DEFAULT_URL: String
+
+    fun accessToken() {
+        log.info { "accessToken" }
+
         try {
-            return webClient.post()
-                .uri("https://api.kiwoom.com/oauth2/token")
+            val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+
+            if(accessToken.isNullOrEmpty()) {
+                refreshToken()
+            }
+        }catch (e: Exception) {
+            log.error { "refreshToken error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    private fun refreshToken() {
+        log.info { "refreshToken" }
+
+        try {
+            val accessTokenRes = webClient.post()
+                .uri("$DEFAULT_URL/oauth2/token")
                 .bodyValue(
                     AccessTokenReq(
                         appkey = APP_KEY,
@@ -33,7 +57,15 @@ class AuthService(
                 .onStatus({ t -> t.isError }, { throw RuntimeException("통신 오류") })
                 .bodyToMono(AccessTokenRes::class.java)
                 .block()
-        }catch (e: RuntimeException) {
+
+            log.info { "accessTokenRes $accessTokenRes" }
+
+            if(accessTokenRes?.token?.isEmpty() == true) {
+                throw RuntimeException("access token 오류")
+            }
+
+            accessTokenRes?.token?.let { redisTemplate.opsForValue().set("kiwoom:access_token", it, Duration.ofMinutes(30)) }
+        }catch (e: Exception) {
             log.error { "accessToken error" }
 
             throw RuntimeException(e.message)

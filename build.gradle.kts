@@ -29,6 +29,10 @@ dependencies {
     //webClient
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    //redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    //AOP
+    implementation("org.springframework.boot:spring-boot-starter-aop")
 }
 
 kotlin {
