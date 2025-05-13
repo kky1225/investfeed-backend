@@ -2,6 +2,7 @@ package com.example.investfeed.kiwoom.auth.service
 
 import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
 import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
+import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -35,7 +36,7 @@ class AuthService(
                 refreshToken()
             }
         }catch (e: Exception) {
-            log.error { "refreshToken error" }
+            log.error { "accessToken Error" }
 
             throw RuntimeException(e.message)
         }
@@ -54,11 +55,9 @@ class AuthService(
                     )
                 )
                 .retrieve()
-                .onStatus({ t -> t.isError }, { throw RuntimeException("통신 오류") })
+                .onStatus({ it -> it.isError }, { throw KiwoomApiException() })
                 .bodyToMono(AccessTokenRes::class.java)
                 .block()
-
-            log.info { "accessTokenRes $accessTokenRes" }
 
             if(accessTokenRes?.token?.isEmpty() == true) {
                 throw RuntimeException("access token 오류")
@@ -66,7 +65,7 @@ class AuthService(
 
             accessTokenRes?.token?.let { redisTemplate.opsForValue().set("kiwoom:access_token", it, Duration.ofMinutes(30)) }
         }catch (e: Exception) {
-            log.error { "accessToken error" }
+            log.error { "refreshToken Error" }
 
             throw RuntimeException(e.message)
         }

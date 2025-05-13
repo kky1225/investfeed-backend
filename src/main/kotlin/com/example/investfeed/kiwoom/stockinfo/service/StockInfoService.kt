@@ -49,7 +49,7 @@ class StockInfoService(
 
             return res
         }catch (e: Exception) {
-            log.error { "StkInfoList error $e" }
+            log.error { "stockInfoList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -79,7 +79,7 @@ class StockInfoService(
 
             return res
         }catch (e: Exception) {
-            log.error { "StkInfo error $e" }
+            log.error { "stockInfo Error" }
 
             throw RuntimeException(e.message)
         }
@@ -109,7 +109,7 @@ class StockInfoService(
 
             return res
         }catch (e: Exception) {
-            log.error { "StkInfoDailyTrade error $e" }
+            log.error { "stockInfoDailyTrade Error" }
 
             throw RuntimeException(e.message)
         }
@@ -139,7 +139,7 @@ class StockInfoService(
 
             return res
         }catch (e: Exception) {
-            log.error { "StkInfoJumpList error $e" }
+            log.error { "stockInfoJumpList Error" }
 
             throw RuntimeException(e.message)
         }

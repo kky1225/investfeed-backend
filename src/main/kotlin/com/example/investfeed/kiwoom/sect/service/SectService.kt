@@ -1,9 +1,13 @@
 package com.example.investfeed.kiwoom.sect.service
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.auth.service.AuthService
+import com.example.investfeed.kiwoom.exception.AccessTokenNotFound
+import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.exception.SectCodeListException
+import com.example.investfeed.kiwoom.sect.dto.req.SectCodeListReq
 import com.example.investfeed.kiwoom.sect.dto.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.SectPriceReq
+import com.example.investfeed.kiwoom.sect.dto.res.SectCodeListRes
 import com.example.investfeed.kiwoom.sect.dto.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.res.SectPriceRes
 import mu.KotlinLogging
@@ -79,6 +83,36 @@ class SectService(
             return res
         }catch (e: Exception) {
             log.error { "sectPrice error $e" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    fun sectCodeList(
+        req: SectCodeListReq
+    ): SectCodeListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+
+        accessToken ?: throw AccessTokenNotFound()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10101")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(SectCodeListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectCodeListException()
+            }
+
+            return res
+        }catch (e: Exception) {
+            log.error { "sectCodeList Error" }
 
             throw RuntimeException(e.message)
         }
