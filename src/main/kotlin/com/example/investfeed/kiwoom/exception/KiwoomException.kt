@@ -4,5 +4,4 @@ class AccessTokenNotFound(): InvestFeedException(code = "T9999", message = "API 
 class KiwoomApiException(): InvestFeedException(code = "K9999", message = "API 통신 오류가 발생하였습니다.")
 class InvestorDailyTradeException(): InvestFeedException(code = "K0001", message = "투자자별 일별 매매 조회에 실패하였습니다.")
 class InvestorOrganizeTradeException(): InvestFeedException(code = "K0002", message = "종목별 투자자 기관별 합계 요청 조회에 실패하였습니다.")
-class SectCodeListException(): InvestFeedException(code = "K1001", message = "업종 코드 리스트 조회에 실패하였습니다.")
-class SectInvestorTradeRankException(): InvestFeedException(code = "K1002", message = "기관/외국인 매수 상위 순위 조회에 실패하였습니다.")
+class InvestorTradeRankException(): InvestFeedException(code = "K1002", message = "기관/외국인 매수 상위 순위 조회에 실패하였습니다.")

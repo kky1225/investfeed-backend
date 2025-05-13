@@ -4,8 +4,8 @@ import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFound
 import com.example.investfeed.kiwoom.exception.InvestorDailyTradeException
 import com.example.investfeed.kiwoom.exception.InvestorOrganizeTradeException
+import com.example.investfeed.kiwoom.exception.InvestorTradeRankException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
-import com.example.investfeed.kiwoom.exception.SectInvestorTradeRankException
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorDailyTradeReq
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankReq
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorOrganizeTradeReq
@@ -110,7 +110,7 @@ class InvestorService(
                 .block()
 
             if(res?.return_code != 0) {
-                throw SectInvestorTradeRankException()
+                throw InvestorTradeRankException()
             }
 
             return res

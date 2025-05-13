@@ -2,9 +2,15 @@ package com.example.investfeed.kiwoom.sect.controller
 
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.kiwoom.sect.dto.req.SectCodeListReq
+import com.example.investfeed.kiwoom.sect.dto.req.SectIndexListReq
 import com.example.investfeed.kiwoom.sect.dto.req.SectInvestorReq
+import com.example.investfeed.kiwoom.sect.dto.req.SectPriceNowReq
 import com.example.investfeed.kiwoom.sect.dto.req.SectPriceReq
+import com.example.investfeed.kiwoom.sect.dto.res.SectCodeListRes
+import com.example.investfeed.kiwoom.sect.dto.res.SectIndexListRes
 import com.example.investfeed.kiwoom.sect.dto.res.SectInvestorRes
+import com.example.investfeed.kiwoom.sect.dto.res.SectPriceNowRes
 import com.example.investfeed.kiwoom.sect.dto.res.SectPriceRes
 import com.example.investfeed.kiwoom.sect.service.SectService
 import mu.KotlinLogging
@@ -36,6 +42,21 @@ class SectController(
         )
     }
 
+    @GetMapping("priceNow")
+    fun sectPriceNow(
+        req: SectPriceNowReq
+    ): ResponseEntity<ApiResponse<SectPriceNowRes?>> {
+        log.info { "sectNowPrice $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.SECT_PRICE_NOW.code,
+                message = ResponseCode.SECT_PRICE_NOW.message,
+                result = sectService.sectPriceNow(req)
+            ), HttpStatus.OK
+        )
+    }
+
     @GetMapping("price")
     fun sectPrice(
         req: SectPriceReq
@@ -47,6 +68,36 @@ class SectController(
                 code = ResponseCode.SECT_PRICE.code,
                 message = ResponseCode.SECT_PRICE.message,
                 result = sectService.sectPrice(req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("codeList")
+    fun sectCodeList(
+        req: SectCodeListReq
+    ): ResponseEntity<ApiResponse<SectCodeListRes?>> {
+        log.info { "sectCodeList $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.SECT_CODE_LIST.code,
+                message = ResponseCode.SECT_CODE_LIST.message,
+                result = sectService.sectCodeList(req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("indexList")
+    fun sectIndexList(
+        req: SectIndexListReq
+    ): ResponseEntity<ApiResponse<SectIndexListRes?>> {
+        log.info { "sectIndex $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.SECT_INDEX_LIST.code,
+                message = ResponseCode.SECT_INDEX_LIST.message,
+                result = sectService.sectIndexList(req)
             ), HttpStatus.OK
         )
     }
