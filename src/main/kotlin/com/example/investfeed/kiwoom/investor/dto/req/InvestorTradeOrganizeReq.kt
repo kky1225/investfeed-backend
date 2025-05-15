@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.investor.dto.req
 
-data class InvestorOrganizeTradeReq(
+data class InvestorTradeOrganizeReq(
     var stk_cd: String, // 종목코드 KRX:039490,NXT:039490_NX,SOR:039490_AL
     var strt_dt: String, // 시작일자 YYYYMMDD
     var end_dt: String, // 종료일자 YYYYMMDD

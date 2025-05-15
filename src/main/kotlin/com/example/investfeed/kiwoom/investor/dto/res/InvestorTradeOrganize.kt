@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.investor.dto.res
 
-data class InvestorOrganizeTrade(
+data class InvestorTradeOrganize(
     var ind_invsr: String? = null,
     var frgnr_invsr: String? = null,
     var orgn: String? = null,

@@ -15,7 +15,7 @@ class ExceptionAdviceController {
         log.error { "exception $e" }
 
         return ResponseEntity(
-            ApiResponse(code = "S9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
+            ApiResponse(code = "SERVER_9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
         )
     }
 
@@ -24,7 +24,7 @@ class ExceptionAdviceController {
         log.error { "runtimeException $e" }
 
         return ResponseEntity(
-            ApiResponse(code = "S9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
+            ApiResponse(code = "SERVER_9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
         )
     }
 

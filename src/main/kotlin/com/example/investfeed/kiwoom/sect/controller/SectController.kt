@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-@RequestMapping("api/sect")
 @RestController
+@RequestMapping("api/sect")
 class SectController(
     private val sectService: SectService
 ) {
@@ -37,7 +37,7 @@ class SectController(
             ApiResponse(
                 code = ResponseCode.SECT_INVESTOR.code,
                 message = ResponseCode.SECT_INVESTOR.message,
-                result = sectService.sectInvestor(req)
+                result = sectService.sectInvestor(req = req)
             ), HttpStatus.OK
         )
     }
@@ -52,7 +52,7 @@ class SectController(
             ApiResponse(
                 code = ResponseCode.SECT_PRICE_NOW.code,
                 message = ResponseCode.SECT_PRICE_NOW.message,
-                result = sectService.sectPriceNow(req)
+                result = sectService.sectPriceNow(req = req)
             ), HttpStatus.OK
         )
     }
@@ -67,7 +67,7 @@ class SectController(
             ApiResponse(
                 code = ResponseCode.SECT_PRICE.code,
                 message = ResponseCode.SECT_PRICE.message,
-                result = sectService.sectPrice(req)
+                result = sectService.sectPrice(req = req)
             ), HttpStatus.OK
         )
     }
@@ -82,7 +82,7 @@ class SectController(
             ApiResponse(
                 code = ResponseCode.SECT_CODE_LIST.code,
                 message = ResponseCode.SECT_CODE_LIST.message,
-                result = sectService.sectCodeList(req)
+                result = sectService.sectCodeList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -97,7 +97,7 @@ class SectController(
             ApiResponse(
                 code = ResponseCode.SECT_INDEX_LIST.code,
                 message = ResponseCode.SECT_INDEX_LIST.message,
-                result = sectService.sectIndexList(req)
+                result = sectService.sectIndexList(req = req)
             ), HttpStatus.OK
         )
     }

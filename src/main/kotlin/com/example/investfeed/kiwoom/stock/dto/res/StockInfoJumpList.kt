@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.stockinfo.dto.res
+package com.example.investfeed.kiwoom.stock.dto.res
 
 data class StockInfoJumpList(
     var stk_cd: String? = null, // 종목코드

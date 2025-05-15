@@ -11,6 +11,7 @@ class WebClientConfig {
     fun webClient(): WebClient {
         return WebClient.builder()
             .defaultHeader("Content-Type", "application/json")
+            .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) } // 5mb
             .build()
     }
 }

@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.stockinfo.dto.res
+package com.example.investfeed.kiwoom.stock.dto.res
 
 data class StockInfoRes(
     var return_code: Int,

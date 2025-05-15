@@ -1,13 +1,20 @@
-package com.example.investfeed.kiwoom.stockinfo.service
+package com.example.investfeed.kiwoom.stock.service
 
-import com.example.investfeed.kiwoom.stockinfo.dto.req.StockInfoDailyTradeReq
-import com.example.investfeed.kiwoom.stockinfo.dto.req.StockInfoJumpListReq
-import com.example.investfeed.kiwoom.stockinfo.dto.req.StockInfoListReq
-import com.example.investfeed.kiwoom.stockinfo.dto.req.StockInfoReq
-import com.example.investfeed.kiwoom.stockinfo.dto.res.StockInfoDailyTradeRes
-import com.example.investfeed.kiwoom.stockinfo.dto.res.StockInfoJumpRes
-import com.example.investfeed.kiwoom.stockinfo.dto.res.StockInfoListRes
-import com.example.investfeed.kiwoom.stockinfo.dto.res.StockInfoRes
+import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.exception.StockInfoTradeDailyException
+import com.example.investfeed.kiwoom.exception.StockInfoException
+import com.example.investfeed.kiwoom.exception.StockInfoJumpListException
+import com.example.investfeed.kiwoom.exception.StockInfoListException
+import com.example.investfeed.kiwoom.stock.dto.req.StockInfoTradeDailyReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockInfoJumpListReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.res.StockInfoTradeDailyRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockInfoJumpListRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -25,12 +32,12 @@ class StockInfoService(
     @Value("\${kiwoom.default-url}")
     private lateinit var DEFAULT_URL: String
 
+    @KiwoomToken
     fun stockInfoList(
         req: StockInfoListReq
     ): StockInfoListRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw RuntimeException("access token is null")
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -39,15 +46,19 @@ class StockInfoService(
                 .header("api-id", "ka10099")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw RuntimeException("통신 오류") })
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
                 .bodyToMono(StockInfoListRes::class.java)
                 .block()
 
             if (res?.return_code != 0) {
-                throw RuntimeException("정목 정보 리스트 조회 실패")
+                throw StockInfoListException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInfoListException) {
+            throw e
         }catch (e: Exception) {
             log.error { "stockInfoList Error" }
 
@@ -55,29 +66,37 @@ class StockInfoService(
         }
     }
 
+    @KiwoomToken
     fun stockInfo(
-        req: StockInfoReq
+        stockNm: String
     ): StockInfoRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw RuntimeException("access token is null")
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10001")
-                .bodyValue(req)
+                .bodyValue(
+                    StockInfoReq(
+                        stk_cd = stockNm
+                    )
+                )
                 .retrieve()
-                .onStatus( { it.isError }, { throw RuntimeException("통신 오류") })
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
                 .bodyToMono(StockInfoRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw RuntimeException("주식 기본 정보 조회 실패")
+                throw StockInfoException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInfoException) {
+            throw e
         }catch (e: Exception) {
             log.error { "stockInfo Error" }
 
@@ -85,12 +104,12 @@ class StockInfoService(
         }
     }
 
-    fun stockInfoDailyTrade(
-        req: StockInfoDailyTradeReq
-    ): StockInfoDailyTradeRes? {
+    @KiwoomToken
+    fun stockInfoTradeDaily(
+        req: StockInfoTradeDailyReq
+    ): StockInfoTradeDailyRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw RuntimeException("access token is null")
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -99,28 +118,32 @@ class StockInfoService(
                 .header("api-id", "ka10015")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw RuntimeException("통신 오류") })
-                .bodyToMono(StockInfoDailyTradeRes::class.java)
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(StockInfoTradeDailyRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw RuntimeException("일별 거래 상세 조회 실패")
+                throw StockInfoTradeDailyException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInfoTradeDailyException) {
+            throw e
         }catch (e: Exception) {
-            log.error { "stockInfoDailyTrade Error" }
+            log.error { "stockInfoTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }
     }
 
+    @KiwoomToken
     fun stockInfoJumpList(
         req: StockInfoJumpListReq
-    ): StockInfoJumpRes? {
+    ): StockInfoJumpListRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw RuntimeException("access token is null")
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -129,15 +152,19 @@ class StockInfoService(
                 .header("api-id", "ka10019")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw RuntimeException("통신 오류") })
-                .bodyToMono(StockInfoJumpRes::class.java)
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(StockInfoJumpListRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw RuntimeException("가격 급등락 조회 실패")
+                throw StockInfoJumpListException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInfoJumpListException) {
+            throw e
         }catch (e: Exception) {
             log.error { "stockInfoJumpList Error" }
 

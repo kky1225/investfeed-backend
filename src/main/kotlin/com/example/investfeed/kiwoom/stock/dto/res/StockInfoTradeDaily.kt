@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.stockinfo.dto.res
+package com.example.investfeed.kiwoom.stock.dto.res
 
-data class StockInfoDailyTrade (
+data class StockInfoTradeDaily (
     var dt: String? = null, // 일자
     var close_pric: String? = null, // 종가
     var pred_pre_sig: String? = null, // 전일대비기호

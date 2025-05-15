@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.investor.dto.res
 
-data class InvestorTradeRank(
+data class InvestorTradeRankList(
     var rank: String? = null, // 순위
     var stk_cd: String? = null, // 종목코드
     var stk_nm: String? = null, // 종목명

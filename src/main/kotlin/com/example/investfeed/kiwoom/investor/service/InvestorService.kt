@@ -1,17 +1,17 @@
 package com.example.investfeed.kiwoom.investor.service
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFound
-import com.example.investfeed.kiwoom.exception.InvestorDailyTradeException
-import com.example.investfeed.kiwoom.exception.InvestorOrganizeTradeException
-import com.example.investfeed.kiwoom.exception.InvestorTradeRankException
+import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.exception.InvestorTradeDailyException
+import com.example.investfeed.kiwoom.exception.InvestorTradeOrganizeException
+import com.example.investfeed.kiwoom.exception.InvestorTradeRankListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorDailyTradeReq
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankReq
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorOrganizeTradeReq
-import com.example.investfeed.kiwoom.investor.dto.res.InvestorDailyTradeRes
-import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankRes
-import com.example.investfeed.kiwoom.investor.dto.res.InvestorOrganizeTradeRes
+import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeDailyReq
+import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
+import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeOrganizeReq
+import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeDailyRes
+import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
+import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeOrganizeRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -29,93 +29,102 @@ class InvestorService(
     private lateinit var DEFAULT_URL: String
 
     @KiwoomToken
-    fun investorDailyTrade(
-        req: InvestorDailyTradeReq
-    ): InvestorDailyTradeRes? {
+    fun investorTradeDaily(
+        req: InvestorTradeDailyReq
+    ): InvestorTradeDailyRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header("Authorization", "Bearer $accessToken")
-                .header("api-key", "ka10058")
+                .header("api-id", "ka10058")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(InvestorDailyTradeRes::class.java)
+                .bodyToMono(InvestorTradeDailyRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw InvestorDailyTradeException()
+                throw InvestorTradeDailyException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: InvestorTradeDailyException) {
+            throw e
         }catch (e: Exception) {
-            log.error { "investorDailyTrade Error" }
+            log.error { "investorTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }
     }
 
     @KiwoomToken
-    fun investorOrganizeTrade(
-        req: InvestorOrganizeTradeReq
-    ): InvestorOrganizeTradeRes? {
+    fun investorTradeOrganize(
+        req: InvestorTradeOrganizeReq
+    ): InvestorTradeOrganizeRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header("Authorization", "Bearer $accessToken")
-                .header("api-key", "ka10061")
+                .header("api-id", "ka10061")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(InvestorOrganizeTradeRes::class.java)
+                .bodyToMono(InvestorTradeOrganizeRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw InvestorOrganizeTradeException()
+                throw InvestorTradeOrganizeException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: InvestorTradeOrganizeException) {
+            throw e
         }catch (e: Exception) {
-            log.error { "investorOrganizeTrade Error" }
+            log.error { "investorTradeOrganize Error" }
 
             throw RuntimeException(e.message)
         }
     }
 
     @KiwoomToken
-    fun investorTradeRank(
-        req: InvestorTradeRankReq
-    ): InvestorTradeRankRes? {
+    fun investorTradeRankList(
+        req: InvestorTradeRankListReq
+    ): InvestorTradeRankListRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/frgnistt")
                 .header("Authorization", "Bearer $accessToken")
-                .header("api-key", "ka10131")
+                .header("api-id", "ka10131")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(InvestorTradeRankRes::class.java)
+                .bodyToMono(InvestorTradeRankListRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw InvestorTradeRankException()
+                throw InvestorTradeRankListException()
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: InvestorTradeRankListException) {
+            throw e
         }catch (e: Exception) {
-            log.error { "investorTradeRank Error" }
+            log.error { "investorTradeRankList Error" }
 
             throw RuntimeException(e.message)
         }

@@ -1,7 +1,7 @@
 package com.example.investfeed.kiwoom.sect.service
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFound
+import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.SectCodeListException
 import com.example.investfeed.kiwoom.exception.SectIndexListException
@@ -40,7 +40,7 @@ class SectService(
         req: SectInvestorReq
     ): SectInvestorRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -58,6 +58,10 @@ class SectService(
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectInvestorException) {
+            throw e
         }catch (e: Exception) {
             log.error { "sectInvestor Error" }
 
@@ -70,7 +74,7 @@ class SectService(
         req: SectPriceNowReq
     ): SectPriceNowRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -90,6 +94,10 @@ class SectService(
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectPriceNowException) {
+            throw e
         }catch (e: Exception) {
             log.error { "sectNowPrice Error" }
 
@@ -102,7 +110,7 @@ class SectService(
         req: SectPriceReq
     ): SectPriceRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -120,6 +128,10 @@ class SectService(
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectPriceException) {
+            throw e
         }catch (e: Exception) {
             log.error { "sectPrice Error" }
 
@@ -132,7 +144,7 @@ class SectService(
         req: SectCodeListReq
     ): SectCodeListRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -150,6 +162,10 @@ class SectService(
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectCodeListException) {
+            throw e
         }catch (e: Exception) {
             log.error { "sectCodeList Error" }
 
@@ -162,7 +178,7 @@ class SectService(
         req: SectIndexListReq
     ): SectIndexListRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFound()
+        accessToken ?: throw AccessTokenNotFoundException()
 
         try {
             val res = webClient.post()
@@ -180,6 +196,10 @@ class SectService(
             }
 
             return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectIndexListException) {
+            throw e
         }catch (e: Exception) {
             log.error { "sectIndexList Error" }
 
