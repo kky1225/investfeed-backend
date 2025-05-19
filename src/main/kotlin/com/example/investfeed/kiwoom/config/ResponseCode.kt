@@ -20,5 +20,15 @@ enum class ResponseCode(
     INVESTOR_TRADE_RANK_LIST(message = "기관/외국인 매수 상위 순위 조회에 성공하셨습니다."),
 
     RANK_TRADE_VOLUME_LIST(message = "거래량 급증 순위 조회에 성공하셨습니다."),
-    RANK_TRADE_DAILY_VOLUME_LIST(message = "당일 거래량 상위 순위 조회에 성공하셨습니다.")
+    RANK_TRADE_DAILY_VOLUME_LIST(message = "당일 거래량 상위 순위 조회에 성공하셨습니다."),
+
+    THEME_GROUP_LIST(message = "테마 그룹별 조회에 성공하셨습니다."),
+    THEME_GROUP_STOCK_LIST(message = "테마 구성 종목 조회에 성공하셨습니다."),
+
+    CHART_TICK_LIST(message = "주식 틱 차트 조회에 성공하셨습니다."),
+    CHART_MINUTE_LIST(message = "주식 분봉 차트 조회에 성공하셨습니다."),
+    CHART_DAY_LIST(message = "주식 일봉 차트 조회에 성공하셨습니다."),
+    CHART_WEEK_LIST(message = "주식 주봉 차트 조회에 성공하셨습니다."),
+    CHART_MONTH_LIST(message = "주식 월봉 차트 조회에 성공하셨습니다."),
+    CHART_YEAR_LIST(message = "주식 년봉 차트 조회에 성공하셨습니다."),
 }
