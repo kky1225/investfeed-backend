@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.stock.dto.req
 
-data class StockInfoJumpListReq (
+data class StockJumpListReq (
     var mrkt_tp: String? = null, // 시장구분 000:전체, 001:코스피, 101:코스닥, 201:코스피200
     var flu_tp: String? = null, // 등락구분 1:급등, 2:급락
     var tm_tp: String? = null, // 시간구분 1:분전, 2:일전
