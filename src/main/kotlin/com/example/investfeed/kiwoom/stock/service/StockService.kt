@@ -6,17 +6,20 @@ import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.StockInfoException
 import com.example.investfeed.kiwoom.exception.StockInfoListException
 import com.example.investfeed.kiwoom.exception.StockJumpListException
+import com.example.investfeed.kiwoom.exception.StockNewPriceListException
 import com.example.investfeed.kiwoom.exception.StockSinglePriceListException
 import com.example.investfeed.kiwoom.exception.StockTradeDailyListException
 import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
 import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -200,6 +203,40 @@ class StockService(
             throw e
         }catch (e: Exception) {
             log.error { "stockSinglePriceList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockNewPriceList(
+        req: StockNewPriceListReq
+    ): StockNewPriceListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10016")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(StockNewPriceListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockNewPriceListException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockNewPriceListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockNewPriceList Error" }
 
             throw RuntimeException(e.message)
         }
