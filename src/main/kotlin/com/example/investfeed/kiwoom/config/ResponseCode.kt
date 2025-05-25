@@ -15,6 +15,7 @@ enum class ResponseCode(
     STOCK_TRADE_DAILY_LIST(message = "일별 거래 상세 조회에 성공하셨습니다."),
     STOCK_JUMP_LIST(message = "가격 급등락 조회에 성공하셨습니다."),
     STOCK_SINGLE_PRICE_LIST(message = "시간외단일가 조회에 성공하셨습니다."),
+    STOCK_NEW_PRICE_LIST(message = "신고저가 조회에 성공하셨습니다."),
 
     INVESTOR_TRADE_DAILY(message = "투자자별 일별 매매 조회에 성공하셨습니다."),
     INVESTOR_TRADE_ORGANIZE(message = "종목별 투자자 기관별 합계 요청 조회에 성공하셨습니다."),

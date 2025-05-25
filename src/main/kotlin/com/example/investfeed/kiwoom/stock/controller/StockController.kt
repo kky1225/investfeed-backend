@@ -6,11 +6,13 @@ import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
 import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
 import com.example.investfeed.kiwoom.stock.service.StockService
 import mu.KotlinLogging
@@ -98,6 +100,21 @@ class StockController(
                 code = ResponseCode.STOCK_SINGLE_PRICE_LIST.code,
                 message = ResponseCode.STOCK_SINGLE_PRICE_LIST.message,
                 result = stockService.stockSinglePriceList(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("newPriceList")
+    fun stockNewPriceList(
+        req: StockNewPriceListReq
+    ): ResponseEntity<ApiResponse<StockNewPriceListRes?>> {
+        log.info { "stockNewPriceList $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.STOCK_NEW_PRICE_LIST.code,
+                message = ResponseCode.STOCK_NEW_PRICE_LIST.message,
+                result = stockService.stockNewPriceList(req = req)
             ), HttpStatus.OK
         )
     }
