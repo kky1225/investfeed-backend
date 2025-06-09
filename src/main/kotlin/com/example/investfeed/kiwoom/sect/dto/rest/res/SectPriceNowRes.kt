@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.res
+package com.example.investfeed.kiwoom.sect.dto.rest.res
 
 import com.fasterxml.jackson.annotation.JsonProperty
 

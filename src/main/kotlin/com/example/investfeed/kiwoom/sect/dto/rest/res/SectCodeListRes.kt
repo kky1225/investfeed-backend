@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.res
+package com.example.investfeed.kiwoom.sect.dto.rest.res
 
 data class SectCodeListRes(
     var return_code: Int, // 응답 코드

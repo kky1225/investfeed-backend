@@ -59,11 +59,11 @@ class AuthService(
                 .bodyToMono(AccessTokenRes::class.java)
                 .block()
 
-            if(accessTokenRes?.token?.isEmpty() == true) {
+            if(accessTokenRes?.return_code != 0) {
                 throw RuntimeException("access token 오류")
             }
 
-            accessTokenRes?.token?.let { redisTemplate.opsForValue().set("kiwoom:access_token", it, Duration.ofMinutes(30)) }
+            accessTokenRes.token?.let { redisTemplate.opsForValue().set("kiwoom:access_token", it, Duration.ofMinutes(30)) }
         }catch (e: Exception) {
             log.error { "refreshToken Error" }
 

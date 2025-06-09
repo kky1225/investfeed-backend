@@ -1,7 +1,12 @@
 spring:
   application:
     name: InvestFeed
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 kiwoom:
   app-key: ENoqH8oL9GF9Xt651kcNTfDpLXtTYwuGxjbvnOkCFWc
   secret-key: P3NIlTVvvicHXGcDumxMRCHO4skMCQjAjLMX8khoMJg
+  default-url: https://api.kiwoom.com

@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.res
+package com.example.investfeed.kiwoom.sect.dto.rest.res
 
 data class SectPriceNowTime (
     var tm_n: String? = null, // 시간 n

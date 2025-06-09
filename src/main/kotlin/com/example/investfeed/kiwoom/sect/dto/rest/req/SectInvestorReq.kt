@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.req
+package com.example.investfeed.kiwoom.sect.dto.rest.req
 
 data class SectInvestorReq (
     var mrkt_tp: String, // 시장 구분

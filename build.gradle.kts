@@ -33,6 +33,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     //AOP
     implementation("org.springframework.boot:spring-boot-starter-aop")
+
+    //socket
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
+
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("com.google.code.gson:gson:2.11.0")
 }
 
 kotlin {

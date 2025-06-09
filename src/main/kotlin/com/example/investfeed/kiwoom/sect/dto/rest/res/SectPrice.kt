@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.res
+package com.example.investfeed.kiwoom.sect.dto.rest.res
 
 data class SectPrice(
     var stk_cd: String, // 종목코드

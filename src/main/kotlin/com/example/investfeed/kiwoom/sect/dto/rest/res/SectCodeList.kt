@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.sect.dto.res
+package com.example.investfeed.kiwoom.sect.dto.rest.res
 
 data class SectCodeList(
     var marketCode: String? = null, // 시장구분코드

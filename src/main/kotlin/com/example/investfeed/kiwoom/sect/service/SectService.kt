@@ -8,27 +8,30 @@ import com.example.investfeed.kiwoom.exception.SectIndexListException
 import com.example.investfeed.kiwoom.exception.SectInvestorException
 import com.example.investfeed.kiwoom.exception.SectPriceException
 import com.example.investfeed.kiwoom.exception.SectPriceNowException
-import com.example.investfeed.kiwoom.sect.dto.req.SectCodeListReq
-import com.example.investfeed.kiwoom.sect.dto.req.SectIndexListReq
-import com.example.investfeed.kiwoom.sect.dto.req.SectInvestorReq
-import com.example.investfeed.kiwoom.sect.dto.req.SectPriceNowReq
-import com.example.investfeed.kiwoom.sect.dto.req.SectPriceReq
-import com.example.investfeed.kiwoom.sect.dto.res.SectCodeListRes
-import com.example.investfeed.kiwoom.sect.dto.res.SectIndexListRes
-import com.example.investfeed.kiwoom.sect.dto.res.SectInvestorRes
-import com.example.investfeed.kiwoom.sect.dto.res.SectPriceNowRes
-import com.example.investfeed.kiwoom.sect.dto.res.SectPriceRes
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectCodeListReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexListReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceReq
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectCodeListRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexListRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import java.time.LocalTime
 
 @Service
 class SectService(
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>,
+    private val SectSocketService: SectSocketService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -180,6 +183,18 @@ class SectService(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
+        if(isMarketOpen()) {
+            SectSocketService.sectIndexListStream(
+                accessToken = accessToken,
+                req = SectIndexListStreamReq(
+                    trnm = req.trnm,
+                    grp_no = req.grp_no,
+                    refresh = req.refresh,
+                    data = req.data
+                )
+            )
+        }
+
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/sect")
@@ -205,5 +220,11 @@ class SectService(
 
             throw RuntimeException(e.message)
         }
+    }
+
+    fun isMarketOpen(): Boolean {
+        val now = LocalTime.now()
+
+        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }
