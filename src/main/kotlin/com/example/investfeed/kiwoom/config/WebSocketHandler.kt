@@ -33,10 +33,10 @@ class WebSocketHandler: TextWebSocketHandler() {
         sessions.remove(session)
     }
 
-    fun broadcastToAllClients(payload: String) {
-        sessions.forEach {
-            if (it.isOpen) {
-                it.sendMessage(TextMessage(payload))
+    fun broadcast(message: String) {
+        for (session in sessions) {
+            if (session.isOpen) {
+                session.sendMessage(TextMessage(message))
             }
         }
     }

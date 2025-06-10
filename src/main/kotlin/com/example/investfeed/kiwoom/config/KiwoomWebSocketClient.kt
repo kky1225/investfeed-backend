@@ -45,6 +45,10 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
             val rootNode = jacksonObjectMapper().readTree(message)
             val trnm = rootNode.get("trnm")?.asText() ?: return
 
+            if(trnm.equals("PING")) {
+                send(message)
+            }
+
             if(rootNode.has("return_code")) {
                 if(rootNode.get("return_code")?.asInt() != 0) {
                     val return_msg = rootNode.get("return_msg")?.asText() ?: "Socket error"
