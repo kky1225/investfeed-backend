@@ -28,7 +28,7 @@ class SectSocketService(
             trnm = "REAL",
             handler = {
                 log.info { "실시간 데이터 :  $it" }
-                //webSocketHandler.broadcast(it)
+                webSocketHandler.broadcast(it)
             }
         )
 
