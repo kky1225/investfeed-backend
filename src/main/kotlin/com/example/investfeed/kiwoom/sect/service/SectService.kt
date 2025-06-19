@@ -4,19 +4,23 @@ import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.SectCodeListException
+import com.example.investfeed.kiwoom.exception.SectIndexDailyListException
 import com.example.investfeed.kiwoom.exception.SectIndexListException
 import com.example.investfeed.kiwoom.exception.SectInvestorException
 import com.example.investfeed.kiwoom.exception.SectPriceException
 import com.example.investfeed.kiwoom.exception.SectPriceNowException
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectCodeListReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceReq
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectCodeListRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexDailyListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowTime
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import mu.KotlinLogging
@@ -79,15 +83,61 @@ class SectService(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
+//        var nextKey: String? = null
+//        var contYn: String? = null
+//
+//        var sectPriceNowRes: SectPriceNowRes? = null
+//        val totalIndsCurPrcTm = mutableListOf<SectPriceNowTime>()
+//
+//        do {
+//            val res = webClient.post()
+//                .uri("$DEFAULT_URL/api/dostk/sect")
+//                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+//                .header("api-id", "ka20001")
+//                .apply {
+//                    if(contYn == "Y") header("cont-yn", contYn)
+//                    if(!nextKey.isNullOrEmpty()) header("next-key", nextKey)
+//                }
+//                .bodyValue(req)
+//                .exchangeToMono { res ->
+//                    if (res.statusCode().isError) {
+//                        throw KiwoomApiException()
+//                    }
+//
+//                    val headers = res.headers().asHttpHeaders()
+//                    contYn = headers.getFirst("cont-yn")
+//                    nextKey = headers.getFirst("next-key")
+//
+//                    res.bodyToMono(SectPriceNowRes::class.java)
+//                }
+//                .block()
+//
+//            log.info { "sectNowPriceRes $res" }
+//
+//            if(res?.return_code != 0) {
+//                throw SectPriceNowException()
+//            }
+//
+//            res.inds_cur_prc_tm?.let { totalIndsCurPrcTm.addAll(it) }
+//
+//            sectPriceNowRes = res
+//        }while (!nextKey.isNullOrEmpty())
+//
+//        return sectPriceNowRes
+
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/sect")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20001")
                 .bodyValue(req)
-                .retrieve()
-                .onStatus( { it -> it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectPriceNowRes::class.java)
+                .exchangeToMono { res ->
+                    if (res.statusCode().isError) {
+                        throw KiwoomApiException()
+                    }
+
+                    res.bodyToMono(SectPriceNowRes::class.java)
+                }
                 .block()
 
             log.info { "sectNowPriceRes $res" }
@@ -183,17 +233,17 @@ class SectService(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
-        if(isMarketOpen()) {
-            SectSocketService.sectIndexListStream(
-                accessToken = accessToken,
-                req = SectIndexListStreamReq(
-                    trnm = req.trnm,
-                    grp_no = req.grp_no,
-                    refresh = req.refresh,
-                    data = req.data
-                )
-            )
-        }
+//        if(isMarketOpen()) {
+//            SectSocketService.sectIndexListStream(
+//                accessToken = accessToken,
+//                req = SectIndexListStreamReq(
+//                    trnm = req.trnm,
+//                    grp_no = req.grp_no,
+//                    refresh = req.refresh,
+//                    data = req.data
+//                )
+//            )
+//        }
 
         try {
             val res = webClient.post()
@@ -217,6 +267,40 @@ class SectService(
             throw e
         }catch (e: Exception) {
             log.error { "sectIndexList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun sectIndexDailyList(
+        req: SectIndexDailyListReq
+    ): SectIndexDailyListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/sect")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka20009")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(SectIndexDailyListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectIndexDailyListException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectIndexDailyListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "sectIndexDailyList Error" }
 
             throw RuntimeException(e.message)
         }

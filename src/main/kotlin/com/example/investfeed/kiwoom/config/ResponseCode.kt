@@ -4,12 +4,14 @@ enum class ResponseCode(
     val code: String = "0000",
     val message: String
 ) {
+    DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
+
     SECT_PRICE(message = "업종별 주가 조회에 성공하셨습니다."),
     SECT_INVESTOR(message = "업종별 투자자 순매수 조회에 성공하셨습니다."),
     SECT_PRICE_NOW(message = "업종 현재가 조회에 성공하셨습니다."),
     SECT_CODE_LIST(message = "업종 코드 리스트 조회에 성공하셨습니다."),
     SECT_INDEX_LIST(message = "전업종 지수 조회에 성공하셨습니다."),
-    SECT_PRICE_LIST_STREAM(message = "실시간 업종 지수 조회에 성공하셨습니다."),
+    SECT_INDEX_DAILY_LIST(message = "업종 현재가 일별 조회에 성공하셨습니다."),
 
     STOCK_INFO_LIST(message = "정목 정보 리스트 조회에 성공하셨습니다."),
     STOCK_INFO(message = "주식 기본 정보 조회에 성공하셨습니다."),
@@ -35,9 +37,11 @@ enum class ResponseCode(
     CHART_MONTH_LIST(message = "주식 월봉 차트 조회에 성공하셨습니다."),
     CHART_YEAR_LIST(message = "주식 년봉 차트 조회에 성공하셨습니다."),
 
+    SECT_CHART_MINUTE_LIST(message = "업종 분봉 차트 조회에 성공하셨습니다."),
+
     ETF_PRICE_LIST(message = "ETF 전체 시세 조회에 성공하셨습니다."),
     ETF_INFO(message = "ETF 정목 정보 조회에 성공하셨습니다."),
     ETF_TRADE_DAILY_LIST(message = "ETF 일자별 체결 조회에 성공하셨습니다."),
 
-    SEARCH_LIST(message = "조건검색 목록 조회에 성공하셨습니다.")
+    INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다.")
 }

@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.chart.dto.res
+package com.example.investfeed.kiwoom.chart.dto.stock.res
 
 data class ChartDayList(
     var cur_prc: String? = null, // 현재가

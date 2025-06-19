@@ -3,18 +3,18 @@ package com.example.investfeed.kiwoom.sect.controller
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectCodeListReq
+import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceReq
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectCodeListRes
+import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexDailyListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import com.example.investfeed.kiwoom.sect.service.SectService
-import com.example.investfeed.kiwoom.sect.service.SectSocketService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,8 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("api/sect")
 class SectController(
-    private val sectService: SectService,
-    private val SectSocketService: SectSocketService
+    private val sectService: SectService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -103,6 +102,21 @@ class SectController(
                 code = ResponseCode.SECT_INDEX_LIST.code,
                 message = ResponseCode.SECT_INDEX_LIST.message,
                 result = sectService.sectIndexList(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("indexDailyList")
+    fun sectIndexDailyList(
+        req: SectIndexDailyListReq
+    ): ResponseEntity<ApiResponse<SectIndexDailyListRes?>> {
+        log.info { "sectIndexDailyList $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.SECT_INDEX_DAILY_LIST.code,
+                message = ResponseCode.SECT_INDEX_DAILY_LIST.message,
+                result = sectService.sectIndexDailyList(req = req)
             ), HttpStatus.OK
         )
     }

@@ -5,3 +5,4 @@ class SectPriceNowException(): InvestFeedException(code = "SECT_0002", message =
 class SectPriceException(): InvestFeedException(code = "SECT_0003", message = "업종별 주가 조회에 실패하셨습니다.")
 class SectCodeListException(): InvestFeedException(code = "SECT_0004", message = "업종 코드 리스트 조회에 실패하였습니다.")
 class SectIndexListException(): InvestFeedException(code = "SECT_0005", message = "전업종 지수 조회에 실패하였습니다.")
+class SectIndexDailyListException(): InvestFeedException(code = "SECT_0005", message = "전업종 지수 일별 조회에 실패하였습니다.")

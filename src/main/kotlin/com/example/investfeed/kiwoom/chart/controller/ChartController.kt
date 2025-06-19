@@ -1,17 +1,19 @@
 package com.example.investfeed.kiwoom.chart.controller
 
-import com.example.investfeed.kiwoom.chart.dto.req.ChartDayListReq
-import com.example.investfeed.kiwoom.chart.dto.req.ChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.req.ChartMonthListReq
-import com.example.investfeed.kiwoom.chart.dto.req.ChartTickListReq
-import com.example.investfeed.kiwoom.chart.dto.req.ChartWeekListReq
-import com.example.investfeed.kiwoom.chart.dto.req.ChartYearListReq
-import com.example.investfeed.kiwoom.chart.dto.res.ChartDayListRes
-import com.example.investfeed.kiwoom.chart.dto.res.ChartMinuteListRes
-import com.example.investfeed.kiwoom.chart.dto.res.ChartMonthListRes
-import com.example.investfeed.kiwoom.chart.dto.res.ChartTickListRes
-import com.example.investfeed.kiwoom.chart.dto.res.ChartWeekListRes
-import com.example.investfeed.kiwoom.chart.dto.res.ChartYearListRes
+import com.example.investfeed.kiwoom.chart.dto.index.req.SectChartMinuteListReq
+import com.example.investfeed.kiwoom.chart.dto.index.res.SectChartMinuteListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartDayListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMinuteListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMonthListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartTickListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartWeekListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartYearListReq
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartDayListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartMinuteListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartMonthListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartTickListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartWeekListRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartYearListRes
 import com.example.investfeed.kiwoom.chart.service.ChartService
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
@@ -115,6 +117,21 @@ class ChartController(
                 code = ResponseCode.CHART_YEAR_LIST.code,
                 message = ResponseCode.CHART_YEAR_LIST.message,
                 result = chartService.chartYearList(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("sectChartMinuteList")
+    fun sectChartMinuteList(
+        req: SectChartMinuteListReq
+    ): ResponseEntity<ApiResponse<SectChartMinuteListRes?>> {
+        log.info { "sectChartMinuteList $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.SECT_CHART_MINUTE_LIST.code,
+                message = ResponseCode.SECT_CHART_MINUTE_LIST.message,
+                result = chartService.sectChartMinuteList(req = req)
             ), HttpStatus.OK
         )
     }

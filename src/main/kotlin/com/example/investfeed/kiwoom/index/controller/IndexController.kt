@@ -1,0 +1,33 @@
+package com.example.investfeed.kiwoom.index.controller
+
+import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
+import com.example.investfeed.kiwoom.index.service.IndexService
+import mu.KotlinLogging
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+@RequestMapping("/api/index")
+class IndexController(
+    private val indexService: IndexService
+) {
+    private val log = KotlinLogging.logger {}
+
+    @GetMapping("list")
+    fun indexList(): ResponseEntity<ApiResponse<IndexListRes?>> {
+        log.info { "indexList" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INDEX_LIST.code,
+                message = ResponseCode.INDEX_LIST.message,
+                result = indexService.indexList()
+            ), HttpStatus.OK
+        )
+    }
+}
