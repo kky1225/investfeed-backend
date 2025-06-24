@@ -8,3 +8,4 @@ class ChartMonthListException(): InvestFeedException(code = "CHART_0005", messag
 class ChartYearListException(): InvestFeedException(code = "CHART_0006", message = "주식 년봉 차트 조회에 실패하셨습니다.")
 
 class SectChartMinuteListException(): InvestFeedException(code = "INDEX_CHART_0001", message = "업종 분봉 차트 조회에 실패하셨습니다.")
+class SectChartDayListException(): InvestFeedException(code = "INDEX_CHART_0001", message = "업종 일봉 차트 조회에 실패하셨습니다.")

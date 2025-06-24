@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.chart.dto.index.res
+package com.example.investfeed.kiwoom.chart.dto.sect.res
 
 data class SectChartMinuteListRes(
     var return_code: Int, // 응답 코드

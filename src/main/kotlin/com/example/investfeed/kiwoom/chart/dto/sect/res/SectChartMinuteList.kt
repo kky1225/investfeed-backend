@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.chart.dto.index.res
+package com.example.investfeed.kiwoom.chart.dto.sect.res
 
 data class SectChartMinuteList(
     var cur_prc: String? = null, // 현재가

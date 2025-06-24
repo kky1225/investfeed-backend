@@ -1,7 +1,5 @@
 package com.example.investfeed.kiwoom.chart.controller
 
-import com.example.investfeed.kiwoom.chart.dto.index.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.index.res.SectChartMinuteListRes
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMonthListReq
@@ -14,7 +12,7 @@ import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartMonthListRes
 import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartTickListRes
 import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartWeekListRes
 import com.example.investfeed.kiwoom.chart.dto.stock.res.ChartYearListRes
-import com.example.investfeed.kiwoom.chart.service.ChartService
+import com.example.investfeed.kiwoom.chart.service.StockChartService
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
@@ -25,9 +23,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("api/chart")
-class ChartController(
-    private val chartService: ChartService
+@RequestMapping("api/stock/chart")
+class StockChartController(
+    private val stockChartService: StockChartService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -41,7 +39,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_TICK_LIST.code,
                 message = ResponseCode.CHART_TICK_LIST.message,
-                result = chartService.chartTickList(req = req)
+                result = stockChartService.chartTickList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -56,7 +54,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_MINUTE_LIST.code,
                 message = ResponseCode.CHART_MINUTE_LIST.message,
-                result = chartService.chartMinuteList(req = req)
+                result = stockChartService.chartMinuteList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -71,7 +69,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_DAY_LIST.code,
                 message = ResponseCode.CHART_DAY_LIST.message,
-                result = chartService.chartDayList(req = req)
+                result = stockChartService.chartDayList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -86,7 +84,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_WEEK_LIST.code,
                 message = ResponseCode.CHART_WEEK_LIST.message,
-                result = chartService.chartWeekList(req = req)
+                result = stockChartService.chartWeekList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -101,7 +99,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_MONTH_LIST.code,
                 message = ResponseCode.CHART_MONTH_LIST.message,
-                result = chartService.chartMonthList(req = req)
+                result = stockChartService.chartMonthList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -116,22 +114,7 @@ class ChartController(
             ApiResponse(
                 code = ResponseCode.CHART_YEAR_LIST.code,
                 message = ResponseCode.CHART_YEAR_LIST.message,
-                result = chartService.chartYearList(req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("sectChartMinuteList")
-    fun sectChartMinuteList(
-        req: SectChartMinuteListReq
-    ): ResponseEntity<ApiResponse<SectChartMinuteListRes?>> {
-        log.info { "sectChartMinuteList $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.SECT_CHART_MINUTE_LIST.code,
-                message = ResponseCode.SECT_CHART_MINUTE_LIST.message,
-                result = chartService.sectChartMinuteList(req = req)
+                result = stockChartService.chartYearList(req = req)
             ), HttpStatus.OK
         )
     }

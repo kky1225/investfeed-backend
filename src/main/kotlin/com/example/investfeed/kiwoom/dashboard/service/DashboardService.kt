@@ -1,7 +1,5 @@
 package com.example.investfeed.kiwoom.dashboard.service
 
-import com.example.investfeed.kiwoom.chart.dto.index.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.service.ChartService
 import com.example.investfeed.kiwoom.dashboard.dto.res.DashboardRes
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.investor.service.InvestorService
@@ -12,7 +10,6 @@ import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
 import com.example.investfeed.kiwoom.sect.service.SectService
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import kotlin.String
 
 @Service
 class DashboardService(

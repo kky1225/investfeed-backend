@@ -2,6 +2,8 @@ package com.example.investfeed.kiwoom.index.controller
 
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
+import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes
 import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.index.service.IndexService
 import mu.KotlinLogging
@@ -27,6 +29,21 @@ class IndexController(
                 code = ResponseCode.INDEX_LIST.code,
                 message = ResponseCode.INDEX_LIST.message,
                 result = indexService.indexList()
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("detail")
+    fun indexDetail(
+        req: IndexDetailReq
+    ): ResponseEntity<ApiResponse<IndexDetailRes<*>?>> {
+        log.info { "indexDetail" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INDEX_DETAIL.code,
+                message = ResponseCode.INDEX_DETAIL.message,
+                result = indexService.indexDetail(req = req)
             ), HttpStatus.OK
         )
     }

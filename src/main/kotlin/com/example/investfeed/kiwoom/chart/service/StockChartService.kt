@@ -1,8 +1,6 @@
 package com.example.investfeed.kiwoom.chart.service
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.chart.dto.index.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.index.res.SectChartMinuteListRes
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.stock.req.ChartMonthListReq
@@ -22,7 +20,6 @@ import com.example.investfeed.kiwoom.exception.ChartMonthListException
 import com.example.investfeed.kiwoom.exception.ChartTickListException
 import com.example.investfeed.kiwoom.exception.ChartWeekListException
 import com.example.investfeed.kiwoom.exception.ChartYearListException
-import com.example.investfeed.kiwoom.exception.SectChartMinuteListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -32,7 +29,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
 @Service
-class ChartService(
+class StockChartService(
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
@@ -240,44 +237,6 @@ class ChartService(
             throw e
         }catch (e: Exception) {
             log.error { "chartYearList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
-    fun sectChartMinuteList(
-        req: SectChartMinuteListReq
-    ): SectChartMinuteListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/chart")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka20005")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartMinuteListRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw SectChartMinuteListException()
-            }
-
-            val today = res.inds_min_pole_qry?.get(0)?.cntr_tm?.substring(0, 8)
-
-            res.inds_min_pole_qry = res.inds_min_pole_qry?.filter { it.cntr_tm?.startsWith(today ?: "") == true }
-
-            return res
-        }catch(e: KiwoomApiException) {
-            throw e
-        }catch(e: SectChartMinuteListException) {
-            throw e
-        }catch (e: Exception) {
-            log.error { "sectChartMinuteList Error" }
 
             throw RuntimeException(e.message)
         }
