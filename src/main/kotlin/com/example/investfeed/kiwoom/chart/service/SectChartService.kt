@@ -3,12 +3,21 @@ package com.example.investfeed.kiwoom.chart.service
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
+import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMonthListReq
+import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartWeekListReq
+import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartYearListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartDayListRes
 import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMinuteListRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMonthListRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartWeekListRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartYearListRes
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.SectChartDayListException
 import com.example.investfeed.kiwoom.exception.SectChartMinuteListException
+import com.example.investfeed.kiwoom.exception.SectChartMonthListException
+import com.example.investfeed.kiwoom.exception.SectChartWeekListException
+import com.example.investfeed.kiwoom.exception.SectChartYearListException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -93,6 +102,108 @@ class SectChartService(
             throw e
         }catch (e: Exception) {
             log.error { "sectChartDayList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun sectChartWeekList(
+        req: SectChartWeekListReq
+    ): SectChartWeekListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/chart")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka20007")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(SectChartWeekListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectChartWeekListException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException) {
+            throw e
+        }catch(e: SectChartWeekListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "sectChartWeekList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun sectChartMonthList(
+        req: SectChartMonthListReq
+    ): SectChartMonthListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/chart")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka20008")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(SectChartMonthListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectChartMonthListException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException) {
+            throw e
+        }catch(e: SectChartMonthListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "sectChartMonthList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun sectChartYearList(
+        req: SectChartYearListReq
+    ): SectChartYearListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/chart")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka20019")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(SectChartYearListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectChartYearListException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException) {
+            throw e
+        }catch(e: SectChartYearListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "sectChartYearList Error" }
 
             throw RuntimeException(e.message)
         }
