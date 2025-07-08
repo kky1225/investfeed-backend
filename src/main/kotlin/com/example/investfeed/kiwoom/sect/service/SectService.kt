@@ -22,6 +22,7 @@ import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowTime
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -164,6 +165,23 @@ class SectService(
     ): SectPriceRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
+
+//        if(isMarketOpen()) {
+//            SectSocketService.sectIndexListStream(
+//                accessToken = accessToken,
+//                req = SectIndexListStreamReq(
+//                    trnm = "REG",
+//                    grp_no = "0001",
+//                    refresh = "0",
+//                    data = listOf(
+//                        SectIndexListStream(
+//                            item = listOf("001", "101", "201"),
+//                            type = listOf("0J")
+//                        )
+//                    )
+//                )
+//            )
+//        }
 
         try {
             val res = webClient.post()

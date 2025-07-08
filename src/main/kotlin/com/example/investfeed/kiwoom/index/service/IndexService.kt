@@ -13,15 +13,36 @@ import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import com.example.investfeed.kiwoom.sect.service.SectService
+import com.example.investfeed.kiwoom.sect.service.SectSocketService
 import org.springframework.stereotype.Service
+import java.time.LocalTime
 
 @Service
 class IndexService(
     private val sectService: SectService,
     private val sectChartService: SectChartService,
+    private val SectSocketService: SectSocketService
 ) {
     fun indexList(): IndexListRes? {
+        if(isMarketOpen()) {
+            SectSocketService.sectIndexListStream(
+                req = SectIndexListStreamReq(
+                    trnm = "REG",
+                    grp_no = "0001",
+                    refresh = "0",
+                    data = listOf(
+                        SectIndexListStream(
+                            item = listOf("001", "101", "201"),
+                            type = listOf("0J")
+                        )
+                    )
+                )
+            )
+        }
+
         return IndexListRes(
             kospiPriceRes = sectService.sectPriceNow(
                 req = SectPriceNowReq(
@@ -143,5 +164,11 @@ class IndexService(
                 )
             ),
         )
+    }
+
+    fun isMarketOpen(): Boolean {
+        val now = LocalTime.now()
+
+        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }
