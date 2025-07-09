@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
+import java.time.LocalTime
 
 @Service
 class SectSocketService(
@@ -27,24 +28,31 @@ class SectSocketService(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
-        val kiwoomWebSocketClient = KiwoomWebSocketClient()
-        kiwoomWebSocketClient.setAccessToken(accessToken)
-        kiwoomWebSocketClient.connectBlocking()
+        if(isMarketOpen()) {
+            val kiwoomWebSocketClient = KiwoomWebSocketClient()
+            kiwoomWebSocketClient.setAccessToken(accessToken)
+            kiwoomWebSocketClient.connectBlocking()
 
-        kiwoomWebSocketClient.sendRealTimeHandler(
-            trnm = "REAL",
-            handler = {
-                log.info { "실시간 데이터 :  $it" }
-                webSocketHandler.broadcast(it)
-            }
-        )
+            kiwoomWebSocketClient.sendRealTimeHandler(
+                trnm = "REAL",
+                handler = {
+                    webSocketHandler.broadcast(it)
+                }
+            )
 
-        kiwoomWebSocketClient.sendRequest(
-            request = objectMapper.writeValueAsString(req),
-            trnm = req.trnm,
-            handler = {
-                log.info { "1111 :  $it" }
-            }
-        )
+            kiwoomWebSocketClient.sendRequest(
+                request = objectMapper.writeValueAsString(req),
+                trnm = req.trnm,
+                handler = {
+
+                }
+            )
+        }
+    }
+
+    private fun isMarketOpen(): Boolean {
+        val now = LocalTime.now()
+
+        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }

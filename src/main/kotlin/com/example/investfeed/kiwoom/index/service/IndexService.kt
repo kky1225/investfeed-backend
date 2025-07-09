@@ -27,22 +27,6 @@ class IndexService(
     private val SectSocketService: SectSocketService
 ) {
     fun indexList(): IndexListRes? {
-        if(isMarketOpen()) {
-            SectSocketService.sectIndexListStream(
-                req = SectIndexListStreamReq(
-                    trnm = "REG",
-                    grp_no = "0001",
-                    refresh = "0",
-                    data = listOf(
-                        SectIndexListStream(
-                            item = listOf("001", "101", "201"),
-                            type = listOf("0J")
-                        )
-                    )
-                )
-            )
-        }
-
         return IndexListRes(
             kospiPriceRes = sectService.sectPriceNow(
                 req = SectPriceNowReq(
@@ -164,11 +148,5 @@ class IndexService(
                 )
             ),
         )
-    }
-
-    fun isMarketOpen(): Boolean {
-        val now = LocalTime.now()
-
-        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }

@@ -44,5 +44,6 @@ enum class ResponseCode(
     ETF_TRADE_DAILY_LIST(message = "ETF 일자별 체결 조회에 성공하셨습니다."),
 
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
+    INDEX_WS_LIST(message = "지수 목록 소켓 조회에 성공하셨습니다."),
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다.")
 }

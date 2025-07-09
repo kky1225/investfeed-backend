@@ -6,6 +6,9 @@ import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
 import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes
 import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.index.service.IndexService
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
+import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
+import com.example.investfeed.kiwoom.sect.service.SectSocketService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -16,7 +19,8 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/index")
 class IndexController(
-    private val indexService: IndexService
+    private val indexService: IndexService,
+    private val SectSocketService: SectSocketService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -29,6 +33,33 @@ class IndexController(
                 code = ResponseCode.INDEX_LIST.code,
                 message = ResponseCode.INDEX_LIST.message,
                 result = indexService.indexList()
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/list/stream")
+    fun indexListStream(): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "indexListStream" }
+
+        SectSocketService.sectIndexListStream(
+            req = SectIndexListStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    SectIndexListStream(
+                        item = listOf("001", "101", "201"),
+                        type = listOf("0J")
+                    )
+                )
+            )
+        )
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INDEX_WS_LIST.code,
+                message = ResponseCode.INDEX_WS_LIST.message,
+                result = null
             ), HttpStatus.OK
         )
     }
