@@ -24,7 +24,6 @@ import java.time.LocalTime
 class IndexService(
     private val sectService: SectService,
     private val sectChartService: SectChartService,
-    private val SectSocketService: SectSocketService
 ) {
     fun indexList(): IndexListRes? {
         return IndexListRes(
