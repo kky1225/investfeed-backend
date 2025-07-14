@@ -45,6 +45,17 @@ class AuthService(
     private fun refreshToken() {
         log.info { "refreshToken" }
 
+        val isLocked = redisTemplate.opsForValue().setIfAbsent(
+            "lock:kiwoom:access_token",
+            "1",
+            Duration.ofSeconds(5)
+        )
+
+        if(isLocked == false) {
+            Thread.sleep(500)
+            accessToken()
+        }
+
         try {
             val accessTokenRes = webClient.post()
                 .uri("$DEFAULT_URL/oauth2/token")
