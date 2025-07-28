@@ -68,7 +68,7 @@ class IndexController(
     fun indexDetail(
         req: IndexDetailReq
     ): ResponseEntity<ApiResponse<IndexDetailRes<*>?>> {
-        log.info { "indexDetail" }
+        log.info { "indexDetail: $req" }
 
         return ResponseEntity(
             ApiResponse(

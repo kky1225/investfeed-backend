@@ -13,17 +13,13 @@ import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import com.example.investfeed.kiwoom.sect.service.SectService
-import com.example.investfeed.kiwoom.sect.service.SectSocketService
 import org.springframework.stereotype.Service
-import java.time.LocalTime
 
 @Service
 class IndexService(
     private val sectService: SectService,
-    private val sectChartService: SectChartService,
+    private val sectChartService: SectChartService
 ) {
     fun indexList(): IndexListRes? {
         return IndexListRes(
@@ -141,7 +137,7 @@ class IndexService(
             chartListRes = chartListRes,
             sectInvestor = sectService.sectInvestor(
                 req = SectInvestorReq(
-                    mrkt_tp = if(req.inds_cd === "101") "1" else "0",
+                    mrkt_tp = if(req.inds_cd == "101") "1" else "0",
                     amt_qty_tp = "0",
                     stex_tp = "0"
                 )
