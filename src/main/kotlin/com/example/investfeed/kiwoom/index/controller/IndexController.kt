@@ -3,6 +3,7 @@ package com.example.investfeed.kiwoom.index.controller
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
+import com.example.investfeed.kiwoom.index.dto.req.IndexDetailStreamReq
 import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes
 import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.index.service.IndexService
@@ -75,6 +76,35 @@ class IndexController(
                 code = ResponseCode.INDEX_DETAIL.code,
                 message = ResponseCode.INDEX_DETAIL.message,
                 result = indexService.indexDetail(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/detail/stream")
+    fun indexDetailStream(
+        req: IndexDetailStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "indexDetailStream: $req" }
+
+        SectSocketService.sectIndexListStream(
+            req = SectIndexListStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    SectIndexListStream(
+                        item = listOf(req.inds_cd),
+                        type = listOf("0J")
+                    )
+                )
+            )
+        )
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INDEX_WS_DETAIL.code,
+                message = ResponseCode.INDEX_WS_DETAIL.message,
+                result = null
             ), HttpStatus.OK
         )
     }
