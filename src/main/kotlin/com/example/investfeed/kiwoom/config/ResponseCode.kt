@@ -6,6 +6,8 @@ enum class ResponseCode(
 ) {
     DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
 
+    TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
+
     SECT_PRICE(message = "업종별 주가 조회에 성공하셨습니다."),
     SECT_INVESTOR(message = "업종별 투자자 순매수 조회에 성공하셨습니다."),
     SECT_PRICE_NOW(message = "업종 현재가 조회에 성공하셨습니다."),
