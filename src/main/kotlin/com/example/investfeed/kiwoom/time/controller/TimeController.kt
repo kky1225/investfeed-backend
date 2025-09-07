@@ -1,8 +1,10 @@
 package com.example.investfeed.kiwoom.time.controller
 
+import com.example.investfeed.kiwoom.config.MarketType
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.time.dto.TimeNowRes
+import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
+import com.example.investfeed.kiwoom.time.dto.res.TimeNowRes
 import com.example.investfeed.kiwoom.time.service.TimeService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
@@ -12,22 +14,26 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping(("/api/time"))
+@RequestMapping("api/time")
 class TimeController(
     private val timeService: TimeService
 ) {
     private val log = KotlinLogging.logger {}
 
 
-    @GetMapping("/now")
-    fun timeNow(): ResponseEntity<ApiResponse<TimeNowRes>> {
-        log.info { "timeNow" }
+    @GetMapping("now")
+    fun timeNow(
+        req: TimeNowReq
+    ): ResponseEntity<ApiResponse<TimeNowRes>> {
+        log.info { "timeNow: $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.TIME_NOW.code,
                 message = ResponseCode.TIME_NOW.message,
-                result = timeService.timeNow()
+                result = timeService.timeNow(
+                    req = req
+                )
             ), HttpStatus.OK
         )
     }

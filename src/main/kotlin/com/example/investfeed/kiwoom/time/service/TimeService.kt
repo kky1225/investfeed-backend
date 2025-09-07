@@ -1,7 +1,9 @@
 package com.example.investfeed.kiwoom.time.service
 
+import com.example.investfeed.kiwoom.config.ExchangeType
 import com.example.investfeed.kiwoom.config.MarketType
-import com.example.investfeed.kiwoom.time.dto.TimeNowRes
+import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
+import com.example.investfeed.kiwoom.time.dto.res.TimeNowRes
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDateTime
@@ -10,39 +12,75 @@ import java.time.ZoneId
 
 @Service
 class TimeService() {
-    fun timeNow(): TimeNowRes {
+    fun timeNow(
+        req: TimeNowReq
+    ): TimeNowRes {
         val now = System.currentTimeMillis()
         var nowEpoch = Instant.ofEpochMilli(now).atZone(ZoneId.of("Asia/Seoul"))
-        val time = nowEpoch.toLocalTime()
-        var marketType: String? = null
+        val nowTime = nowEpoch.toLocalTime()
+        var exchangeType: String? = null
         var isMarketOpen = false
+        var startMarketTime: Long
+        var endMarketTime: Long
 
-        if (time.isAfter(LocalTime.of(9, 0)) && time.isBefore(LocalTime.of(15, 30))) {
-            marketType = MarketType.KRX.name
-            isMarketOpen = true
-        } else if (time.isAfter(LocalTime.of(8, 0)) && time.isBefore(LocalTime.of(20, 0))) {
-            marketType = MarketType.NXT.name
-            isMarketOpen = true
-        } else if(time.isAfter(LocalTime.of(20, 30))) {
-            nowEpoch = nowEpoch.plusDays(1)
+        val krxOpen  = LocalTime.of(9, 0)
+        val krxClose = LocalTime.of(15, 30)
+        val nxtOpen  = LocalTime.of(8, 0)
+        val nxtClose = LocalTime.of(20, 0)
+
+        if (req.marketType === MarketType.INDEX) {
+            if(!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
+                exchangeType = ExchangeType.KRX.name
+                isMarketOpen = true
+            }
+
+            if (nowTime.isAfter(LocalTime.of(15, 30))) {
+                nowEpoch = nowEpoch.plusDays(1)
+            }
+
+            startMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), krxOpen)
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .toInstant()
+                .toEpochMilli()
+
+            endMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), krxClose)
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .toInstant()
+                .toEpochMilli()
+        } else {
+            if (!nowTime.isBefore(nxtOpen) && nowTime.isBefore(krxOpen)) {
+                exchangeType = ExchangeType.NXT.name
+                isMarketOpen = true
+            } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
+                exchangeType = ExchangeType.SOR.name
+                isMarketOpen = true
+            } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(nxtClose)) {
+                exchangeType = ExchangeType.NXT.name
+                isMarketOpen = true
+            }
+
+            if (nowTime.isAfter(LocalTime.of(20, 0))) {
+                nowEpoch = nowEpoch.plusDays(1)
+            }
+
+            startMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), nxtOpen)
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .toInstant()
+                .toEpochMilli()
+
+            endMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), nxtClose)
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .toInstant()
+                .toEpochMilli()
         }
-
-        val startMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), LocalTime.of(9, 0))
-            .atZone(ZoneId.of("Asia/Seoul"))
-            .toInstant()
-            .toEpochMilli()
-
-        val endMarketTime = LocalDateTime.of(nowEpoch.toLocalDate(), LocalTime.of(20, 0))
-            .atZone(ZoneId.of("Asia/Seoul"))
-            .toInstant()
-            .toEpochMilli()
 
         return TimeNowRes(
             time = now,
-            marketType = marketType,
-            startMarketTime = startMarketTime,
-            endMarketTime = endMarketTime,
+            marketType = req.marketType.name,
             isMarketOpen = isMarketOpen,
+            exchangeType = exchangeType,
+            startMarketTime = startMarketTime,
+            endMarketTime = endMarketTime
         )
     }
 }
