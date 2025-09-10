@@ -5,6 +5,7 @@ enum class ResponseCode(
     val message: String
 ) {
     DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
+    DASHBOARD_WS(message = "대시보드 소켓 조회에 성공하셨습니다."),
 
     TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
 

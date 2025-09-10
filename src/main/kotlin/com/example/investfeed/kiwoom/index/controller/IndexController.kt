@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/index")
 class IndexController(
     private val indexService: IndexService,
-    private val SectSocketService: SectSocketService
+    private val sectSocketService: SectSocketService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -42,7 +42,7 @@ class IndexController(
     fun indexListStream(): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "indexListStream" }
 
-        SectSocketService.sectIndexListStream(
+        sectSocketService.sectIndexListStream(
             req = SectIndexListStreamReq(
                 trnm = "REG",
                 grp_no = "0001",
@@ -86,7 +86,7 @@ class IndexController(
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "indexDetailStream: $req" }
 
-        SectSocketService.sectIndexListStream(
+        sectSocketService.sectIndexListStream(
             req = SectIndexListStreamReq(
                 trnm = "REG",
                 grp_no = "0001",
