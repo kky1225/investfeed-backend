@@ -18,9 +18,9 @@ class DashboardService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun dashboard(
-        req: SectIndexListReq,
-    ): DashboardRes? {
+    fun dashboard(): DashboardRes? {
+        log.debug { "dashboard" }
+
         val kospiIndexDailyListRes = sectService.sectIndexDailyList(
             req = SectIndexDailyListReq(
                 mrkt_tp = "0",
