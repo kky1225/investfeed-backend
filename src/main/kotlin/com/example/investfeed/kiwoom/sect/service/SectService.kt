@@ -36,7 +36,6 @@ import java.time.LocalTime
 class SectService(
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>,
-    private val SectSocketService: SectSocketService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -84,48 +83,6 @@ class SectService(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
-//        var nextKey: String? = null
-//        var contYn: String? = null
-//
-//        var sectPriceNowRes: SectPriceNowRes? = null
-//        val totalIndsCurPrcTm = mutableListOf<SectPriceNowTime>()
-//
-//        do {
-//            val res = webClient.post()
-//                .uri("$DEFAULT_URL/api/dostk/sect")
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-//                .header("api-id", "ka20001")
-//                .apply {
-//                    if(contYn == "Y") header("cont-yn", contYn)
-//                    if(!nextKey.isNullOrEmpty()) header("next-key", nextKey)
-//                }
-//                .bodyValue(req)
-//                .exchangeToMono { res ->
-//                    if (res.statusCode().isError) {
-//                        throw KiwoomApiException()
-//                    }
-//
-//                    val headers = res.headers().asHttpHeaders()
-//                    contYn = headers.getFirst("cont-yn")
-//                    nextKey = headers.getFirst("next-key")
-//
-//                    res.bodyToMono(SectPriceNowRes::class.java)
-//                }
-//                .block()
-//
-//            log.info { "sectNowPriceRes $res" }
-//
-//            if(res?.return_code != 0) {
-//                throw SectPriceNowException()
-//            }
-//
-//            res.inds_cur_prc_tm?.let { totalIndsCurPrcTm.addAll(it) }
-//
-//            sectPriceNowRes = res
-//        }while (!nextKey.isNullOrEmpty())
-//
-//        return sectPriceNowRes
-
         try {
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/sect")
@@ -148,11 +105,11 @@ class SectService(
             }
 
             return res
-        }catch (e: KiwoomApiException) {
+        } catch (e: KiwoomApiException) {
             throw e
-        }catch (e: SectPriceNowException) {
+        } catch (e: SectPriceNowException) {
             throw e
-        }catch (e: Exception) {
+        } catch (e: Exception) {
             log.error { "sectNowPrice Error" }
 
             throw RuntimeException(e.message)

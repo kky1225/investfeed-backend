@@ -1,0 +1,59 @@
+package com.example.investfeed.kiwoom.gold.service
+
+import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.exception.GoldPriceNowException
+import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.gold.dto.req.GoldPriceNowReq
+import com.example.investfeed.kiwoom.gold.dto.res.GoldPriceNowRes
+import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.http.HttpHeaders
+import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.WebClient
+
+@Service
+class GoldService (
+    private val webClient: WebClient,
+    private val redisTemplate: RedisTemplate<String, String>,
+) {
+    private val log = KotlinLogging.logger {}
+
+    @Value("\${kiwoom.default-url}")
+    private lateinit var DEFAULT_URL: String
+
+    @KiwoomToken
+    fun goldPriceNow (
+        req: GoldPriceNowReq
+    ): GoldPriceNowRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/mrkcond")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka50100")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                .bodyToMono(GoldPriceNowRes::class.java)
+                .block()
+
+            if (res?.return_code != 0) {
+                throw GoldPriceNowException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: GoldPriceNowException) {
+            throw e;
+        } catch (e: Exception) {
+            log.error { "goldPriceNow Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+}
