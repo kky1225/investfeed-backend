@@ -32,7 +32,7 @@ class GoldChartService (
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka50092")
+                .header("api-id", "ka50080")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })

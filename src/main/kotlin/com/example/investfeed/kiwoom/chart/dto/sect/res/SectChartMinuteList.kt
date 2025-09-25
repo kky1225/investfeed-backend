@@ -7,8 +7,7 @@ data class SectChartMinuteList(
     var open_pric: String? = null, // 시가
     var high_pric: String? = null, // 고가
     var low_pric: String? = null, // 저가
-    var bic_inds_tp: String? = null, // 대업종구분
-    var sm_inds_tp: String? = null, // 소업종구분
-    var stk_infr: String? = null, // 종목정보
-    var pred_close_pric: String? = null, // 전일종가
+    var acc_trde_qty: String? = null, // 누적거래량
+    var pred_pre: String? = null, // 전일대비
+    var pred_pre_sig: String? = null, // 전일대비 기호
 )

@@ -8,8 +8,4 @@ data class SectChartMonthList(
     var high_pric: String? = null, // 고가
     var low_pric: String? = null, // 저가
     var trde_prica: String? = null, // 거래대금
-    var bic_inds_tp: String? = null, // 대업종구분
-    var sm_inds_tp: String? = null, // 소업종구분
-    var stk_infr: String? = null, // 종목정보
-    var pred_close_pric: String? = null, // 전일종가
 )
