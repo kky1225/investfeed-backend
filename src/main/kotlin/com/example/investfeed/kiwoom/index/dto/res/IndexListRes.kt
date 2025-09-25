@@ -2,7 +2,7 @@ package com.example.investfeed.kiwoom.index.dto.res
 
 import com.example.investfeed.kiwoom.chart.dto.gold.res.GoldChartMinuteListRes
 import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMinuteListRes
-import com.example.investfeed.kiwoom.gold.dto.res.GoldPriceNowRes
+import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldPriceNowRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
 
 data class IndexListRes(

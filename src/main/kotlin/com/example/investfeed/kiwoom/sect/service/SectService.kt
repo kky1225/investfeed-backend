@@ -20,10 +20,7 @@ import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexDailyListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
-import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowTime
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate

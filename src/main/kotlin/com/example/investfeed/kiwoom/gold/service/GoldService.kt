@@ -4,8 +4,8 @@ import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.GoldPriceNowException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
-import com.example.investfeed.kiwoom.gold.dto.req.GoldPriceNowReq
-import com.example.investfeed.kiwoom.gold.dto.res.GoldPriceNowRes
+import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
+import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldPriceNowRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate

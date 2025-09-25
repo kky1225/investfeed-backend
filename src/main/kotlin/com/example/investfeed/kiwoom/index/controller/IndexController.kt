@@ -2,6 +2,9 @@ package com.example.investfeed.kiwoom.index.controller
 
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.kiwoom.gold.dto.socket.req.GoldListStream
+import com.example.investfeed.kiwoom.gold.dto.socket.req.GoldListStreamReq
+import com.example.investfeed.kiwoom.gold.service.GoldSocketService
 import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
 import com.example.investfeed.kiwoom.index.dto.req.IndexDetailStreamReq
 import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes
@@ -21,7 +24,8 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/index")
 class IndexController(
     private val indexService: IndexService,
-    private val sectSocketService: SectSocketService
+    private val sectSocketService: SectSocketService,
+    private val goldSocketService: GoldSocketService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -55,6 +59,22 @@ class IndexController(
                 )
             )
         )
+
+        goldSocketService.goldListStream(
+            req = GoldListStreamReq(
+                trnm = "REG",
+                grp_no = "0002",
+                refresh = "0",
+                data = listOf(
+                    GoldListStream(
+                        item = listOf("M04020000"),
+                        type = listOf("0I")
+                    )
+                )
+            )
+        )
+
+
 
         return ResponseEntity(
             ApiResponse(

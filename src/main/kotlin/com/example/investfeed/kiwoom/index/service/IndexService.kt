@@ -9,7 +9,7 @@ import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartYearListReq
 import com.example.investfeed.kiwoom.chart.enum.ChartType
 import com.example.investfeed.kiwoom.chart.service.GoldChartService
 import com.example.investfeed.kiwoom.chart.service.SectChartService
-import com.example.investfeed.kiwoom.gold.dto.req.GoldPriceNowReq
+import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.gold.service.GoldService
 import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
 import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes

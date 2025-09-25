@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.gold.dto.res
+package com.example.investfeed.kiwoom.gold.dto.rest.res
 
 data class GoldPriceNowRes (
     var return_code: Int, // 결과 코드
