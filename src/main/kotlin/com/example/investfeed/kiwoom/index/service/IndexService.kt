@@ -1,16 +1,12 @@
 package com.example.investfeed.kiwoom.index.service
 
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMonthListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartWeekListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartYearListReq
+import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.ChartType
 import com.example.investfeed.kiwoom.chart.service.GoldChartService
 import com.example.investfeed.kiwoom.chart.service.SectChartService
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
-import com.example.investfeed.kiwoom.gold.service.GoldService
+import com.example.investfeed.kiwoom.gold.service.GoldClient
 import com.example.investfeed.kiwoom.index.dto.req.IndexDetailReq
 import com.example.investfeed.kiwoom.index.dto.res.IndexDetailRes
 import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
@@ -24,7 +20,7 @@ import org.springframework.stereotype.Service
 class IndexService(
     private val sectService: SectService,
     private val sectChartService: SectChartService,
-    private val goldService: GoldService,
+    private val goldClient: GoldClient,
     private val goldChartService: GoldChartService,
 ) {
     fun indexList(): IndexListRes? {
@@ -65,7 +61,7 @@ class IndexService(
                     tic_scope = "1"
                 )
             ),
-            goldPriceRes = goldService.goldPriceNow(
+            goldPriceRes = goldClient.goldPriceNow(
                 req = GoldPriceNowReq(
                     stk_cd = "M04020000"
                 )

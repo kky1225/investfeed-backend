@@ -74,8 +74,6 @@ class IndexController(
             )
         )
 
-
-
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.INDEX_WS_LIST.code,
@@ -86,7 +84,7 @@ class IndexController(
     }
 
     @GetMapping("detail")
-    fun indexDetail(
+    fun sectIndexDetail(
         req: IndexDetailReq
     ): ResponseEntity<ApiResponse<IndexDetailRes<*>?>> {
         log.info { "indexDetail: $req" }
