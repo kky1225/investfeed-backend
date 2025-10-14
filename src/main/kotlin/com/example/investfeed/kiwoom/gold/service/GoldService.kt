@@ -5,12 +5,11 @@ import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMonthListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartWeekListReq
 import com.example.investfeed.kiwoom.chart.enum.ChartType
-import com.example.investfeed.kiwoom.chart.service.GoldChartService
+import com.example.investfeed.kiwoom.gold.client.GoldClient
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldDetailReq
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldDetailRes
-import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldPriceNowMinuteRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -19,7 +18,6 @@ import java.time.format.DateTimeFormatter
 @Service
 class GoldService(
     private val goldClient: GoldClient,
-    private val goldChartService: GoldChartService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -32,7 +30,7 @@ class GoldService(
 
         when(req.chart_type) {
             ChartType.DAY -> {
-                chartListRes = goldChartService.goldChartDayList(
+                chartListRes = goldClient.goldChartDayList(
                     req = GoldChartDayListReq(
                         stk_cd = req.stk_cd,
                         base_dt = baseDt,
@@ -41,7 +39,7 @@ class GoldService(
                 )
             }
             ChartType.WEEK -> {
-                chartListRes = goldChartService.goldChartWeekList(
+                chartListRes = goldClient.goldChartWeekList(
                     req = GoldChartWeekListReq(
                         stk_cd = req.stk_cd,
                         base_dt = baseDt,
@@ -50,7 +48,7 @@ class GoldService(
                 )
             }
             ChartType.MONTH -> {
-                chartListRes = goldChartService.goldChartMonthList(
+                chartListRes = goldClient.goldChartMonthList(
                     req = GoldChartMonthListReq(
                         stk_cd = req.stk_cd,
                         base_dt = baseDt,
@@ -60,7 +58,7 @@ class GoldService(
             }
             else -> {
                 chartListRes = req.chart_type.value?.let {
-                    goldChartService.goldChartMinuteList(
+                    goldClient.goldChartMinuteList(
                         req = GoldChartMinuteListReq(
                             stk_cd = req.stk_cd,
                             tic_scope = it,

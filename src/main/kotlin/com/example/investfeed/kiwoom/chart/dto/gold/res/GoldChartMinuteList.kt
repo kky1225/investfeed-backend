@@ -1,9 +1,10 @@
 package com.example.investfeed.kiwoom.chart.dto.gold.res
 
 data class GoldChartMinuteList (
-    var cur_prc: String? = null, // 현재가
+    var cntr_pric: String? = null, // 체결가
     var pred_pre: String? = null, // 전일 대비(원)
     var acc_trde_qty: String? = null, // 누적거래량
+    var acc_trde_prica: String? = null, // 누적 거래대금
     var trde_qty: String? = null, // 거래량(체결량)
     var open_pric: String? = null, // 시가
     var high_pric: String? = null, // 고가
