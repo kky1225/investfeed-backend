@@ -28,8 +28,8 @@ class GoldController(
 
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.INDEX_DETAIL.code,
-                message = ResponseCode.INDEX_DETAIL.message,
+                code = ResponseCode.GOLD_DETAIL.code,
+                message = ResponseCode.GOLD_DETAIL.message,
                 result = goldService.goldDetail(req = req)
             ), HttpStatus.OK
         )

@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.chart.service
 
+import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMonthListReq
@@ -26,6 +27,7 @@ class GoldChartService (
     @Value("\${kiwoom.default-url}")
     private lateinit var DEFAULT_URL: String
 
+    @KiwoomToken
     fun goldChartMinuteList (
         req: GoldChartMinuteListReq
     ): GoldChartMinuteListRes? {
@@ -59,6 +61,7 @@ class GoldChartService (
         }
     }
 
+    @KiwoomToken
     fun goldChartDayList (
         req: GoldChartDayListReq
     ): GoldChartDayListRes? {
@@ -92,6 +95,7 @@ class GoldChartService (
         }
     }
 
+    @KiwoomToken
     fun goldChartWeekList (
         req: GoldChartWeekListReq
     ): GoldChartWeekListRes? {
@@ -125,6 +129,7 @@ class GoldChartService (
         }
     }
 
+    @KiwoomToken
     fun goldChartMonthList (
         req: GoldChartMonthListReq
     ): GoldChartMonthListRes? {

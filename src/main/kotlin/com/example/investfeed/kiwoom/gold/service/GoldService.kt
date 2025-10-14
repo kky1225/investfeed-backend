@@ -7,8 +7,10 @@ import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartWeekListReq
 import com.example.investfeed.kiwoom.chart.enum.ChartType
 import com.example.investfeed.kiwoom.chart.service.GoldChartService
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldDetailReq
+import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldDetailRes
+import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldPriceNowMinuteRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -73,6 +75,12 @@ class GoldService(
             goldPriceNowRes = goldClient.goldPriceNow(
                 req = GoldPriceNowReq(
                     stk_cd = req.stk_cd
+                )
+            ),
+            goldPriceNowMinuteRes = goldClient.goldPriceNowMinute(
+                req = GoldPriceNowMinuteReq(
+                    stk_cd = req.stk_cd,
+                    tic_scope = "1"
                 )
             ),
             chartListRes = chartListRes,
