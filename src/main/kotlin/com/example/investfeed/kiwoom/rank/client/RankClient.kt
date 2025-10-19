@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.rank.service
+package com.example.investfeed.kiwoom.rank.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
 @Service
-class RankService(
+class RankClient(
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {

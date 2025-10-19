@@ -6,7 +6,7 @@ import com.example.investfeed.kiwoom.rank.dto.req.RankTradeDailyVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.RankTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.res.RankTradeDailyVolumeListRes
 import com.example.investfeed.kiwoom.rank.dto.res.RankTradeVolumeListRes
-import com.example.investfeed.kiwoom.rank.service.RankService
+import com.example.investfeed.kiwoom.rank.client.RankClient
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("api/rank")
 class RankController(
-  private val rankService: RankService
+  private val rankClient: RankClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -31,7 +31,7 @@ class RankController(
             ApiResponse(
                 code = ResponseCode.RANK_TRADE_VOLUME_LIST.code,
                 message = ResponseCode.RANK_TRADE_VOLUME_LIST.message,
-                result = rankService.rankTradeVolumeList(req = req)
+                result = rankClient.rankTradeVolumeList(req = req)
             ), HttpStatus.OK
         )
     }
@@ -46,7 +46,7 @@ class RankController(
             ApiResponse(
                 code = ResponseCode.RANK_TRADE_DAILY_VOLUME_LIST.code,
                 message = ResponseCode.RANK_TRADE_DAILY_VOLUME_LIST.message,
-                result = rankService.rankTradeDailyVolumeList(req = req)
+                result = rankClient.rankTradeDailyVolumeList(req = req)
             ), HttpStatus.OK
         )
     }

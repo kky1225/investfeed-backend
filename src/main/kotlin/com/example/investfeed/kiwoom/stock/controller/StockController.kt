@@ -14,6 +14,8 @@ import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
+import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.dto.res.StockTradeHighRes
 import com.example.investfeed.kiwoom.stock.service.StockService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
@@ -29,93 +31,93 @@ class StockController(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("infoList")
-    fun stockInfoList(
-        req: StockInfoListReq
-    ): ResponseEntity<ApiResponse<StockInfoListRes?>> {
-        log.info { "stockInfoList $req" }
+    @GetMapping("list")
+    fun stockList(
+
+    ): ResponseEntity<ApiResponse<StockTradeHighRes?>> {
+        log.info { "stockList" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.STOCK_INFO_LIST.code,
                 message = ResponseCode.STOCK_INFO_LIST.message,
-                result = stockService.stockInfoList(req = req)
+                result = stockService.stockList()
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("info")
-    fun stockInfo(
-        req: StockInfoReq
-    ): ResponseEntity<ApiResponse<StockInfoRes?>> {
-        log.info { "stockInfo $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.STOCK_INFO.code,
-                message = ResponseCode.STOCK_INFO.message,
-                result = stockService.stockInfo(req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("tradeDailyList")
-    fun stockTradeDailyList(
-        req: StockTradeDailyListReq
-    ): ResponseEntity<ApiResponse<StockTradeDailyListRes?>> {
-        log.info { "stockTradeDailyList $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.STOCK_TRADE_DAILY_LIST.code,
-                message = ResponseCode.STOCK_TRADE_DAILY_LIST.message,
-                result = stockService.stockTradeDailyList(req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("jumpList")
-    fun stockJumpList(
-        req: StockJumpListReq
-    ): ResponseEntity<ApiResponse<StockJumpListRes?>> {
-        log.info { "stockJumpList $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.STOCK_JUMP_LIST.code,
-                message = ResponseCode.STOCK_JUMP_LIST.message,
-                result = stockService.stockJumpList(req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("singlePriceList")
-    fun stockSinglePriceList(
-        req: StockSinglePriceListReq
-    ): ResponseEntity<ApiResponse<StockSinglePriceListRes?>> {
-        log.info { "stockSinglePriceList $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.STOCK_SINGLE_PRICE_LIST.code,
-                message = ResponseCode.STOCK_SINGLE_PRICE_LIST.message,
-                result = stockService.stockSinglePriceList(req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("newPriceList")
-    fun stockNewPriceList(
-        req: StockNewPriceListReq
-    ): ResponseEntity<ApiResponse<StockNewPriceListRes?>> {
-        log.info { "stockNewPriceList $req" }
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.STOCK_NEW_PRICE_LIST.code,
-                message = ResponseCode.STOCK_NEW_PRICE_LIST.message,
-                result = stockService.stockNewPriceList(req = req)
-            ), HttpStatus.OK
-        )
-    }
+//    @GetMapping("info")
+//    fun stockInfo(
+//        req: StockInfoReq
+//    ): ResponseEntity<ApiResponse<StockInfoRes?>> {
+//        log.info { "stockInfo $req" }
+//
+//        return ResponseEntity(
+//            ApiResponse(
+//                code = ResponseCode.STOCK_INFO.code,
+//                message = ResponseCode.STOCK_INFO.message,
+//                result = stockClient.stockInfo(req = req)
+//            ), HttpStatus.OK
+//        )
+//    }
+//
+//    @GetMapping("tradeDailyList")
+//    fun stockTradeDailyList(
+//        req: StockTradeDailyListReq
+//    ): ResponseEntity<ApiResponse<StockTradeDailyListRes?>> {
+//        log.info { "stockTradeDailyList $req" }
+//
+//        return ResponseEntity(
+//            ApiResponse(
+//                code = ResponseCode.STOCK_TRADE_DAILY_LIST.code,
+//                message = ResponseCode.STOCK_TRADE_DAILY_LIST.message,
+//                result = stockClient.stockTradeDailyList(req = req)
+//            ), HttpStatus.OK
+//        )
+//    }
+//
+//    @GetMapping("jumpList")
+//    fun stockJumpList(
+//        req: StockJumpListReq
+//    ): ResponseEntity<ApiResponse<StockJumpListRes?>> {
+//        log.info { "stockJumpList $req" }
+//
+//        return ResponseEntity(
+//            ApiResponse(
+//                code = ResponseCode.STOCK_JUMP_LIST.code,
+//                message = ResponseCode.STOCK_JUMP_LIST.message,
+//                result = stockClient.stockJumpList(req = req)
+//            ), HttpStatus.OK
+//        )
+//    }
+//
+//    @GetMapping("singlePriceList")
+//    fun stockSinglePriceList(
+//        req: StockSinglePriceListReq
+//    ): ResponseEntity<ApiResponse<StockSinglePriceListRes?>> {
+//        log.info { "stockSinglePriceList $req" }
+//
+//        return ResponseEntity(
+//            ApiResponse(
+//                code = ResponseCode.STOCK_SINGLE_PRICE_LIST.code,
+//                message = ResponseCode.STOCK_SINGLE_PRICE_LIST.message,
+//                result = stockClient.stockSinglePriceList(req = req)
+//            ), HttpStatus.OK
+//        )
+//    }
+//
+//    @GetMapping("newPriceList")
+//    fun stockNewPriceList(
+//        req: StockNewPriceListReq
+//    ): ResponseEntity<ApiResponse<StockNewPriceListRes?>> {
+//        log.info { "stockNewPriceList $req" }
+//
+//        return ResponseEntity(
+//            ApiResponse(
+//                code = ResponseCode.STOCK_NEW_PRICE_LIST.code,
+//                message = ResponseCode.STOCK_NEW_PRICE_LIST.message,
+//                result = stockClient.stockNewPriceList(req = req)
+//            ), HttpStatus.OK
+//        )
+//    }
 }
