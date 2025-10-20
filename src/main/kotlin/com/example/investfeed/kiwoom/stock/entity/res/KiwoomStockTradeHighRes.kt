@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.stock.dto.res
+package com.example.investfeed.kiwoom.stock.entity.res
 
-data class StockTradeHigh(
+data class KiwoomStockTradeHighRes(
     var stk_cd: String? = null, // 종목코드
     var now_rank: String? = null, // 현재순위
     var pred_rank: String? = null, // 전일순위

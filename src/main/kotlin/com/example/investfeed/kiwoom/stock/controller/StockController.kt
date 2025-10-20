@@ -2,20 +2,7 @@ package com.example.investfeed.kiwoom.stock.controller
 
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
-import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
-import com.example.investfeed.kiwoom.stock.client.StockClient
-import com.example.investfeed.kiwoom.stock.dto.res.StockTradeHighRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockListRes
 import com.example.investfeed.kiwoom.stock.service.StockService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
@@ -34,7 +21,7 @@ class StockController(
     @GetMapping("list")
     fun stockList(
 
-    ): ResponseEntity<ApiResponse<StockTradeHighRes?>> {
+    ): ResponseEntity<ApiResponse<StockListRes?>> {
         log.info { "stockList" }
 
         return ResponseEntity(

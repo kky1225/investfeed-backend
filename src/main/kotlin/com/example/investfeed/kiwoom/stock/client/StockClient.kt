@@ -16,20 +16,19 @@ import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockTradeHighListReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeHighReq
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockTradeHighRes
+import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeHighListRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
-import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
 @Component
@@ -248,8 +247,8 @@ class StockClient(
 
     @KiwoomToken
     fun stockTradeHighList(
-        req: StockTradeHighListReq
-    ): StockTradeHighRes? {
+        req: KiwoomStockTradeHighReq
+    ): KiwoomStockTradeHighListRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -261,7 +260,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockTradeHighRes::class.java)
+                .bodyToMono(KiwoomStockTradeHighListRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
