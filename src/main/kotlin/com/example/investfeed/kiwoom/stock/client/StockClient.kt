@@ -9,21 +9,24 @@ import com.example.investfeed.kiwoom.exception.StockJumpListException
 import com.example.investfeed.kiwoom.exception.StockNewPriceListException
 import com.example.investfeed.kiwoom.exception.StockSinglePriceListException
 import com.example.investfeed.kiwoom.exception.StockTradeDailyListException
-import com.example.investfeed.kiwoom.exception.StockTradeHighListException
+import com.example.investfeed.kiwoom.exception.StockTradeValueListException
+import com.example.investfeed.kiwoom.exception.StockTradeVolumeListException
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeHighReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
-import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeHighListRes
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
+import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeValueListRes
+import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeVolumeListRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -246,9 +249,9 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockTradeHighList(
-        req: KiwoomStockTradeHighReq
-    ): KiwoomStockTradeHighListRes {
+    fun stockTradeValueList(
+        req: KiwoomStockTradeValueReq
+    ): KiwoomStockTradeValueListRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -260,20 +263,54 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeHighListRes::class.java)
+                .bodyToMono(KiwoomStockTradeValueListRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw StockTradeHighListException()
+                throw StockTradeValueListException()
             }
 
             return res
         }catch (e: KiwoomApiException) {
             throw e
-        }catch (e: StockTradeHighListException) {
+        }catch (e: StockTradeValueListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockTradeHighList Error" }
+            log.error { "stockTradeValueList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockTradeVolumeList(
+        req: KiwoomStockTradeVolumeListReq
+    ): KiwoomStockTradeVolumeListRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/rkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10030")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockTradeVolumeListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockTradeVolumeListException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException){
+            throw e
+        }catch(e: StockTradeVolumeListException){
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockTradeVolumeList Error" }
 
             throw RuntimeException(e.message)
         }
