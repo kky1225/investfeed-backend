@@ -1,32 +1,15 @@
 package com.example.investfeed.kiwoom.stock.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
-import com.example.investfeed.kiwoom.exception.KiwoomApiException
-import com.example.investfeed.kiwoom.exception.StockInfoException
-import com.example.investfeed.kiwoom.exception.StockInfoListException
-import com.example.investfeed.kiwoom.exception.StockJumpListException
-import com.example.investfeed.kiwoom.exception.StockNewPriceListException
-import com.example.investfeed.kiwoom.exception.StockSinglePriceListException
-import com.example.investfeed.kiwoom.exception.StockTradeDailyListException
-import com.example.investfeed.kiwoom.exception.StockTradeValueListException
-import com.example.investfeed.kiwoom.exception.StockTradeVolumeListException
-import com.example.investfeed.kiwoom.stock.dto.req.StockInfoListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockInfoReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockJumpListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockNewPriceListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockSinglePriceListReq
-import com.example.investfeed.kiwoom.stock.dto.req.StockTradeDailyListReq
+import com.example.investfeed.kiwoom.exception.*
+import com.example.investfeed.kiwoom.stock.dto.req.*
+import com.example.investfeed.kiwoom.stock.dto.res.*
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
-import com.example.investfeed.kiwoom.stock.dto.res.StockInfoListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockInfoRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockJumpListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockNewPriceListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockSinglePriceListRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockTradeDailyListRes
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
 import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeValueListRes
 import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeVolumeListRes
+import com.example.investfeed.kiwoom.stock.entity.res.KiwoomSurgeTradeVolumeListRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -311,6 +294,40 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.error { "stockTradeVolumeList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockSurgeTradeVolumeList(
+        req: KiwoomSurgeTradeVolumeListReq
+    ): KiwoomSurgeTradeVolumeListRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/rkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10023")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomSurgeTradeVolumeListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockSurgeTradeVolumeListException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException){
+            throw e
+        }catch(e: StockSurgeTradeVolumeListException){
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockSurgeTradeVolumeList Error" }
 
             throw RuntimeException(e.message)
         }

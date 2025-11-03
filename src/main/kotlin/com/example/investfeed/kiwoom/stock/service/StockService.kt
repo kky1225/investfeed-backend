@@ -6,7 +6,9 @@ import com.example.investfeed.kiwoom.stock.dto.res.StockListItemRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockListRes
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
 import org.springframework.stereotype.Service
+import kotlin.String
 
 @Service
 class StockService(
@@ -71,10 +73,14 @@ class StockService(
                 )
             }
             else -> {
-                val kiwoomStockTradeValueListRes = socketClient.stockTradeValueList(
-                    req = KiwoomStockTradeValueReq(
+                val kiwoomStockTradeValueListRes = socketClient.stockSurgeTradeVolumeList(
+                    req = KiwoomSurgeTradeVolumeListReq(
                         mrkt_tp = "000",
-                        mang_stk_incls = "1",
+                        sort_tp = "2",
+                        tm_tp = "2",
+                        trde_qty_tp = "5",
+                        stk_cnd = "0",
+                        pric_tp = "0",
                         stex_tp = "3"
                     )
                 )
@@ -82,14 +88,14 @@ class StockService(
                 return StockListRes(
                     return_code = kiwoomStockTradeValueListRes.return_code,
                     return_msg = kiwoomStockTradeValueListRes.return_msg,
-                    stockList = kiwoomStockTradeValueListRes.trde_prica_upper?.map {
+                    stockList = kiwoomStockTradeValueListRes.trde_qty_sdnin?.mapIndexed { index, it ->
                         StockListItemRes(
                             stk_cd = it.stk_cd,
-                            rank = it.now_rank,
+                            rank = (index + 1).toString(),
                             stk_nm = it.stk_nm,
                             flu_rt = it.flu_rt,
                             cur_prc = it.cur_prc,
-                            trde_prica = it.trde_prica,
+                            trde_prica = it.sdnin_rt,
                         )
                     } ?: emptyList()
                 )

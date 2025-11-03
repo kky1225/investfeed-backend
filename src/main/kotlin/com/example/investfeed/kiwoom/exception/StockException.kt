@@ -7,4 +7,5 @@ class StockJumpListException(): InvestFeedException(code = "STOCK_0004", message
 class StockSinglePriceListException(): InvestFeedException(code = "STOCK_0005", message = "시간외단일가 조회에 실패하셨습니다.")
 class StockNewPriceListException(): InvestFeedException(code = "STOCK_0006", message = "신고저가 조회에 실패하셨습니다.")
 class StockTradeValueListException(): InvestFeedException(code = "STOCK_0007", message = "거래대금 상위 요청 조회에 실패하셨습니다.")
-class StockTradeVolumeListException(): InvestFeedException(code = "RANK_0002", message = "당일 거래량 상위 순위 조회에 실패하셨습니다.")
+class StockTradeVolumeListException(): InvestFeedException(code = "STOCK_0008", message = "당일 거래량 상위 순위 조회에 실패하셨습니다.")
+class StockSurgeTradeVolumeListException(): InvestFeedException(code = "STOCK_0009", message = "거래량 급증 순위 조회에 실패하셨습니다.")

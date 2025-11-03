@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.rank.dto.res
+package com.example.investfeed.kiwoom.stock.entity.res
 
-data class RankTradeVolumeList(
+data class KiwoomSurgeTradeVolumeRes(
     var stk_cd: String? = null, // 종목코드
     var stk_nm: String? = null, // 종목명
     var cur_prc: String? = null, // 현재가
