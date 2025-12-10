@@ -4,12 +4,8 @@ import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.stock.dto.req.*
 import com.example.investfeed.kiwoom.stock.dto.res.*
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
-import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeValueListRes
-import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockTradeVolumeListRes
-import com.example.investfeed.kiwoom.stock.entity.res.KiwoomSurgeTradeVolumeListRes
+import com.example.investfeed.kiwoom.stock.entity.req.*
+import com.example.investfeed.kiwoom.stock.entity.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -63,8 +59,8 @@ class StockClient(
 
     @KiwoomToken
     fun stockInfo(
-        req: StockInfoReq
-    ): StockInfoRes? {
+        req: KiwoomStockInfoReq
+    ): KiwoomStockInfoRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -76,7 +72,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockInfoRes::class.java)
+                .bodyToMono(KiwoomStockInfoRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -90,6 +86,74 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.error { "stockInfo Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockTradeInfo(
+        req: KiwoomStockTradeInfoReq
+    ): KiwoomStockTradeInfoRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/mrkcond")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10006")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockTradeInfoRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockTradeInfoException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: StockTradeInfoException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "stockTradeInfo Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockInvestor(
+        req: KiwoomStockInvestorReq
+    ): KiwoomStockInvestorRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10059")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockInvestorRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockInvestorException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInvestorException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockInvestor Error" }
 
             throw RuntimeException(e.message)
         }

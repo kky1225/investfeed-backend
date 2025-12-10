@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.chart.dto.stock.res
+package com.example.investfeed.kiwoom.stock.entity.res
 
-data class ChartWeekList(
+data class KiwoomStockChartYear(
     var cur_prc: String? = null, // 현재가
     var trde_qty: String? = null, // 거래량
     var trde_prica: String? = null, // 거래대금

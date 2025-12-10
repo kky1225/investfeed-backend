@@ -2,7 +2,7 @@ package com.example.investfeed.kiwoom.index.service
 
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.*
-import com.example.investfeed.kiwoom.chart.enum.ChartType
+import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.chart.service.SectChartService
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.gold.client.GoldClient
@@ -86,7 +86,7 @@ class IndexService(
         var chartListRes: Any?
 
         when(req.chart_type) {
-            ChartType.DAY -> {
+            IndexChartType.DAY -> {
                 chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
                     sectChartService.sectChartDayList(
                         req = SectChartDayListReq(
@@ -96,7 +96,7 @@ class IndexService(
                     )
                 }
             }
-            ChartType.WEEK -> {
+            IndexChartType.WEEK -> {
                 chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
                     sectChartService.sectChartWeekList(
                         req = SectChartWeekListReq(
@@ -106,7 +106,7 @@ class IndexService(
                     )
                 }
             }
-            ChartType.MONTH -> {
+            IndexChartType.MONTH -> {
                 chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
                     sectChartService.sectChartMonthList(
                         req = SectChartMonthListReq(
@@ -116,7 +116,7 @@ class IndexService(
                     )
                 }
             }
-            ChartType.YEAR -> {
+            IndexChartType.YEAR -> {
                 chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
                     sectChartService.sectChartYearList(
                         req = SectChartYearListReq(

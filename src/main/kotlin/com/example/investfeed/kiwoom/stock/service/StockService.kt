@@ -1,25 +1,43 @@
 package com.example.investfeed.kiwoom.stock.service
 
+import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartDayReq
+import com.example.investfeed.kiwoom.chart.enum.StockChartType
+import com.example.investfeed.kiwoom.stock.client.StockChartClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.StockListReq
+import com.example.investfeed.kiwoom.stock.dto.res.StockChart
+import com.example.investfeed.kiwoom.stock.dto.res.StockDetailRes
+import com.example.investfeed.kiwoom.stock.dto.res.StockInfo
+import com.example.investfeed.kiwoom.stock.dto.res.StockInvestor
 import com.example.investfeed.kiwoom.stock.dto.res.StockListItemRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockListRes
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartMinuteReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartMonthReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartWeekReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartYearReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockInfoReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockInvestorReq
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.String
 
 @Service
 class StockService(
-    private val socketClient: StockClient
+    private val stockClient: StockClient,
+    private val stockChartClient: StockChartClient,
 ) {
     fun stockList(
         req: StockListReq
     ): StockListRes? {
         when (req.type) {
             "0" -> {
-                val kiwoomStockTradeValueListRes = socketClient.stockTradeValueList(
+                val kiwoomStockTradeValueListRes = stockClient.stockTradeValueList(
                     req = KiwoomStockTradeValueReq(
                         mrkt_tp = "000",
                         mang_stk_incls = "1",
@@ -43,7 +61,7 @@ class StockService(
                 )
             }
             "1" -> {
-                val kiwoomStockTradeVolumeListRes = socketClient.stockTradeVolumeList(
+                val kiwoomStockTradeVolumeListRes = stockClient.stockTradeVolumeList(
                     req = KiwoomStockTradeVolumeListReq(
                         mrkt_tp = "000",
                         sort_tp = "1",
@@ -73,7 +91,7 @@ class StockService(
                 )
             }
             else -> {
-                val kiwoomStockTradeValueListRes = socketClient.stockSurgeTradeVolumeList(
+                val kiwoomStockTradeValueListRes = stockClient.stockSurgeTradeVolumeList(
                     req = KiwoomSurgeTradeVolumeListReq(
                         mrkt_tp = "000",
                         sort_tp = "2",
@@ -101,5 +119,219 @@ class StockService(
                 )
             }
         }
+    }
+
+    fun stockDetail(
+        req: KiwoomStockInfoReq
+    ): StockDetailRes? {
+        val kiwoomStockInfoRes = stockClient.stockInfo(req)
+        val kiwoomStockTradeInfoRes = stockClient.stockTradeInfo(
+            req = KiwoomStockTradeInfoReq(
+                stk_cd = req.stk_cd,
+            )
+        )
+        val kiwoomStockInvestor = stockClient.stockInvestor(
+            req = KiwoomStockInvestorReq(
+                dt = today("yyyyMMdd"),
+                stk_cd = req.stk_cd,
+                amt_qty_tp = "2",
+                trde_tp = "0",
+                unit_tp = "1"
+            )
+        )
+
+        var stockInfo: StockInfo? = null
+        if (kiwoomStockInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
+            stockInfo = StockInfo(
+                stk_cd = kiwoomStockInfoRes.stk_cd,
+                stk_nm = kiwoomStockInfoRes.stk_nm,
+                per = kiwoomStockInfoRes.per,
+                eps = kiwoomStockInfoRes.eps,
+                roe = kiwoomStockInfoRes.roe,
+                pbr = kiwoomStockInfoRes.pbr,
+                _250hgst = kiwoomStockInfoRes._250hgst,
+                _250lwst = kiwoomStockInfoRes._250lwst,
+                high_pric = kiwoomStockInfoRes.high_pric,
+                open_pric = kiwoomStockInfoRes.open_pric,
+                low_pric = kiwoomStockInfoRes.low_pric,
+                cur_prc = kiwoomStockInfoRes.cur_prc,
+                pre_sig = kiwoomStockInfoRes.pre_sig,
+                flu_rt = kiwoomStockInfoRes.flu_rt,
+                trde_qty = kiwoomStockInfoRes.trde_qty,
+                trde_prica = kiwoomStockTradeInfoRes.trde_prica,
+                tm = kiwoomStockTradeInfoRes.date
+            )
+        }
+
+        val stockInvestorList: MutableList<StockInvestor> = mutableListOf()
+        if (kiwoomStockInvestor.return_code == 0) {
+            kiwoomStockInvestor.stk_invsr_orgn?.forEach {
+                stockInvestorList.add(
+                    StockInvestor(
+                        dt = it.dt,
+                        ind_invsr = it.ind_invsr,
+                        frgnr_invsr = it.frgnr_invsr,
+                        orgn = it.orgn,
+                        etc_fnnc = it.etc_fnnc,
+                        fnnc_invt = it.fnnc_invt,
+                        insrnc = it.insrnc,
+                        invtrt = it.invtrt,
+                        samo_fund = it.samo_fund,
+                        penfnd_etc = it.penfnd_etc,
+                        bank = it.bank,
+                        etc_corp = it.etc_corp,
+                        natfor = it.natfor,
+                    )
+                )
+            }
+        }
+
+        var chartListRes: MutableList<StockChart> = mutableListOf()
+
+        when(req.chart_type) {
+            StockChartType.DAY -> {
+                val kiwoomStockChartDayRes = stockChartClient.chartDayList(
+                    req = KiwoomStockChartDayReq(
+                        stk_cd = req.stk_cd,
+                        base_dt = today("yyyyMMdd"),
+                        upd_stkpc_tp = "1"
+                    )
+                )
+
+                if (kiwoomStockChartDayRes.return_code == 0) {
+                    kiwoomStockChartDayRes.stk_dt_pole_chart_qry?.stream()?.forEach {
+                        chartListRes.add(
+                            StockChart(
+                                dt = it.dt,
+                                cur_prc = it.cur_prc,
+                                open_pric = it.open_pric,
+                                high_pric = it.high_pric,
+                                low_pric = it.low_pric,
+                                trde_qty = it.trde_qty,
+                                trde_prica = it.trde_prica,
+                            )
+                        )
+                    }
+                }
+            }
+            StockChartType.WEEK -> {
+                val kiwoomStockChartWeekRes = stockChartClient.chartWeekList(
+                    req = KiwoomStockChartWeekReq(
+                        stk_cd = req.stk_cd,
+                        base_dt = today("yyyyMMdd"),
+                        upd_stkpc_tp = "1"
+                    )
+                )
+
+                if (kiwoomStockChartWeekRes.return_code == 0) {
+                    kiwoomStockChartWeekRes.stk_stk_pole_chart_qry?.stream()?.forEach {
+                        chartListRes.add(
+                            StockChart(
+                                dt = it.dt,
+                                cur_prc = it.cur_prc,
+                                open_pric = it.open_pric,
+                                high_pric = it.high_pric,
+                                low_pric = it.low_pric,
+                                trde_qty = it.trde_qty,
+                                trde_prica = it.trde_prica,
+                            )
+                        )
+                    }
+                }
+            }
+            StockChartType.MONTH -> {
+                val kiwoomStockChartMonthRes = stockChartClient.chartMonthList(
+                    req = KiwoomStockChartMonthReq(
+                        stk_cd = req.stk_cd,
+                        base_dt = today("yyyyMMdd"),
+                        upd_stkpc_tp = "1"
+                    )
+                )
+
+                if (kiwoomStockChartMonthRes.return_code == 0) {
+                    kiwoomStockChartMonthRes.stk_mth_pole_chart_qry?.stream()?.forEach {
+                        chartListRes.add(
+                            StockChart(
+                                dt = it.dt,
+                                cur_prc = it.cur_prc,
+                                open_pric = it.open_pric,
+                                high_pric = it.high_pric,
+                                low_pric = it.low_pric,
+                                trde_qty = it.trde_qty,
+                                trde_prica = it.trde_prica,
+                            )
+                        )
+                    }
+                }
+            }
+            StockChartType.YEAR -> {
+                val kiwoomStockChartYearRes = stockChartClient.chartYearList(
+                    req = KiwoomStockChartYearReq(
+                        stk_cd = req.stk_cd,
+                        base_dt = today("yyyyMMdd"),
+                        upd_stkpc_tp = "1"
+                    )
+                )
+
+                if (kiwoomStockChartYearRes.return_code == 0) {
+                    kiwoomStockChartYearRes.stk_yr_pole_chart_qry?.stream()?.forEach {
+                        chartListRes.add(
+                            StockChart(
+                                dt = it.dt,
+                                cur_prc = it.cur_prc,
+                                open_pric = it.open_pric,
+                                high_pric = it.high_pric,
+                                low_pric = it.low_pric,
+                                trde_qty = it.trde_qty,
+                                trde_prica = it.trde_prica,
+                            )
+                        )
+                    }
+                }
+            }
+            else -> {
+                val kiwoomStockChartMinuteRes = req.chart_type.value?.let {
+                    stockChartClient.chartMinuteList(
+                        req = KiwoomStockChartMinuteReq(
+                            stk_cd = req.stk_cd,
+                            tic_scope = it,
+                            upd_stkpc_tp = "1"
+                        )
+                    )
+                }
+
+                kiwoomStockChartMinuteRes?.let {
+                    if (it.return_code == 0) {
+                        kiwoomStockChartMinuteRes.stk_min_pole_chart_qry?.stream()?.filter { it.cntr_tm?.contains(today("yyyyMMdd")) == true }?.forEach {
+                            chartListRes.add(
+                                StockChart(
+                                    dt = it.cntr_tm,
+                                    cur_prc = it.cur_prc,
+                                    open_pric = it.open_pric,
+                                    high_pric = it.high_pric,
+                                    low_pric = it.low_pric,
+                                    trde_qty = it.trde_qty,
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        return StockDetailRes(
+            stockInfo = stockInfo,
+            stockChartList = chartListRes,
+            stockInvestorList = stockInvestorList
+        )
+    }
+
+    fun today(
+        pattern: String
+    ): String {
+        val now = LocalDate.now()
+        val pattern = DateTimeFormatter.ofPattern(pattern)
+
+        return pattern.format(now)
     }
 }

@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.chart.enum
 
-enum class ChartType(
+enum class StockChartType(
     val value: String? = null
 ) {
     MINUTE_1("1"),

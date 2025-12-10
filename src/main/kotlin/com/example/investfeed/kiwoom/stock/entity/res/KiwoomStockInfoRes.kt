@@ -1,8 +1,11 @@
-package com.example.investfeed.kiwoom.stock.dto.res
+package com.example.investfeed.kiwoom.stock.entity.res
 
-data class StockInfoRes(
-    var return_code: Int, // 응답 코드
-    var return_msg: String, // 응답 메세지
+import com.example.investfeed.kiwoom.KiwoomRes
+import com.fasterxml.jackson.annotation.JsonProperty
+
+data class KiwoomStockInfoRes(
+    override var return_code: Int, // 응답 코드
+    override var return_msg: String, // 응답 메세지
     var stk_cd: String? = null, // 종목코드
     var stk_nm: String? = null, // 종목명
     var setl_mm: String? = null, // 결산월
@@ -25,7 +28,9 @@ data class StockInfoRes(
     var sale_amt: String? = null, // 매출액
     var bus_pro: String? = null, // 영업이익
     var cup_nga: String? = null, // 당기순이익
+    @JsonProperty("250hgst")
     var _250hgst: String? = null, // 250최고
+    @JsonProperty("250lwst")
     var _250lwst: String? = null, // 250최저
     var high_pric: String? = null, // 고가
     var open_pric: String? = null, // 시가
@@ -35,9 +40,13 @@ data class StockInfoRes(
     var base_pric: String? = null, // 기준가
     var exp_cntr_pric: String? = null, // 예상체결가
     var exp_cntr_qty: String? = null, // 예상체결수량
+    @JsonProperty("250hgst_pric_dt")
     var _250hgst_pric_dt: String? = null, // 250최고가일
+    @JsonProperty("250hgst_pric_pre_rt")
     var _250hgst_pric_pre_rt: String? = null, // 250최고가대비율
+    @JsonProperty("250lwst_pric_dt")
     var _250lwst_pric_dt: String? = null, // 250최저가일
+    @JsonProperty("250lwst_pric_pre_rtm")
     var _250lwst_pric_pre_rtm: String? = null, // 250최저가대비율
     var cur_prc: String? = null, // 현재가
     var pre_sig: String? = null, // 대비기호
@@ -48,4 +57,4 @@ data class StockInfoRes(
     var fav_unit: String? = null, // 액면가단위
     var dstr_stk: String? = null, // 유통주식
     var dstr_r: String? = null // 유통비율
-)
+): KiwoomRes(return_code, return_msg)

@@ -4,7 +4,7 @@ import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMonthListReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartWeekListReq
-import com.example.investfeed.kiwoom.chart.enum.ChartType
+import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.gold.client.GoldClient
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldDetailReq
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowMinuteReq
@@ -29,7 +29,7 @@ class GoldService(
         val baseDt = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
 
         when(req.chart_type) {
-            ChartType.DAY -> {
+            IndexChartType.DAY -> {
                 chartListRes = goldClient.goldChartDayList(
                     req = GoldChartDayListReq(
                         stk_cd = req.stk_cd,
@@ -38,7 +38,7 @@ class GoldService(
                     )
                 )
             }
-            ChartType.WEEK -> {
+            IndexChartType.WEEK -> {
                 chartListRes = goldClient.goldChartWeekList(
                     req = GoldChartWeekListReq(
                         stk_cd = req.stk_cd,
@@ -47,7 +47,7 @@ class GoldService(
                     )
                 )
             }
-            ChartType.MONTH -> {
+            IndexChartType.MONTH -> {
                 chartListRes = goldClient.goldChartMonthList(
                     req = GoldChartMonthListReq(
                         stk_cd = req.stk_cd,
