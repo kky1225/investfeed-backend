@@ -24,6 +24,7 @@ import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeList
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.String
 
@@ -159,7 +160,7 @@ class StockService(
                 flu_rt = kiwoomStockInfoRes.flu_rt,
                 trde_qty = kiwoomStockInfoRes.trde_qty,
                 trde_prica = kiwoomStockTradeInfoRes.trde_prica,
-                tm = kiwoomStockTradeInfoRes.date
+                tm = kiwoomStockTradeInfoRes.date + time("HHmm"),
             )
         }
 
@@ -186,8 +187,7 @@ class StockService(
             }
         }
 
-        var chartListRes: MutableList<StockChart> = mutableListOf()
-
+        val chartListRes: MutableList<StockChart> = mutableListOf()
         when(req.chart_type) {
             StockChartType.DAY -> {
                 val kiwoomStockChartDayRes = stockChartClient.chartDayList(
@@ -330,6 +330,15 @@ class StockService(
         pattern: String
     ): String {
         val now = LocalDate.now()
+        val pattern = DateTimeFormatter.ofPattern(pattern)
+
+        return pattern.format(now)
+    }
+
+    fun time(
+        pattern: String
+    ): String {
+        val now = LocalTime.now()
         val pattern = DateTimeFormatter.ofPattern(pattern)
 
         return pattern.format(now)
