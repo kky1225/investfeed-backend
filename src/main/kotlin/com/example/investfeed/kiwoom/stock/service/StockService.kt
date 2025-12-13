@@ -1,37 +1,23 @@
 package com.example.investfeed.kiwoom.stock.service
 
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartDayReq
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.stock.client.StockChartClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.StockListReq
-import com.example.investfeed.kiwoom.stock.dto.res.StockChart
-import com.example.investfeed.kiwoom.stock.dto.res.StockDetailRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockInfo
-import com.example.investfeed.kiwoom.stock.dto.res.StockInvestor
-import com.example.investfeed.kiwoom.stock.dto.res.StockListItemRes
-import com.example.investfeed.kiwoom.stock.dto.res.StockListRes
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartMinuteReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartMonthReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartWeekReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockChartYearReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockInfoReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockInvestorReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeInfoReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeValueReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockTradeVolumeListReq
-import com.example.investfeed.kiwoom.stock.entity.req.KiwoomSurgeTradeVolumeListReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockStreamReq
+import com.example.investfeed.kiwoom.stock.dto.res.*
+import com.example.investfeed.kiwoom.stock.entity.req.*
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import kotlin.String
 
 @Service
 class StockService(
     private val stockClient: StockClient,
     private val stockChartClient: StockChartClient,
+    private val stockSocketClient: StockSocketClient
 ) {
     fun stockList(
         req: StockListReq
@@ -323,6 +309,24 @@ class StockService(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
             stockInvestorList = stockInvestorList
+        )
+    }
+
+    fun stockStream(
+        req: StockStreamReq
+    ) {
+        stockSocketClient.stockListStream(
+            req = KiwoomStockStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    KiwoomStockStream(
+                        item = req.items,
+                        type = listOf("0A")
+                    )
+                )
+            )
         )
     }
 

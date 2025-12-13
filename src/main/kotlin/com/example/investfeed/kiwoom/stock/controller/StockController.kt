@@ -3,17 +3,15 @@ package com.example.investfeed.kiwoom.stock.controller
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.stock.dto.req.StockListReq
+import com.example.investfeed.kiwoom.stock.dto.req.StockStreamReq
 import com.example.investfeed.kiwoom.stock.dto.res.StockDetailRes
 import com.example.investfeed.kiwoom.stock.dto.res.StockListRes
 import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockInfoReq
-import com.example.investfeed.kiwoom.stock.entity.res.KiwoomStockInfoRes
 import com.example.investfeed.kiwoom.stock.service.StockService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("api/stock")
@@ -30,8 +28,8 @@ class StockController(
 
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.STOCK_INFO_LIST.code,
-                message = ResponseCode.STOCK_INFO_LIST.message,
+                code = ResponseCode.STOCK_LIST.code,
+                message = ResponseCode.STOCK_LIST.message,
                 result = stockService.stockList(req)
             ), HttpStatus.OK
         )
@@ -45,9 +43,26 @@ class StockController(
 
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.STOCK_INFO.code,
-                message = ResponseCode.STOCK_INFO.message,
+                code = ResponseCode.STOCK_DETAIL.code,
+                message = ResponseCode.STOCK_DETAIL.message,
                 result = stockService.stockDetail(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("/detail/stream")
+    fun stockDetailStream(
+       @RequestBody req: StockStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "stockDetailStream $req" }
+
+        stockService.stockStream(req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.STOCK_DETAIL_WS.code,
+                message = ResponseCode.STOCK_DETAIL_WS.message,
+                result = null
             ), HttpStatus.OK
         )
     }

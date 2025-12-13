@@ -16,6 +16,10 @@ enum class ResponseCode(
     SECT_INDEX_LIST(message = "전업종 지수 조회에 성공하셨습니다."),
     SECT_INDEX_DAILY_LIST(message = "업종 현재가 일별 조회에 성공하셨습니다."),
 
+    STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),
+    STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
+    STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
+
     STOCK_INFO_LIST(message = "정목 정보 리스트 조회에 성공하셨습니다."),
     STOCK_INFO(message = "주식 기본 정보 조회에 성공하셨습니다."),
     STOCK_TRADE_DAILY_LIST(message = "일별 거래 상세 조회에 성공하셨습니다."),

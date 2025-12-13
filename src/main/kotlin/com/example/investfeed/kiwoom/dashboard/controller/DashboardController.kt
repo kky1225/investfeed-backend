@@ -5,17 +5,15 @@ import com.example.investfeed.kiwoom.dashboard.dto.req.DashboardStreamReq
 import com.example.investfeed.kiwoom.dashboard.dto.res.DashboardRes
 import com.example.investfeed.kiwoom.dashboard.service.DashboardService
 import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexListReq
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import com.example.investfeed.kiwoom.sect.service.SectSocketService
-import com.example.investfeed.kiwoom.stock.dto.req.StockListStream
-import com.example.investfeed.kiwoom.stock.dto.req.StockListStreamReq
-import com.example.investfeed.kiwoom.stock.service.StockSocketService
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockStream
+import com.example.investfeed.kiwoom.stock.entity.req.KiwoomStockStreamReq
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -25,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("api")
 class DashboardController(
     private val dashboardService: DashboardService,
-    private val stockSocketService: StockSocketService,
+    private val stockSocketClient: StockSocketClient,
     private val sectSocketService: SectSocketService
 ) {
     private val log = KotlinLogging.logger {}
@@ -63,14 +61,14 @@ class DashboardController(
             )
         )
 
-        stockSocketService.stockListStream(
-            req = StockListStreamReq(
+        stockSocketClient.stockListStream(
+            req = KiwoomStockStreamReq(
                 trnm = "REG",
-                grp_no = "0002",
+                grp_no = "0001",
                 refresh = "0",
                 data = listOf(
-                    StockListStream(
-                        item = req.items ?: emptyList(),
+                    KiwoomStockStream(
+                        item = req.items,
                         type = listOf("0A")
                     )
                 )
