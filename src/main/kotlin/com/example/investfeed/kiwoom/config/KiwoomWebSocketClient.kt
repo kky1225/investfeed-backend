@@ -5,7 +5,6 @@ import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import org.springframework.stereotype.Component
-import java.lang.Exception
 import java.net.URI
 
 @Component
@@ -13,6 +12,8 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
     private val log = KotlinLogging.logger {}
 
     private var accessToken: String? = null
+    private var request: String? = null
+    private var trnm: String? = null
 
     fun setAccessToken(accessToken: String) {
         this.accessToken = accessToken
@@ -26,6 +27,10 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
         accessToken?.let {
             handlerMap["LOGIN"] = {
                 log.info { "로그인 응답: $it" }
+
+                if (request != null) {
+                    send(request)
+                }
             }
 
             send(
@@ -45,7 +50,7 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
             val rootNode = jacksonObjectMapper().readTree(message)
             val trnm = rootNode.get("trnm")?.asText() ?: return
 
-            if(trnm.equals("PING")) {
+            if(trnm == "PING") {
                 send(message)
             }
 
@@ -76,13 +81,12 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
         log.error { "WebSocket onError : $e" }
     }
 
-    fun sendRequest(
+    fun setRequest(
         request: String,
         trnm: String,
-        handler: (String) -> Unit
     ) {
-        handlerMap[trnm] = handler
-        send(request)
+        this.request = request
+        this.trnm = trnm
     }
 
     fun sendRealTimeHandler(

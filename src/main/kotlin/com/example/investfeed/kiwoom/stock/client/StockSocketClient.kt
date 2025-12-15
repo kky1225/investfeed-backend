@@ -34,39 +34,6 @@ class StockSocketClient(
         val now = LocalTime.now()
 
         if(isMarketOpen(now, nxtOpen, nxtClose)) {
-//            if (!now.isBefore(nxtOpen) && now.isBefore(krxOpen)) {
-//                req.data!!.stream().map { i ->
-//                    i.item?.let { it + ExchangeType.NXT }
-//                }
-//            } else if (!now.isBefore(krxOpen) && now.isBefore(krxClose)) {
-//                req.data!!.stream().map { i ->
-//                    i.item?.let { it + ExchangeType.SOR }
-//                }
-//            } else if (!now.isBefore(krxOpen) && now.isBefore(nxtClose)) {
-//                req.data!!.stream().map { i ->
-//                    i.item?.let { it + ExchangeType.NXT }
-//                }
-//            }
-//
-//            val kiwoomWebSocketClient = KiwoomWebSocketClient()
-//            kiwoomWebSocketClient.setAccessToken(accessToken)
-//            kiwoomWebSocketClient.connectBlocking()
-//
-//            kiwoomWebSocketClient.sendRealTimeHandler(
-//                trnm = "REAL",
-//                handler = {
-//                    webSocketHandler.broadcast(it)
-//                }
-//            )
-//
-//            kiwoomWebSocketClient.sendRequest(
-//                request = objectMapper.writeValueAsString(req),
-//                trnm = req.trnm,
-//                handler = {
-//
-//                }
-//            )
-
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()
@@ -78,12 +45,9 @@ class StockSocketClient(
                 }
             )
 
-            kiwoomWebSocketClient.sendRequest(
+            kiwoomWebSocketClient.setRequest(
                 request = objectMapper.writeValueAsString(req),
                 trnm = req.trnm,
-                handler = {
-
-                }
             )
         }
     }

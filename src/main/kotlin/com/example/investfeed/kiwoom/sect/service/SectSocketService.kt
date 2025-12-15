@@ -40,12 +40,9 @@ class SectSocketService(
                 }
             )
 
-            kiwoomWebSocketClient.sendRequest(
+            kiwoomWebSocketClient.setRequest(
                 request = objectMapper.writeValueAsString(req),
                 trnm = req.trnm,
-                handler = {
-
-                }
             )
         }
     }

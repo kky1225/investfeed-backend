@@ -323,7 +323,7 @@ class StockService(
                 data = listOf(
                     KiwoomStockStream(
                         item = req.items,
-                        type = listOf("0A")
+                        type = listOf("0J")
                     )
                 )
             )
