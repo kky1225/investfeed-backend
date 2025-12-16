@@ -50,8 +50,8 @@ class StockController(
         )
     }
 
-    @PostMapping("/detail/stream")
-    fun stockDetailStream(
+    @PostMapping("/stream")
+    fun stockStream(
        @RequestBody req: StockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "stockDetailStream $req" }

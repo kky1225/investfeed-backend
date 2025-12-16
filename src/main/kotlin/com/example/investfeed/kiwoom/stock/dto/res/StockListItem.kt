@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.stock.dto.res
 
-data class StockListItemRes(
+data class StockListItem(
     var stk_cd: String? = null, // 종목코드
     var rank: String? = null, // 현재순위
     var stk_nm: String? = null, // 종목명

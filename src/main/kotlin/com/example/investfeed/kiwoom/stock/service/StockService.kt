@@ -36,7 +36,7 @@ class StockService(
                     return_code = kiwoomStockTradeValueListRes.return_code,
                     return_msg = kiwoomStockTradeValueListRes.return_msg,
                     stockList = kiwoomStockTradeValueListRes.trde_prica_upper?.map {
-                        StockListItemRes(
+                        StockListItem(
                             stk_cd = it.stk_cd,
                             rank = it.now_rank,
                             stk_nm = it.stk_nm,
@@ -66,7 +66,7 @@ class StockService(
                     return_code = kiwoomStockTradeVolumeListRes.return_code,
                     return_msg = kiwoomStockTradeVolumeListRes.return_msg,
                     stockList = kiwoomStockTradeVolumeListRes.tdy_trde_qty_upper?.mapIndexed { index, it ->
-                        StockListItemRes(
+                        StockListItem(
                             stk_cd = it.stk_cd,
                             rank = (index + 1).toString(),
                             stk_nm = it.stk_nm,
@@ -94,7 +94,7 @@ class StockService(
                     return_code = kiwoomStockTradeValueListRes.return_code,
                     return_msg = kiwoomStockTradeValueListRes.return_msg,
                     stockList = kiwoomStockTradeValueListRes.trde_qty_sdnin?.mapIndexed { index, it ->
-                        StockListItemRes(
+                        StockListItem(
                             stk_cd = it.stk_cd,
                             rank = (index + 1).toString(),
                             stk_nm = it.stk_nm,
@@ -323,7 +323,7 @@ class StockService(
                 data = listOf(
                     KiwoomStockStream(
                         item = req.items,
-                        type = listOf("0J")
+                        type = listOf("0B")
                     )
                 )
             )
