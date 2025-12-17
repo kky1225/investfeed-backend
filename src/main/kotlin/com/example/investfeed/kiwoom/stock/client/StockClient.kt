@@ -58,6 +58,40 @@ class StockClient(
     }
 
     @KiwoomToken
+    fun stockDefaultInfo(
+        req: KiwoomDefaultStockInfoReq
+    ): KiwoomStockDefaultInfoRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10001")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockDefaultInfoRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockDefaultInfoException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockDefaultInfoException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockInfo Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
     fun stockInfo(
         req: KiwoomStockInfoReq
     ): KiwoomStockInfoRes {
@@ -68,7 +102,7 @@ class StockClient(
             val res = webClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10001")
+                .header("api-id", "ka10100")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })

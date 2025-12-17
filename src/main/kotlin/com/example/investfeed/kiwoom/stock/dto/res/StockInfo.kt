@@ -16,6 +16,10 @@ data class StockInfo(
     var pre_sig: String? = null, // 대비기호
     var flu_rt: String? = null, // 등락율
     var trde_qty: String? = null, // 거래량
-    val tm: String? = null, // 시간
-    val trde_prica: String? = null, // 누적거래대금
+    var tm: String? = null, // 시간
+    var trde_prica: String? = null, // 누적거래대금
+    var nxtEnable: String? = null, // NXT가능여부
+    var orderWarning: String? = null, // 투자유의종목여부
+    var marketCode: String? = null, // 시장구분코드
+    var marketName: String? = null, // 시장명
 )

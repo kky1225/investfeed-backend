@@ -7,4 +7,5 @@ data class StockListItem(
     var flu_rt: String? = null, // 등락률
     var cur_prc: String? = null, // 현재가
     var trde_prica: String? = null, // 거래대금
+    var nxtEnable: String? = null, // NXT가능여부
 )

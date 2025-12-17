@@ -4,6 +4,7 @@ import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.stock.client.StockChartClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.dto.req.StockDetailReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockListReq
 import com.example.investfeed.kiwoom.stock.dto.req.StockStreamReq
 import com.example.investfeed.kiwoom.stock.dto.res.*
@@ -109,9 +110,18 @@ class StockService(
     }
 
     fun stockDetail(
-        req: KiwoomStockInfoReq
+        req: StockDetailReq
     ): StockDetailRes? {
-        val kiwoomStockInfoRes = stockClient.stockInfo(req)
+        val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
+            req = KiwoomDefaultStockInfoReq(
+                stk_cd = req.stk_cd
+            )
+        )
+        val kiwoomStockInfoRes = stockClient.stockInfo(
+            req = KiwoomStockInfoReq(
+                stk_cd = req.stk_cd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
+            )
+        )
         val kiwoomStockTradeInfoRes = stockClient.stockTradeInfo(
             req = KiwoomStockTradeInfoReq(
                 stk_cd = req.stk_cd,
@@ -128,25 +138,29 @@ class StockService(
         )
 
         var stockInfo: StockInfo? = null
-        if (kiwoomStockInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
+        if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
             stockInfo = StockInfo(
-                stk_cd = kiwoomStockInfoRes.stk_cd,
-                stk_nm = kiwoomStockInfoRes.stk_nm,
-                per = kiwoomStockInfoRes.per,
-                eps = kiwoomStockInfoRes.eps,
-                roe = kiwoomStockInfoRes.roe,
-                pbr = kiwoomStockInfoRes.pbr,
-                _250hgst = kiwoomStockInfoRes._250hgst,
-                _250lwst = kiwoomStockInfoRes._250lwst,
-                high_pric = kiwoomStockInfoRes.high_pric,
-                open_pric = kiwoomStockInfoRes.open_pric,
-                low_pric = kiwoomStockInfoRes.low_pric,
-                cur_prc = kiwoomStockInfoRes.cur_prc,
-                pre_sig = kiwoomStockInfoRes.pre_sig,
-                flu_rt = kiwoomStockInfoRes.flu_rt,
-                trde_qty = kiwoomStockInfoRes.trde_qty,
+                stk_cd = kiwoomStockDefaultInfoRes.stk_cd,
+                stk_nm = kiwoomStockDefaultInfoRes.stk_nm,
+                per = kiwoomStockDefaultInfoRes.per,
+                eps = kiwoomStockDefaultInfoRes.eps,
+                roe = kiwoomStockDefaultInfoRes.roe,
+                pbr = kiwoomStockDefaultInfoRes.pbr,
+                _250hgst = kiwoomStockDefaultInfoRes._250hgst,
+                _250lwst = kiwoomStockDefaultInfoRes._250lwst,
+                high_pric = kiwoomStockDefaultInfoRes.high_pric,
+                open_pric = kiwoomStockDefaultInfoRes.open_pric,
+                low_pric = kiwoomStockDefaultInfoRes.low_pric,
+                cur_prc = kiwoomStockDefaultInfoRes.cur_prc,
+                pre_sig = kiwoomStockDefaultInfoRes.pre_sig,
+                flu_rt = kiwoomStockDefaultInfoRes.flu_rt,
+                trde_qty = kiwoomStockDefaultInfoRes.trde_qty,
                 trde_prica = kiwoomStockTradeInfoRes.trde_prica,
                 tm = kiwoomStockTradeInfoRes.date + time("HHmm"),
+                nxtEnable = kiwoomStockInfoRes.nxtEnable,
+                orderWarning = kiwoomStockInfoRes.orderWarning,
+                marketCode = kiwoomStockInfoRes.marketCode,
+                marketName = kiwoomStockInfoRes.marketName,
             )
         }
 
