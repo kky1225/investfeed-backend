@@ -12,7 +12,7 @@ import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
-import com.example.investfeed.kiwoom.sect.service.SectService
+import com.example.investfeed.kiwoom.index.client.SectService
 import org.springframework.stereotype.Service
 
 @Service

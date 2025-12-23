@@ -2,14 +2,22 @@ package com.example.investfeed.kiwoom.stock.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.stock.entity.req.*
-import com.example.investfeed.kiwoom.stock.entity.res.*
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartDayReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMonthReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartWeekReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartYearReq
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartDayRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartMinuteRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartMonthRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartWeekRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartYearRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import kotlin.jvm.java
 
 @Service
 class StockChartClient(
@@ -23,7 +31,7 @@ class StockChartClient(
 
     @KiwoomToken
     fun chartMinuteList(
-        req: KiwoomStockChartMinuteReq
+        req: com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMinuteReq
     ): KiwoomStockChartMinuteRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()

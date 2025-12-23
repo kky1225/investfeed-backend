@@ -1,11 +1,21 @@
 package com.example.investfeed.kiwoom.stock.client
 
+import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
+import com.example.investfeed.domain.stock.dto.req.StockJumpListReq
+import com.example.investfeed.domain.stock.dto.req.StockNewPriceListReq
+import com.example.investfeed.domain.stock.dto.req.StockTradeDailyListReq
+import com.example.investfeed.domain.stock.dto.res.StockInfoListRes
+import com.example.investfeed.domain.stock.dto.res.StockJumpListRes
+import com.example.investfeed.domain.stock.dto.res.StockNewPriceListRes
+import com.example.investfeed.domain.stock.dto.res.StockTradeDailyListRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.stock.dto.req.*
-import com.example.investfeed.kiwoom.stock.dto.res.*
-import com.example.investfeed.kiwoom.stock.entity.req.*
-import com.example.investfeed.kiwoom.stock.entity.res.*
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockDefaultInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestorRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -126,40 +136,6 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockTradeInfo(
-        req: KiwoomStockTradeInfoReq
-    ): KiwoomStockTradeInfoRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/mrkcond")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10006")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeInfoRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw StockTradeInfoException()
-            }
-
-            return res
-        } catch (e: KiwoomApiException) {
-            throw e
-        } catch (e: StockTradeInfoException) {
-            throw e
-        } catch (e: Exception) {
-            log.error { "stockTradeInfo Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
     fun stockInvestor(
         req: KiwoomStockInvestorReq
     ): KiwoomStockInvestorRes {
@@ -262,40 +238,6 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockSinglePriceList(
-        req: StockSinglePriceListReq
-    ): StockSinglePriceListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/mrkcond")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10087")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockSinglePriceListRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw StockSinglePriceListException()
-            }
-
-            return res
-        }catch (e: KiwoomApiException) {
-            throw e
-        }catch (e: StockSinglePriceListException) {
-            throw e
-        }catch (e: Exception) {
-            log.error { "stockSinglePriceList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
     fun stockNewPriceList(
         req: StockNewPriceListReq
     ): StockNewPriceListRes? {
@@ -324,108 +266,6 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.error { "stockNewPriceList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
-    fun stockTradeValueList(
-        req: KiwoomStockTradeValueReq
-    ): KiwoomStockTradeValueListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10032")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeValueListRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw StockTradeValueListException()
-            }
-
-            return res
-        }catch (e: KiwoomApiException) {
-            throw e
-        }catch (e: StockTradeValueListException) {
-            throw e
-        }catch (e: Exception) {
-            log.error { "stockTradeValueList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
-    fun stockTradeVolumeList(
-        req: KiwoomStockTradeVolumeListReq
-    ): KiwoomStockTradeVolumeListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10030")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeVolumeListRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw StockTradeVolumeListException()
-            }
-
-            return res
-        }catch(e: KiwoomApiException){
-            throw e
-        }catch(e: StockTradeVolumeListException){
-            throw e
-        }catch (e: Exception) {
-            log.error { "stockTradeVolumeList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
-    fun stockSurgeTradeVolumeList(
-        req: KiwoomSurgeTradeVolumeListReq
-    ): KiwoomSurgeTradeVolumeListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
-
-        try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10023")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSurgeTradeVolumeListRes::class.java)
-                .block()
-
-            if(res?.return_code != 0) {
-                throw StockSurgeTradeVolumeListException()
-            }
-
-            return res
-        }catch(e: KiwoomApiException){
-            throw e
-        }catch(e: StockSurgeTradeVolumeListException){
-            throw e
-        }catch (e: Exception) {
-            log.error { "stockSurgeTradeVolumeList Error" }
 
             throw RuntimeException(e.message)
         }

@@ -12,7 +12,7 @@ import com.example.investfeed.kiwoom.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.index.service.IndexService
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
-import com.example.investfeed.kiwoom.sect.service.SectSocketService
+import com.example.investfeed.kiwoom.index.client.SectSocketService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

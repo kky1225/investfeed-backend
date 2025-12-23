@@ -1,0 +1,93 @@
+package com.example.investfeed.kiwoom.price.client
+
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockSinglePriceRes
+import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.exception.*
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
+import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.http.HttpHeaders
+import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.WebClient
+
+@Component
+class PriceClient(
+    private val webClient: WebClient,
+    private val redisTemplate: RedisTemplate<String, String>,
+) {
+    private val log = KotlinLogging.logger {}
+
+    @Value("\${kiwoom.default-url}")
+    private lateinit var DEFAULT_URL: String
+
+    @KiwoomToken
+    fun stockTradeInfo(
+        req: KiwoomStockTradeInfoReq
+    ): KiwoomStockTradeInfoRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/mrkcond")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10006")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockTradeInfoRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockTradeInfoException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: StockTradeInfoException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "stockTradeInfo Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockSinglePriceList(
+        req: KiwoomStockSinglePriceReq
+    ): KiwoomStockSinglePriceRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/mrkcond")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10087")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomStockSinglePriceRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockSinglePriceListException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockSinglePriceListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockSinglePriceList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+}

@@ -14,7 +14,7 @@ import com.example.investfeed.kiwoom.sect.dto.rest.res.SectIndexListRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectInvestorRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceNowRes
 import com.example.investfeed.kiwoom.sect.dto.rest.res.SectPriceRes
-import com.example.investfeed.kiwoom.sect.service.SectService
+import com.example.investfeed.kiwoom.index.client.SectService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

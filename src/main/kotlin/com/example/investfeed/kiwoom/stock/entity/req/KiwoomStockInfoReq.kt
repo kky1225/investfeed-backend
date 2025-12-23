@@ -1,5 +1,0 @@
-package com.example.investfeed.kiwoom.stock.entity.req
-
-data class KiwoomStockInfoReq (
-    var stk_cd: String, // 종목코드
-)
