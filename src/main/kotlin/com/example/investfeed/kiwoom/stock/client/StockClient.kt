@@ -10,6 +10,8 @@ import com.example.investfeed.domain.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.domain.stock.dto.res.StockTradeDailyListRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomSectCodeListReq
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomSectCodeListRes
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
@@ -32,6 +34,7 @@ class StockClient(
 
     @Value("\${kiwoom.default-url}")
     private lateinit var DEFAULT_URL: String
+    private final val STOCK_URL = "/api/dostk/stkinfo"
 
     @KiwoomToken
     fun stockInfoList(
@@ -42,7 +45,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10099")
                 .bodyValue(req)
@@ -76,7 +79,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10001")
                 .bodyValue(req)
@@ -110,7 +113,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10100")
                 .bodyValue(req)
@@ -144,7 +147,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10059")
                 .bodyValue(req)
@@ -178,7 +181,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10015")
                 .bodyValue(req)
@@ -212,7 +215,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10019")
                 .bodyValue(req)
@@ -246,7 +249,7 @@ class StockClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/stkinfo")
+                .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10016")
                 .bodyValue(req)
@@ -266,6 +269,40 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.error { "stockNewPriceList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun sectCodeList(
+        req: KiwoomSectCodeListReq
+    ): KiwoomSectCodeListRes? {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + STOCK_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10101")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomSectCodeListRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw SectCodeListException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: SectCodeListException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "sectCodeList Error" }
 
             throw RuntimeException(e.message)
         }

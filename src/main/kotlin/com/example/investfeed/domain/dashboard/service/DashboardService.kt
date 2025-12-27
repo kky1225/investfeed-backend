@@ -3,16 +3,16 @@ package com.example.investfeed.domain.dashboard.service
 import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.investor.service.InvestorService
-import com.example.investfeed.kiwoom.sect.dto.rest.req.SectIndexDailyListReq
-import com.example.investfeed.kiwoom.sect.dto.rest.req.SectInvestorReq
-import com.example.investfeed.kiwoom.sect.dto.rest.req.SectPriceNowReq
-import com.example.investfeed.kiwoom.index.client.SectService
+import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
+import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
+import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
+import com.example.investfeed.kiwoom.sect.client.SectClient
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
 @Service
 class DashboardService(
-    private val sectService: SectService,
+    private val sectClient: SectClient,
     private val investorService: InvestorService,
 ) {
     private val log = KotlinLogging.logger {}
@@ -20,55 +20,55 @@ class DashboardService(
     fun dashboard(): DashboardRes? {
         log.debug { "dashboard" }
 
-        val kospiIndexDailyListRes = sectService.sectIndexDailyList(
-            req = SectIndexDailyListReq(
+        val kospiIndexDailyListRes = sectClient.sectIndexDailyList(
+            req = KiwoomSectIndexDailyReq(
                 mrkt_tp = "0",
                 inds_cd = "001"
             )
         )
 
         return DashboardRes(
-            kospiPriceRes = sectService.sectPriceNow(
-                req = SectPriceNowReq(
+            kospiPriceRes = sectClient.sectPriceNow(
+                req = KiwoomSectPriceNowReq(
                     mrkt_tp = "0",
                     inds_cd = "001"
                 )
             ),
             kospiIndexDailyListRes = kospiIndexDailyListRes,
-            kospiInvestor = sectService.sectInvestor(
-                req = SectInvestorReq(
+            kospiInvestor = sectClient.sectInvestor(
+                req = KiwoomSectInvestorReq(
                     mrkt_tp = "0",
                     amt_qty_tp = "0",
                     stex_tp = "0"
                 )
             ),
-            kosdacPriceRes = sectService.sectPriceNow(
-                req = SectPriceNowReq(
+            kosdacPriceRes = sectClient.sectPriceNow(
+                req = KiwoomSectPriceNowReq(
                     mrkt_tp = "1",
                     inds_cd = "101"
                 )
             ),
-            kosdacIndexDailyListRes = sectService.sectIndexDailyList(
-                req = SectIndexDailyListReq(
+            kosdacIndexDailyListRes = sectClient.sectIndexDailyList(
+                req = KiwoomSectIndexDailyReq(
                     mrkt_tp = "1",
                     inds_cd = "101"
                 )
             ),
-            kosdacInvestor = sectService.sectInvestor(
-                req = SectInvestorReq(
+            kosdacInvestor = sectClient.sectInvestor(
+                req = KiwoomSectInvestorReq(
                     mrkt_tp = "1",
                     amt_qty_tp = "0",
                     stex_tp = "0"
                 )
             ),
-            kospi200PriceRes = sectService.sectPriceNow(
-                req = SectPriceNowReq(
+            kospi200PriceRes = sectClient.sectPriceNow(
+                req = KiwoomSectPriceNowReq(
                     mrkt_tp = "0",
                     inds_cd = "201"
                 )
             ),
-            kospi200IndexDailyListRes = sectService.sectIndexDailyList(
-                req = SectIndexDailyListReq(
+            kospi200IndexDailyListRes = sectClient.sectIndexDailyList(
+                req = KiwoomSectIndexDailyReq(
                     mrkt_tp = "0",
                     inds_cd = "201"
                 )
