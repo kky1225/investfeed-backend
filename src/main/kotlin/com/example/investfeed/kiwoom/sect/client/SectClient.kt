@@ -68,7 +68,7 @@ class SectClient(
     @KiwoomToken
     fun sectPriceNow(
         req: KiwoomSectPriceNowReq
-    ): KiwoomSectPriceNowRes? {
+    ): KiwoomSectPriceNowRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 

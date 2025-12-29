@@ -6,11 +6,11 @@ import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMonthListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartWeekListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartYearListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartDayListRes
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMinuteListRes
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMonthListRes
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartWeekListRes
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartYearListRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartDayRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMinuteRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMonthRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartWeekRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartYearRes
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.SectChartDayListException
@@ -38,7 +38,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartMinuteList(
         req: SectChartMinuteListReq
-    ): SectChartMinuteListRes? {
+    ): KiwoomSectChartMinuteRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -50,7 +50,7 @@ class SectChartService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartMinuteListRes::class.java)
+                .bodyToMono(KiwoomSectChartMinuteRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -76,7 +76,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartDayList(
         req: SectChartDayListReq
-    ): SectChartDayListRes? {
+    ): KiwoomSectChartDayRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -88,7 +88,7 @@ class SectChartService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartDayListRes::class.java)
+                .bodyToMono(KiwoomSectChartDayRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -110,7 +110,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartWeekList(
         req: SectChartWeekListReq
-    ): SectChartWeekListRes? {
+    ): KiwoomSectChartWeekRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -122,7 +122,7 @@ class SectChartService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartWeekListRes::class.java)
+                .bodyToMono(KiwoomSectChartWeekRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -144,7 +144,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartMonthList(
         req: SectChartMonthListReq
-    ): SectChartMonthListRes? {
+    ): KiwoomSectChartMonthRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -156,7 +156,7 @@ class SectChartService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartMonthListRes::class.java)
+                .bodyToMono(KiwoomSectChartMonthRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -178,7 +178,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartYearList(
         req: SectChartYearListReq
-    ): SectChartYearListRes? {
+    ): KiwoomSectChartYearRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -190,7 +190,7 @@ class SectChartService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(SectChartYearListRes::class.java)
+                .bodyToMono(KiwoomSectChartYearRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {

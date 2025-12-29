@@ -1,8 +1,8 @@
 package com.example.investfeed.kiwoom.chart.dto.sect.res
 
-data class SectChartYearListRes(
+data class KiwoomSectChartWeekRes(
     var return_code: Int, // 응답 코드
     var return_msg: String, // 응답 메세지
     var inds_cd: String? = null, // 업종코드
-    var inds_yr_pole_qry: List<SectChartYearList>? = null // 업종년봉조회
+    var inds_stk_pole_qry: List<KiwoomSectChartWeek>? = null // 업종주봉조회
 )

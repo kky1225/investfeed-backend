@@ -12,12 +12,16 @@ import com.example.investfeed.kiwoom.gold.client.GoldClient
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
+import com.example.investfeed.domain.index.dto.res.ChartMinute
 import com.example.investfeed.domain.index.dto.res.IndexDetailRes
+import com.example.investfeed.domain.index.dto.res.IndexListItem
 import com.example.investfeed.domain.index.dto.res.IndexListRes
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import org.springframework.stereotype.Service
+import java.util.Collections.emptyList
+import kotlin.String
 
 @Service
 class IndexService(
@@ -26,43 +30,83 @@ class IndexService(
     private val goldClient: GoldClient,
 ) {
     fun indexList(): IndexListRes? {
+        val indexCode = listOf("001", "101", "201")
+        val indexListRes: MutableList<IndexListItem> = mutableListOf()
+
+        indexCode.forEach { it ->
+            val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
+                req = KiwoomSectPriceNowReq(
+                    mrkt_tp = "0",
+                    inds_cd = it
+                )
+            )
+
+            if (kiwoomSectPriceNowRes.return_code == 0) {
+                var chartMinuteList: List<ChartMinute> = mutableListOf()
+
+                val kiwoomSectChartMinuteRes = sectChartService.sectChartMinuteList(
+                    req = SectChartMinuteListReq(
+                        inds_cd = it,
+                        tic_scope = "1"
+                    )
+                )
+
+                if (kiwoomSectChartMinuteRes.return_code == 0) {
+                    chartMinuteList = kiwoomSectChartMinuteRes.inds_min_pole_qry?.map { it ->
+                        ChartMinute(
+                            curPrc = it.cur_prc,
+                            cntrTm = it.cntr_tm
+                        )
+                    } ?: emptyList()
+                }
+
+                indexListRes.add(
+                    IndexListItem(
+                        indsCd = it,
+                        indsNm = "",
+                        curPrc = kiwoomSectPriceNowRes.cur_prc,
+                        predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
+                        fluRt = kiwoomSectPriceNowRes.flu_rt,
+                        trdeQty = kiwoomSectPriceNowRes.trde_qty,
+                        trdePrica = kiwoomSectPriceNowRes.trde_prica,
+                        openPric = kiwoomSectPriceNowRes.open_pric,
+                        tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.first()?.tm_n,
+                        chartMinuteList = chartMinuteList
+                    )
+                )
+            }
+        }
+
+//        val kiwoomKosdacPriceNowRes = sectClient.sectPriceNow(
+//            req = KiwoomSectPriceNowReq(
+//                mrkt_tp = "0",
+//                inds_cd = "101"
+//            )
+//        )
+//        kosdacChartMinuteListRes = sectChartService.sectChartMinuteList(
+//            req = SectChartMinuteListReq(
+//                inds_cd = "101",
+//                tic_scope = "1"
+//            )
+//        )
+//
+//
+//
+//        val kiwoomKospi200PriceRes = sectClient.sectPriceNow(
+//            req = KiwoomSectPriceNowReq(
+//                mrkt_tp = "0",
+//                inds_cd = "201"
+//            )
+//        )
+//        kospi200ChartMinuteListRes = sectChartService.sectChartMinuteList(
+//            req = SectChartMinuteListReq(
+//                inds_cd = "201",
+//                tic_scope = "1"
+//            )
+//        )
+
         return IndexListRes(
-            kospiPriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = "001"
-                )
-            ),
-            kospiChartMinuteListRes = sectChartService.sectChartMinuteList(
-                req = SectChartMinuteListReq(
-                    inds_cd = "001",
-                    tic_scope = "1"
-                )
-            ),
-            kosdacPriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = "101"
-                )
-            ),
-            kosdacChartMinuteListRes = sectChartService.sectChartMinuteList(
-                req = SectChartMinuteListReq(
-                    inds_cd = "101",
-                    tic_scope = "1"
-                )
-            ),
-            kospi200PriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = "201"
-                )
-            ),
-            kospi200ChartMinuteListRes = sectChartService.sectChartMinuteList(
-                req = SectChartMinuteListReq(
-                    inds_cd = "201",
-                    tic_scope = "1"
-                )
-            ),
+            indexList = indexListRes,
             goldPriceRes = goldClient.goldPriceNow(
                 req = GoldPriceNowReq(
                     stk_cd = "M04020000"

@@ -1,7 +1,7 @@
 package com.example.investfeed.kiwoom.chart.controller
 
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.res.SectChartMinuteListRes
+import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMinuteRes
 import com.example.investfeed.kiwoom.chart.service.SectChartService
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
@@ -22,7 +22,7 @@ class SectChartController(
     @GetMapping("minuteList")
     fun sectChartMinuteList(
         req: SectChartMinuteListReq
-    ): ResponseEntity<ApiResponse<SectChartMinuteListRes?>> {
+    ): ResponseEntity<ApiResponse<KiwoomSectChartMinuteRes?>> {
         log.info { "sectChartMinuteList $req" }
 
         return ResponseEntity(
