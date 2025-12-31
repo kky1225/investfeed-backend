@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.index.service
 
+import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
@@ -30,14 +31,14 @@ class IndexService(
     private val goldClient: GoldClient,
 ) {
     fun indexList(): IndexListRes? {
-        val indexCode = listOf("001", "101", "201")
+        val indexList = IndexType.entries
         val indexListRes: MutableList<IndexListItem> = mutableListOf()
 
-        indexCode.forEach { it ->
+        indexList.forEach { it ->
             val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
                 req = KiwoomSectPriceNowReq(
                     mrkt_tp = "0",
-                    inds_cd = it
+                    inds_cd = it.indsCd
                 )
             )
 
@@ -46,7 +47,7 @@ class IndexService(
 
                 val kiwoomSectChartMinuteRes = sectChartService.sectChartMinuteList(
                     req = SectChartMinuteListReq(
-                        inds_cd = it,
+                        inds_cd = it.indsCd,
                         tic_scope = "1"
                     )
                 )
@@ -62,8 +63,8 @@ class IndexService(
 
                 indexListRes.add(
                     IndexListItem(
-                        indsCd = it,
-                        indsNm = "",
+                        indsCd = it.indsCd,
+                        indsNm = it.indsNm,
                         curPrc = kiwoomSectPriceNowRes.cur_prc,
                         predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
                         fluRt = kiwoomSectPriceNowRes.flu_rt,
@@ -76,34 +77,6 @@ class IndexService(
                 )
             }
         }
-
-//        val kiwoomKosdacPriceNowRes = sectClient.sectPriceNow(
-//            req = KiwoomSectPriceNowReq(
-//                mrkt_tp = "0",
-//                inds_cd = "101"
-//            )
-//        )
-//        kosdacChartMinuteListRes = sectChartService.sectChartMinuteList(
-//            req = SectChartMinuteListReq(
-//                inds_cd = "101",
-//                tic_scope = "1"
-//            )
-//        )
-//
-//
-//
-//        val kiwoomKospi200PriceRes = sectClient.sectPriceNow(
-//            req = KiwoomSectPriceNowReq(
-//                mrkt_tp = "0",
-//                inds_cd = "201"
-//            )
-//        )
-//        kospi200ChartMinuteListRes = sectChartService.sectChartMinuteList(
-//            req = SectChartMinuteListReq(
-//                inds_cd = "201",
-//                tic_scope = "1"
-//            )
-//        )
 
         return IndexListRes(
             indexList = indexListRes,
