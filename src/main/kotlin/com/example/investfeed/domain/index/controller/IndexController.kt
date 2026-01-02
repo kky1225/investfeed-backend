@@ -1,14 +1,14 @@
 package com.example.investfeed.domain.index.controller
 
-import com.example.investfeed.kiwoom.config.ResponseCode
-import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.gold.service.GoldSocketService
-import com.example.investfeed.kiwoom.index.client.SectSocketService
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.req.IndexDetailStreamReq
 import com.example.investfeed.domain.index.dto.res.IndexDetailRes
 import com.example.investfeed.domain.index.dto.res.IndexListRes
 import com.example.investfeed.domain.index.service.IndexService
+import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.kiwoom.gold.service.GoldSocketService
+import com.example.investfeed.kiwoom.index.client.SectSocketService
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
 import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
 import mu.KotlinLogging
@@ -84,7 +84,7 @@ class IndexController(
     @GetMapping("detail")
     fun indexDetail(
         req: IndexDetailReq
-    ): ResponseEntity<ApiResponse<IndexDetailRes<*>?>> {
+    ): ResponseEntity<ApiResponse<IndexDetailRes>> {
         log.info { "indexDetail: $req" }
 
         return ResponseEntity(

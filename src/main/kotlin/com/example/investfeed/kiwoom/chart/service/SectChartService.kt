@@ -76,7 +76,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartDayList(
         req: SectChartDayListReq
-    ): KiwoomSectChartDayRes? {
+    ): KiwoomSectChartDayRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -110,7 +110,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartWeekList(
         req: SectChartWeekListReq
-    ): KiwoomSectChartWeekRes? {
+    ): KiwoomSectChartWeekRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -144,7 +144,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartMonthList(
         req: SectChartMonthListReq
-    ): KiwoomSectChartMonthRes? {
+    ): KiwoomSectChartMonthRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -178,7 +178,7 @@ class SectChartService(
     @KiwoomToken
     fun sectChartYearList(
         req: SectChartYearListReq
-    ): KiwoomSectChartYearRes? {
+    ): KiwoomSectChartYearRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 

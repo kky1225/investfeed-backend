@@ -1,28 +1,21 @@
 package com.example.investfeed.domain.index.service
 
 import com.example.investfeed.domain.index.IndexType
+import com.example.investfeed.domain.index.dto.req.IndexDetailReq
+import com.example.investfeed.domain.index.dto.res.*
 import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMonthListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartWeekListReq
-import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartYearListReq
+import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.chart.service.SectChartService
 import com.example.investfeed.kiwoom.gold.client.GoldClient
 import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
-import com.example.investfeed.domain.index.dto.req.IndexDetailReq
-import com.example.investfeed.domain.index.dto.res.ChartMinute
-import com.example.investfeed.domain.index.dto.res.IndexDetailRes
-import com.example.investfeed.domain.index.dto.res.IndexListItem
-import com.example.investfeed.domain.index.dto.res.IndexListRes
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Collections.emptyList
-import kotlin.String
 
 @Service
 class IndexService(
@@ -96,59 +89,60 @@ class IndexService(
 
     fun indexDetail(
         req: IndexDetailReq
-    ): IndexDetailRes<*>? {
-        val sectIndexDailyListRes = sectClient.sectIndexDailyList(
-            req = KiwoomSectIndexDailyReq(
-                mrkt_tp = "0",
-                inds_cd = req.inds_cd
-            )
-        )
-
-        var chartListRes: Any?
+    ): IndexDetailRes {
+        val chartList: MutableList<IndexChart> = mutableListOf()
 
         when(req.chart_type) {
             IndexChartType.DAY -> {
-                chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
-                    sectChartService.sectChartDayList(
-                        req = SectChartDayListReq(
-                            inds_cd = req.inds_cd,
-                            base_dt = it
-                        )
+                val kiwoomSectChartDayRes = sectChartService.sectChartDayList(
+                    req = SectChartDayListReq(
+                        inds_cd = req.inds_cd,
+                        base_dt = today("yyyyMMdd")
                     )
+                )
+
+                if (kiwoomSectChartDayRes.return_code == 0) {
+                    kiwoomSectChartDayRes.inds_dt_pole_qry?.forEach {
+                        chartList.add(
+                            IndexChart(
+                                dt = it.dt,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica
+                            )
+                        )
+                    }
                 }
             }
             IndexChartType.WEEK -> {
-                chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
-                    sectChartService.sectChartWeekList(
-                        req = SectChartWeekListReq(
-                            inds_cd = req.inds_cd,
-                            base_dt = it
-                        )
+                sectChartService.sectChartWeekList(
+                    req = SectChartWeekListReq(
+                        inds_cd = req.inds_cd,
+                        base_dt = today("yyyyMMdd")
                     )
-                }
+                )
             }
             IndexChartType.MONTH -> {
-                chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
-                    sectChartService.sectChartMonthList(
-                        req = SectChartMonthListReq(
-                            inds_cd = req.inds_cd,
-                            base_dt = it
-                        )
+                sectChartService.sectChartMonthList(
+                    req = SectChartMonthListReq(
+                        inds_cd = req.inds_cd,
+                        base_dt = today("yyyyMMdd")
                     )
-                }
+                )
             }
             IndexChartType.YEAR -> {
-                chartListRes = sectIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n?.let {
-                    sectChartService.sectChartYearList(
-                        req = SectChartYearListReq(
-                            inds_cd = req.inds_cd,
-                            base_dt = it
-                        )
+                sectChartService.sectChartYearList(
+                    req = SectChartYearListReq(
+                        inds_cd = req.inds_cd,
+                        base_dt = today("yyyyMMdd")
                     )
-                }
+                )
             }
             else -> {
-                chartListRes = req.chart_type.value?.let {
+                req.chart_type.value?.let {
                     sectChartService.sectChartMinuteList(
                         req = SectChartMinuteListReq(
                             inds_cd = req.inds_cd,
@@ -159,21 +153,52 @@ class IndexService(
             }
         }
 
-        return IndexDetailRes(
-            sectPriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = req.inds_cd
-                )
-            ),
-            chartListRes = chartListRes,
-            sectInvestor = sectClient.sectInvestor(
-                req = KiwoomSectInvestorReq(
-                    mrkt_tp = if (req.inds_cd == "101") "1" else "0",
-                    amt_qty_tp = "0",
-                    stex_tp = "0"
-                )
-            ),
+        val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
+            req = KiwoomSectPriceNowReq(
+                mrkt_tp = "0",
+                inds_cd = req.inds_cd
+            )
         )
+
+
+        val kiwoomSectInvestorRes = sectClient.sectInvestor(
+            req = KiwoomSectInvestorReq(
+                mrkt_tp = if (req.inds_cd == "101") "1" else "0",
+                amt_qty_tp = "0",
+                stex_tp = "0"
+            )
+        )
+
+        return IndexDetailRes(
+            indexInfo = IndexInfo(
+                indsCd = req.inds_cd,
+                indsNm = IndexType.entries.find { it.indsCd == req.inds_cd }?.indsNm,
+                curPrc = kiwoomSectPriceNowRes.cur_prc,
+                predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
+                predPre = kiwoomSectPriceNowRes.pred_pre,
+                fluRt = kiwoomSectPriceNowRes.flu_rt,
+                trdeQty = kiwoomSectPriceNowRes.trde_qty,
+                trdePrica = kiwoomSectPriceNowRes.trde_prica,
+                highPric = kiwoomSectPriceNowRes.high_pric,
+                openPric = kiwoomSectPriceNowRes.open_pric,
+                lowPric = kiwoomSectPriceNowRes.low_pric,
+                _250hgst = kiwoomSectPriceNowRes._52wk_hgst_pric,
+                _250lwst = kiwoomSectPriceNowRes._52wk_lwst_pric,
+                tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
+                indNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.ind_netprps,
+                frgnrNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.frgnr_netprps,
+                orgnNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.orgn_netprps
+            ),
+            chartList = chartList
+        )
+    }
+
+    fun today(
+        pattern: String
+    ): String {
+        val now = LocalDate.now()
+        val pattern = DateTimeFormatter.ofPattern(pattern)
+
+        return pattern.format(now)
     }
 }

@@ -2,16 +2,8 @@ package com.example.investfeed.kiwoom.sect.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexReq
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
-import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceReq
-import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectIndexDailyRes
-import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectIndexRes
-import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
-import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectPriceNowRes
-import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectPriceRes
+import com.example.investfeed.kiwoom.sect.dto.req.*
+import com.example.investfeed.kiwoom.sect.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -34,7 +26,7 @@ class SectClient(
     @KiwoomToken
     fun sectInvestor(
         req: KiwoomSectInvestorReq
-    ): KiwoomSectInvestorRes? {
+    ): KiwoomSectInvestorRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -108,7 +100,7 @@ class SectClient(
     @KiwoomToken
     fun sectPrice(
         req: KiwoomSectPriceReq
-    ): KiwoomSectPriceRes? {
+    ): KiwoomSectPriceRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -159,7 +151,7 @@ class SectClient(
     @KiwoomToken
     fun sectIndexList(
         req: KiwoomSectIndexReq
-    ): KiwoomSectIndexRes? {
+    ): KiwoomSectIndexRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -205,7 +197,7 @@ class SectClient(
     @KiwoomToken
     fun sectIndexDailyList(
         req: KiwoomSectIndexDailyReq
-    ): KiwoomSectIndexDailyRes? {
+    ): KiwoomSectIndexDailyRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 

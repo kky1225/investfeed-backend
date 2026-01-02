@@ -1,29 +1,20 @@
 package com.example.investfeed.domain.stock.service
 
-import com.example.investfeed.kiwoom.stock.client.StockChartClient
-import com.example.investfeed.kiwoom.stock.client.StockClient
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartDayReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMinuteReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMonthReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartWeekReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartYearReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.rank.client.RankClient
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
+import com.example.investfeed.kiwoom.stock.client.StockChartClient
+import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.dto.req.*
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
@@ -220,12 +211,12 @@ class StockService(
                         chartListRes.add(
                             StockChart(
                                 dt = it.dt,
-                                cur_prc = it.cur_prc,
-                                open_pric = it.open_pric,
-                                high_pric = it.high_pric,
-                                low_pric = it.low_pric,
-                                trde_qty = it.trde_qty,
-                                trde_prica = it.trde_prica,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica,
                             )
                         )
                     }
@@ -245,12 +236,12 @@ class StockService(
                         chartListRes.add(
                             StockChart(
                                 dt = it.dt,
-                                cur_prc = it.cur_prc,
-                                open_pric = it.open_pric,
-                                high_pric = it.high_pric,
-                                low_pric = it.low_pric,
-                                trde_qty = it.trde_qty,
-                                trde_prica = it.trde_prica,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica,
                             )
                         )
                     }
@@ -270,12 +261,12 @@ class StockService(
                         chartListRes.add(
                             StockChart(
                                 dt = it.dt,
-                                cur_prc = it.cur_prc,
-                                open_pric = it.open_pric,
-                                high_pric = it.high_pric,
-                                low_pric = it.low_pric,
-                                trde_qty = it.trde_qty,
-                                trde_prica = it.trde_prica,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica,
                             )
                         )
                     }
@@ -295,12 +286,12 @@ class StockService(
                         chartListRes.add(
                             StockChart(
                                 dt = it.dt,
-                                cur_prc = it.cur_prc,
-                                open_pric = it.open_pric,
-                                high_pric = it.high_pric,
-                                low_pric = it.low_pric,
-                                trde_qty = it.trde_qty,
-                                trde_prica = it.trde_prica,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica,
                             )
                         )
                     }
@@ -323,11 +314,11 @@ class StockService(
                             chartListRes.add(
                                 StockChart(
                                     dt = it.cntr_tm,
-                                    cur_prc = it.cur_prc,
-                                    open_pric = it.open_pric,
-                                    high_pric = it.high_pric,
-                                    low_pric = it.low_pric,
-                                    trde_qty = it.trde_qty,
+                                    curPrc = it.cur_prc,
+                                    openPric = it.open_pric,
+                                    highPric = it.high_pric,
+                                    lowPric = it.low_pric,
+                                    trdeQty = it.trde_qty,
                                 )
                             )
                         }
