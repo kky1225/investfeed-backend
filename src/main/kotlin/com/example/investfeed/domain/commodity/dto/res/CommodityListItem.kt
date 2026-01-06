@@ -1,8 +1,10 @@
-package com.example.investfeed.domain.index.dto.res
+package com.example.investfeed.domain.commodity.dto.res
 
-data class IndexListItem(
-    var indsCd: String? = null,
-    var indsNm: String? = null,
+import com.example.investfeed.domain.index.dto.res.ChartMinute
+
+data class CommodityListItem(
+    var stkCd: String? = null,
+    var stkNm: String? = null,
     var curPrc: String? = null,
     var predPreSig: String? = null,
     var fluRt: String? = null,

@@ -6,9 +6,9 @@ import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.domain.dashboard.service.DashboardService
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
-import com.example.investfeed.kiwoom.index.client.SectSocketService
+import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
+import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
+import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import mu.KotlinLogging
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController
 class DashboardController(
     private val dashboardService: DashboardService,
     private val stockSocketClient: StockSocketClient,
-    private val sectSocketService: SectSocketService
+    private val realTimeClient: RealTimeClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -47,7 +47,7 @@ class DashboardController(
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "dashboardStream: $req" }
 
-        sectSocketService.sectIndexListStream(
+        realTimeClient.sectIndexListStream(
             req = SectIndexListStreamReq(
                 trnm = "REG",
                 grp_no = "0001",

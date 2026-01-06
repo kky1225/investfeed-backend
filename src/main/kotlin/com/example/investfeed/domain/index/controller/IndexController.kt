@@ -8,9 +8,9 @@ import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.gold.service.GoldSocketService
-import com.example.investfeed.kiwoom.index.client.SectSocketService
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStream
-import com.example.investfeed.kiwoom.sect.dto.socket.req.SectIndexListStreamReq
+import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
+import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
+import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -22,8 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/index")
 class IndexController(
     private val indexService: IndexService,
-    private val sectSocketService: SectSocketService,
-    private val goldSocketService: GoldSocketService
+    private val realTimeClient: RealTimeClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -44,7 +43,7 @@ class IndexController(
     fun indexListStream(): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "indexListStream" }
 
-        sectSocketService.sectIndexListStream(
+        realTimeClient.sectIndexListStream(
             req = SectIndexListStreamReq(
                 trnm = "REG",
                 grp_no = "0001",
@@ -102,7 +101,7 @@ class IndexController(
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "indexDetailStream: $req" }
 
-        sectSocketService.sectIndexListStream(
+        realTimeClient.sectIndexListStream(
             req = SectIndexListStreamReq(
                 trnm = "REG",
                 grp_no = "0001",

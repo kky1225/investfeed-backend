@@ -55,5 +55,8 @@ enum class ResponseCode(
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다."),
     INDEX_WS_DETAIL(message = "지수 상세 소켓 조회에 성공하셨습니다."),
 
-    GOLD_DETAIL(message = "금현물 상세 조회에 성공하셨습니다."),
+    COMMODITY_LIST(message = "원자재 목록 조회에 성공하셨습니다."),
+    COMMODITY_LIST_REALTIME(message = "원자재 목록 실시간 조회에 성공하셨습니다."),
+    COMMODITY_DETAIL(message = "원자재 상세 조회에 성공하셨습니다."),
+    COMMODITY_DETAIL_REALTIME(message = "원자재 상세 실시간 조회에 성공하셨습니다."),
 }

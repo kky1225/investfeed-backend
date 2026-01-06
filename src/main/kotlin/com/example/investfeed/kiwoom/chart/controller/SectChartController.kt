@@ -2,7 +2,7 @@ package com.example.investfeed.kiwoom.chart.controller
 
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMinuteRes
-import com.example.investfeed.kiwoom.chart.service.SectChartService
+import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("api/sect/chart")
 class SectChartController(
-    private val sectChartService: SectChartService
+    private val sectChartClient: SectChartClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -29,7 +29,7 @@ class SectChartController(
             ApiResponse(
                 code = ResponseCode.SECT_CHART_MINUTE_LIST.code,
                 message = ResponseCode.SECT_CHART_MINUTE_LIST.message,
-                result = sectChartService.sectChartMinuteList(req = req)
+                result = sectChartClient.sectChartMinuteList(req = req)
             ), HttpStatus.OK
         )
     }

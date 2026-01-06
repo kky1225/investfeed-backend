@@ -8,7 +8,7 @@ import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeDailyRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeOrganizeRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
-import com.example.investfeed.kiwoom.investor.service.InvestorService
+import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("api/investor")
 class InvestorController(
-    private val investorService: InvestorService
+    private val investorClient: InvestorClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -33,7 +33,7 @@ class InvestorController(
             ApiResponse(
                 code = ResponseCode.INVESTOR_TRADE_DAILY.code,
                 message = ResponseCode.INVESTOR_TRADE_DAILY.message,
-                result = investorService.investorTradeDaily(req = req)
+                result = investorClient.investorTradeDaily(req = req)
             ), HttpStatus.OK
         )
     }
@@ -48,7 +48,7 @@ class InvestorController(
             ApiResponse(
                 code = ResponseCode.INVESTOR_TRADE_ORGANIZE.code,
                 message = ResponseCode.INVESTOR_TRADE_ORGANIZE.message,
-                result = investorService.investorTradeOrganize(req = req)
+                result = investorClient.investorTradeOrganize(req = req)
             ), HttpStatus.OK
         )
     }
@@ -63,7 +63,7 @@ class InvestorController(
             ApiResponse(
                 code = ResponseCode.INVESTOR_TRADE_RANK_LIST.code,
                 message = ResponseCode.INVESTOR_TRADE_RANK_LIST.message,
-                result = investorService.investorTradeRankList(req = req)
+                result = investorClient.investorTradeRankList(req = req)
             ), HttpStatus.OK
         )
     }

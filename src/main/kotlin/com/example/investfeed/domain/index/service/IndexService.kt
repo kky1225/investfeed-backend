@@ -3,12 +3,10 @@ package com.example.investfeed.domain.index.service
 import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.res.*
-import com.example.investfeed.kiwoom.chart.dto.gold.req.GoldChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
-import com.example.investfeed.kiwoom.chart.service.SectChartService
+import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.gold.client.GoldClient
-import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
@@ -20,14 +18,14 @@ import java.util.Collections.emptyList
 @Service
 class IndexService(
     private val sectClient: SectClient,
-    private val sectChartService: SectChartService,
+    private val sectChartClient: SectChartClient,
     private val goldClient: GoldClient,
 ) {
     fun indexList(): IndexListRes? {
-        val indexList = IndexType.entries
-        val indexListRes: MutableList<IndexListItem> = mutableListOf()
+        val indexTypeList = IndexType.entries
+        val indexList: MutableList<IndexListItem> = mutableListOf()
 
-        indexList.forEach { it ->
+        indexTypeList.forEach { it ->
             val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
                 req = KiwoomSectPriceNowReq(
                     mrkt_tp = "0",
@@ -38,7 +36,7 @@ class IndexService(
             if (kiwoomSectPriceNowRes.return_code == 0) {
                 var chartMinuteList: List<ChartMinute> = mutableListOf()
 
-                val kiwoomSectChartMinuteRes = sectChartService.sectChartMinuteList(
+                val kiwoomSectChartMinuteRes = sectChartClient.sectChartMinuteList(
                     req = SectChartMinuteListReq(
                         inds_cd = it.indsCd,
                         tic_scope = "1"
@@ -54,7 +52,7 @@ class IndexService(
                     } ?: emptyList()
                 }
 
-                indexListRes.add(
+                indexList.add(
                     IndexListItem(
                         indsCd = it.indsCd,
                         indsNm = it.indsNm,
@@ -64,7 +62,7 @@ class IndexService(
                         trdeQty = kiwoomSectPriceNowRes.trde_qty,
                         trdePrica = kiwoomSectPriceNowRes.trde_prica,
                         openPric = kiwoomSectPriceNowRes.open_pric,
-                        tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.first()?.tm_n,
+                        tm = kiwoomSectPriceNowRes.inds_cur_prc_tm?.first()?.tm_n,
                         chartMinuteList = chartMinuteList
                     )
                 )
@@ -72,18 +70,7 @@ class IndexService(
         }
 
         return IndexListRes(
-            indexList = indexListRes,
-            goldPriceRes = goldClient.goldPriceNow(
-                req = GoldPriceNowReq(
-                    stk_cd = "M04020000"
-                )
-            ),
-            goldChartMinuteListRes = goldClient.goldChartMinuteList(
-                req = GoldChartMinuteListReq(
-                    stk_cd = "M04020000",
-                    tic_scope = "1",
-                )
-            )
+            indexList = indexList
         )
     }
 
@@ -94,7 +81,7 @@ class IndexService(
 
         when(req.chart_type) {
             IndexChartType.DAY -> {
-                val kiwoomSectChartDayRes = sectChartService.sectChartDayList(
+                val kiwoomSectChartDayRes = sectChartClient.sectChartDayList(
                     req = SectChartDayListReq(
                         inds_cd = req.inds_cd,
                         base_dt = today("yyyyMMdd")
@@ -118,37 +105,101 @@ class IndexService(
                 }
             }
             IndexChartType.WEEK -> {
-                sectChartService.sectChartWeekList(
+                val kiwoomSectChartWeekRes = sectChartClient.sectChartWeekList(
                     req = SectChartWeekListReq(
                         inds_cd = req.inds_cd,
                         base_dt = today("yyyyMMdd")
                     )
                 )
+
+                if (kiwoomSectChartWeekRes.return_code == 0) {
+                    kiwoomSectChartWeekRes.inds_stk_pole_qry?.forEach {
+                        chartList.add(
+                            IndexChart(
+                                dt = it.dt,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica
+                            )
+                        )
+                    }
+                }
             }
             IndexChartType.MONTH -> {
-                sectChartService.sectChartMonthList(
+                val kiwoomSectChartMonthRes = sectChartClient.sectChartMonthList(
                     req = SectChartMonthListReq(
                         inds_cd = req.inds_cd,
                         base_dt = today("yyyyMMdd")
                     )
                 )
+
+                if (kiwoomSectChartMonthRes.return_code == 0) {
+                    kiwoomSectChartMonthRes.inds_mth_pole_qry?.forEach {
+                        chartList.add(
+                            IndexChart(
+                                dt = it.dt,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica
+                            )
+                        )
+                    }
+                }
             }
             IndexChartType.YEAR -> {
-                sectChartService.sectChartYearList(
+                val kiwoomSectChartYearRes = sectChartClient.sectChartYearList(
                     req = SectChartYearListReq(
                         inds_cd = req.inds_cd,
                         base_dt = today("yyyyMMdd")
                     )
                 )
+
+                if (kiwoomSectChartYearRes.return_code == 0) {
+                    kiwoomSectChartYearRes.inds_yr_pole_qry?.forEach {
+                        chartList.add(
+                            IndexChart(
+                                dt = it.dt,
+                                curPrc = it.cur_prc,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdeQty = it.trde_qty,
+                                trdePrica = it.trde_prica
+                            )
+                        )
+                    }
+                }
             }
             else -> {
                 req.chart_type.value?.let {
-                    sectChartService.sectChartMinuteList(
+                    val kiwoomSectChartMinuteRes = sectChartClient.sectChartMinuteList(
                         req = SectChartMinuteListReq(
                             inds_cd = req.inds_cd,
                             tic_scope = it
                         )
                     )
+                    
+                    if (kiwoomSectChartMinuteRes.return_code == 0) {
+                        kiwoomSectChartMinuteRes.inds_min_pole_qry?.forEach { it ->
+                            chartList.add(
+                                IndexChart(
+                                    dt = it.cntr_tm,
+                                    curPrc = it.cur_prc,
+                                    openPric = it.open_pric,
+                                    highPric = it.high_pric,
+                                    lowPric = it.low_pric,
+                                    trdeQty = it.trde_qty,
+                                    trdePrica = it.acc_trde_qty
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -159,7 +210,6 @@ class IndexService(
                 inds_cd = req.inds_cd
             )
         )
-
 
         val kiwoomSectInvestorRes = sectClient.sectInvestor(
             req = KiwoomSectInvestorReq(
