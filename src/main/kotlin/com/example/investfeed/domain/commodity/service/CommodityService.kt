@@ -17,12 +17,10 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import kotlin.String
 
 @Service
 class CommodityService(
@@ -167,6 +165,22 @@ class CommodityService(
                         upd_stkpc_tp = "1"
                     )
                 )
+
+                if (kiwoomGoldChartWeekRes.return_code == 0) {
+                    kiwoomGoldChartWeekRes.gds_week_chart_qry?.forEach {
+                        chartListRes.add(
+                            CommodityChart(
+                                curPrc = it.cur_prc,
+                                trdeQty = it.acc_trde_qty,
+                                dt = it.dt,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdePrica = it.acc_trde_prica,
+                            )
+                        )
+                    }
+                }
             }
             CommodityChartType.MONTH -> {
                 val kiwoomGoldChartMonthRes = goldChartClient.goldChartMonthList(
@@ -176,6 +190,22 @@ class CommodityService(
                         upd_stkpc_tp = "1"
                     )
                 )
+
+                if (kiwoomGoldChartMonthRes.return_code == 0) {
+                    kiwoomGoldChartMonthRes.gds_month_chart_qry?.forEach {
+                        chartListRes.add(
+                            CommodityChart(
+                                curPrc = it.cur_prc,
+                                trdeQty = it.acc_trde_qty,
+                                dt = it.dt,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdePrica = it.acc_trde_prica,
+                            )
+                        )
+                    }
+                }
             }
             else -> {
                 val kiwoomGoldChartMinuteRes = req.chartType.value?.let {
@@ -187,6 +217,22 @@ class CommodityService(
                         )
                     )
                 }
+
+                if (kiwoomGoldChartMinuteRes?.return_code == 0) {
+                    kiwoomGoldChartMinuteRes.gds_min_chart_qry?.forEach {
+                        chartListRes.add(
+                            CommodityChart(
+                                curPrc = it.cntr_pric,
+                                trdeQty = it.acc_trde_qty,
+                                dt = it.dt,
+                                openPric = it.open_pric,
+                                highPric = it.high_pric,
+                                lowPric = it.low_pric,
+                                trdePrica = it.acc_trde_prica,
+                            )
+                        )
+                    }
+                }
             }
         }
 
@@ -194,15 +240,6 @@ class CommodityService(
             commodityInfo = commodityInfo,
             commodityChartList = chartListRes
         )
-    }
-
-    fun today(
-        pattern: String
-    ): String {
-        val now = LocalDate.now()
-        val pattern = DateTimeFormatter.ofPattern(pattern)
-
-        return pattern.format(now)
     }
 
     fun time(

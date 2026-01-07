@@ -28,7 +28,7 @@ class TimeService() {
         val nxtOpen  = LocalTime.of(8, 0)
         val nxtClose = LocalTime.of(20, 0)
 
-        if (req.marketType === MarketType.INDEX) {
+        if (req.marketType in listOf(MarketType.INDEX, MarketType.COMMODITY)) {
             if(!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
                 exchangeType = ExchangeType.KRX.name
                 isMarketOpen = true

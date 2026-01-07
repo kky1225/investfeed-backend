@@ -1,6 +1,5 @@
 package com.example.investfeed.kiwoom.time.controller
 
-import com.example.investfeed.kiwoom.config.MarketType
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
@@ -19,7 +18,6 @@ class TimeController(
     private val timeService: TimeService
 ) {
     private val log = KotlinLogging.logger {}
-
 
     @GetMapping("now")
     fun timeNow(
