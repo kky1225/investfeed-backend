@@ -50,7 +50,7 @@ class CommodityController(
                 data = listOf(
                     KiwoomGoldPriceStream(
                         item = listOf("M04020000", "M04020100"),
-                        type = listOf("0I")
+                        type = listOf("0B")
                     )
                 )
             )
