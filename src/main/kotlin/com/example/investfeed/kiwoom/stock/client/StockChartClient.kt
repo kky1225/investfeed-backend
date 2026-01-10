@@ -3,6 +3,7 @@ package com.example.investfeed.kiwoom.stock.client
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartDayReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMinuteReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMonthReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartWeekReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartYearReq
@@ -31,7 +32,7 @@ class StockChartClient(
 
     @KiwoomToken
     fun chartMinuteList(
-        req: com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMinuteReq
+        req: KiwoomStockChartMinuteReq
     ): KiwoomStockChartMinuteRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()

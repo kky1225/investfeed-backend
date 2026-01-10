@@ -207,7 +207,7 @@ class StockService(
                 )
 
                 if (kiwoomStockChartDayRes.return_code == 0) {
-                    kiwoomStockChartDayRes.stk_dt_pole_chart_qry?.stream()?.forEach {
+                    kiwoomStockChartDayRes.stk_dt_pole_chart_qry?.forEach {
                         chartListRes.add(
                             StockChart(
                                 dt = it.dt,
@@ -310,7 +310,7 @@ class StockService(
 
                 kiwoomStockChartMinuteRes?.let {
                     if (it.return_code == 0) {
-                        kiwoomStockChartMinuteRes.stk_min_pole_chart_qry?.stream()?.filter { it.cntr_tm?.contains(today("yyyyMMdd")) == true }?.forEach {
+                        kiwoomStockChartMinuteRes.stk_min_pole_chart_qry?.stream()?.filter { kiwoomStockTradeInfoRes.date?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
                             chartListRes.add(
                                 StockChart(
                                     dt = it.cntr_tm,
