@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.gold.dto.rest.res
+package com.example.investfeed.kiwoom.price.dto.res
 
-data class GoldPriceNowMinute(
+data class KiwoomGoldPriceNowMinute(
     var cntr_pric: String? = null, // 체결가
     var pred_pre: String? = null, // 전일 대비(원)
     var flu_rt: String? = null, // 등락율

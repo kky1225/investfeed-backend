@@ -94,7 +94,7 @@ class CommodityController(
                 data = listOf(
                     KiwoomGoldPriceStream(
                         item = listOf(req.stkCd),
-                        type = listOf("0I")
+                        type = listOf("0B")
                     )
                 )
             )

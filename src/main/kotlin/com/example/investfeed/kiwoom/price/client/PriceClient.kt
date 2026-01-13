@@ -4,9 +4,9 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockSinglePriceRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.gold.dto.rest.req.GoldPriceNowMinuteReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowReq
-import com.example.investfeed.kiwoom.gold.dto.rest.res.GoldPriceNowMinuteRes
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowMinuteRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowRes
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
@@ -133,8 +133,8 @@ class PriceClient(
 
     @KiwoomToken
     fun goldPriceNowMinute(
-        req: GoldPriceNowMinuteReq
-    ): GoldPriceNowMinuteRes? {
+        req: KiwoomGoldPriceNowMinuteReq
+    ): KiwoomGoldPriceNowMinuteRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -146,7 +146,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(GoldPriceNowMinuteRes::class.java)
+                .bodyToMono(KiwoomGoldPriceNowMinuteRes::class.java)
                 .block()
 
             if (res?.return_code != 0) {

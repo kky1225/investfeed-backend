@@ -6,7 +6,6 @@ import com.example.investfeed.domain.index.dto.res.*
 import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
-import com.example.investfeed.kiwoom.gold.client.GoldClient
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
@@ -18,8 +17,7 @@ import java.util.Collections.emptyList
 @Service
 class IndexService(
     private val sectClient: SectClient,
-    private val sectChartClient: SectChartClient,
-    private val goldClient: GoldClient,
+    private val sectChartClient: SectChartClient
 ) {
     fun indexList(): IndexListRes? {
         val indexTypeList = IndexType.entries
