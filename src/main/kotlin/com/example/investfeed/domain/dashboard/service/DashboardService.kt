@@ -1,12 +1,17 @@
 package com.example.investfeed.domain.dashboard.service
 
+import com.example.investfeed.domain.dashboard.dto.res.ChartDay
+import com.example.investfeed.domain.dashboard.dto.res.DashboardIndexListItem
 import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
+import com.example.investfeed.domain.dashboard.dto.res.InvestorTradeRankListItem
+import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
+import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
+import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
-import com.example.investfeed.kiwoom.sect.client.SectClient
+import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
@@ -20,70 +25,93 @@ class DashboardService(
     fun dashboard(): DashboardRes? {
         log.debug { "dashboard" }
 
-        val kospiIndexDailyListRes = sectClient.sectIndexDailyList(
-            req = KiwoomSectIndexDailyReq(
-                mrkt_tp = "0",
-                inds_cd = "001"
+        val indexTypeList = IndexType.entries
+        val indexList: MutableList<DashboardIndexListItem> = mutableListOf()
+
+        indexTypeList.forEach {
+            val kiwoomSectIndexDailyRes = sectClient.sectIndexDailyList(
+                req = KiwoomSectIndexDailyReq(
+                    mrkt_tp = "0",
+                    inds_cd = it.indsCd
+                )
+            )
+
+            val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
+                req = KiwoomSectPriceNowReq(
+                    mrkt_tp = "0",
+                    inds_cd = it.indsCd
+                )
+            )
+
+            var kiwoomSectInvestorRes: KiwoomSectInvestorRes? = null
+
+            if (!it.marketType.isEmpty()) {
+                kiwoomSectInvestorRes = sectClient.sectInvestor(
+                    req = KiwoomSectInvestorReq(
+                        mrkt_tp = it.marketType,
+                        amt_qty_tp = "0",
+                        stex_tp = "0"
+                    )
+                );
+            }
+
+            if (kiwoomSectIndexDailyRes.return_code == 0 && kiwoomSectPriceNowRes.return_code == 0) {
+                val chartList: MutableList<ChartDay> = mutableListOf()
+
+                kiwoomSectIndexDailyRes.inds_cur_prc_daly_rept?.forEach {
+                    chartList.add(
+                        ChartDay(
+                            curPrc = it.cur_prc_n,
+                            dt = it.dt_n,
+                        )
+                    )
+                }
+
+                indexList.add(
+                    DashboardIndexListItem(
+                        indsCd = it.indsCd,
+                        indsNm = it.indsNm,
+                        curPrc = kiwoomSectIndexDailyRes.cur_prc,
+                        predPreSig = kiwoomSectIndexDailyRes.pred_pre_sig,
+                        fluRt = kiwoomSectIndexDailyRes.flu_rt,
+                        tm = kiwoomSectIndexDailyRes.inds_cur_prc_daly_rept?.get(0)?.dt_n + kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
+                        ind = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.ind_netprps,
+                        orgn = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.orgn_netprps,
+                        frgnr = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.frgnr_netprps,
+                        chartList = chartList,
+                    )
+                )
+            }
+        }
+
+        val investorTradeRankListRes = investorClient.investorTradeRankList(
+            req = InvestorTradeRankListReq(
+                dt = "20",
+                mrkt_tp = "001",
+                stk_inds_tp = "0",
+                amt_qty_tp = "0",
+                stex_tp = "1"
             )
         )
 
+        val investorTradeRankListItem: MutableList<InvestorTradeRankListItem> = mutableListOf()
+        if (investorTradeRankListRes.return_code == 0) {
+            investorTradeRankListRes.orgn_frgnr_cont_trde_prst?.forEach {
+                investorTradeRankListItem.add(
+                    InvestorTradeRankListItem(
+                        stkCd = it.stk_cd,
+                        rank = it.rank,
+                        stkNm = it.stk_nm,
+                        pridStkpcFluRt = it.prid_stkpc_flu_rt,
+                        nettrdeAmt = it.nettrde_amt
+                    )
+                )
+            }
+        }
+
         return DashboardRes(
-            kospiPriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = "001"
-                )
-            ),
-            kospiIndexDailyListRes = kospiIndexDailyListRes,
-            kospiInvestor = sectClient.sectInvestor(
-                req = KiwoomSectInvestorReq(
-                    mrkt_tp = "0",
-                    amt_qty_tp = "0",
-                    stex_tp = "0"
-                )
-            ),
-            kosdacPriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "1",
-                    inds_cd = "101"
-                )
-            ),
-            kosdacIndexDailyListRes = sectClient.sectIndexDailyList(
-                req = KiwoomSectIndexDailyReq(
-                    mrkt_tp = "1",
-                    inds_cd = "101"
-                )
-            ),
-            kosdacInvestor = sectClient.sectInvestor(
-                req = KiwoomSectInvestorReq(
-                    mrkt_tp = "1",
-                    amt_qty_tp = "0",
-                    stex_tp = "0"
-                )
-            ),
-            kospi200PriceRes = sectClient.sectPriceNow(
-                req = KiwoomSectPriceNowReq(
-                    mrkt_tp = "0",
-                    inds_cd = "201"
-                )
-            ),
-            kospi200IndexDailyListRes = sectClient.sectIndexDailyList(
-                req = KiwoomSectIndexDailyReq(
-                    mrkt_tp = "0",
-                    inds_cd = "201"
-                )
-            ),
-            investorTradeRankRes = investorClient.investorTradeRankList(
-                req = InvestorTradeRankListReq(
-                    dt = "0",
-                    strt_dt = kospiIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n,
-                    end_dt = kospiIndexDailyListRes?.inds_cur_prc_daly_rept?.get(0)?.dt_n,
-                    mrkt_tp = "001",
-                    stk_inds_tp = "0",
-                    amt_qty_tp = "0",
-                    stex_tp = "1"
-                )
-            )
+            indexList = indexList,
+            investorTradeRankList = investorTradeRankListItem,
         )
     }
 }

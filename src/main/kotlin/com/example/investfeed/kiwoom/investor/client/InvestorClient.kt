@@ -1,19 +1,14 @@
 package com.example.investfeed.kiwoom.investor.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
-import com.example.investfeed.kiwoom.exception.GoldInvestorException
-import com.example.investfeed.kiwoom.exception.InvestorTradeDailyException
-import com.example.investfeed.kiwoom.exception.InvestorTradeOrganizeException
-import com.example.investfeed.kiwoom.exception.InvestorTradeRankListException
-import com.example.investfeed.kiwoom.exception.KiwoomApiException
-import com.example.investfeed.kiwoom.investor.dto.res.KiwoomGoldInvestorRes
+import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeDailyReq
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeOrganizeReq
+import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeDailyRes
-import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeOrganizeRes
+import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
+import com.example.investfeed.kiwoom.investor.dto.res.KiwoomGoldInvestorRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -102,7 +97,7 @@ class InvestorClient(
     @KiwoomToken
     fun investorTradeRankList(
         req: InvestorTradeRankListReq
-    ): InvestorTradeRankListRes? {
+    ): InvestorTradeRankListRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
