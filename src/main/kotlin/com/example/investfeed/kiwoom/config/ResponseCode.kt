@@ -8,12 +8,9 @@ enum class ResponseCode(
 
     TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
 
-    SECT_PRICE(message = "업종별 주가 조회에 성공하셨습니다."),
-    SECT_INVESTOR(message = "업종별 투자자 순매수 조회에 성공하셨습니다."),
-    SECT_PRICE_NOW(message = "업종 현재가 조회에 성공하셨습니다."),
     SECT_CODE_LIST(message = "업종 코드 리스트 조회에 성공하셨습니다."),
-    SECT_INDEX_LIST(message = "전업종 지수 조회에 성공하셨습니다."),
-    SECT_INDEX_DAILY_LIST(message = "업종 현재가 일별 조회에 성공하셨습니다."),
+    SECT_LIST(message = "전업종 지수 목록 조회에 성공하셨습니다."),
+    SECT_DETAIL(message = "업종별 주식 목록 조회에 성공하셨습니다."),
 
     STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),

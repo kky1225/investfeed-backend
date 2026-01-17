@@ -155,18 +155,6 @@ class SectClient(
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
-//        if(isMarketOpen()) {
-//            SectSocketService.sectIndexListStream(
-//                accessToken = accessToken,
-//                req = SectIndexListStreamReq(
-//                    trnm = req.trnm,
-//                    grp_no = req.grp_no,
-//                    refresh = req.refresh,
-//                    data = req.data
-//                )
-//            )
-//        }
-
         try {
             val res = webClient.post()
                 .uri(DEFAULT_URL + SECT_URL)

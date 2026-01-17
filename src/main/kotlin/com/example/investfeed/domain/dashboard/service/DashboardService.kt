@@ -1,10 +1,10 @@
 package com.example.investfeed.domain.dashboard.service
 
+import com.example.investfeed.domain.dashboard.DashboardIndexType
 import com.example.investfeed.domain.dashboard.dto.res.ChartDay
 import com.example.investfeed.domain.dashboard.dto.res.DashboardIndexListItem
 import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.domain.dashboard.dto.res.InvestorTradeRankListItem
-import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
@@ -25,7 +25,7 @@ class DashboardService(
     fun dashboard(): DashboardRes? {
         log.debug { "dashboard" }
 
-        val indexTypeList = IndexType.entries
+        val indexTypeList = DashboardIndexType.entries
         val indexList: MutableList<DashboardIndexListItem> = mutableListOf()
 
         indexTypeList.forEach {
