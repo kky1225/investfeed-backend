@@ -10,6 +10,8 @@ enum class ResponseCode(
 
     SECT_CODE_LIST(message = "업종 코드 리스트 조회에 성공하셨습니다."),
     SECT_LIST(message = "전업종 지수 목록 조회에 성공하셨습니다."),
+    SECT_LIST_STREAM(message = "실시간 전업종 지수 목록 조회에 성공하셨습니다."),
+    SECT_STOCK_LIST(message = "업종별 주식 목록 조회에 성공하셨습니다."),
     SECT_DETAIL(message = "업종별 주식 목록 조회에 성공하셨습니다."),
 
     STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),

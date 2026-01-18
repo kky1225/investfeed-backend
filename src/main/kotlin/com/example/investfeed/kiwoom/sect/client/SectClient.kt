@@ -10,7 +10,6 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import java.time.LocalTime
 
 @Service
 class SectClient(
@@ -103,23 +102,6 @@ class SectClient(
     ): KiwoomSectPriceRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
-
-//        if(isMarketOpen()) {
-//            SectSocketService.sectIndexListStream(
-//                accessToken = accessToken,
-//                req = SectIndexListStreamReq(
-//                    trnm = "REG",
-//                    grp_no = "0001",
-//                    refresh = "0",
-//                    data = listOf(
-//                        SectIndexListStream(
-//                            item = listOf("001", "101", "201"),
-//                            type = listOf("0J")
-//                        )
-//                    )
-//                )
-//            )
-//        }
 
         try {
             val res = webClient.post()
@@ -214,11 +196,5 @@ class SectClient(
 
             throw RuntimeException(e.message)
         }
-    }
-
-    fun isMarketOpen(): Boolean {
-        val now = LocalTime.now()
-
-        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }
