@@ -73,11 +73,9 @@ class SectService(
     fun sectStockList(
         req: SectStockListReq
     ): SectStockListRes {
-        val mrkt_tp: String = DashboardIndexType.entries.filter { it.indsCd == req.indsCd }.first().marketType
-
         val kiwoomSectPriceRes = sectClient.sectPrice(
             req = KiwoomSectPriceReq(
-                mrkt_tp = mrkt_tp,
+                mrkt_tp = req.mrktTp,
                 inds_cd = req.indsCd,
                 stex_tp = "3"
             )

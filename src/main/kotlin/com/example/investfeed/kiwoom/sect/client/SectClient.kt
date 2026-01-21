@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.toEntity
 
 @Service
 class SectClient(
@@ -104,21 +105,49 @@ class SectClient(
         accessToken ?: throw AccessTokenNotFoundException()
 
         try {
-            val res = webClient.post()
-                .uri(DEFAULT_URL + SECT_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka20002")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectPriceRes::class.java)
-                .block()
+            val inds_stkpc = mutableListOf<KiwoomSectPrice>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
 
-            if (res?.return_code != 0) {
-                throw SectPriceException()
+            while(true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + SECT_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka20002")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus({ t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomSectPriceRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw SectPriceException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.inds_stkpc?.forEach { inds_stkpc.add(it) }
+
+                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers?.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break;
+                }
+
+                Thread.sleep(70)
             }
 
-            return res
+            return KiwoomSectPriceRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                inds_stkpc = inds_stkpc
+            )
         }catch (e: KiwoomApiException) {
             throw e
         }catch (e: SectPriceException) {

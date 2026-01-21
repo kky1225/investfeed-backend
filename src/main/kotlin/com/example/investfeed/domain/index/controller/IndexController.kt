@@ -49,7 +49,7 @@ class IndexController(
                 refresh = "0",
                 data = listOf(
                     SectIndexListStream(
-                        item = listOf("001", "101", "201"),
+                        item = listOf("001", "101", "201", "150"),
                         type = listOf("0J")
                     )
                 )

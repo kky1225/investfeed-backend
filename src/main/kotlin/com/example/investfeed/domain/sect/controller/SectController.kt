@@ -50,7 +50,7 @@ class SectController(
         )
     }
 
-    @GetMapping("stockList")
+    @GetMapping("stock/list")
     fun sectStockList(
         req: SectStockListReq
     ): ResponseEntity<ApiResponse<SectStockListRes>> {
