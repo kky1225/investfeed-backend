@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.theme.dto.res
 
-data class ThemeGroupStockList(
+data class KiwoomThemeGroupStock(
     var stk_cd: String? = null, // 종목코드
     var stk_nm: String? = null, // 종목명
     var cur_prc: String? = null, // 현재가

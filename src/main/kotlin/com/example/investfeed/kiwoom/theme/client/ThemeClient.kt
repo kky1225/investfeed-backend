@@ -1,14 +1,14 @@
-package com.example.investfeed.kiwoom.theme.service
+package com.example.investfeed.kiwoom.theme.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.ThemeGroupListException
 import com.example.investfeed.kiwoom.exception.ThemeGroupStockListException
-import com.example.investfeed.kiwoom.theme.dto.req.ThemeGroupListReq
-import com.example.investfeed.kiwoom.theme.dto.req.ThemeGroupStockListReq
-import com.example.investfeed.kiwoom.theme.dto.res.ThemeGroupListRes
-import com.example.investfeed.kiwoom.theme.dto.res.ThemeGroupStockListRes
+import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupReq
+import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupStockReq
+import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupRes
+import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupStockRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
 @Service
-class ThemeService(
+class ThemeClient(
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
@@ -28,8 +28,8 @@ class ThemeService(
 
     @KiwoomToken
     fun themeGroupList(
-        req: ThemeGroupListReq
-    ): ThemeGroupListRes? {
+        req: KiwoomThemeGroupReq
+    ): KiwoomThemeGroupRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -41,7 +41,7 @@ class ThemeService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(ThemeGroupListRes::class.java)
+                .bodyToMono(KiwoomThemeGroupRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
@@ -62,8 +62,8 @@ class ThemeService(
 
     @KiwoomToken
     fun themeGroupStockList(
-        req: ThemeGroupStockListReq
-    ): ThemeGroupStockListRes? {
+        req: KiwoomThemeGroupStockReq
+    ): KiwoomThemeGroupStockRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -75,7 +75,7 @@ class ThemeService(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(ThemeGroupStockListRes::class.java)
+                .bodyToMono(KiwoomThemeGroupStockRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {

@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.theme.dto.res
 
-data class ThemeGroupList(
+data class KiwoomThemeGroup(
     var thema_grp_cd: String? = null, // 테마그룹코드
     var thema_nm: String? = null, // 테마명
     var stk_num: String? = null, // 종목수

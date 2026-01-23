@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.theme.dto.req
 
-data class ThemeGroupListReq(
+data class KiwoomThemeGroupReq(
     var qry_tp: String, // 검색구분 0:전체검색, 1:테마검색, 2:종목검색
     var stk_cd: String? = null, // 종목코드 검색하려는 종목코드
     var date_tp: String, // 날짜구분 n일전 (1일 ~ 99일 날짜입력)
