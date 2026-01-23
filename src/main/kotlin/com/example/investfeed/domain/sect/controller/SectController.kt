@@ -26,6 +26,8 @@ class SectController(
     fun sectList(
         req: SectListReq
     ): ResponseEntity<ApiResponse<SectListRes>> {
+        log.info { "sectList : $req" }
+
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.SECT_LIST.code,
@@ -39,6 +41,8 @@ class SectController(
     fun sectListStream(
         req: SectListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "sectListStream : $req" }
+
         sectService.sectListStream(req = req)
 
         return ResponseEntity(
@@ -54,6 +58,8 @@ class SectController(
     fun sectStockList(
         req: SectStockListReq
     ): ResponseEntity<ApiResponse<SectStockListRes>> {
+        log.info { "sectStockList : $req" }
+
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.SECT_STOCK_LIST.code,

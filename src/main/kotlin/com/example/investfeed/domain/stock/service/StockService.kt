@@ -46,12 +46,12 @@ class StockService(
                     return_msg = kiwoomStockTradeValueListRes.return_msg,
                     stockList = kiwoomStockTradeValueListRes.trde_prica_upper?.map {
                         StockListItem(
-                            stk_cd = it.stk_cd,
+                            stkCd = it.stk_cd,
                             rank = it.now_rank,
-                            stk_nm = it.stk_nm,
-                            flu_rt = it.flu_rt,
-                            cur_prc = it.cur_prc,
-                            trde_prica = it.trde_prica,
+                            stkNm = it.stk_nm,
+                            fluRt = it.flu_rt,
+                            curPrc = it.cur_prc,
+                            trdePrica = it.trde_prica,
                         )
                     } ?: emptyList()
                 )
@@ -76,12 +76,12 @@ class StockService(
                     return_msg = kiwoomStockTradeVolumeListRes.return_msg,
                     stockList = kiwoomStockTradeVolumeListRes.tdy_trde_qty_upper?.mapIndexed { index, it ->
                         StockListItem(
-                            stk_cd = it.stk_cd,
+                            stkCd = it.stk_cd,
                             rank = (index + 1).toString(),
-                            stk_nm = it.stk_nm,
-                            flu_rt = it.flu_rt,
-                            cur_prc = it.cur_prc,
-                            trde_prica = it.trde_qty,
+                            stkNm = it.stk_nm,
+                            fluRt = it.flu_rt,
+                            curPrc = it.cur_prc,
+                            trdePrica = it.trde_qty,
                         )
                     } ?: emptyList()
                 )
@@ -104,12 +104,12 @@ class StockService(
                     return_msg = kiwoomStockTradeValueListRes.return_msg,
                     stockList = kiwoomStockTradeValueListRes.trde_qty_sdnin?.mapIndexed { index, it ->
                         StockListItem(
-                            stk_cd = it.stk_cd,
+                            stkCd = it.stk_cd,
                             rank = (index + 1).toString(),
-                            stk_nm = it.stk_nm,
-                            flu_rt = it.flu_rt,
-                            cur_prc = it.cur_prc,
-                            trde_prica = it.sdnin_rt,
+                            stkNm = it.stk_nm,
+                            fluRt = it.flu_rt,
+                            curPrc = it.cur_prc,
+                            trdePrica = it.sdnin_rt,
                         )
                     } ?: emptyList()
                 )
@@ -122,23 +122,23 @@ class StockService(
     ): StockDetailRes? {
         val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
             req = KiwoomDefaultStockInfoReq(
-                stk_cd = req.stk_cd
+                stk_cd = req.stkCd
             )
         )
         val kiwoomStockInfoRes = stockClient.stockInfo(
             req = KiwoomStockInfoReq(
-                stk_cd = req.stk_cd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
+                stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
             )
         )
         val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
             req = KiwoomStockTradeInfoReq(
-                stk_cd = req.stk_cd,
+                stk_cd = req.stkCd,
             )
         )
         val kiwoomStockInvestor = stockClient.stockInvestor(
             req = KiwoomStockInvestorReq(
                 dt = today("yyyyMMdd"),
-                stk_cd = req.stk_cd,
+                stk_cd = req.stkCd,
                 amt_qty_tp = "2",
                 trde_tp = "0",
                 unit_tp = "1"
@@ -148,27 +148,31 @@ class StockService(
         var stockInfo: StockInfo? = null
         if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
             stockInfo = StockInfo(
-                stk_cd = kiwoomStockDefaultInfoRes.stk_cd,
-                stk_nm = kiwoomStockDefaultInfoRes.stk_nm,
+                stkCd = kiwoomStockDefaultInfoRes.stk_cd,
+                stkNm = kiwoomStockDefaultInfoRes.stk_nm,
                 per = kiwoomStockDefaultInfoRes.per,
                 eps = kiwoomStockDefaultInfoRes.eps,
                 roe = kiwoomStockDefaultInfoRes.roe,
                 pbr = kiwoomStockDefaultInfoRes.pbr,
+                mac = kiwoomStockDefaultInfoRes.mac,
+                macWght = kiwoomStockDefaultInfoRes.mac_wght,
+                forExhRt = kiwoomStockDefaultInfoRes.for_exh_rt,
                 _250hgst = kiwoomStockDefaultInfoRes._250hgst,
                 _250lwst = kiwoomStockDefaultInfoRes._250lwst,
-                high_pric = kiwoomStockDefaultInfoRes.high_pric,
-                open_pric = kiwoomStockDefaultInfoRes.open_pric,
-                low_pric = kiwoomStockDefaultInfoRes.low_pric,
-                cur_prc = kiwoomStockDefaultInfoRes.cur_prc,
-                pre_sig = kiwoomStockDefaultInfoRes.pre_sig,
-                flu_rt = kiwoomStockDefaultInfoRes.flu_rt,
-                trde_qty = kiwoomStockDefaultInfoRes.trde_qty,
-                trde_prica = kiwoomStockTradeInfoRes.trde_prica,
+                highPric = kiwoomStockDefaultInfoRes.high_pric,
+                openPric = kiwoomStockDefaultInfoRes.open_pric,
+                lowPric = kiwoomStockDefaultInfoRes.low_pric,
+                curPrc = kiwoomStockDefaultInfoRes.cur_prc,
+                preSig = kiwoomStockDefaultInfoRes.pre_sig,
+                fluRt = kiwoomStockDefaultInfoRes.flu_rt,
+                trdeQty = kiwoomStockDefaultInfoRes.trde_qty,
+                trdePrica = kiwoomStockTradeInfoRes.trde_prica,
                 tm = kiwoomStockTradeInfoRes.date + time("HHmm"),
                 nxtEnable = kiwoomStockInfoRes.nxtEnable,
                 orderWarning = kiwoomStockInfoRes.orderWarning,
                 marketCode = kiwoomStockInfoRes.marketCode,
                 marketName = kiwoomStockInfoRes.marketName,
+                upName = kiwoomStockInfoRes.upName
             )
         }
 
@@ -178,17 +182,17 @@ class StockService(
                 stockInvestorList.add(
                     StockInvestor(
                         dt = it.dt,
-                        ind_invsr = it.ind_invsr,
-                        frgnr_invsr = it.frgnr_invsr,
+                        indInvsr = it.ind_invsr,
+                        frgnrInvsr = it.frgnr_invsr,
                         orgn = it.orgn,
-                        etc_fnnc = it.etc_fnnc,
-                        fnnc_invt = it.fnnc_invt,
+                        etcFnnc = it.etc_fnnc,
+                        fnncInvt = it.fnnc_invt,
                         insrnc = it.insrnc,
                         invtrt = it.invtrt,
-                        samo_fund = it.samo_fund,
-                        penfnd_etc = it.penfnd_etc,
+                        samoFund = it.samo_fund,
+                        penfndEtc = it.penfnd_etc,
                         bank = it.bank,
-                        etc_corp = it.etc_corp,
+                        etcCorp = it.etc_corp,
                         natfor = it.natfor,
                     )
                 )
@@ -196,11 +200,11 @@ class StockService(
         }
 
         val chartListRes: MutableList<StockChart> = mutableListOf()
-        when(req.chart_type) {
+        when(req.chartType) {
             StockChartType.DAY -> {
                 val kiwoomStockChartDayRes = stockChartClient.chartDayList(
                     req = KiwoomStockChartDayReq(
-                        stk_cd = req.stk_cd,
+                        stk_cd = req.stkCd,
                         base_dt = today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -225,7 +229,7 @@ class StockService(
             StockChartType.WEEK -> {
                 val kiwoomStockChartWeekRes = stockChartClient.chartWeekList(
                     req = KiwoomStockChartWeekReq(
-                        stk_cd = req.stk_cd,
+                        stk_cd = req.stkCd,
                         base_dt = today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -250,7 +254,7 @@ class StockService(
             StockChartType.MONTH -> {
                 val kiwoomStockChartMonthRes = stockChartClient.chartMonthList(
                     req = KiwoomStockChartMonthReq(
-                        stk_cd = req.stk_cd,
+                        stk_cd = req.stkCd,
                         base_dt = today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -275,7 +279,7 @@ class StockService(
             StockChartType.YEAR -> {
                 val kiwoomStockChartYearRes = stockChartClient.chartYearList(
                     req = KiwoomStockChartYearReq(
-                        stk_cd = req.stk_cd,
+                        stk_cd = req.stkCd,
                         base_dt = today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -298,10 +302,10 @@ class StockService(
                 }
             }
             else -> {
-                val kiwoomStockChartMinuteRes = req.chart_type.value?.let {
+                val kiwoomStockChartMinuteRes = req.chartType.value?.let {
                     stockChartClient.chartMinuteList(
                         req = KiwoomStockChartMinuteReq(
-                            stk_cd = req.stk_cd,
+                            stk_cd = req.stkCd,
                             tic_scope = it,
                             upd_stkpc_tp = "1"
                         )
