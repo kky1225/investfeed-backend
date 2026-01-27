@@ -5,6 +5,7 @@ import com.example.investfeed.domain.theme.dto.req.ThemeStockListReq
 import com.example.investfeed.domain.theme.dto.res.ThemeListRes
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
 import com.example.investfeed.domain.theme.service.ThemeService
+import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
@@ -28,8 +29,8 @@ class ThemeController(
 
         return ResponseEntity(
             ApiResponse(
-                code = "",
-                message = "",
+                code = ResponseCode.THEME_LIST.code,
+                message = ResponseCode.THEME_LIST.message,
                 result = themeService.themeList(req = req)
             ), HttpStatus.OK
         )
@@ -43,8 +44,8 @@ class ThemeController(
 
         return ResponseEntity(
             ApiResponse(
-                code = "",
-                message = "",
+                code = ResponseCode.THEME_STOCK_LIST.code,
+                message = ResponseCode.THEME_STOCK_LIST.message,
                 result = themeService.themeStockList(req = req)
             ), HttpStatus.OK
         )

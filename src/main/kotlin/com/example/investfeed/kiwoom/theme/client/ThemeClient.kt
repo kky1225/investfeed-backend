@@ -7,6 +7,7 @@ import com.example.investfeed.kiwoom.exception.ThemeGroupListException
 import com.example.investfeed.kiwoom.exception.ThemeGroupStockListException
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupReq
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupStockReq
+import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroup
 import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupRes
 import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupStockRes
 import mu.KotlinLogging
@@ -15,6 +16,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.toEntity
 
 @Service
 class ThemeClient(
@@ -25,6 +27,7 @@ class ThemeClient(
 
     @Value("\${kiwoom.default-url}")
     private lateinit var DEFAULT_URL: String
+    private final val THEME_URL = "/api/dostk/thme"
 
     @KiwoomToken
     fun themeGroupList(
@@ -34,21 +37,47 @@ class ThemeClient(
         accessToken ?: throw AccessTokenNotFoundException()
 
         try {
-            val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/thme")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka90001")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomThemeGroupRes::class.java)
-                .block()
+            val thema_grp = mutableListOf<KiwoomThemeGroup>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
 
-            if(res?.return_code != 0) {
-                throw ThemeGroupListException()
+            while(true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + THEME_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka90001")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomThemeGroupRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw ThemeGroupListException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.thema_grp?.forEach { thema_grp.add(it) }
+
+                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers?.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break;
+                }
             }
 
-            return res
+            return KiwoomThemeGroupRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                thema_grp = thema_grp
+            )
         }catch(e: KiwoomApiException) {
             throw e
         }catch(e: ThemeGroupListException) {
@@ -69,7 +98,7 @@ class ThemeClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/thme")
+                .uri(DEFAULT_URL + THEME_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka90002")
                 .bodyValue(req)
