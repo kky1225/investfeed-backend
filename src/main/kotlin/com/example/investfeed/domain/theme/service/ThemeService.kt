@@ -23,7 +23,7 @@ class ThemeService(
             KiwoomThemeGroupReq(
                 qry_tp = "1",
                 date_tp =  req.dateTp,
-                flu_pl_amt_tp = "1",
+                flu_pl_amt_tp = req.fluPlAmtTp,
                 stex_tp = "3"
             )
         )
