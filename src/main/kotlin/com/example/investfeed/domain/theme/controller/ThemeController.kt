@@ -2,6 +2,7 @@ package com.example.investfeed.domain.theme.controller
 
 import com.example.investfeed.domain.theme.dto.req.ThemeListReq
 import com.example.investfeed.domain.theme.dto.req.ThemeStockListReq
+import com.example.investfeed.domain.theme.dto.req.ThemeStockListStreamReq
 import com.example.investfeed.domain.theme.dto.res.ThemeListRes
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
 import com.example.investfeed.domain.theme.service.ThemeService
@@ -11,13 +12,14 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/theme")
 class ThemeController(
-    private val themeService: ThemeService
+    private val themeService: ThemeService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -47,6 +49,23 @@ class ThemeController(
                 code = ResponseCode.THEME_STOCK_LIST.code,
                 message = ResponseCode.THEME_STOCK_LIST.message,
                 result = themeService.themeStockList(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("stock/stream")
+    fun themeStockStream(
+        req: ThemeStockListStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "themeStockList : $req" }
+
+        themeService.themeStockStream(req = req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.THEME_STOCK_LIST_STREAM.code,
+                message = ResponseCode.THEME_STOCK_LIST_STREAM.message,
+                result = null
             ), HttpStatus.OK
         )
     }

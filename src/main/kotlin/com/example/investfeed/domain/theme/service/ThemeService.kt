@@ -2,19 +2,23 @@ package com.example.investfeed.domain.theme.service
 
 import com.example.investfeed.domain.theme.dto.req.ThemeListReq
 import com.example.investfeed.domain.theme.dto.req.ThemeStockListReq
+import com.example.investfeed.domain.theme.dto.req.ThemeStockListStreamReq
 import com.example.investfeed.domain.theme.dto.res.ThemeListItem
 import com.example.investfeed.domain.theme.dto.res.ThemeListRes
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListItem
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import com.example.investfeed.kiwoom.theme.client.ThemeClient
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupReq
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupStockReq
 import org.springframework.stereotype.Service
-import kotlin.String
 
 @Service
 class ThemeService(
-    private val themeClient: ThemeClient
+    private val themeClient: ThemeClient,
+    private val stockSocketClient: StockSocketClient
 ) {
     fun themeList(
         req: ThemeListReq
@@ -82,6 +86,24 @@ class ThemeService(
 
         return ThemeStockListRes(
             themeStockList = themeStockList
+        )
+    }
+
+    fun themeStockStream(
+        req: ThemeStockListStreamReq
+    ) {
+        stockSocketClient.stockListStream(
+            req = KiwoomStockStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    KiwoomStockStream(
+                        item = req.items,
+                        type = listOf("0B")
+                    )
+                )
+            )
         )
     }
 }
