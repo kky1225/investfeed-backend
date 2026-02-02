@@ -15,6 +15,7 @@ enum class ResponseCode(
     STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
     STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
+    STOCK_INVESTOR(message = "장중 투자자별 매매 상위 조회에 성공하셨습니다."),
 
     INVESTOR_TRADE_DAILY(message = "투자자별 일별 매매 조회에 성공하셨습니다."),
     INVESTOR_TRADE_ORGANIZE(message = "종목별 투자자 기관별 합계 요청 조회에 성공하셨습니다."),

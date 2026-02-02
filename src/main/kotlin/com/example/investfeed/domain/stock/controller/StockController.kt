@@ -1,13 +1,16 @@
 package com.example.investfeed.domain.stock.controller
 
+import com.example.investfeed.domain.stock.dto.req.StockInvestorReq
 import com.example.investfeed.kiwoom.config.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
+import com.example.investfeed.domain.stock.dto.res.StockInvestorRes
 import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockListRes
 import com.example.investfeed.domain.stock.service.StockService
+import com.example.investfeed.kiwoom.rank.client.RankClient
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -16,7 +19,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("api/stock")
 class StockController(
-    private val stockService: StockService
+    private val stockService: StockService,
+    private val rankClient: RankClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -66,6 +70,22 @@ class StockController(
             ), HttpStatus.OK
         )
     }
+
+    @GetMapping("/investor")
+    fun stockInvestor(
+        req: StockInvestorReq
+    ): ResponseEntity<ApiResponse<StockInvestorRes?>> {
+        log.info { "stockInvestor $req" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.STOCK_INVESTOR.code,
+                message = ResponseCode.STOCK_INVESTOR.message,
+                result = stockService.stockInvestor(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
 //
 //    @GetMapping("tradeDailyList")
 //    fun stockTradeDailyList(

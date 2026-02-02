@@ -2,9 +2,11 @@ package com.example.investfeed.kiwoom.rank.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
+import com.example.investfeed.kiwoom.rank.dto.req.KiwoomInvestorTradeDailyReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
+import com.example.investfeed.kiwoom.rank.dto.res.KiwoomInvestorTradeDailyRes
 import com.example.investfeed.kiwoom.rank.dto.res.KiwoomStockTradeValueListRes
 import com.example.investfeed.kiwoom.rank.dto.res.KiwoomStockTradeVolumeListRes
 import com.example.investfeed.kiwoom.rank.dto.res.KiwoomSurgeTradeVolumeListRes
@@ -24,6 +26,7 @@ class RankClient(
 
     @Value("\${kiwoom.default-url}")
     private lateinit var DEFAULT_URL: String
+    private final val RANK_URL = "/api/dostk/rkinfo"
 
     @KiwoomToken
     fun stockTradeValueList(
@@ -34,7 +37,7 @@ class RankClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
+                .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10032")
                 .bodyValue(req)
@@ -68,7 +71,7 @@ class RankClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
+                .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10030")
                 .bodyValue(req)
@@ -102,7 +105,7 @@ class RankClient(
 
         try {
             val res = webClient.post()
-                .uri("$DEFAULT_URL/api/dostk/rkinfo")
+                .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10023")
                 .bodyValue(req)
@@ -122,6 +125,39 @@ class RankClient(
             throw e
         }catch (e: Exception) {
             log.error { "stockSurgeTradeVolumeList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    fun investorTradeDaily(
+        req: KiwoomInvestorTradeDailyReq
+    ): KiwoomInvestorTradeDailyRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + RANK_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10065")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomInvestorTradeDailyRes::class.java)
+                .block()
+
+            if(res?.return_code != 0) {
+                throw InvestorTradeDailyException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException){
+            throw e
+        }catch(e: InvestorTradeDailyException){
+            throw e
+        }catch (e: Exception) {
+            log.error { "investorTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }

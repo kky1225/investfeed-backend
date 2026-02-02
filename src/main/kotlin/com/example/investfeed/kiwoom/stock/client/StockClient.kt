@@ -3,11 +3,11 @@ package com.example.investfeed.kiwoom.stock.client
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.dto.req.StockJumpListReq
 import com.example.investfeed.domain.stock.dto.req.StockNewPriceListReq
-import com.example.investfeed.domain.stock.dto.req.StockTradeDailyListReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockTradeDailyListReq
 import com.example.investfeed.domain.stock.dto.res.StockInfoListRes
 import com.example.investfeed.domain.stock.dto.res.StockJumpListRes
 import com.example.investfeed.domain.stock.dto.res.StockNewPriceListRes
-import com.example.investfeed.domain.stock.dto.res.StockTradeDailyListRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockTradeDailyRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomSectCodeListReq
@@ -174,8 +174,8 @@ class StockClient(
 
     @KiwoomToken
     fun stockTradeDailyList(
-        req: StockTradeDailyListReq
-    ): StockTradeDailyListRes? {
+        req: KiwoomStockTradeDailyListReq
+    ): KiwoomStockTradeDailyRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -187,7 +187,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockTradeDailyListRes::class.java)
+                .bodyToMono(KiwoomStockTradeDailyRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {

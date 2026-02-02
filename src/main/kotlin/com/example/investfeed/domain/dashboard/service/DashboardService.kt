@@ -6,7 +6,7 @@ import com.example.investfeed.domain.dashboard.dto.res.DashboardIndexListItem
 import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.domain.dashboard.dto.res.InvestorTradeRankListItem
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
+import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeRankListReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
@@ -85,7 +85,7 @@ class DashboardService(
         }
 
         val investorTradeRankListRes = investorClient.investorTradeRankList(
-            req = InvestorTradeRankListReq(
+            req = KiwoomInvestorTradeRankListReq(
                 dt = "20",
                 mrkt_tp = "001",
                 stk_inds_tp = "0",

@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.investor.dto.req
 
-data class InvestorTradeRankListReq(
+data class KiwoomInvestorTradeRankListReq(
     var dt: String, // 기간 1:최근일, 3:3일, 5:5일, 10:10일, 20:20일, 120:120일, 0:시작일자/종료일자로 조회
     var strt_dt: String? = null, // YYYYMMDD
     var end_dt: String? = null, // YYYYMMDD

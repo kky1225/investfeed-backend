@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.stock.service
 
+import com.example.investfeed.domain.stock.dto.req.StockInvestorReq
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
@@ -8,6 +9,7 @@ import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.rank.client.RankClient
+import com.example.investfeed.kiwoom.rank.dto.req.KiwoomInvestorTradeDailyReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlin.String
 
 @Service
 class StockService(
@@ -353,6 +356,37 @@ class StockService(
                     )
                 )
             )
+        )
+    }
+
+    fun stockInvestor(
+        req: StockInvestorReq
+    ): StockInvestorRes {
+        val kiwoomInvestorTradeDailyRes = rankClient.investorTradeDaily(
+            req = KiwoomInvestorTradeDailyReq(
+                trde_tp = req.trdeTp,
+                mrkt_tp = "000",
+                orgn_tp = req.orgnTp,
+            )
+        )
+
+        val investorTradeDailyList = mutableListOf<StockInvestorListItem>()
+        if (kiwoomInvestorTradeDailyRes.return_code == 0) {
+            kiwoomInvestorTradeDailyRes.opmr_invsr_trde_upper?.forEach {
+                investorTradeDailyList.add(
+                    StockInvestorListItem(
+                        stkCd = it.stk_cd,
+                        stkNm = it.stk_nm,
+                        selQty = it.sel_qty,
+                        buyQty = it.buy_qty,
+                        netslmt = it.netslmt,
+                    )
+                )
+            }
+        }
+
+        return StockInvestorRes(
+            investorTradeDailyList = investorTradeDailyList
         )
     }
 

@@ -2,10 +2,10 @@ package com.example.investfeed.kiwoom.investor.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeDailyReq
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeOrganizeReq
-import com.example.investfeed.kiwoom.investor.dto.req.InvestorTradeRankListReq
-import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeDailyRes
+import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeDayReq
+import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeOrganizeReq
+import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeRankListReq
+import com.example.investfeed.kiwoom.investor.dto.res.KiwoomInvestorTradeDayRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeOrganizeRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
 import com.example.investfeed.kiwoom.investor.dto.res.KiwoomGoldInvestorRes
@@ -27,9 +27,9 @@ class InvestorClient(
     private lateinit var DEFAULT_URL: String
 
     @KiwoomToken
-    fun investorTradeDaily(
-        req: InvestorTradeDailyReq
-    ): InvestorTradeDailyRes? {
+    fun investorTradeDay(
+        req: KiwoomInvestorTradeDayReq
+    ): KiwoomInvestorTradeDayRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 
@@ -41,17 +41,17 @@ class InvestorClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(InvestorTradeDailyRes::class.java)
+                .bodyToMono(KiwoomInvestorTradeDayRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
-                throw InvestorTradeDailyException()
+                throw InvestorTradeDayException()
             }
 
             return res
         }catch (e: KiwoomApiException) {
             throw e
-        }catch (e: InvestorTradeDailyException) {
+        }catch (e: InvestorTradeDayException) {
             throw e
         }catch (e: Exception) {
             log.error { "investorTradeDaily Error" }
@@ -62,7 +62,7 @@ class InvestorClient(
 
     @KiwoomToken
     fun investorTradeOrganize(
-        req: InvestorTradeOrganizeReq
+        req: KiwoomInvestorTradeOrganizeReq
     ): InvestorTradeOrganizeRes? {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
@@ -96,7 +96,7 @@ class InvestorClient(
 
     @KiwoomToken
     fun investorTradeRankList(
-        req: InvestorTradeRankListReq
+        req: KiwoomInvestorTradeRankListReq
     ): InvestorTradeRankListRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()

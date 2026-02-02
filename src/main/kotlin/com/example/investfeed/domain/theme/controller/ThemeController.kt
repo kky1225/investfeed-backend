@@ -53,7 +53,7 @@ class ThemeController(
         )
     }
 
-    @PostMapping("stock/stream")
+    @PostMapping("stock/list/stream")
     fun themeStockStream(
         req: ThemeStockListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

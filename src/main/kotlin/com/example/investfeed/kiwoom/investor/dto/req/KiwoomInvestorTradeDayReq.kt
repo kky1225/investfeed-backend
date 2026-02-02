@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.investor.dto.req
 
-data class InvestorTradeDailyReq(
+data class KiwoomInvestorTradeDayReq(
     var strt_dt: String, // 시작일자 YYYYMMDD
     var end_dt: String, // 종료일자 YYYYMMDD
     var trde_tp: String, // 매매구분 순매도:1, 순매수:2
