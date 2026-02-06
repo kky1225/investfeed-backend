@@ -211,7 +211,7 @@ class IndexService(
 
         val kiwoomSectInvestorRes = sectClient.sectInvestor(
             req = KiwoomSectInvestorReq(
-                mrkt_tp = if (req.inds_cd == "101") "1" else "0",
+                mrkt_tp = if (req.inds_cd == "101" || req.inds_cd == "150") "1" else "0",
                 amt_qty_tp = "0",
                 stex_tp = "0"
             )
