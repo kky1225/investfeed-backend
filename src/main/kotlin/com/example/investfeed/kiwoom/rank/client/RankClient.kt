@@ -2,20 +2,15 @@ package com.example.investfeed.kiwoom.rank.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomInvestorTradeDailyReq
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
-import com.example.investfeed.kiwoom.rank.dto.res.KiwoomInvestorTradeDailyRes
-import com.example.investfeed.kiwoom.rank.dto.res.KiwoomStockTradeValueListRes
-import com.example.investfeed.kiwoom.rank.dto.res.KiwoomStockTradeVolumeListRes
-import com.example.investfeed.kiwoom.rank.dto.res.KiwoomSurgeTradeVolumeListRes
+import com.example.investfeed.kiwoom.rank.dto.req.*
+import com.example.investfeed.kiwoom.rank.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.toEntity
 
 @Component
 class RankClient(
@@ -130,6 +125,7 @@ class RankClient(
         }
     }
 
+    @KiwoomToken
     fun investorTradeDaily(
         req: KiwoomInvestorTradeDailyReq
     ): KiwoomInvestorTradeDailyRes {
@@ -152,12 +148,72 @@ class RankClient(
             }
 
             return res
-        }catch(e: KiwoomApiException){
+        } catch(e: KiwoomApiException){
             throw e
-        }catch(e: InvestorTradeDailyException){
+        } catch(e: InvestorTradeDailyException){
             throw e
-        }catch (e: Exception) {
+        } catch (e: Exception) {
             log.error { "investorTradeDaily Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun investorTrade(
+        req: KiwoomInvestorTradeReq
+    ): KiwoomInvestorTradeRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            var frgnr_orgn_trde_upper = mutableListOf<KiwoomInvestorTrade>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+            while(true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + RANK_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka90009")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomInvestorTradeRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw InvestorTradeException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.frgnr_orgn_trde_upper?.forEach { frgnr_orgn_trde_upper.add(it) }
+
+                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers?.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break
+                }
+            }
+
+            return KiwoomInvestorTradeRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                frgnr_orgn_trde_upper = frgnr_orgn_trde_upper
+            )
+        } catch(e: KiwoomApiException){
+            throw e
+        } catch(e: InvestorTradeException){
+            throw e
+        } catch (e: Exception) {
+            log.error { "investorTrade Error" }
 
             throw RuntimeException(e.message)
         }
