@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.investor.dto.req
 
 data class InvestorListReq(
-    var amtQtyTp: String,
+    var trdeTp: String,
+    var orgnTp: String,
 )

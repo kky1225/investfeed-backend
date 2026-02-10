@@ -6,9 +6,15 @@ import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowMinuteRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowRes
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -16,6 +22,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.toEntity
 
 @Component
 class PriceClient(
@@ -160,6 +167,128 @@ class PriceClient(
             throw e
         } catch (e: Exception) {
             log.error { "goldPriceNowMinute Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun investorTradeOpenMarket(
+        req: KiwoomInvestorTradeOpenMarketReq
+    ): KiwoomInvestorTradeOpenMarketRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val opmr_invsr_trde = mutableListOf<KiwoomInvestorTradeOpenMarketItemList>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+
+            while (true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + PRICE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka10063")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomInvestorTradeOpenMarketRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw InvestorTradeOpenMarketException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.opmr_invsr_trde?.forEach { opmr_invsr_trde.add(it) }
+
+                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers?.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break;
+                }
+            }
+
+            return KiwoomInvestorTradeOpenMarketRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                opmr_invsr_trde = opmr_invsr_trde
+            )
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: InvestorTradeOpenMarketException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "investorTradeOpenMarket Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun investorTradeOpenMarket(
+        req: KiwoomInvestorTradeCloseMarketReq
+    ): KiwoomInvestorTradeCloseMarketRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val opaf_invsr_trde = mutableListOf<KiwoomInvestorTradeCloseMarketItemList>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+
+            while (true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + PRICE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka10063")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomInvestorTradeCloseMarketRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw InvestorTradeOpenMarketException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.opaf_invsr_trde?.forEach { opaf_invsr_trde.add(it) }
+
+                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers?.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break;
+                }
+            }
+
+            return KiwoomInvestorTradeCloseMarketRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                opaf_invsr_trde = opaf_invsr_trde
+            )
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: InvestorTradeOpenMarketException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "investorTradeOpenMarket Error" }
 
             throw RuntimeException(e.message)
         }
