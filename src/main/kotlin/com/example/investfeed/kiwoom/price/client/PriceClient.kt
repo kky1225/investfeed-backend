@@ -234,7 +234,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun investorTradeOpenMarket(
+    fun investorTradeCloseMarket(
         req: KiwoomInvestorTradeCloseMarketReq
     ): KiwoomInvestorTradeCloseMarketRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
@@ -247,12 +247,11 @@ class PriceClient(
             var returnCode = 0
             var returnMsg = ""
 
-
             while (true) {
                 val entity = webClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                    .header("api-id", "ka10063")
+                    .header("api-id", "ka10066")
                     .header("cont-yn", contYn)
                     .header("next-key", nextKey)
                     .bodyValue(req)
@@ -262,7 +261,7 @@ class PriceClient(
                     .block()
 
                 if (entity?.body?.return_code != 0) {
-                    throw InvestorTradeOpenMarketException()
+                    throw InvestorTradeCloseMarketException()
                 }
 
                 entity.body?.let { returnCode = it.return_code }
@@ -274,8 +273,10 @@ class PriceClient(
                 nextKey = entity.headers?.getFirst("next-key") ?: ""
 
                 if (contYn == "N") {
-                    break;
+                    break
                 }
+
+                Thread.sleep(55)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
@@ -285,7 +286,7 @@ class PriceClient(
             )
         } catch (e: KiwoomApiException) {
             throw e
-        } catch (e: InvestorTradeOpenMarketException) {
+        } catch (e: InvestorTradeCloseMarketException) {
             throw e
         } catch (e: Exception) {
             log.error { "investorTradeOpenMarket Error" }

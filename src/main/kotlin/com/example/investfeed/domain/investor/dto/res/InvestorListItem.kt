@@ -9,9 +9,5 @@ data class InvestorListItem(
     var fluRt: String? = null, // 등락율
     var accTrdeQty: String? = null, // 누적거래량
     var netprpsAmt: String? = null, // 순매수금액
-    var buyAmt: String? = null, // 매수금액
-    var sellAmt: String? = null, // 매도금액
     var netprpsQty: String? = null, // 순매수수량
-    var buyQty: String? = null, // 매수수량
-    var sellQty: String? = null, // 매도수량
 )
