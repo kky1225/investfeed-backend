@@ -246,6 +246,7 @@ class PriceClient(
             var nextKey = ""
             var returnCode = 0
             var returnMsg = ""
+            var apiCnt = 0
 
             while (true) {
                 val entity = webClient.post()
@@ -276,7 +277,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(55)
+                Thread.sleep(60)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
