@@ -11,7 +11,6 @@ import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarket
 import org.springframework.stereotype.Service
 import java.time.LocalTime
 import java.util.Collections.emptyList
-import kotlin.streams.toList
 
 @Service
 class InvestorService(
@@ -23,14 +22,15 @@ class InvestorService(
         val investorList: MutableList<InvestorListItem> = mutableListOf()
         var openResult: MutableList<KiwoomInvestorTradeOpenMarketItemList> = mutableListOf()
         var closeResult: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
+        val now = LocalTime.now()
 
-        if (isMarketAfter()) {
+        if (isKRXTradeClose(now = now)) {
             val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
                 req = KiwoomInvestorTradeCloseMarketReq(
                     mrkt_tp = "000",
                     amt_qty_tp = "1",
                     trde_tp = "0",
-                    stex_tp = "3",
+                    stex_tp = if (isTradeClose(now = now)) "3" else "1",
                 )
             )
 
@@ -269,9 +269,15 @@ class InvestorService(
 //        )
 //    }
 
-    private fun isMarketAfter(): Boolean {
-        val now = LocalTime.now()
-
+    private fun isKRXTradeClose(
+        now: LocalTime
+    ): Boolean {
         return now.isAfter(LocalTime.of(15, 30))
+    }
+
+    private fun isTradeClose(
+        now: LocalTime
+    ): Boolean {
+        return now.isAfter(LocalTime.of(20, 0))
     }
 }
