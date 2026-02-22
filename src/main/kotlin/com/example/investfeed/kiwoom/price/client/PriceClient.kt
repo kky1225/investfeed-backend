@@ -277,7 +277,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(60)
+                Thread.sleep(75)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
