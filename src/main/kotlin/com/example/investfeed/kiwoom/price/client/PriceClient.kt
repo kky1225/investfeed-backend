@@ -186,7 +186,6 @@ class PriceClient(
             var returnCode = 0
             var returnMsg = ""
 
-
             while (true) {
                 val entity = webClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
@@ -213,7 +212,7 @@ class PriceClient(
                 nextKey = entity.headers?.getFirst("next-key") ?: ""
 
                 if (contYn == "N") {
-                    break;
+                    break
                 }
             }
 
@@ -277,7 +276,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(75)
+                Thread.sleep(80)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
