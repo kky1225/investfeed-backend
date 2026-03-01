@@ -2,7 +2,7 @@ package com.example.investfeed.domain.dashboard.controller
 
 import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.domain.dashboard.service.DashboardService
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus

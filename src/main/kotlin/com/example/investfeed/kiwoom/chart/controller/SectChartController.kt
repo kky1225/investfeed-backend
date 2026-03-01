@@ -3,7 +3,7 @@ package com.example.investfeed.kiwoom.chart.controller
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMinuteRes
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus

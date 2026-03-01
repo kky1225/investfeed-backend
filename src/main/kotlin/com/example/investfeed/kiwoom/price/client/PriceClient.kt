@@ -245,7 +245,6 @@ class PriceClient(
             var nextKey = ""
             var returnCode = 0
             var returnMsg = ""
-            var apiCnt = 0
 
             while (true) {
                 val entity = webClient.post()
@@ -269,8 +268,8 @@ class PriceClient(
 
                 entity.body?.opaf_invsr_trde?.forEach { opaf_invsr_trde.add(it) }
 
-                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
-                nextKey = entity.headers?.getFirst("next-key") ?: ""
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
 
                 if (contYn == "N") {
                     break

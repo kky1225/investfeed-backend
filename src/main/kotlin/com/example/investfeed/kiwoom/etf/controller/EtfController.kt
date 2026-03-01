@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.etf.controller
 
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.etf.dto.req.EtfInfoReq
 import com.example.investfeed.kiwoom.etf.dto.req.EtfPriceListReq
 import com.example.investfeed.kiwoom.etf.dto.req.EtfTradeDailyListReq

@@ -6,7 +6,7 @@ import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockListRes
 import com.example.investfeed.domain.stock.service.StockService
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus

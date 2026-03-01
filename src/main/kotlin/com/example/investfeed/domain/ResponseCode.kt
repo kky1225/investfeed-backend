@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config
+package com.example.investfeed.domain
 
 enum class ResponseCode(
     val code: String = "0000",
@@ -41,4 +41,6 @@ enum class ResponseCode(
     THEME_LIST(message = "테마 그룹별 조회에 성공하셨습니다."),
     THEME_STOCK_LIST(message = "테마 구성 종목 조회에 성공하셨습니다."),
     THEME_STOCK_LIST_STREAM(message = "실시간 테마 구성 종목 조회에 성공하셨습니다."),
+
+    
 }

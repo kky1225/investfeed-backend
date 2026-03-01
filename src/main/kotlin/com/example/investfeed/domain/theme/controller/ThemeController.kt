@@ -6,7 +6,7 @@ import com.example.investfeed.domain.theme.dto.req.ThemeStockListStreamReq
 import com.example.investfeed.domain.theme.dto.res.ThemeListRes
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
 import com.example.investfeed.domain.theme.service.ThemeService
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus

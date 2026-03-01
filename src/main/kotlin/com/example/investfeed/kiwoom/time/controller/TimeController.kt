@@ -1,6 +1,6 @@
 package com.example.investfeed.kiwoom.time.controller
 
-import com.example.investfeed.kiwoom.config.ResponseCode
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
 import com.example.investfeed.kiwoom.time.dto.res.TimeNowRes
