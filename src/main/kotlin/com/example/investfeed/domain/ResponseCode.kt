@@ -42,5 +42,5 @@ enum class ResponseCode(
     THEME_STOCK_LIST(message = "테마 구성 종목 조회에 성공하셨습니다."),
     THEME_STOCK_LIST_STREAM(message = "실시간 테마 구성 종목 조회에 성공하셨습니다."),
 
-    
+    RECOMMEND_LIST(message = "주식 추천 목록 조회에 성공하셨습니다.")
 }

@@ -140,6 +140,7 @@ class RecommendService(
                     stkNm = it.stk_nm,
                     fluRt = it.flu_rt,
                     curPrc = it.cur_prc,
+                    preSig = it.pre_sig
                 )
             )
         }
@@ -152,6 +153,7 @@ class RecommendService(
                     stkNm = it.stk_nm,
                     fluRt = it.flu_rt,
                     curPrc = it.cur_prc,
+                    preSig = it.pre_sig
                 )
             )
         }
