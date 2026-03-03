@@ -1,12 +1,17 @@
 package com.example.investfeed.domain.recommend.service
 
+import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
+import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -17,6 +22,7 @@ import kotlin.String
 class RecommendService(
     private val priceClient: PriceClient,
     private val stockClient: StockClient,
+    private val stockSocketClient: StockSocketClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -161,6 +167,24 @@ class RecommendService(
         return RecommendListRes(
             recommendList = recommendList,
             avoidList = avoidList
+        )
+    }
+
+    fun recommendListStream(
+        req: RecommendListStreamReq
+    ) {
+        stockSocketClient.stockListStream(
+            req = KiwoomStockStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    KiwoomStockStream(
+                        item = req.items,
+                        type = listOf("0B")
+                    )
+                )
+            )
         )
     }
 
