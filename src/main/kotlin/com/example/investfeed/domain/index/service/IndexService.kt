@@ -6,6 +6,8 @@ import com.example.investfeed.domain.index.dto.res.*
 import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
+import com.example.investfeed.kiwoom.price.client.PriceClient
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
@@ -13,11 +15,13 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Collections.emptyList
+import kotlin.String
 
 @Service
 class IndexService(
     private val sectClient: SectClient,
-    private val sectChartClient: SectChartClient
+    private val sectChartClient: SectChartClient,
+    private val priceClient: PriceClient
 ) {
     fun indexList(): IndexListRes? {
         val indexTypeList = IndexType.entries
@@ -217,6 +221,16 @@ class IndexService(
             )
         )
 
+        val kiwoomProgramTradeRes = priceClient.programTrade(
+            req = KiwoomProgramTradeReq(
+                date = today("yyyyMMdd"),
+                amt_qty_tp = "1",
+                mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
+                min_tic_tp = "1",
+                stex_tp = "3",
+            )
+        )
+
         return IndexDetailRes(
             indexInfo = IndexInfo(
                 indsCd = req.inds_cd,
@@ -235,7 +249,10 @@ class IndexService(
                 tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
                 indNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.ind_netprps,
                 frgnrNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.frgnr_netprps,
-                orgnNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.orgn_netprps
+                orgnNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.orgn_netprps,
+                dfrtTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.dfrt_trde_netprps,
+                ndiffproTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.ndiffpro_trde_netprps,
+                allNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.all_netprps,
             ),
             chartList = chartList
         )

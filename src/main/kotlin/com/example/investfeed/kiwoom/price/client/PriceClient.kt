@@ -8,6 +8,7 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowMinuteRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowRes
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
@@ -15,6 +16,7 @@ import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarke
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketRes
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomProgramTradeRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -289,6 +291,40 @@ class PriceClient(
             throw e
         } catch (e: Exception) {
             log.error { "investorTradeOpenMarket Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun programTrade(
+        req: KiwoomProgramTradeReq
+    ): KiwoomProgramTradeRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + PRICE_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka90010")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                .bodyToMono(KiwoomProgramTradeRes::class.java)
+                .block()
+
+            if (res?.return_code != 0) {
+                throw GoldPriceNowMinuteException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: ProgramTradeException) {
+          throw e
+        } catch (e: Exception) {
+            log.error { "programTrade Error" }
 
             throw RuntimeException(e.message)
         }

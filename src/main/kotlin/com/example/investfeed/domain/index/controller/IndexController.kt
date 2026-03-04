@@ -56,20 +56,6 @@ class IndexController(
             )
         )
 
-//        goldSocketService.goldListStream(
-//            req = GoldListStreamReq(
-//                trnm = "REG",
-//                grp_no = "0002",
-//                refresh = "0",
-//                data = listOf(
-//                    GoldListStream(
-//                        item = listOf("MGD"),
-//                        type = listOf("0I")
-//                    )
-//                )
-//            )
-//        )
-
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.INDEX_WS_LIST.code,

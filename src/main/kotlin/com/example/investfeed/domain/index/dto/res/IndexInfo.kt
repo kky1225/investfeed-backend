@@ -17,5 +17,8 @@ data class IndexInfo(
     var tmN: String? = null, // 시간
     var indNetprps: String? = null, // 개인순매수
     var frgnrNetprps: String? = null, // 외국인순매수
-    var orgnNetprps: String? = null // 기관계순매수
+    var orgnNetprps: String? = null, // 기관계순매수
+    var dfrtTrdeNetprps: String? = null, // 프로그램 차익 순매수
+    var ndiffproTrdeNetprps: String? = null, // 프로그램 비차익 순매수
+    var allNetprps: String? = null, // 프로그램 전체 순매수
 )
