@@ -8,6 +8,7 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowMinuteRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowRes
@@ -16,7 +17,9 @@ import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarke
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketRes
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockProgramTradeDayRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomProgramTradeRes
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockProgramTradeDay
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -24,6 +27,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
 import org.springframework.web.reactive.function.client.toEntity
 
 @Component
@@ -53,7 +57,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeInfoRes::class.java)
+                .bodyToMono<KiwoomStockTradeInfoRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -87,7 +91,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockSinglePriceRes::class.java)
+                .bodyToMono<KiwoomStockSinglePriceRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -121,7 +125,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomGoldPriceNowRes::class.java)
+                .bodyToMono<KiwoomGoldPriceNowRes>()
                 .block()
 
             if (res?.return_code != 0) {
@@ -155,7 +159,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomGoldPriceNowMinuteRes::class.java)
+                .bodyToMono<KiwoomGoldPriceNowMinuteRes>()
                 .block()
 
             if (res?.return_code != 0) {
@@ -210,8 +214,8 @@ class PriceClient(
 
                 entity.body?.opmr_invsr_trde?.forEach { opmr_invsr_trde.add(it) }
 
-                contYn = entity.headers?.getFirst("cont-yn") ?: "N"
-                nextKey = entity.headers?.getFirst("next-key") ?: ""
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
 
                 if (contYn == "N") {
                     break
@@ -311,11 +315,11 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomProgramTradeRes::class.java)
+                .bodyToMono<KiwoomProgramTradeRes>()
                 .block()
 
             if (res?.return_code != 0) {
-                throw GoldPriceNowMinuteException()
+                throw ProgramTradeException()
             }
 
             return res
@@ -325,6 +329,71 @@ class PriceClient(
           throw e
         } catch (e: Exception) {
             log.error { "programTrade Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    fun stockProgramTradeDay(
+        req: KiwoomStockProgramTradeDayReq
+    ): KiwoomStockProgramTradeDayRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val stk_daly_prm_trde_trnsn = mutableListOf<KiwoomStockProgramTradeDay>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+            while (true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + PRICE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka90013")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomStockProgramTradeDayRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw StockProgramTradeDayException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.stk_daly_prm_trde_trnsn?.forEach { stk_daly_prm_trde_trnsn.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break
+                }
+
+                Thread.sleep(80)
+
+                if (stk_daly_prm_trde_trnsn.size >= 100) {
+                    break
+                }
+            }
+
+            return KiwoomStockProgramTradeDayRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                stk_daly_prm_trde_trnsn = stk_daly_prm_trde_trnsn
+            )
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: StockProgramTradeDayException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "stockProgramTradeDay Error" }
 
             throw RuntimeException(e.message)
         }

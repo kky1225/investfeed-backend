@@ -23,7 +23,7 @@ class StockController(
     @GetMapping("list")
     fun stockList(
         req: StockListReq
-    ): ResponseEntity<ApiResponse<StockListRes?>> {
+    ): ResponseEntity<ApiResponse<StockListRes>> {
         log.info { "stockList : $req" }
 
         return ResponseEntity(
@@ -38,7 +38,7 @@ class StockController(
     @GetMapping("detail")
     fun stockDetail(
         req: StockDetailReq
-    ): ResponseEntity<ApiResponse<StockDetailRes?>> {
+    ): ResponseEntity<ApiResponse<StockDetailRes>> {
         log.info { "stockInfo $req" }
 
         return ResponseEntity(

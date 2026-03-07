@@ -14,4 +14,5 @@ data class StockInvestor(
     var bank: String? = null, // 은행
     var etcCorp: String? = null, // 기타법인
     var natfor: String? = null, // 내외국인
+    var program: String? = null, // 프로그램
 )

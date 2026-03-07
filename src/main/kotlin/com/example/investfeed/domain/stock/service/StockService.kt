@@ -6,6 +6,7 @@ import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.rank.client.RankClient
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
@@ -15,10 +16,12 @@ import com.example.investfeed.kiwoom.stock.client.StockChartClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
+import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlin.String
 
 @Service
 class StockService(
@@ -28,9 +31,11 @@ class StockService(
     private val stockChartClient: StockChartClient,
     private val stockSocketClient: StockSocketClient
 ) {
+    private val log = KotlinLogging.logger {}
+
     fun stockList(
         req: StockListReq
-    ): StockListRes? {
+    ): StockListRes {
         when (req.type) {
             "0" -> {
                 val kiwoomStockTradeValueListRes = rankClient.stockTradeValueList(
@@ -119,7 +124,7 @@ class StockService(
 
     fun stockDetail(
         req: StockDetailReq
-    ): StockDetailRes? {
+    ): StockDetailRes {
         val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
             req = KiwoomDefaultStockInfoReq(
                 stk_cd = req.stkCd
@@ -193,9 +198,23 @@ class StockService(
                         penfndEtc = it.penfnd_etc,
                         bank = it.bank,
                         etcCorp = it.etc_corp,
-                        natfor = it.natfor,
+                        natfor = it.natfor
                     )
                 )
+            }
+
+            val kiwoomStockProgramTradeDayRes = priceClient.stockProgramTradeDay(
+                req = KiwoomStockProgramTradeDayReq(
+                    amt_qty_tp = "2",
+                    stk_cd = req.stkCd,
+                    date = today("yyyyMMdd")
+                )
+            )
+
+            if(kiwoomStockProgramTradeDayRes.return_code == 0) {
+                stockInvestorList.mapIndexed { index, investor ->
+                    investor.program = kiwoomStockProgramTradeDayRes.stk_daly_prm_trde_trnsn?.get(index)?.prm_netprps_qty?.replace("--", "-") ?: "0"
+                }
             }
         }
 
