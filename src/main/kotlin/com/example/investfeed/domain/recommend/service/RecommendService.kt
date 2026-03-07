@@ -181,7 +181,7 @@ class RecommendService(
                 data = listOf(
                     KiwoomStockStream(
                         item = req.items,
-                        type = listOf("0B")
+                        type = listOf("0J")
                     )
                 )
             )

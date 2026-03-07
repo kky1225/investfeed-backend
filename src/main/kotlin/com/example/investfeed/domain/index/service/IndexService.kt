@@ -217,7 +217,7 @@ class IndexService(
             req = KiwoomSectInvestorReq(
                 mrkt_tp = if (req.inds_cd == "101" || req.inds_cd == "150") "1" else "0",
                 amt_qty_tp = "0",
-                stex_tp = "0"
+                stex_tp = "3"
             )
         )
 
