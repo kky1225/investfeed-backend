@@ -7,6 +7,8 @@ import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.price.client.PriceClient
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomIndexProgramTradeDayReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomIndexProgramTradeMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
@@ -231,6 +233,61 @@ class IndexService(
             )
         )
 
+        val programList = mutableListOf<ProgramListItem>()
+
+        var index = 99
+        if (chartList.size < 100) {
+            index = chartList.size - 1
+        }
+
+        if (index > 0) {
+            val kiwoomIndexProgramTradeDayRes = priceClient.indexProgramTradeDay(
+                req = KiwoomIndexProgramTradeDayReq(
+                    date = chartList[index].dt,
+                    amt_qty_tp = "1",
+                    mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "0" else "1",
+                    stex_tp = "3",
+                )
+            )
+
+            if (kiwoomIndexProgramTradeDayRes.return_code == 0) {
+                kiwoomIndexProgramTradeDayRes.prm_trde_acc_trnsn?.forEach {
+                    programList.add(
+                        ProgramListItem(
+                            dt = it.dt,
+                            dfrtTrdeTdy = it.dfrt_trde_tdy,
+                            ndiffproTrdeTdy = it.ndiffpro_trde_tdy,
+                            allTdy = it.all_tdy,
+                        )
+                    )
+                }
+            }
+        }
+
+        val kiwoomIndexProgramTradeMinuteRes = priceClient.indexProgramTradeMinute(
+            req = KiwoomIndexProgramTradeMinuteReq(
+                date = today("yyyyMMdd"),
+                amt_qty_tp = "1",
+                mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
+                min_tic_tp = "1",
+                stex_tp = "3",
+            )
+        )
+
+        val programChartList: MutableList<ProgramChart> = mutableListOf()
+        if (kiwoomIndexProgramTradeMinuteRes.return_code == 0) {
+            kiwoomIndexProgramTradeMinuteRes.prm_trde_trnsn?.forEach {
+                programChartList.add(
+                    ProgramChart(
+                        cntrTm = it.cntr_tm,
+                        dfrtTrdeNetprps = it.dfrt_trde_netprps,
+                        ndiffproTrdeNetprps = it.ndiffpro_trde_netprps,
+                        allNetprps = it.all_netprps,
+                    )
+                )
+            }
+        }
+
         return IndexDetailRes(
             indexInfo = IndexInfo(
                 indsCd = req.inds_cd,
@@ -254,7 +311,9 @@ class IndexService(
                 ndiffproTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.ndiffpro_trde_netprps,
                 allNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.all_netprps,
             ),
-            chartList = chartList
+            chartList = chartList,
+            programChartList = programChartList.reversed(),
+            programList = programList
         )
     }
 

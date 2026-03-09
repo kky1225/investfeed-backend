@@ -1,6 +1,8 @@
 package com.example.investfeed.domain.index.dto.res
 
 data class IndexDetailRes(
-    var indexInfo: IndexInfo,
-    var chartList: List<IndexChart>,
+    var indexInfo: IndexInfo? = null,
+    var chartList: List<IndexChart>? = null,
+    var programChartList: List<ProgramChart>? = null,
+    var programList: List<ProgramListItem>? = null
 )

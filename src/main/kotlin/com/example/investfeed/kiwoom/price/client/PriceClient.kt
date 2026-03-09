@@ -1,26 +1,9 @@
 package com.example.investfeed.kiwoom.price.client
 
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockSinglePriceRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowMinuteReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomGoldPriceNowReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowMinuteRes
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomGoldPriceNowRes
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketRes
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockProgramTradeDayRes
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomProgramTradeRes
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockProgramTradeDay
-import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
+import com.example.investfeed.kiwoom.price.dto.req.*
+import com.example.investfeed.kiwoom.price.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
@@ -394,6 +377,100 @@ class PriceClient(
             throw e
         } catch (e: Exception) {
             log.error { "stockProgramTradeDay Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    fun indexProgramTradeDay(
+        req: KiwoomIndexProgramTradeDayReq
+    ): KiwoomIndexProgramTradeDayRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + PRICE_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka90007")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomIndexProgramTradeDayRes>()
+                .block()
+
+            if (res?.return_code != 0) {
+                throw IndexProgramTradeDayException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: IndexProgramTradeDayException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "indexProgramTradeDay Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    fun indexProgramTradeMinute(
+        req: KiwoomIndexProgramTradeMinuteReq
+    ): KiwoomIndexProgramTradeMinuteRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val prm_trde_trnsn = mutableListOf<KiwoomIndexProgramTradeMinute>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+            while (true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + PRICE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka90005")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomIndexProgramTradeMinuteRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw IndexProgramTradeMinuteException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.prm_trde_trnsn?.forEach { prm_trde_trnsn.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break
+                }
+
+                Thread.sleep(80)
+            }
+
+            return KiwoomIndexProgramTradeMinuteRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                prm_trde_trnsn = prm_trde_trnsn
+            )
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: IndexProgramTradeMinuteException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "indexProgramTradeMinute Error" }
 
             throw RuntimeException(e.message)
         }
