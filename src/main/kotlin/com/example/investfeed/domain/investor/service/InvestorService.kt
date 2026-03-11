@@ -70,7 +70,7 @@ class InvestorService(
                                 InvestorListItem(
                                     stkCd = it.stk_cd,
                                     stkNm = it.stk_nm,
-                                    curPrc = it.cur_prc,
+                                    curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
                                     preSig = it.pre_sig,
                                     predPre = it.pred_pre,
                                     fluRt = it.flu_rt,
@@ -86,7 +86,7 @@ class InvestorService(
                                 InvestorListItem(
                                     stkCd = it.stk_cd,
                                     stkNm = it.stk_nm,
-                                    curPrc = it.cur_prc,
+                                    curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
                                     preSig = it.pre_sig,
                                     predPre = it.pred_pre,
                                     fluRt = it.flu_rt,
@@ -161,7 +161,7 @@ class InvestorService(
                             InvestorListItem(
                                 stkCd = it.stk_cd,
                                 stkNm = it.stk_nm,
-                                curPrc = it.cur_prc,
+                                curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
                                 preSig = it.pre_sig,
                                 predPre = it.pred_pre,
                                 fluRt = it.flu_rt,
@@ -212,7 +212,7 @@ class InvestorService(
                             InvestorListItem(
                                 stkCd = it.stk_cd,
                                 stkNm = it.stk_nm,
-                                curPrc = it.cur_prc,
+                                curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
                                 preSig = it.pre_sig,
                                 predPre = it.pred_pre,
                                 fluRt = it.flu_rt,

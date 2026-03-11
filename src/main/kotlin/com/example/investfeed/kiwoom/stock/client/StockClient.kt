@@ -24,6 +24,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
 
 @Component
 class StockClient(
@@ -51,7 +52,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockInfoListRes::class.java)
+                .bodyToMono<StockInfoListRes>()
                 .block()
 
             if (res?.return_code != 0) {
@@ -59,11 +60,11 @@ class StockClient(
             }
 
             return res
-        }catch (e: KiwoomApiException) {
+        } catch (e: KiwoomApiException) {
             throw e
-        }catch (e: StockInfoListException) {
+        } catch (e: StockInfoListException) {
             throw e
-        }catch (e: Exception) {
+        } catch (e: Exception) {
             log.error { "stockInfoList Error" }
 
             throw RuntimeException(e.message)
@@ -85,7 +86,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockDefaultInfoRes::class.java)
+                .bodyToMono<KiwoomStockDefaultInfoRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -119,7 +120,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockInfoRes::class.java)
+                .bodyToMono<KiwoomStockInfoRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -153,7 +154,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockInvestorRes::class.java)
+                .bodyToMono<KiwoomStockInvestorRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -187,7 +188,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockTradeDailyRes::class.java)
+                .bodyToMono<KiwoomStockTradeDailyRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -221,7 +222,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockJumpListRes::class.java)
+                .bodyToMono<StockJumpListRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -255,7 +256,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(StockNewPriceListRes::class.java)
+                .bodyToMono<StockNewPriceListRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -289,7 +290,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectCodeListRes::class.java)
+                .bodyToMono<KiwoomSectCodeListRes>()
                 .block()
 
             if(res?.return_code != 0) {

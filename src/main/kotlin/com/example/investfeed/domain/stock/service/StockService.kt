@@ -19,6 +19,8 @@ import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
 import com.example.investfeed.kiwoom.chart.client.StockChartClient
+import com.example.investfeed.kiwoom.shortselling.client.ShortSellingClient
+import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
@@ -35,7 +37,8 @@ class StockService(
     private val priceClient: PriceClient,
     private val rankClient: RankClient,
     private val stockChartClient: StockChartClient,
-    private val stockSocketClient: StockSocketClient
+    private val stockSocketClient: StockSocketClient,
+    private val shortSellingClient: ShortSellingClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -388,12 +391,38 @@ class StockService(
             }
         }
 
+        val kiwoomStockShortSellingRes = shortSellingClient.stockShortSelling(
+            req = KiwoomStockShortSellingReq(
+                stk_cd = req.stkCd,
+                tm_tp = "1",
+                strt_dt = stockProgramList?.last()?.dt ?: today("yyyyMMdd"),
+                end_dt = stockProgramList?.first()?.dt ?: today("yyyyMMdd"),
+            )
+        )
+
+        val stockShortSellingList: MutableList<StockShortSelling> = mutableListOf()
+        if (kiwoomStockShortSellingRes.return_code == 0) {
+            kiwoomStockShortSellingRes.shrts_trnsn?.forEach {
+                stockShortSellingList.add(
+                    StockShortSelling(
+                        dt = it.dt,
+                        trdeQty = it.trde_qty,
+                        shrtsQty = it.shrts_qty,
+                        trdeWght = it.trde_wght,
+                        shrtsTrdePrica = it.shrts_trde_prica,
+                        shrtsAvgPric = it.shrts_avg_pric,
+                    )
+                )
+            }
+        }
+
         return StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
             stockInvestorChartList = stockInvestorChartList,
             stockInvestorList = stockInvestorList,
-            stockProgramList = stockProgramList
+            stockProgramList = stockProgramList,
+            stockShortSellingList = stockShortSellingList
         )
     }
 
