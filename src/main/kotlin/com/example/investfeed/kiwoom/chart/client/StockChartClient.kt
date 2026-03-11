@@ -1,24 +1,16 @@
-package com.example.investfeed.kiwoom.stock.client
+package com.example.investfeed.kiwoom.chart.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.chart.dto.stock.req.*
+import com.example.investfeed.kiwoom.chart.dto.stock.res.*
 import com.example.investfeed.kiwoom.exception.*
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartDayReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMinuteReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartMonthReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartWeekReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockChartYearReq
-import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartDayRes
-import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartMinuteRes
-import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartMonthRes
-import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartWeekRes
-import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockChartYearRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import kotlin.jvm.java
+import org.springframework.web.reactive.function.client.bodyToMono
 
 @Service
 class StockChartClient(
@@ -49,13 +41,13 @@ class StockChartClient(
                 .block()
 
             if(res?.return_code != 0) {
-                throw ChartMinuteListException()
+                throw StockChartMinuteListException()
             }
 
             return res
         }catch(e: KiwoomApiException) {
             throw e
-        }catch(e: ChartMinuteListException) {
+        }catch(e: StockChartMinuteListException) {
             throw e
         }catch (e: Exception) {
             log.error { "chartMinuteList Error" }
@@ -83,13 +75,13 @@ class StockChartClient(
                 .block()
 
             if(res?.return_code != 0) {
-                throw ChartDayListException()
+                throw StockChartDayListException()
             }
 
             return res
         }catch(e: KiwoomApiException) {
             throw e
-        }catch(e: ChartDayListException) {
+        }catch(e: StockChartDayListException) {
             throw e
         }catch (e: Exception) {
             log.error { "chartDayList Error" }
@@ -117,13 +109,13 @@ class StockChartClient(
                 .block()
 
             if(res?.return_code != 0) {
-                throw ChartWeekListException()
+                throw StockChartWeekListException()
             }
 
             return res
         }catch(e: KiwoomApiException) {
             throw e
-        }catch(e: ChartWeekListException) {
+        }catch(e: StockChartWeekListException) {
             throw e
         }catch (e: Exception) {
             log.error { "chartWeekList Error" }
@@ -151,13 +143,13 @@ class StockChartClient(
                 .block()
 
             if(res?.return_code != 0) {
-                throw ChartMonthListException()
+                throw StockChartMonthListException()
             }
 
             return res
         }catch(e: KiwoomApiException) {
             throw e
-        }catch(e: ChartMonthListException) {
+        }catch(e: StockChartMonthListException) {
             throw e
         }catch (e: Exception) {
             log.error { "chartMonthList Error" }
@@ -185,16 +177,50 @@ class StockChartClient(
                 .block()
 
             if(res?.return_code != 0) {
-                throw ChartYearListException()
+                throw StockChartYearListException()
             }
 
             return res
         }catch(e: KiwoomApiException) {
             throw e
-        }catch(e: ChartYearListException) {
+        }catch(e: StockChartYearListException) {
             throw e
         }catch (e: Exception) {
             log.error { "chartYearList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockChartInvestor(
+        req: KiwoomStockChartInvestorReq
+    ): KiwoomStockChartInvestorRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/chart")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10064")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomStockChartInvestorRes>()
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockChartInvestorException()
+            }
+
+            return res
+        }catch(e: KiwoomApiException) {
+            throw e
+        }catch(e: StockChartInvestorException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockChartInvestor Error" }
 
             throw RuntimeException(e.message)
         }

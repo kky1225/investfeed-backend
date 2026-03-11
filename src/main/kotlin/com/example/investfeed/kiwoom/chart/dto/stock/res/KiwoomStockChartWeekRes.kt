@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.stock.dto.res
+package com.example.investfeed.kiwoom.chart.dto.stock.res
 
 data class KiwoomStockChartWeekRes(
     var return_code: Int, // 응답 코드

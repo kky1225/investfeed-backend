@@ -4,6 +4,12 @@ import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartDayReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartMinuteReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartMonthReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartWeekReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartYearReq
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartInvestorReq
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
@@ -12,7 +18,7 @@ import com.example.investfeed.kiwoom.rank.client.RankClient
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
-import com.example.investfeed.kiwoom.stock.client.StockChartClient
+import com.example.investfeed.kiwoom.chart.client.StockChartClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
@@ -202,20 +208,6 @@ class StockService(
                     )
                 )
             }
-
-            val kiwoomStockProgramTradeDayRes = priceClient.stockProgramTradeDay(
-                req = KiwoomStockProgramTradeDayReq(
-                    amt_qty_tp = "2",
-                    stk_cd = req.stkCd,
-                    date = today("yyyyMMdd")
-                )
-            )
-
-            if(kiwoomStockProgramTradeDayRes.return_code == 0) {
-                stockInvestorList.mapIndexed { index, investor ->
-                    investor.program = kiwoomStockProgramTradeDayRes.stk_daly_prm_trde_trnsn?.get(index)?.prm_netprps_qty?.replace("--", "-") ?: "0"
-                }
-            }
         }
 
         val chartListRes: MutableList<StockChart> = mutableListOf()
@@ -350,10 +342,58 @@ class StockService(
             }
         }
 
+        val kiwoomIndexInvestorRes = stockChartClient.stockChartInvestor(
+            req = KiwoomStockChartInvestorReq(
+                mrkt_tp = "000",
+                amt_qty_tp = "2",
+                trde_tp = "0",
+                stk_cd = req.stkCd,
+            )
+        )
+
+        val stockInvestorChartList: MutableList<StockInvestorChart> = mutableListOf()
+        if (kiwoomIndexInvestorRes.return_code == 0) {
+            kiwoomIndexInvestorRes.opmr_invsr_trde_chart?.forEach {
+                stockInvestorChartList.add(
+                    StockInvestorChart(
+                        tm = it.tm,
+                        frgnrInvsr = it.frgnr_invsr,
+                        orgn = it.orgn,
+                        penfnd_etc = it.penfnd_etc,
+                    )
+                )
+            }
+        }
+
+        val kiwoomStockProgramTradeDayRes = priceClient.stockProgramTradeDay(
+            req = KiwoomStockProgramTradeDayReq(
+                amt_qty_tp = "2",
+                stk_cd = req.stkCd,
+                date = today("yyyyMMdd")
+            )
+        )
+
+        val stockProgramList: MutableList<StockProgram> = mutableListOf()
+        if(kiwoomStockProgramTradeDayRes.return_code == 0) {
+            kiwoomStockProgramTradeDayRes.stk_daly_prm_trde_trnsn?.forEach {
+                stockProgramList.add(
+                    StockProgram(
+                        dt = it.dt,
+                        prmSellQty = "-" + it.prm_sell_qty,
+                        prmBuyQty = it.prm_buy_qty,
+                        prmNetprpsQty = it.prm_netprps_qty?.replace("--", "-"),
+                        prmNetprpsQtyIrds = it.prm_netprps_qty_irds?.replace("--", "-"),
+                    )
+                )
+            }
+        }
+
         return StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
-            stockInvestorList = stockInvestorList
+            stockInvestorChartList = stockInvestorChartList,
+            stockInvestorList = stockInvestorList,
+            stockProgramList = stockProgramList
         )
     }
 

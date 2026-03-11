@@ -280,9 +280,9 @@ class IndexService(
                 programChartList.add(
                     ProgramChart(
                         cntrTm = it.cntr_tm,
-                        dfrtTrdeNetprps = it.dfrt_trde_netprps,
-                        ndiffproTrdeNetprps = it.ndiffpro_trde_netprps,
-                        allNetprps = it.all_netprps,
+                        dfrtTrdeNetprps = it.dfrt_trde_netprps?.replace("--", "-"),
+                        ndiffproTrdeNetprps = it.ndiffpro_trde_netprps?.replace("--", "-"),
+                        allNetprps = it.all_netprps?.replace("--", "-"),
                     )
                 )
             }
@@ -313,7 +313,7 @@ class IndexService(
             ),
             chartList = chartList,
             programChartList = programChartList.reversed(),
-            programList = programList
+            programList = programList,
         )
     }
 
