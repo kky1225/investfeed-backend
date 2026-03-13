@@ -36,4 +36,13 @@ class ExceptionAdviceController {
             ApiResponse(code = e.code, message = e.message, null), HttpStatus.INTERNAL_SERVER_ERROR
         )
     }
+
+    @ExceptionHandler(AuthException::class)
+    fun authException(e: AuthException): ResponseEntity<ApiResponse<Nothing?>> {
+        log.warn { "authException: [${e.code}] ${e.message}" }
+
+        return ResponseEntity(
+            ApiResponse(code = e.code, message = e.message, null), HttpStatus.BAD_REQUEST
+        )
+    }
 }

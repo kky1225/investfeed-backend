@@ -43,5 +43,10 @@ enum class ResponseCode(
     THEME_STOCK_LIST_STREAM(message = "실시간 테마 구성 종목 조회에 성공하셨습니다."),
 
     RECOMMEND_LIST(message = "주식 추천 목록 조회에 성공하셨습니다."),
-    RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다.")
+    RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다."),
+
+    AUTH_SIGNUP(message = "회원가입에 성공하셨습니다."),
+    AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
+    AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
+    AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다.")
 }
