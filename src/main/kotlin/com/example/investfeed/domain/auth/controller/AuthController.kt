@@ -7,10 +7,10 @@ import com.example.investfeed.domain.auth.dto.res.TokenRes
 import com.example.investfeed.domain.auth.service.AuthService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.kiwoom.exception.ApiResponse
-import com.example.investfeed.kiwoom.exception.AuthException
 import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletResponse
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/auth")
 class AuthController(
+    @Value("\${jwt.refresh-token-expiration}")
+    private val refreshTokenExpiration: Long,
     private val authService: AuthService
 ) {
     private val log = KotlinLogging.logger {}
@@ -63,12 +65,11 @@ class AuthController(
 
     @PostMapping("/reissue")
     fun reissue(
-        @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
-        response: HttpServletResponse
+        @CookieValue(name = "refreshToken", required = false) refreshToken: String?
     ): ResponseEntity<ApiResponse<TokenRes>> {
+        log.info { "reissue: ${refreshToken}" }
 
-        val (tokenRes, newRefreshToken) = authService.reissue(refreshToken)
-        response.addCookie(createRefreshTokenCookie(newRefreshToken))
+        val tokenRes = authService.reissue(refreshToken)
 
         return ResponseEntity(
             ApiResponse(
@@ -99,11 +100,13 @@ class AuthController(
     }
 
     private fun createRefreshTokenCookie(refreshToken: String): Cookie {
+        var age = refreshTokenExpiration * 24 * 60 * 60
+
         return Cookie("refreshToken", refreshToken).apply {
             isHttpOnly = true
             secure = true
             path = "/api/auth"
-            maxAge = 7 * 24 * 60 * 60
+            maxAge = age.toInt()
         }
     }
 

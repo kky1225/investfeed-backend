@@ -60,7 +60,6 @@ class AuthService(
             throw AuthException("AUTH_4011", "아이디 또는 비밀번호가 올바르지 않습니다.")
         }
 
-        log.info { "login: ${req.loginId}" }
         return Pair(
             TokenRes(accessToken = jwtProvider.generateAccessToken(member.loginId)),
             jwtProvider.generateRefreshToken(member.loginId)
@@ -69,7 +68,7 @@ class AuthService(
 
     fun reissue(
         refreshToken: String?
-    ): Pair<TokenRes, String> {
+    ): TokenRes {
         if (refreshToken == null) {
             throw AuthException("AUTH_4012", "리프레시 토큰이 없습니다.")
         }
@@ -79,12 +78,8 @@ class AuthService(
         }
 
         val loginId = jwtProvider.getLoginId(refreshToken)
-        jwtProvider.deleteRefreshToken(loginId)
 
-        return Pair(
-            TokenRes(accessToken = jwtProvider.generateAccessToken(loginId)),
-            jwtProvider.generateRefreshToken(loginId)
-        )
+        return TokenRes(accessToken = jwtProvider.generateAccessToken(loginId))
     }
 
     fun logout(
