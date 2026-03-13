@@ -6,11 +6,18 @@ import java.time.LocalDateTime
 @Entity
 @Table(name = "members")
 class Member(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
+
     @Column(unique = true, nullable = false)
-    val email: String,
+    val loginId: String,
 
     @Column(nullable = false)
     var password: String,
+
+    @Column(unique = true, nullable = false)
+    val email: String,
 
     @Column(nullable = false)
     val nickname: String,
@@ -26,11 +33,7 @@ class Member(
     val role: Role = Role.USER,
 
     @Column(nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0
+    val createdAt: LocalDateTime = LocalDateTime.now()
 )
 
 enum class Role {

@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config.security
+package com.example.investfeed.domain.security
 
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
@@ -9,7 +9,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.stereotype.Component
-import java.util.Date
+import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
 
@@ -25,29 +25,29 @@ class JwtProvider(
         Keys.hmacShaKeyFor(secret.toByteArray())
     }
 
-    fun generateAccessToken(email: String): String {
+    fun generateAccessToken(loginId: String): String {
         val now = Date()
         return Jwts.builder()
-            .subject(email)
+            .subject(loginId)
             .claim("type", "access")
             .issuedAt(now)
-            .expiration(Date(now.time + accessTokenExpiration))
+            .expiration(Date(now.time + transMinutes(accessTokenExpiration)))
             .signWith(key)
             .compact()
     }
 
-    fun generateRefreshToken(email: String): String {
+    fun generateRefreshToken(loginId: String): String {
         val now = Date()
         val refreshToken = Jwts.builder()
-            .subject(email)
+            .subject(loginId)
             .claim("type", "refresh")
             .issuedAt(now)
-            .expiration(Date(now.time + refreshTokenExpiration))
+            .expiration(Date(now.time + transDays(refreshTokenExpiration)))
             .signWith(key)
             .compact()
 
         redisTemplate.opsForValue().set(
-            "RT:$email",
+            "RT:$loginId",
             refreshToken,
             refreshTokenExpiration,
             TimeUnit.MILLISECONDS
@@ -56,8 +56,8 @@ class JwtProvider(
     }
 
     fun getAuthentication(token: String): Authentication {
-        val email = getClaims(token).subject
-        val userDetails = userDetailsService.loadUserByUsername(email)
+        val loginId = getClaims(token).subject
+        val userDetails = userDetailsService.loadUserByUsername(loginId)
         return UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
     }
 
@@ -72,15 +72,15 @@ class JwtProvider(
 
     fun validateRefreshToken(refreshToken: String): Boolean {
         if (!validateToken(refreshToken)) return false
-        val email = getClaims(refreshToken).subject
-        val stored = redisTemplate.opsForValue().get("RT:$email")
+        val loginId = getClaims(refreshToken).subject
+        val stored = redisTemplate.opsForValue().get("RT:$loginId")
         return stored == refreshToken
     }
 
-    fun getEmail(token: String): String = getClaims(token).subject
+    fun getLoginId(token: String): String = getClaims(token).subject
 
-    fun deleteRefreshToken(email: String) {
-        redisTemplate.delete("RT:$email")
+    fun deleteRefreshToken(loginId: String) {
+        redisTemplate.delete("RT:$loginId")
     }
 
     fun resolveToken(bearerToken: String?): String? {
@@ -95,5 +95,13 @@ class JwtProvider(
             .build()
             .parseSignedClaims(token)
             .payload
+    }
+
+    private fun transMinutes(time: Long): Long {
+        return time * 60 * 1000
+    }
+
+    private fun transDays(time: Long): Long {
+        return time * 24 * 60 * 60 * 1000
     }
 }

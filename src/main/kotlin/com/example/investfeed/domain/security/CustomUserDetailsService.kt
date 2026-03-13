@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config.security
+package com.example.investfeed.domain.security
 
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import org.springframework.security.core.userdetails.UserDetails
@@ -12,8 +12,8 @@ class CustomUserDetailsService(
 ) : UserDetailsService {
 
     override fun loadUserByUsername(username: String): UserDetails {
-        val member = memberRepository.findByEmail(username)
-            .orElseThrow { UsernameNotFoundException("존재하지 않는 이메일입니다.") }
+        val member = memberRepository.findByLoginId(username)
+            .orElseThrow { UsernameNotFoundException("존재하지 않는 아이디입니다.") }
         return CustomUserDetails(member)
     }
 }

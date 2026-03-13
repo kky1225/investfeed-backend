@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config.security
+package com.example.investfeed.domain.security
 
 import com.example.investfeed.domain.auth.entity.Member
 import org.springframework.security.core.GrantedAuthority

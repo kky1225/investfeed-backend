@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config.security
+package com.example.investfeed.domain.security
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest

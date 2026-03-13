@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config.security
+package com.example.investfeed.domain.security
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.example.investfeed.kiwoom.exception.ApiResponse

@@ -7,8 +7,8 @@ spring:
       port: 6379
   datasource:
     url: jdbc:postgresql://localhost:5432/investfeed
-    username: postgres
-    password: password
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -20,11 +20,11 @@ spring:
         format_sql: true
 
 jwt:
-  secret: investfeed-secret-key-must-be-at-least-256-bits-long-for-hs256
-  access-token-expiration: 1800000    # 30분 (ms)
-  refresh-token-expiration: 604800000 # 7일 (ms)
+  secret: ${JWT_SECRET}
+  access-token-expiration: 30
+  refresh-token-expiration: 1
 
 kiwoom:
-  app-key: ENoqH8oL9GF9Xt651kcNTfDpLXtTYwuGxjbvnOkCFWc
-  secret-key: P3NIlTVvvicHXGcDumxMRCHO4skMCQjAjLMX8khoMJg
+  app-key: ${KIWOOM_APP_KEY}
+  secret-key: ${KIWOOM_SECRET_KEY}
   default-url: https://api.kiwoom.com
