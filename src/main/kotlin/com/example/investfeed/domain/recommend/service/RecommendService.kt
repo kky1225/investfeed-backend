@@ -3,7 +3,10 @@ package com.example.investfeed.domain.recommend.service
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
-import com.example.investfeed.domain.stock.dto.req.StockStreamReq
+import com.example.investfeed.domain.recommend.entity.StockAvoid
+import com.example.investfeed.domain.recommend.entity.StockRecommend
+import com.example.investfeed.domain.recommend.repository.StockAvoidRepository
+import com.example.investfeed.domain.recommend.repository.StockRecommendRepository
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
@@ -13,7 +16,9 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import mu.KotlinLogging
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.String
@@ -22,11 +27,15 @@ import kotlin.String
 class RecommendService(
     private val priceClient: PriceClient,
     private val stockClient: StockClient,
-    private val stockSocketClient: StockSocketClient
+    private val stockSocketClient: StockSocketClient,
+    private val stockRecommendRepository: StockRecommendRepository,
+    private val stockAvoidRepository: StockAvoidRepository
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun recommandList(): RecommendListRes {
+    @Scheduled(cron = "0 30 20 * * *")
+    @Transactional
+    fun recommandList() {
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
@@ -138,29 +147,55 @@ class RecommendService(
             }.toList().toMutableList()
         }
 
-        val recommendList: MutableList<RecommendListItem> = mutableListOf()
-        recommendResult.forEach {
-            recommendList.add(
-                RecommendListItem(
-                    stkCd = it.stk_cd,
-                    stkNm = it.stk_nm,
-                    fluRt = it.flu_rt,
-                    curPrc = it.cur_prc,
-                    preSig = it.pre_sig
+        // 기존 데이터 삭제 후 새로 저장
+        stockRecommendRepository.deleteAll()
+        stockAvoidRepository.deleteAll()
+
+        stockRecommendRepository.saveAll(
+            recommendResult.map { item ->
+                StockRecommend(
+                    stkCd = item.stk_cd ?: "",
+                    stkNm = item.stk_nm ?: "",
+                    fluRt = item.flu_rt,
+                    curPrc = item.cur_prc,
+                    preSig = item.pre_sig
                 )
+            }
+        )
+
+        stockAvoidRepository.saveAll(
+            avoidResult.map { item ->
+                StockAvoid(
+                    stkCd = item.stk_cd ?: "",
+                    stkNm = item.stk_nm ?: "",
+                    fluRt = item.flu_rt,
+                    curPrc = item.cur_prc,
+                    preSig = item.pre_sig
+                )
+            }
+        )
+
+        log.info { "추천 종목 ${recommendResult.size}건, 회피 종목 ${avoidResult.size}건 저장 완료" }
+    }
+
+    fun getRecommendList(): RecommendListRes {
+        val recommendList = stockRecommendRepository.findAll().map { entity ->
+            RecommendListItem(
+                stkCd = entity.stkCd,
+                stkNm = entity.stkNm,
+                fluRt = entity.fluRt,
+                curPrc = entity.curPrc,
+                preSig = entity.preSig
             )
         }
 
-        val avoidList: MutableList<RecommendListItem> = mutableListOf()
-        avoidResult.forEach {
-            avoidList.add(
-                RecommendListItem(
-                    stkCd = it.stk_cd,
-                    stkNm = it.stk_nm,
-                    fluRt = it.flu_rt,
-                    curPrc = it.cur_prc,
-                    preSig = it.pre_sig
-                )
+        val avoidList = stockAvoidRepository.findAll().map { entity ->
+            RecommendListItem(
+                stkCd = entity.stkCd,
+                stkNm = entity.stkNm,
+                fluRt = entity.fluRt,
+                curPrc = entity.curPrc,
+                preSig = entity.preSig
             )
         }
 
