@@ -15,9 +15,12 @@ class StockAvoid(
     @Column(nullable = false)
     val stkNm: String,
 
-    val fluRt: String? = null,
+    @Column(nullable = false)
+    val fluRt: String,
 
-    val curPrc: String? = null,
+    @Column(nullable = false)
+    val curPrc: String,
 
-    val preSig: String? = null
+    @Column(nullable = false)
+    val preSig: String
 )

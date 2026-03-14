@@ -156,9 +156,9 @@ class RecommendService(
                 StockRecommend(
                     stkCd = item.stk_cd ?: "",
                     stkNm = item.stk_nm ?: "",
-                    fluRt = item.flu_rt,
-                    curPrc = item.cur_prc,
-                    preSig = item.pre_sig
+                    fluRt = item.flu_rt ?: "",
+                    curPrc = item.cur_prc ?: "",
+                    preSig = item.pre_sig ?: ""
                 )
             }
         )
@@ -168,9 +168,9 @@ class RecommendService(
                 StockAvoid(
                     stkCd = item.stk_cd ?: "",
                     stkNm = item.stk_nm ?: "",
-                    fluRt = item.flu_rt,
-                    curPrc = item.cur_prc,
-                    preSig = item.pre_sig
+                    fluRt = item.flu_rt ?: "",
+                    curPrc = item.cur_prc ?: "",
+                    preSig = item.pre_sig ?: ""
                 )
             }
         )
