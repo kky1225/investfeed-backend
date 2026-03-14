@@ -25,7 +25,7 @@ class RecommendController(
             ApiResponse(
                 code = ResponseCode.RECOMMEND_LIST.code,
                 message = ResponseCode.RECOMMEND_LIST.message,
-                result = recommendService.getRecommendList()
+                result = recommendService.recommendList()
             ), HttpStatus.OK
         )
     }

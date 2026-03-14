@@ -35,7 +35,7 @@ class RecommendService(
 
     @Scheduled(cron = "0 30 20 * * *")
     @Transactional
-    fun recommandList() {
+    fun recommendStock() {
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
@@ -179,10 +179,10 @@ class RecommendService(
             }
         )
 
-        log.info { "추천 종목 ${recommendResult.size}건, 회피 종목 ${avoidResult.size}건 저장 완료" }
+        log.info { "매수 추천 종목 ${recommendResult.size}건, 매도 추천 종목 ${avoidResult.size}건 저장 완료" }
     }
 
-    fun getRecommendList(): RecommendListRes {
+    fun recommendList(): RecommendListRes {
         val recommendList = stockRecommendRepository.findAll().map { entity ->
             RecommendListItem(
                 stkCd = entity.stkCd,
