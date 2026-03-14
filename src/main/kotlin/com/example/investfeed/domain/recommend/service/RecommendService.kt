@@ -152,25 +152,29 @@ class RecommendService(
         stockAvoidRepository.deleteAll()
 
         stockRecommendRepository.saveAll(
-            recommendResult.map { item ->
+            recommendResult.filter { item ->
+                item.stk_cd != null && item.stk_nm != null && item.flu_rt != null && item.cur_prc != null && item.pre_sig != null
+            }.map { item ->
                 StockRecommend(
-                    stkCd = item.stk_cd ?: "",
-                    stkNm = item.stk_nm ?: "",
-                    fluRt = item.flu_rt ?: "",
-                    curPrc = item.cur_prc ?: "",
-                    preSig = item.pre_sig ?: ""
+                    stkCd = item.stk_cd!!,
+                    stkNm = item.stk_nm!!,
+                    fluRt = item.flu_rt!!,
+                    curPrc = item.cur_prc!!,
+                    preSig = item.pre_sig!!
                 )
             }
         )
 
         stockAvoidRepository.saveAll(
-            avoidResult.map { item ->
+            avoidResult.filter { item ->
+                item.stk_cd != null && item.stk_nm != null && item.flu_rt != null && item.cur_prc != null && item.pre_sig != null
+            }.map { item ->
                 StockAvoid(
-                    stkCd = item.stk_cd ?: "",
-                    stkNm = item.stk_nm ?: "",
-                    fluRt = item.flu_rt ?: "",
-                    curPrc = item.cur_prc ?: "",
-                    preSig = item.pre_sig ?: ""
+                    stkCd = item.stk_cd!!,
+                    stkNm = item.stk_nm!!,
+                    fluRt = item.flu_rt!!,
+                    curPrc = item.cur_prc!!,
+                    preSig = item.pre_sig!!
                 )
             }
         )
