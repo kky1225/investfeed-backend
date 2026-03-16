@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.sect.service
 
-import com.example.investfeed.domain.dashboard.DashboardIndexType
 import com.example.investfeed.domain.sect.dto.req.SectListReq
 import com.example.investfeed.domain.sect.dto.req.SectListStreamReq
 import com.example.investfeed.domain.sect.dto.req.SectStockListReq

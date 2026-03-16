@@ -140,7 +140,7 @@ class SectClient(
                     break;
                 }
 
-                Thread.sleep(70)
+                Thread.sleep(100)
             }
 
             return KiwoomSectPriceRes(

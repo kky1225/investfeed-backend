@@ -48,5 +48,15 @@ enum class ResponseCode(
     AUTH_SIGNUP(message = "회원가입에 성공하셨습니다."),
     AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
-    AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다.")
+    AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다."),
+
+    INTEREST_GROUP_LIST(message = "관심종목 그룹 목록 조회에 성공하셨습니다."),
+    INTEREST_GROUP_CREATE(message = "관심종목 그룹 생성에 성공하셨습니다."),
+    INTEREST_GROUP_UPDATE(message = "관심종목 그룹 수정에 성공하셨습니다."),
+    INTEREST_GROUP_DELETE(message = "관심종목 그룹 삭제에 성공하셨습니다."),
+    INTEREST_GROUP_REORDER(message = "관심종목 그룹 순서 변경에 성공하셨습니다."),
+    INTEREST_ITEM_LIST(message = "관심종목 목록 조회에 성공하셨습니다."),
+    INTEREST_ITEM_ADD(message = "관심종목 추가에 성공하셨습니다."),
+    INTEREST_ITEM_DELETE(message = "관심종목 삭제에 성공하셨습니다."),
+    INTEREST_ITEM_REORDER(message = "관심종목 순서 변경에 성공하셨습니다.")
 }

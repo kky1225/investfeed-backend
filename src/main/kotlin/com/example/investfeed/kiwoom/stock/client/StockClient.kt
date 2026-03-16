@@ -14,9 +14,11 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomSectCodeListReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomSectCodeListRes
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockDefaultInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterestRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestorRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -304,6 +306,40 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.error { "sectCodeList Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun stockInterest(
+        req: KiwoomStockInterestReq
+    ): KiwoomStockInterestRes {
+        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
+        accessToken ?: throw AccessTokenNotFoundException()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + STOCK_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10095")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomStockInterestRes>()
+                .block()
+
+            if(res?.return_code != 0) {
+                throw StockInterestException()
+            }
+
+            return res
+        }catch (e: KiwoomApiException) {
+            throw e
+        }catch (e: StockInterestException) {
+            throw e
+        }catch (e: Exception) {
+            log.error { "stockInterest Error" }
 
             throw RuntimeException(e.message)
         }

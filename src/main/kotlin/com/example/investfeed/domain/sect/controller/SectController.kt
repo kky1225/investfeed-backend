@@ -1,12 +1,12 @@
 package com.example.investfeed.domain.sect.controller
 
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.sect.dto.req.SectListReq
 import com.example.investfeed.domain.sect.dto.req.SectListStreamReq
 import com.example.investfeed.domain.sect.dto.req.SectStockListReq
 import com.example.investfeed.domain.sect.dto.res.SectListRes
 import com.example.investfeed.domain.sect.dto.res.SectStockListRes
 import com.example.investfeed.domain.sect.service.SectService
-import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus

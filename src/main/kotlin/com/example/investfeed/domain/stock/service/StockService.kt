@@ -395,8 +395,8 @@ class StockService(
             req = KiwoomStockShortSellingReq(
                 stk_cd = req.stkCd,
                 tm_tp = "1",
-                strt_dt = stockProgramList?.last()?.dt ?: today("yyyyMMdd"),
-                end_dt = stockProgramList?.first()?.dt ?: today("yyyyMMdd"),
+                strt_dt = stockProgramList.lastOrNull()?.dt ?: today("yyyyMMdd"),
+                end_dt = stockProgramList.firstOrNull()?.dt ?: today("yyyyMMdd"),
             )
         )
 
