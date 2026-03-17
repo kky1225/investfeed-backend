@@ -12,7 +12,10 @@ import com.example.investfeed.domain.interest.entity.InterestItem
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -21,7 +24,8 @@ import org.springframework.transaction.annotation.Transactional
 class InterestService(
     private val groupRepository: InterestGroupRepository,
     private val itemRepository: InterestItemRepository,
-    private val stockClient: StockClient
+    private val stockClient: StockClient,
+    private val stockSocketClient: StockSocketClient
 ) {
 
     @Transactional(readOnly = true)
@@ -59,9 +63,9 @@ class InterestService(
 
     fun reorderGroups(memberId: Long, req: ReorderGroupsReq) {
         req.orderedIds.forEachIndexed { index, groupId ->
-            val group = groupRepository.findById(groupId)
-                .orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
+            val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
             require(group.memberId == memberId) { "접근 권한이 없습니다." }
+
             group.displayOrder = index
         }
     }
@@ -71,16 +75,10 @@ class InterestService(
         val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
-        var stk_cd = ""
-
         var interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm) }
-        interestItemRes.forEach {
-            stk_cd = stk_cd + it.stkCd + "|"
-        }
-
         val kiwoomStockInterestRes = stockClient.stockInterest(
             req = KiwoomStockInterestReq(
-                stk_cd = stk_cd
+                stk_cd = interestItemRes.mapNotNull { it.stkCd }.joinToString("|")
             )
         )
 
@@ -127,5 +125,27 @@ class InterestService(
             val item = itemRepository.findById(itemId).orElseThrow { IllegalArgumentException("종목을 찾을 수 없습니다.") }
             item.displayOrder = index
         }
+    }
+
+    fun streamItems(memberId: Long, groupId: Long) {
+        val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
+        require(group.memberId == memberId) { "접근 권한이 없습니다." }
+
+        val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
+        val stkCdList = items.map { it.stkCd }
+
+        stockSocketClient.stockListStream(
+            req = KiwoomStockStreamReq(
+                trnm = "REG",
+                grp_no = "0001",
+                refresh = "0",
+                data = listOf(
+                    KiwoomStockStream(
+                        item = stkCdList,
+                        type = listOf("0B")
+                    )
+                )
+            )
+        )
     }
 }

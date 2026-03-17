@@ -155,4 +155,19 @@ class InterestController(
             ), HttpStatus.OK
         )
     }
+
+    @PostMapping("groups/{groupId}/items/stream")
+    fun streamItems(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable groupId: Long
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        interestService.streamItems(user.member.id, groupId)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INTEREST_ITEM_STREAM.code,
+                message = ResponseCode.INTEREST_ITEM_STREAM.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
 }

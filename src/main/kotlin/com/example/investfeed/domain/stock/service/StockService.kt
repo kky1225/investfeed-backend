@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.stock.service
 
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
+import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
@@ -424,6 +425,25 @@ class StockService(
             stockProgramList = stockProgramList,
             stockShortSellingList = stockShortSellingList
         )
+    }
+
+    fun stockSearch(
+        keyword: String
+    ): List<StockSearchItem> {
+        val marketTypes = listOf("0", "10", "8", "60")
+        return marketTypes
+            .flatMap { mrktTp ->
+                try {
+                    stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp))?.list ?: emptyList()
+                } catch (e: Exception) {
+                    log.warn { "stockSearch mrkt_tp=$mrktTp 조회 실패: ${e.message}" }
+                    emptyList()
+                }
+            }
+            .filter { it.name?.contains(keyword, ignoreCase = true) == true }
+            .distinctBy { it.code }
+            .map { StockSearchItem(stkCd = it.code!! + "_AL", stkNm = it.name!!, marketName = it.marketName!!) }
+            .take(20)
     }
 
     fun stockStream(

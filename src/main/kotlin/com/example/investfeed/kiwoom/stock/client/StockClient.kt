@@ -42,7 +42,7 @@ class StockClient(
     @KiwoomToken
     fun stockInfoList(
         req: StockInfoListReq
-    ): StockInfoListRes? {
+    ): StockInfoListRes {
         val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
         accessToken ?: throw AccessTokenNotFoundException()
 

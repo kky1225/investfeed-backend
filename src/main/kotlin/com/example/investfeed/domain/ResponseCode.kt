@@ -15,6 +15,7 @@ enum class ResponseCode(
     STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
     STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
+    STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
 
     INVESTOR_LIST(message = "투자자별 목록 조회에 성공하셨습니다."),
 
@@ -58,5 +59,6 @@ enum class ResponseCode(
     INTEREST_ITEM_LIST(message = "관심종목 목록 조회에 성공하셨습니다."),
     INTEREST_ITEM_ADD(message = "관심종목 추가에 성공하셨습니다."),
     INTEREST_ITEM_DELETE(message = "관심종목 삭제에 성공하셨습니다."),
-    INTEREST_ITEM_REORDER(message = "관심종목 순서 변경에 성공하셨습니다.")
+    INTEREST_ITEM_REORDER(message = "관심종목 순서 변경에 성공하셨습니다."),
+    INTEREST_ITEM_STREAM(message = "실시간 관심종목 조회에 성공하셨습니다.")
 }

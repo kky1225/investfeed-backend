@@ -5,6 +5,7 @@ import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockListRes
+import com.example.investfeed.domain.stock.dto.res.StockSearchItem
 import com.example.investfeed.domain.stock.service.StockService
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.kiwoom.exception.ApiResponse
@@ -46,6 +47,21 @@ class StockController(
                 code = ResponseCode.STOCK_DETAIL.code,
                 message = ResponseCode.STOCK_DETAIL.message,
                 result = stockService.stockDetail(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("search")
+    fun stockSearch(
+        @RequestParam keyword: String
+    ): ResponseEntity<ApiResponse<List<StockSearchItem>>> {
+        log.info { "stockSearch : $keyword" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.STOCK_SEARCH.code,
+                message = ResponseCode.STOCK_SEARCH.message,
+                result = stockService.stockSearch(keyword)
             ), HttpStatus.OK
         )
     }

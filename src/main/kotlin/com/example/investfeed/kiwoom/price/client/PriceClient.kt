@@ -264,7 +264,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(100)
+                Thread.sleep(120)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
@@ -359,7 +359,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(80)
+                Thread.sleep(100)
 
                 if (stk_daly_prm_trde_trnsn.size >= 100) {
                     break
@@ -457,7 +457,7 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(80)
+                Thread.sleep(100)
             }
 
             return KiwoomIndexProgramTradeMinuteRes(

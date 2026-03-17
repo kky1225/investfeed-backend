@@ -12,6 +12,7 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarke
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
@@ -33,7 +34,7 @@ class RecommendService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 30 20 * * *")
+    @Scheduled(cron = "0 30 * * * *")
     @Transactional
     fun recommendStock() {
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
@@ -153,28 +154,22 @@ class RecommendService(
 
         stockRecommendRepository.saveAll(
             recommendResult.filter { item ->
-                item.stk_cd != null && item.stk_nm != null && item.flu_rt != null && item.cur_prc != null && item.pre_sig != null
+                item.stk_cd != null && item.stk_nm != null
             }.map { item ->
                 StockRecommend(
                     stkCd = item.stk_cd!!,
                     stkNm = item.stk_nm!!,
-                    fluRt = item.flu_rt!!,
-                    curPrc = item.cur_prc!!,
-                    preSig = item.pre_sig!!
                 )
             }
         )
 
         stockAvoidRepository.saveAll(
             avoidResult.filter { item ->
-                item.stk_cd != null && item.stk_nm != null && item.flu_rt != null && item.cur_prc != null && item.pre_sig != null
+                item.stk_cd != null && item.stk_nm != null
             }.map { item ->
                 StockAvoid(
                     stkCd = item.stk_cd!!,
                     stkNm = item.stk_nm!!,
-                    fluRt = item.flu_rt!!,
-                    curPrc = item.cur_prc!!,
-                    preSig = item.pre_sig!!
                 )
             }
         )
@@ -184,29 +179,29 @@ class RecommendService(
 
     fun recommendList(): RecommendListRes {
         val recommendList = stockRecommendRepository.findAll().map { entity ->
-            RecommendListItem(
-                stkCd = entity.stkCd,
-                stkNm = entity.stkNm,
-                fluRt = entity.fluRt,
-                curPrc = entity.curPrc,
-                preSig = entity.preSig
-            )
-        }
+            RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
+        }.toMutableList()
 
         val avoidList = stockAvoidRepository.findAll().map { entity ->
-            RecommendListItem(
-                stkCd = entity.stkCd,
-                stkNm = entity.stkNm,
-                fluRt = entity.fluRt,
-                curPrc = entity.curPrc,
-                preSig = entity.preSig
-            )
+            RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
+        }.toMutableList()
+
+        val allCodes = (recommendList + avoidList).mapNotNull { it.stkCd }.joinToString("|")
+        if (allCodes.isNotBlank()) {
+            val kiwoomStockInterestRes = stockClient.stockInterest(req = KiwoomStockInterestReq(stk_cd = allCodes))
+            if (kiwoomStockInterestRes.return_code == 0) {
+                val infoMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd } ?: emptyMap()
+                (recommendList + avoidList).forEach { item ->
+                    infoMap[item.stkCd]?.let { info ->
+                        item.curPrc = info.cur_prc
+                        item.fluRt = info.flu_rt
+                        item.preSig = info.pred_pre_sig
+                    }
+                }
+            }
         }
 
-        return RecommendListRes(
-            recommendList = recommendList,
-            avoidList = avoidList
-        )
+        return RecommendListRes(recommendList = recommendList, avoidList = avoidList)
     }
 
     fun recommendListStream(

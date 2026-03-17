@@ -8,105 +8,128 @@ import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
+import java.time.Duration
 import java.time.LocalTime
 import java.util.Collections.emptyList
 
 @Service
 class InvestorService(
     private val priceClient: PriceClient,
-    private val stockSocketClient: StockSocketClient
+    private val stockSocketClient: StockSocketClient,
+    private val redisTemplate: RedisTemplate<String, String>,
+    private val objectMapper: ObjectMapper,
 ) {
+    companion object {
+        private const val CACHE_PREFIX = "investor:closeMarket"
+        private val ALL_COMBINATIONS = listOf("6" to "1", "6" to "2", "7" to "1", "7" to "2")
+    }
+
+    private fun ttlUntilNextMinute(): Duration {
+        val secondsElapsed = LocalTime.now().second
+        val secondsRemaining = if (secondsElapsed == 0) 60L else (60 - secondsElapsed).toLong()
+        return Duration.ofSeconds(secondsRemaining)
+    }
+
     fun investorList(
         req: InvestorListReq
     ): InvestorListRes? {
-        val investorList: MutableList<InvestorListItem> = mutableListOf()
-        var openResult: MutableList<KiwoomInvestorTradeOpenMarketItemList> = mutableListOf()
-        var closeResult: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
         val now = LocalTime.now()
 
         if (isKRXTradeClose(now = now)) {
-            val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
-                req = KiwoomInvestorTradeCloseMarketReq(
-                    mrkt_tp = "000",
-                    amt_qty_tp = "1",
-                    trde_tp = "0",
-                    stex_tp = if (isTradeClose(now = now)) "3" else "1",
-                )
-            )
+            return getCloseMarketWithCache(req, now)
+        }
 
-            if (kiwoomInvestorTradeCloseMarketRes.return_code == 0) {
-                when (req.orgnTp) {
-                    "6" -> {
-                        when (req.trdeTp) {
-                            "1" -> {
-                                kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedByDescending { it.frgnr_invsr?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { closeResult = it.toList() }
-                            }
-                            "2" -> {
-                                kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedBy { it.frgnr_invsr?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { closeResult = it.toList() }
-                            }
-                        }
-                    }
-                    "7" -> {
-                        when (req.trdeTp) {
-                            "1" -> {
-                                kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedByDescending { it.orgn?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { closeResult = it.toList() }
-                            }
-                            "2" -> {
-                                kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedBy { it.orgn?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { closeResult = it.toList() }
-                            }
-                        }
-                    }
-                }
+        return buildOpenMarketResult(req)
+    }
 
-                when (req.orgnTp) {
-                    "6" -> {
-                        closeResult.forEach {
-                            investorList.add(
-                                InvestorListItem(
-                                    stkCd = it.stk_cd,
-                                    stkNm = it.stk_nm,
-                                    curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
-                                    preSig = it.pre_sig,
-                                    predPre = it.pred_pre,
-                                    fluRt = it.flu_rt,
-                                    accTrdeQty = it.trde_qty,
-                                    netprpsAmt = it.frgnr_invsr,
-                                )
-                            )
-                        }
-                    }
-                    "7" -> {
-                        closeResult.forEach {
-                            investorList.add(
-                                InvestorListItem(
-                                    stkCd = it.stk_cd,
-                                    stkNm = it.stk_nm,
-                                    curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
-                                    preSig = it.pre_sig,
-                                    predPre = it.pred_pre,
-                                    fluRt = it.flu_rt,
-                                    accTrdeQty = it.trde_qty,
-                                    netprpsAmt = it.orgn,
-                                )
-                            )
-                        }
-                    }
-                }
-            }
+    private fun getCloseMarketWithCache(req: InvestorListReq, now: LocalTime): InvestorListRes? {
+        val cacheKey = "$CACHE_PREFIX:${req.orgnTp}:${req.trdeTp}"
 
-            return InvestorListRes(
-                investorList = investorList
+        redisTemplate.opsForValue().get(cacheKey)?.let { cached ->
+            return objectMapper.readValue(cached, InvestorListRes::class.java)
+        }
+
+        val rawRes = fetchRawCloseMarket(now)
+        if (rawRes.return_code != 0) return InvestorListRes(investorList = emptyList())
+
+        val ttl = ttlUntilNextMinute()
+        ALL_COMBINATIONS.forEach { (orgnTp, trdeTp) ->
+            val result = buildFromRaw(rawRes, orgnTp, trdeTp)
+            redisTemplate.opsForValue().set(
+                "$CACHE_PREFIX:$orgnTp:$trdeTp",
+                objectMapper.writeValueAsString(result),
+                ttl
             )
         }
 
+        return buildFromRaw(rawRes, req.orgnTp, req.trdeTp)
+    }
+
+    private fun fetchRawCloseMarket(now: LocalTime): KiwoomInvestorTradeCloseMarketRes {
+        return priceClient.investorTradeCloseMarket(
+            req = KiwoomInvestorTradeCloseMarketReq(
+                mrkt_tp = "000",
+                amt_qty_tp = "1",
+                trde_tp = "0",
+                stex_tp = if (isTradeClose(now)) "3" else "1",
+            )
+        )
+    }
+
+    private fun buildFromRaw(
+        raw: KiwoomInvestorTradeCloseMarketRes,
+        orgnTp: String,
+        trdeTp: String,
+    ): InvestorListRes {
+        val sorted: List<KiwoomInvestorTradeCloseMarketItemList> = when (orgnTp) {
+            "6" -> when (trdeTp) {
+                "1" -> raw.opaf_invsr_trde?.sortedByDescending { it.frgnr_invsr?.toLongOrNull() ?: 0L }?.take(100) ?: emptyList()
+                "2" -> raw.opaf_invsr_trde?.sortedBy { it.frgnr_invsr?.toLongOrNull() ?: 0L }?.take(100) ?: emptyList()
+                else -> emptyList()
+            }
+            "7" -> when (trdeTp) {
+                "1" -> raw.opaf_invsr_trde?.sortedByDescending { it.orgn?.toLongOrNull() ?: 0L }?.take(100) ?: emptyList()
+                "2" -> raw.opaf_invsr_trde?.sortedBy { it.orgn?.toLongOrNull() ?: 0L }?.take(100) ?: emptyList()
+                else -> emptyList()
+            }
+            else -> emptyList()
+        }
+
+        val investorList = sorted.map {
+            InvestorListItem(
+                stkCd = it.stk_cd,
+                stkNm = it.stk_nm,
+                curPrc = it.cur_prc?.replace(Regex("^[+-]"), ""),
+                preSig = it.pre_sig,
+                predPre = it.pred_pre,
+                fluRt = it.flu_rt,
+                accTrdeQty = it.trde_qty,
+                netprpsAmt = when (orgnTp) {
+                    "6" -> it.frgnr_invsr
+                    "7" -> it.orgn
+                    else -> null
+                },
+            )
+        }
+
+        return InvestorListRes(investorList = investorList)
+    }
+
+    private fun buildOpenMarketResult(req: InvestorListReq): InvestorListRes? {
+        val investorList: MutableList<InvestorListItem> = mutableListOf()
+        var openResult: MutableList<KiwoomInvestorTradeOpenMarketItemList>
+
         when (req.orgnTp) {
             "6" -> {
-                var kiwoomInvestorTradeDailyRes1 = priceClient.investorTradeOpenMarket(
+                val kiwoomInvestorTradeDailyRes1 = priceClient.investorTradeOpenMarket(
                     req = KiwoomInvestorTradeOpenMarketReq(
                         mrkt_tp = "000",
                         amt_qty_tp = "1",
@@ -117,7 +140,7 @@ class InvestorService(
                     )
                 )
 
-                var kiwoomInvestorTradeDailyRes2 = priceClient.investorTradeOpenMarket(
+                val kiwoomInvestorTradeDailyRes2 = priceClient.investorTradeOpenMarket(
                     req = KiwoomInvestorTradeOpenMarketReq(
                         mrkt_tp = "000",
                         amt_qty_tp = "1",
@@ -128,11 +151,13 @@ class InvestorService(
                     )
                 )
 
-                val combinedList = (kiwoomInvestorTradeDailyRes1.opmr_invsr_trde ?: emptyList()) + (kiwoomInvestorTradeDailyRes2.opmr_invsr_trde ?: emptyList())
+                val combinedList =
+                    (kiwoomInvestorTradeDailyRes1.opmr_invsr_trde ?: emptyList()) +
+                    (kiwoomInvestorTradeDailyRes2.opmr_invsr_trde ?: emptyList())
+
                 openResult = combinedList.groupBy { it.stk_cd }.map { (_, items) ->
                     val totalAmt = items.sumOf { item ->
                         val netprps_amt = item.netprps_amt?.trim()?.toLongOrNull() ?: 0L
-
                         if (netprps_amt == 0L) {
                             val buy = item.buy_amt?.trim()?.toLongOrNull() ?: 0L
                             val sell = item.sell_amt?.trim()?.replace("--", "")?.toLongOrNull() ?: 0L
@@ -141,18 +166,12 @@ class InvestorService(
                             netprps_amt
                         }
                     }
-
-                    items.first().apply {
-                        this.netprps_amt = totalAmt.toString()
-                    }
+                    items.first().apply { this.netprps_amt = totalAmt.toString() }
                 }.toMutableList()
+
                 when (req.trdeTp) {
-                    "1" -> {
-                        openResult = openResult.sortedByDescending { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
-                    }
-                    "2" -> {
-                        openResult = openResult.sortedBy { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
-                    }
+                    "1" -> openResult = openResult.sortedByDescending { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
+                    "2" -> openResult = openResult.sortedBy { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
                 }
 
                 if (kiwoomInvestorTradeDailyRes1.return_code == 0 && kiwoomInvestorTradeDailyRes2.return_code == 0) {
@@ -187,7 +206,6 @@ class InvestorService(
                 if (kiwoomInvestorTradeDailyRes.return_code == 0) {
                     openResult = kiwoomInvestorTradeDailyRes.opmr_invsr_trde?.map {
                         val netprps_amt = it.netprps_amt?.trim()?.toLongOrNull() ?: 0L
-
                         if (netprps_amt == 0L) {
                             val buy = it.buy_amt?.trim()?.toLongOrNull() ?: 0L
                             val sell = it.sell_amt?.trim()?.replace("--", "")?.toLongOrNull() ?: 0L
@@ -199,12 +217,8 @@ class InvestorService(
                     }?.toMutableList() ?: emptyList()
 
                     when (req.trdeTp) {
-                        "1" -> {
-                            openResult = openResult.sortedByDescending { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
-                        }
-                        "2" -> {
-                            openResult = openResult.sortedBy { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
-                        }
+                        "1" -> openResult = openResult.sortedByDescending { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
+                        "2" -> openResult = openResult.sortedBy { it.netprps_amt?.toLongOrNull() ?: 0L }.stream().limit(100).toList()
                     }
 
                     openResult.forEach {
@@ -225,10 +239,10 @@ class InvestorService(
             }
         }
 
-        return InvestorListRes(
-            investorList = investorList
-        )
+        return InvestorListRes(investorList = investorList)
     }
+
+    // ─── 소켓 스트리밍 ────────────────────────────────────────────────────────
 
     fun investorStream(
         req: InvestorStreamReq
@@ -248,15 +262,13 @@ class InvestorService(
         )
     }
 
-    private fun isKRXTradeClose(
-        now: LocalTime
-    ): Boolean {
+    // ─── 시간 판별 ────────────────────────────────────────────────────────────
+
+    private fun isKRXTradeClose(now: LocalTime): Boolean {
         return now.isAfter(LocalTime.of(15, 30))
     }
 
-    private fun isTradeClose(
-        now: LocalTime
-    ): Boolean {
+    private fun isTradeClose(now: LocalTime): Boolean {
         return now.isAfter(LocalTime.of(20, 0))
     }
 }
