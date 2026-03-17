@@ -53,6 +53,9 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
+    // Playwright (크롤링)
+    implementation("com.microsoft.playwright:playwright:1.50.0")
 }
 
 kotlin {

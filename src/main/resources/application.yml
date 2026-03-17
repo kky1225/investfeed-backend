@@ -1,6 +1,9 @@
 spring:
   application:
     name: InvestFeed
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   data:
     redis:
       host: localhost
