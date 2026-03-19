@@ -1,11 +1,11 @@
-package com.example.investfeed.domain.interest.entity
+package com.example.investfeed.domain.cryptointerest.entity
 
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "stock_interest_item")
-class InterestItem(
+@Table(name = "crypto_interest_item")
+class CryptoInterestItem(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
@@ -14,10 +14,10 @@ class InterestItem(
     val groupId: Long,
 
     @Column(nullable = false)
-    val stkCd: String,
+    val market: String,
 
     @Column(nullable = false)
-    val stkNm: String,
+    val koreanName: String,
 
     @Column(nullable = false)
     val addedAt: LocalDateTime = LocalDateTime.now(),

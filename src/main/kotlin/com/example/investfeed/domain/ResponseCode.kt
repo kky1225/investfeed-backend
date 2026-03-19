@@ -60,5 +60,22 @@ enum class ResponseCode(
     INTEREST_ITEM_ADD(message = "관심종목 추가에 성공하셨습니다."),
     INTEREST_ITEM_DELETE(message = "관심종목 삭제에 성공하셨습니다."),
     INTEREST_ITEM_REORDER(message = "관심종목 순서 변경에 성공하셨습니다."),
-    INTEREST_ITEM_STREAM(message = "실시간 관심종목 조회에 성공하셨습니다.")
+    INTEREST_ITEM_STREAM(message = "실시간 관심종목 조회에 성공하셨습니다."),
+
+    CRYPTO_LIST(message = "암호화폐 목록 조회에 성공하셨습니다."),
+    CRYPTO_LIST_STREAM(message = "실시간 암호화폐 목록 조회에 성공하셨습니다."),
+    CRYPTO_DETAIL(message = "암호화폐 상세 조회에 성공하셨습니다."),
+    CRYPTO_FEAR_GREED(message = "공포탐욕지수 조회에 성공하셨습니다."),
+    CRYPTO_SEARCH(message = "암호화폐 검색에 성공하셨습니다."),
+
+    CRYPTO_INTEREST_GROUP_LIST(message = "암호화폐 관심종목 그룹 목록 조회에 성공하셨습니다."),
+    CRYPTO_INTEREST_GROUP_CREATE(message = "암호화폐 관심종목 그룹 생성에 성공하셨습니다."),
+    CRYPTO_INTEREST_GROUP_UPDATE(message = "암호화폐 관심종목 그룹 수정에 성공하셨습니다."),
+    CRYPTO_INTEREST_GROUP_DELETE(message = "암호화폐 관심종목 그룹 삭제에 성공하셨습니다."),
+    CRYPTO_INTEREST_GROUP_REORDER(message = "암호화폐 관심종목 그룹 순서 변경에 성공하셨습니다."),
+    CRYPTO_INTEREST_ITEM_LIST(message = "암호화폐 관심종목 목록 조회에 성공하셨습니다."),
+    CRYPTO_INTEREST_ITEM_ADD(message = "암호화폐 관심종목 추가에 성공하셨습니다."),
+    CRYPTO_INTEREST_ITEM_DELETE(message = "암호화폐 관심종목 삭제에 성공하셨습니다."),
+    CRYPTO_INTEREST_ITEM_REORDER(message = "암호화폐 관심종목 순서 변경에 성공하셨습니다."),
+    CRYPTO_INTEREST_ITEM_STREAM(message = "실시간 암호화폐 관심종목 조회에 성공하셨습니다."),
 }

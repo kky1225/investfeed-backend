@@ -2,6 +2,7 @@ package com.example.investfeed.domain.stock.controller
 
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockListReq
+import com.example.investfeed.domain.stock.dto.req.StockSearchReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockListRes
@@ -53,15 +54,15 @@ class StockController(
 
     @GetMapping("search")
     fun stockSearch(
-        @RequestParam keyword: String
+        req: StockSearchReq
     ): ResponseEntity<ApiResponse<List<StockSearchItem>>> {
-        log.info { "stockSearch : $keyword" }
+        log.info { "stockSearch : ${req.keyword}" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.STOCK_SEARCH.code,
                 message = ResponseCode.STOCK_SEARCH.message,
-                result = stockService.stockSearch(keyword)
+                result = stockService.stockSearch(req.keyword)
             ), HttpStatus.OK
         )
     }
