@@ -62,6 +62,7 @@ class IndexService(
                         indsNm = it.indsNm,
                         curPrc = kiwoomSectPriceNowRes.cur_prc,
                         predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
+                        predPre = kiwoomSectPriceNowRes.pred_pre,
                         fluRt = kiwoomSectPriceNowRes.flu_rt,
                         trdeQty = kiwoomSectPriceNowRes.trde_qty,
                         trdePrica = kiwoomSectPriceNowRes.trde_prica,

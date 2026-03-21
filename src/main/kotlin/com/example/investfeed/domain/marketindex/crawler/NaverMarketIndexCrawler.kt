@@ -2,159 +2,186 @@ package com.example.investfeed.domain.marketindex.crawler
 
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
-import com.microsoft.playwright.Browser
-import com.microsoft.playwright.BrowserType
-import com.microsoft.playwright.Page
-import com.microsoft.playwright.Playwright
-import com.microsoft.playwright.options.LoadState
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
+import reactor.core.publisher.Mono
 import java.time.LocalDateTime
 
 @Component
-class NaverMarketIndexCrawler {
-
+class NaverMarketIndexCrawler(
+    private val objectMapper: ObjectMapper,
+) {
     private val log = KotlinLogging.logger {}
 
-    companion object {
-        private const val TARGET_URL = "https://stock.naver.com/market/stock/usa"
+    private val webClient = WebClient.builder()
+        .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
+        .build()
 
-        private val TARGET_NAMES = mapOf(
-            "나스닥 종합" to MarketIndexType.NASDAQ,
-            "S&P 500" to MarketIndexType.SP500,
-            "VIX" to MarketIndexType.VIX,
-            "필라델피아 반도체" to MarketIndexType.PHILADELPHIA_SEMICONDUCTOR,
-            "미국 USD" to MarketIndexType.USD_KRW,
-            "달러인덱스" to MarketIndexType.DOLLAR_INDEX,
-            "국제 금" to MarketIndexType.GOLD_INTERNATIONAL,
-            "WTI" to MarketIndexType.WTI,
-            "코스피" to MarketIndexType.KOSPI,
-            "코스닥" to MarketIndexType.KOSDAQ,
+    companion object {
+        private val WORLD_INDEX_API = mapOf(
+            MarketIndexType.NASDAQ to "https://api.stock.naver.com/index/.IXIC/basic",
+            MarketIndexType.SP500 to "https://api.stock.naver.com/index/.INX/basic",
+            MarketIndexType.VIX to "https://api.stock.naver.com/index/.VIX/basic",
+            MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "https://api.stock.naver.com/index/.SOX/basic",
+        )
+
+        private val DOMESTIC_INDEX_API = mapOf(
+            MarketIndexType.KOSPI to "https://m.stock.naver.com/api/index/KOSPI/basic",
+            MarketIndexType.KOSDAQ to "https://m.stock.naver.com/api/index/KOSDAQ/basic",
+        )
+
+        private const val MARKET_INDEX_URL = "https://finance.naver.com/marketindex/"
+        private val MARKET_INDEX_CODE_MAP = mapOf(
+            "FX_USDKRW" to MarketIndexType.USD_KRW,
+            "FX_USDX" to MarketIndexType.DOLLAR_INDEX,
+            "OIL_CL" to MarketIndexType.WTI,
+            "CMDT_GC" to MarketIndexType.GOLD_INTERNATIONAL,
         )
     }
 
     fun crawl(): List<MarketIndexRes> {
-        Playwright.create().use { playwright ->
-            val browser = playwright.chromium().launch(
-                BrowserType.LaunchOptions()
-                    .setHeadless(true)
-                    .setArgs(listOf(
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                    ))
-            )
-
-            browser.use {
-                val page = browser.newPage(
-                    Browser.NewPageOptions().setUserAgent(
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/120.0.0.0 Safari/537.36"
-                    )
-                )
-
-                return extractMarketIndexList(page)
-            }
-        }
-    }
-
-    private fun extractMarketIndexList(page: Page): List<MarketIndexRes> {
-        page.navigate(TARGET_URL, Page.NavigateOptions().setTimeout(60_000.0))
-        page.waitForLoadState(LoadState.LOAD)
-        page.waitForTimeout(5000.0)
-
-        log.info { "실제 URL: ${page.url()}" }
-
-        // 렌더링된 텍스트를 가져와 Kotlin에서 직접 파싱
-        val bodyText = page.evaluate("() => document.body.innerText") as? String ?: ""
-
-        if (bodyText.isBlank()) {
-            log.warn { "body innerText가 비어있습니다" }
-            return emptyList()
-        }
-
-        val lines = bodyText.lines()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-
-        log.debug { "전체 라인 수: ${lines.size}" }
-
-        return parseLines(lines)
-    }
-
-    private fun parseLines(lines: List<String>): List<MarketIndexRes> {
         val result = mutableListOf<MarketIndexRes>()
+        val now = LocalDateTime.now()
 
-        TARGET_NAMES.forEach { (name, type) ->
-            val nameIdx = lines.indexOfFirst { it == name }
-            if (nameIdx == -1) {
-                log.warn { "[$name] innerText에서 항목을 찾지 못했습니다" }
-                return@forEach
-            }
+        val allApiMap = WORLD_INDEX_API + DOMESTIC_INDEX_API
+        val monos = allApiMap.map { (type, url) ->
+            webClient.get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono<String>()
+                .map { body -> parseJsonIndex(type, body, now) }
+                .onErrorResume { e ->
+                    log.error(e) { "[${type.displayName}] API 호출 실패: $url" }
+                    Mono.empty()
+                }
+        }
 
-            val chunk = lines.drop(nameIdx + 1).take(10)
-            log.debug { "[$name] 파싱 청크: $chunk" }
+        val jsonResults = Mono.zip(monos) { results ->
+            results.filterIsInstance<MarketIndexRes>()
+        }.block() ?: emptyList()
 
-            val parsed = parseChunk(name, chunk) ?: return@forEach
-            result.add(
-                MarketIndexRes(
-                    type = type.name,
-                    name = name,
-                    price = parsed.price,
-                    changeAmount = parsed.changeAmount,
-                    changeRate = parsed.changeRate,
-                    delayStatus = parsed.delayStatus,
-                    updatedAt = LocalDateTime.now(),
-                )
-            )
-            log.info { "[$name] price=${parsed.price} changeAmount=${parsed.changeAmount} changeRate=${parsed.changeRate} delayStatus=${parsed.delayStatus}" }
+        result.addAll(jsonResults)
+
+        try {
+            val htmlResults = fetchMarketIndexFromHtml(now)
+            result.addAll(htmlResults)
+        } catch (e: Exception) {
+            log.error(e) { "환율/원자재 HTML 파싱 실패" }
         }
 
         return result
     }
 
-    private fun parseChunk(name: String, chunk: List<String>): ParsedIndex? {
-        val delayStatus = chunk.firstOrNull { it == "실시간" || it.contains("지연") || it == "장마감" } ?: "실시간"
+    private fun parseJsonIndex(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
+        val node = objectMapper.readTree(body)
 
-        val numberPattern = Regex("^[0-9,]+\\.?[0-9]*$")
-        val priceCandidate = chunk.filter { it.matches(numberPattern) }
+        val price = node.textOrNull("closePrice") ?: ""
+        val changeAmount = node.textOrNull("compareToPreviousClosePrice") ?: ""
+        val fluctuationsRatio = node.textOrNull("fluctuationsRatio") ?: ""
 
-        val price = priceCandidate.getOrNull(0)
-        val changeAmountRaw = priceCandidate.getOrNull(1) ?: ""
-
-        if (price == null) {
-            log.warn { "[$name] price 파싱 실패. chunk=$chunk" }
-            return null
-        }
-
-        val direction = chunk.firstOrNull { it == "상승" || it == "하락" || it == "보합" }
+        val direction = node.path("compareToPreviousPrice").textOrNull("name") ?: ""
         val sign = when (direction) {
-            "상승" -> "+"
-            "하락" -> "-"
+            "RISING" -> "+"
+            "FALLING" -> "-"
             else -> ""
         }
 
-        val changeAmount = if (changeAmountRaw.isNotBlank()) "$sign$changeAmountRaw" else ""
+        val changeAmountWithSign = if (changeAmount.isNotBlank() && !changeAmount.startsWith("+") && !changeAmount.startsWith("-")) {
+            "$sign$changeAmount"
+        } else {
+            changeAmount
+        }
 
-        val changeRate = chunk
-            .firstOrNull { it.contains("%") }
-            ?.replace("(", "")
-            ?.replace(")", "")
-            ?: ""
+        val changeRateWithSign = if (fluctuationsRatio.isNotBlank() && !fluctuationsRatio.startsWith("+") && !fluctuationsRatio.startsWith("-")) {
+            "$sign${fluctuationsRatio}%"
+        } else if (fluctuationsRatio.isNotBlank()) {
+            "${fluctuationsRatio}%"
+        } else {
+            ""
+        }
 
-        return ParsedIndex(
+        val delayTimeName = node.textOrNull("delayTimeName") ?: ""
+        val marketStatus = node.textOrNull("marketStatus") ?: ""
+        val delayStatus = when {
+            marketStatus == "CLOSE" -> "장마감"
+            delayTimeName.isNotBlank() -> delayTimeName
+            else -> "실시간"
+        }
+
+        return MarketIndexRes(
+            type = type.name,
+            name = type.displayName,
             price = price,
-            changeAmount = changeAmount,
-            changeRate = changeRate,
+            changeAmount = changeAmountWithSign,
+            changeRate = changeRateWithSign,
             delayStatus = delayStatus,
+            updatedAt = now,
         )
     }
 
-    private data class ParsedIndex(
-        val price: String,
-        val changeAmount: String,
-        val changeRate: String,
-        val delayStatus: String,
-    )
+    private fun fetchMarketIndexFromHtml(now: LocalDateTime): List<MarketIndexRes> {
+        val html = webClient.get()
+            .uri(MARKET_INDEX_URL)
+            .retrieve()
+            .bodyToMono<String>()
+            .block() ?: return emptyList()
+
+        val result = mutableListOf<MarketIndexRes>()
+        val processedCodes = mutableSetOf<String>()
+
+        val blocks = html.split("marketindexCd=")
+        for (block in blocks.drop(1)) {
+            val codeMatch = Regex("^([A-Z_]+)").find(block) ?: continue
+            val code = codeMatch.groupValues[1]
+
+            val type = MARKET_INDEX_CODE_MAP[code] ?: continue
+            if (!processedCodes.add(code)) continue // 중복 블록 스킵
+
+            val chunk = block.take(800)
+
+            val price = Regex("""class="value">([\d,.]+)""").find(chunk)?.groupValues?.get(1) ?: continue
+            val changeAmount = Regex("""class="change">\s*([\d,.]+)""").find(chunk)?.groupValues?.get(1) ?: "0"
+
+            val isUp = chunk.contains("point_up")
+            val isDown = chunk.contains("point_dn")
+            val sign = when {
+                isUp -> "+"
+                isDown -> "-"
+                else -> ""
+            }
+
+            val priceVal = price.replace(",", "").toDoubleOrNull() ?: 0.0
+            val changeVal = changeAmount.replace(",", "").toDoubleOrNull() ?: 0.0
+            val changeRate = if (priceVal > 0 && changeVal > 0) {
+                val rate = (changeVal / priceVal) * 100
+                "$sign%.2f%%".format(rate)
+            } else {
+                ""
+            }
+
+            result.add(
+                MarketIndexRes(
+                    type = type.name,
+                    name = type.displayName,
+                    price = price,
+                    changeAmount = "$sign$changeAmount",
+                    changeRate = changeRate,
+                    delayStatus = "실시간",
+                    updatedAt = now,
+                )
+            )
+        }
+
+        return result
+    }
+
+    private fun JsonNode.textOrNull(fieldName: String): String? {
+        val node = this.get(fieldName) ?: return null
+        return if (node.isTextual) node.asText() else node.toString()
+    }
 }

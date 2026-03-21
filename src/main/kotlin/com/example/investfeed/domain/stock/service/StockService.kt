@@ -179,6 +179,7 @@ class StockService(
                 lowPric = kiwoomStockDefaultInfoRes.low_pric,
                 curPrc = kiwoomStockDefaultInfoRes.cur_prc,
                 preSig = kiwoomStockDefaultInfoRes.pre_sig,
+                predPre = kiwoomStockDefaultInfoRes.pred_pre,
                 fluRt = kiwoomStockDefaultInfoRes.flu_rt,
                 trdeQty = kiwoomStockDefaultInfoRes.trde_qty,
                 trdePrica = kiwoomStockTradeInfoRes.trde_prica,

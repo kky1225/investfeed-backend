@@ -75,18 +75,24 @@ class InterestService(
         val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
-        var interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm) }
+        val interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm) }
+
+        if (interestItemRes.isEmpty()) {
+            return emptyList()
+        }
+
         val kiwoomStockInterestRes = stockClient.stockInterest(
             req = KiwoomStockInterestReq(
-                stk_cd = interestItemRes.mapNotNull { it.stkCd }.joinToString("|")
+                stk_cd = interestItemRes.joinToString("|") { it.stkCd }
             )
         )
 
         if (kiwoomStockInterestRes.return_code == 0) {
             interestItemRes.forEach { interest ->
-                interest.curPrc = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }?.cur_prc
-                interest.fluRt = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }?.flu_rt
-                interest.preSig = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }?.pred_pre_sig
+                val matched = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }
+                interest.curPrc = matched?.cur_prc
+                interest.fluRt = matched?.flu_rt
+                interest.preSig = matched?.pred_pre_sig
             }
         }
 

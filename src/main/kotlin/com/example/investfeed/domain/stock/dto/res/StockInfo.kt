@@ -17,6 +17,7 @@ data class StockInfo(
     var lowPric: String? = null, // 저가
     var curPrc: String? = null, // 현재가
     var preSig: String? = null, // 대비기호
+    var predPre: String? = null, // 전일대비
     var fluRt: String? = null, // 등락율
     var trdeQty: String? = null, // 거래량
     var tm: String? = null, // 시간

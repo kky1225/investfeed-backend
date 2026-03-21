@@ -20,7 +20,6 @@ class MarketIndexScheduler(
             val list = crawler.crawl()
 
             if (list.isEmpty()) {
-                log.warn { "크롤링 결과 없음 - 저장 스킵" }
                 return
             }
 

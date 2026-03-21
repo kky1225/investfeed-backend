@@ -78,4 +78,9 @@ enum class ResponseCode(
     CRYPTO_INTEREST_ITEM_DELETE(message = "암호화폐 관심종목 삭제에 성공하셨습니다."),
     CRYPTO_INTEREST_ITEM_REORDER(message = "암호화폐 관심종목 순서 변경에 성공하셨습니다."),
     CRYPTO_INTEREST_ITEM_STREAM(message = "실시간 암호화폐 관심종목 조회에 성공하셨습니다."),
+
+    NOTIFICATION_LIST(message = "알림 목록 조회에 성공하셨습니다."),
+    NOTIFICATION_UNREAD_COUNT(message = "안읽은 알림 수 조회에 성공하셨습니다."),
+    NOTIFICATION_READ(message = "알림 읽음 처리에 성공하셨습니다."),
+    NOTIFICATION_READ_ALL(message = "전체 알림 읽음 처리에 성공하셨습니다."),
 }

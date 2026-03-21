@@ -5,6 +5,7 @@ data class IndexListItem(
     var indsNm: String? = null,
     var curPrc: String? = null,
     var predPreSig: String? = null,
+    var predPre: String? = null,
     var fluRt: String? = null,
     var trdeQty: String? = null,
     var trdePrica: String? = null,
