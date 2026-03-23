@@ -5,6 +5,7 @@ import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
@@ -13,6 +14,12 @@ import java.time.LocalDateTime
 
 @Component
 class NaverMarketIndexCrawler(
+    @param:Value("\${naver-stock.api-url}")
+    private val naverApiUrl: String,
+    @param:Value("\${naver-stock.mobile-url}")
+    private val naverMobileUrl: String,
+    @param:Value("\${naver-stock.pc-url}")
+    private val naverPcUrl: String,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = KotlinLogging.logger {}
@@ -23,24 +30,27 @@ class NaverMarketIndexCrawler(
         .build()
 
     companion object {
-        private val WORLD_INDEX_API = mapOf(
-            MarketIndexType.NASDAQ to "https://api.stock.naver.com/index/.IXIC/basic",
-            MarketIndexType.SP500 to "https://api.stock.naver.com/index/.INX/basic",
-            MarketIndexType.VIX to "https://api.stock.naver.com/index/.VIX/basic",
-            MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "https://api.stock.naver.com/index/.SOX/basic",
+        private val WORLD_INDEX_PATHS = mapOf(
+            MarketIndexType.NASDAQ to "/index/.IXIC/basic",
+            MarketIndexType.SP500 to "/index/.INX/basic",
+            MarketIndexType.VIX to "/index/.VIX/basic",
+            MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "/index/.SOX/basic",
         )
 
-        private val DOMESTIC_INDEX_API = mapOf(
-            MarketIndexType.KOSPI to "https://m.stock.naver.com/api/index/KOSPI/basic",
-            MarketIndexType.KOSDAQ to "https://m.stock.naver.com/api/index/KOSDAQ/basic",
+        private val DOMESTIC_INDEX_PATHS = mapOf(
+            MarketIndexType.KOSPI to "/api/index/KOSPI/basic",
+            MarketIndexType.KOSDAQ to "/api/index/KOSDAQ/basic",
         )
 
-        private const val MARKET_INDEX_URL = "https://finance.naver.com/marketindex/"
-        private val MARKET_INDEX_CODE_MAP = mapOf(
+        private const val HOME_MAJORS_PATH = "/api/home/majors"
+        private val HOME_MAJORS_CODE_MAP = mapOf(
             "FX_USDKRW" to MarketIndexType.USD_KRW,
-            "FX_USDX" to MarketIndexType.DOLLAR_INDEX,
-            "OIL_CL" to MarketIndexType.WTI,
-            "CMDT_GC" to MarketIndexType.GOLD_INTERNATIONAL,
+        )
+
+        private val POLLING_PATHS = mapOf(
+            MarketIndexType.WTI to "/api/polling/marketindex/energy/CLcv1",
+            MarketIndexType.GOLD_INTERNATIONAL to "/api/polling/marketindex/metals/GCcv1",
+            MarketIndexType.DOLLAR_INDEX to "/api/polling/marketindex/exchange/.DXY",
         )
     }
 
@@ -48,8 +58,9 @@ class NaverMarketIndexCrawler(
         val result = mutableListOf<MarketIndexRes>()
         val now = LocalDateTime.now()
 
-        val allApiMap = WORLD_INDEX_API + DOMESTIC_INDEX_API
-        val monos = allApiMap.map { (type, url) ->
+        val worldApis = WORLD_INDEX_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }
+        val domesticApis = DOMESTIC_INDEX_PATHS.map { (type, path) -> type to "$naverMobileUrl$path" }
+        val monos = (worldApis + domesticApis).map { (type, url) ->
             webClient.get()
                 .uri(url)
                 .retrieve()
@@ -68,13 +79,139 @@ class NaverMarketIndexCrawler(
         result.addAll(jsonResults)
 
         try {
-            val htmlResults = fetchMarketIndexFromHtml(now)
-            result.addAll(htmlResults)
+            val majorsResults = fetchFromHomeMajorsApi(now)
+            result.addAll(majorsResults)
         } catch (e: Exception) {
-            log.error(e) { "환율/원자재 HTML 파싱 실패" }
+            log.error(e) { "환율 API 호출 실패" }
+        }
+
+        try {
+            val pollingResults = fetchFromPollingApi(now)
+            result.addAll(pollingResults)
+        } catch (e: Exception) {
+            log.error(e) { "WTI/금 polling API 호출 실패" }
         }
 
         return result
+    }
+
+    private fun fetchFromHomeMajorsApi(now: LocalDateTime): List<MarketIndexRes> {
+        val body = webClient.get()
+            .uri("$naverMobileUrl$HOME_MAJORS_PATH")
+            .retrieve()
+            .bodyToMono<String>()
+            .block() ?: return emptyList()
+
+        val root = objectMapper.readTree(body)
+        val items = root.get("marketIndexInfos") ?: return emptyList()
+
+        return items.mapNotNull { item ->
+            val code = item.get("reutersCode")?.asText() ?: return@mapNotNull null
+            val type = HOME_MAJORS_CODE_MAP[code] ?: return@mapNotNull null
+
+            val price = item.textOrNull("closePrice") ?: ""
+            val changeAmount = item.textOrNull("compareToPreviousClosePrice") ?: ""
+            val fluctuationsRatio = item.textOrNull("fluctuationsRatio") ?: ""
+
+            val direction = item.path("compareToPreviousPrice").textOrNull("name") ?: ""
+            val sign = when (direction) {
+                "RISING" -> "+"
+                "FALLING" -> "-"
+                else -> ""
+            }
+
+            val changeAmountWithSign = if (changeAmount.isNotBlank() && !changeAmount.startsWith("+") && !changeAmount.startsWith("-")) {
+                "$sign$changeAmount"
+            } else {
+                changeAmount
+            }
+
+            val changeRateWithSign = if (fluctuationsRatio.isNotBlank() && !fluctuationsRatio.startsWith("+") && !fluctuationsRatio.startsWith("-")) {
+                "$sign${fluctuationsRatio}%"
+            } else if (fluctuationsRatio.isNotBlank()) {
+                "${fluctuationsRatio}%"
+            } else {
+                ""
+            }
+
+            MarketIndexRes(
+                type = type.name,
+                name = type.displayName,
+                price = price,
+                changeAmount = changeAmountWithSign,
+                changeRate = changeRateWithSign,
+                delayStatus = "실시간",
+                updatedAt = now,
+            )
+        }
+    }
+
+    private fun fetchFromPollingApi(now: LocalDateTime): List<MarketIndexRes> {
+        val monos = POLLING_PATHS.map { (type, path) ->
+            val url = "$naverPcUrl$path"
+            webClient.get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono<String>()
+                .map { body -> parsePollingIndex(type, body, now) }
+                .onErrorResume { e ->
+                    log.error(e) { "[${type.displayName}] polling API 호출 실패: $url" }
+                    Mono.empty()
+                }
+        }
+
+        return Mono.zip(monos) { results ->
+            results.filterIsInstance<MarketIndexRes>()
+        }.block() ?: emptyList()
+    }
+
+    private fun parsePollingIndex(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
+        val root = objectMapper.readTree(body)
+        val data = root.get("datas")?.firstOrNull()
+            ?: throw IllegalStateException("[${type.displayName}] polling 응답에 datas가 없습니다")
+
+        val price = data.textOrNull("closePrice") ?: ""
+        val changeAmount = data.textOrNull("fluctuations") ?: ""
+        val fluctuationsRatio = data.textOrNull("fluctuationsRatio") ?: ""
+
+        val direction = data.path("fluctuationsType").textOrNull("name") ?: ""
+        val sign = when (direction) {
+            "RISING" -> "+"
+            "FALLING" -> "-"
+            else -> ""
+        }
+
+        val changeAmountWithSign = if (changeAmount.isNotBlank() && !changeAmount.startsWith("+") && !changeAmount.startsWith("-")) {
+            "$sign$changeAmount"
+        } else {
+            changeAmount
+        }
+
+        val changeRateWithSign = if (fluctuationsRatio.isNotBlank() && !fluctuationsRatio.startsWith("+") && !fluctuationsRatio.startsWith("-")) {
+            "$sign${fluctuationsRatio}%"
+        } else if (fluctuationsRatio.isNotBlank()) {
+            "${fluctuationsRatio}%"
+        } else {
+            ""
+        }
+
+        val marketStatus = data.textOrNull("marketStatus") ?: ""
+        val delayTime = data.path("stockExchangeType").get("delayTime")?.asInt() ?: 0
+        val delayStatus = when {
+            marketStatus == "CLOSE" -> "장마감"
+            delayTime > 0 -> "${delayTime}분 지연"
+            else -> "실시간"
+        }
+
+        return MarketIndexRes(
+            type = type.name,
+            name = type.displayName,
+            price = price,
+            changeAmount = changeAmountWithSign,
+            changeRate = changeRateWithSign,
+            delayStatus = delayStatus,
+            updatedAt = now,
+        )
     }
 
     private fun parseJsonIndex(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
@@ -122,62 +259,6 @@ class NaverMarketIndexCrawler(
             delayStatus = delayStatus,
             updatedAt = now,
         )
-    }
-
-    private fun fetchMarketIndexFromHtml(now: LocalDateTime): List<MarketIndexRes> {
-        val html = webClient.get()
-            .uri(MARKET_INDEX_URL)
-            .retrieve()
-            .bodyToMono<String>()
-            .block() ?: return emptyList()
-
-        val result = mutableListOf<MarketIndexRes>()
-        val processedCodes = mutableSetOf<String>()
-
-        val blocks = html.split("marketindexCd=")
-        for (block in blocks.drop(1)) {
-            val codeMatch = Regex("^([A-Z_]+)").find(block) ?: continue
-            val code = codeMatch.groupValues[1]
-
-            val type = MARKET_INDEX_CODE_MAP[code] ?: continue
-            if (!processedCodes.add(code)) continue // 중복 블록 스킵
-
-            val chunk = block.take(800)
-
-            val price = Regex("""class="value">([\d,.]+)""").find(chunk)?.groupValues?.get(1) ?: continue
-            val changeAmount = Regex("""class="change">\s*([\d,.]+)""").find(chunk)?.groupValues?.get(1) ?: "0"
-
-            val isUp = chunk.contains("point_up")
-            val isDown = chunk.contains("point_dn")
-            val sign = when {
-                isUp -> "+"
-                isDown -> "-"
-                else -> ""
-            }
-
-            val priceVal = price.replace(",", "").toDoubleOrNull() ?: 0.0
-            val changeVal = changeAmount.replace(",", "").toDoubleOrNull() ?: 0.0
-            val changeRate = if (priceVal > 0 && changeVal > 0) {
-                val rate = (changeVal / priceVal) * 100
-                "$sign%.2f%%".format(rate)
-            } else {
-                ""
-            }
-
-            result.add(
-                MarketIndexRes(
-                    type = type.name,
-                    name = type.displayName,
-                    price = price,
-                    changeAmount = "$sign$changeAmount",
-                    changeRate = changeRate,
-                    delayStatus = "실시간",
-                    updatedAt = now,
-                )
-            )
-        }
-
-        return result
     }
 
     private fun JsonNode.textOrNull(fieldName: String): String? {

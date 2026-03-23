@@ -10,21 +10,22 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 @Component
 class HolidayClient(
+    @param:Value("\${data-go-kr.default-url}")
+    private val DEFAULT_URL: String,
+    @param:Value("\${data-go-kr.service-key}")
+    private val serviceKey: String,
     private val webClient: WebClient,
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Value("\${data-go-kr.service-key}")
-    private lateinit var serviceKey: String
-
-    private val BASE_URL = "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo"
+    private val HOLIDAY_PATH = "/B090041/openapi/service/SpcdeInfoService/getRestDeInfo"
 
     fun getHolidays(year: Int, month: Int): List<String> {
         val solMonth = String.format("%02d", month)
 
         try {
             val xml = webClient.get()
-                .uri("$BASE_URL?serviceKey=$serviceKey&solYear=$year&solMonth=$solMonth&numOfRows=30")
+                .uri("$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$serviceKey&solYear=$year&solMonth=$solMonth&numOfRows=30")
                 .retrieve()
                 .bodyToMono(String::class.java)
                 .block() ?: return emptyList()

@@ -16,13 +16,12 @@ import org.springframework.web.reactive.function.client.bodyToMono
 
 @Component
 class ShortSellingClient(
+    @param:Value("\${kiwoom.default-url}")
+    private val DEFAULT_URL: String,
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>,
 ) {
     private val log = KotlinLogging.logger {}
-
-    @Value("\${kiwoom.default-url}")
-    private lateinit var DEFAULT_URL: String
     private final val SHORT_SELLING_URL = "/api/dostk/shsa"
 
     @KiwoomToken

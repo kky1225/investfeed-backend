@@ -27,6 +27,9 @@ jwt:
   access-token-expiration: 30
   refresh-token-expiration: 1
 
+security:
+  password-change-cycle: 30
+
 kiwoom:
   app-key: ${KIWOOM_APP_KEY}
   secret-key: ${KIWOOM_SECRET_KEY}
@@ -35,5 +38,14 @@ kiwoom:
 upbit:
   default-url: https://api.upbit.com
 
+naver-stock:
+  api-url: https://api.stock.naver.com
+  mobile-url: https://m.stock.naver.com
+  pc-url: https://stock.naver.com
+
 data-go-kr:
+  default-url: http://apis.data.go.kr
   service-key: ${DATA_GO_KR_SERVICE_KEY}
+
+fear-greed:
+  default-url: https://api.alternative.me

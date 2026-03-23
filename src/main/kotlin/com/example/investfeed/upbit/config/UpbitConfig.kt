@@ -6,10 +6,10 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 
 @Component
-class UpbitConfig {
-
-    @Value("\${upbit.default-url}")
-    private lateinit var defaultUrl: String
+class UpbitConfig(
+    @param:Value("\${upbit.default-url}")
+    private val defaultUrl: String,
+) {
 
     @Bean("upbitWebClient")
     fun upbitWebClient(): WebClient {

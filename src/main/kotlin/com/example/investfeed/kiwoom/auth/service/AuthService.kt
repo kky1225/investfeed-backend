@@ -12,19 +12,16 @@ import java.time.Duration
 
 @Service
 class AuthService(
+    @param:Value("\${kiwoom.app-key}")
+    private val APP_KEY: String,
+    @param:Value("\${kiwoom.secret-key}")
+    private val SECRET_KEY: String,
+    @param:Value("\${kiwoom.default-url}")
+    private val DEFAULT_URL: String,
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
     private val log = KotlinLogging.logger {}
-
-    @Value("\${kiwoom.app-key}")
-    private lateinit var APP_KEY: String
-
-    @Value("\${kiwoom.secret-key}")
-    private lateinit var SECRET_KEY: String
-
-    @Value("\${kiwoom.default-url}")
-    private lateinit var DEFAULT_URL: String
 
     fun accessToken() {
         log.info { "accessToken" }

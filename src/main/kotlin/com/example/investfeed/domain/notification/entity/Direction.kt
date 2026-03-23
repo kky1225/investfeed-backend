@@ -2,5 +2,7 @@ package com.example.investfeed.domain.notification.entity
 
 enum class Direction {
     UP,
-    DOWN
+    DOWN,
+    UPPER_LIMIT,
+    LOWER_LIMIT
 }

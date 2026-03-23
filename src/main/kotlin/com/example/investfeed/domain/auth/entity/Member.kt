@@ -33,7 +33,10 @@ class Member(
     val role: Role = Role.USER,
 
     @Column(nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(nullable = false)
+    var passwordChangedAt: LocalDateTime = LocalDateTime.now()
 )
 
 enum class Role {

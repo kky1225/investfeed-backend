@@ -30,7 +30,7 @@ class PriceAlertScheduler(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        val STOCK_THRESHOLDS = listOf(5.0, 10.0, 15.0, 20.0, 30.0)
+        val STOCK_THRESHOLDS = listOf(5.0, 10.0, 15.0, 20.0)
         val CRYPTO_THRESHOLDS = listOf(5.0, 10.0, 20.0, 30.0)
     }
 
@@ -89,6 +89,8 @@ class PriceAlertScheduler(
             if (basePric == 0.0) continue
             val highPric = kotlin.math.abs(stockData.high_pric?.toDoubleOrNull() ?: continue)
             val lowPric = kotlin.math.abs(stockData.low_pric?.toDoubleOrNull() ?: continue)
+            val uplPric = stockData.upl_pric?.toDoubleOrNull()
+            val lstPric = stockData.lst_pric?.toDoubleOrNull()
 
             val maxUpRt = ((highPric - basePric) / basePric) * 100
             val maxDownRt = ((lowPric - basePric) / basePric) * 100
@@ -99,6 +101,14 @@ class PriceAlertScheduler(
 
             if (maxDownRt < 0) {
                 checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.DOWN, STOCK_THRESHOLDS)
+            }
+
+            if (uplPric != null && highPric >= uplPric) {
+                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UPPER_LIMIT, listOf(0.0))
+            }
+
+            if (lstPric != null && lowPric <= lstPric) {
+                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
             }
         }
     }

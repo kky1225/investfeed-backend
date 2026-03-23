@@ -12,7 +12,7 @@ class CustomUserDetails(val member: Member) : UserDetails {
 
     override fun getPassword(): String = member.password
 
-    override fun getUsername(): String = member.email
+    override fun getUsername(): String = member.loginId
 
     override fun isAccountNonExpired(): Boolean = true
 

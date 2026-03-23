@@ -15,11 +15,11 @@ import javax.crypto.SecretKey
 
 @Component
 class JwtProvider(
-    @Value("\${jwt.secret}")
+    @param:Value("\${jwt.secret}")
     private val secret: String,
-    @Value("\${jwt.access-token-expiration}")
+    @param:Value("\${jwt.access-token-expiration}")
     private val accessTokenExpiration: Long,
-    @Value("\${jwt.refresh-token-expiration}")
+    @param:Value("\${jwt.refresh-token-expiration}")
     private val refreshTokenExpiration: Long,
     private val redisTemplate: StringRedisTemplate,
     private val userDetailsService: UserDetailsService

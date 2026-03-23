@@ -50,6 +50,7 @@ enum class ResponseCode(
     AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
     AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다."),
+    AUTH_CHANGE_PASSWORD(message = "비밀번호 변경에 성공하셨습니다."),
 
     INTEREST_GROUP_LIST(message = "관심종목 그룹 목록 조회에 성공하셨습니다."),
     INTEREST_GROUP_CREATE(message = "관심종목 그룹 생성에 성공하셨습니다."),

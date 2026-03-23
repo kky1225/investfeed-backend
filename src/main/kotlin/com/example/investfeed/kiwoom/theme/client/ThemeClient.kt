@@ -20,13 +20,12 @@ import org.springframework.web.reactive.function.client.toEntity
 
 @Service
 class ThemeClient(
+    @param:Value("\${kiwoom.default-url}")
+    private val DEFAULT_URL: String,
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
     private val log = KotlinLogging.logger {}
-
-    @Value("\${kiwoom.default-url}")
-    private lateinit var DEFAULT_URL: String
     private final val THEME_URL = "/api/dostk/thme"
 
     @KiwoomToken

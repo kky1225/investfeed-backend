@@ -27,13 +27,12 @@ import org.springframework.web.reactive.function.client.WebClient
 
 @Service
 class SectChartClient(
+    @param:Value("\${kiwoom.default-url}")
+    private val DEFAULT_URL: String,
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>
 ) {
     private val log = KotlinLogging.logger {}
-
-    @Value("\${kiwoom.default-url}")
-    private lateinit var DEFAULT_URL: String
 
     @KiwoomToken
     fun sectChartMinuteList(
