@@ -6,6 +6,7 @@ import com.example.investfeed.domain.crypto.dto.req.CryptoDetailStreamReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoSearchReq
 import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoListRes
+import com.example.investfeed.domain.crypto.dto.res.CryptoRankItem
 import com.example.investfeed.domain.crypto.dto.res.CryptoSearchItem
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.kiwoom.exception.ApiResponse
@@ -75,6 +76,34 @@ class CryptoController(
                 code = ResponseCode.CRYPTO_DETAIL.code,
                 message = ResponseCode.CRYPTO_DETAIL.message,
                 result = cryptoService.cryptoDetail(req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("rank")
+    fun cryptoRankList(): ResponseEntity<ApiResponse<List<CryptoRankItem>>> {
+        log.info { "cryptoRankList" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.CRYPTO_RANK_LIST.code,
+                message = ResponseCode.CRYPTO_RANK_LIST.message,
+                result = cryptoService.cryptoRankList()
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("rank/stream")
+    fun cryptoRankStream(): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "cryptoRankStream" }
+
+        cryptoService.cryptoRankStream()
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.CRYPTO_RANK_STREAM.code,
+                message = ResponseCode.CRYPTO_RANK_STREAM.message,
+                result = null
             ), HttpStatus.OK
         )
     }

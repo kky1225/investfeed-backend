@@ -76,7 +76,7 @@ class UpbitWebSocketClient(
                 webSocketHandler.broadcast(broadcastData)
             }
         } catch (e: Exception) {
-            log.error { "[Upbit WebSocket] 메시지 파싱 오류: ${e.message}" }
+
         }
     }
 

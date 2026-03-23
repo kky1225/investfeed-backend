@@ -66,6 +66,7 @@ class CommodityService(
                         stkNm = it.stkNm,
                         curPrc = curPrc.toString(),
                         predPreSig = kiwoomGoldPriceNowRes.pred_pre_sig,
+                        predPre = kiwoomGoldPriceNowRes.pred_pre,
                         fluRt = kiwoomGoldPriceNowRes.flu_rt,
                         trdeQty = kiwoomGoldPriceNowRes.trde_qty,
                         openPric = kiwoomGoldPriceNowRes.open_pric,

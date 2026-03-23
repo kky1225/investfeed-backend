@@ -196,6 +196,7 @@ class RecommendService(
                         item.curPrc = info.cur_prc
                         item.fluRt = info.flu_rt
                         item.preSig = info.pred_pre_sig
+                        item.predPre = info.pred_pre
                     }
                 }
             }

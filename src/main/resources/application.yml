@@ -34,3 +34,6 @@ kiwoom:
 
 upbit:
   default-url: https://api.upbit.com
+
+data-go-kr:
+  service-key: ${DATA_GO_KR_SERVICE_KEY}

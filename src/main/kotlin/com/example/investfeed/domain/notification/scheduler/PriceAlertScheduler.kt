@@ -9,6 +9,7 @@ import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -23,7 +24,8 @@ class PriceAlertScheduler(
     private val cryptoInterestItemRepository: CryptoInterestItemRepository,
     private val stockClient: StockClient,
     private val tickerClient: TickerClient,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val holidayService: HolidayService
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -51,6 +53,10 @@ class PriceAlertScheduler(
     }
 
     private fun checkStockAlerts() {
+        if (holidayService.isHoliday()) {
+            return
+        }
+
         val now = LocalTime.now()
         if (now.isBefore(LocalTime.of(9, 0)) || now.isAfter(LocalTime.of(15, 30))) {
             return

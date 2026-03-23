@@ -286,4 +286,37 @@ class CryptoService(
 
         return allCandles.reversed()
     }
+
+    fun cryptoRankList(): List<CryptoRankItem> {
+        val krwMarkets = marketClient.getKrwMarkets()
+        val marketCodes = krwMarkets.joinToString(",") { it.market }
+
+        val tickers = tickerClient.getTickers(marketCodes)
+
+        return tickers.mapNotNull { ticker ->
+            val marketInfo = krwMarkets.find { it.market == ticker.market } ?: return@mapNotNull null
+
+            CryptoRankItem(
+                market = ticker.market ?: "",
+                koreanName = marketInfo.korean_name,
+                englishName = marketInfo.english_name,
+                tradePrice = ticker.trade_price ?: 0.0,
+                signedChangePrice = ticker.signed_change_price ?: 0.0,
+                signedChangeRate = ticker.signed_change_rate ?: 0.0,
+                change = ticker.change ?: "EVEN",
+                accTradePrice24h = ticker.acc_trade_price_24h ?: 0.0,
+                accTradeVolume24h = ticker.acc_trade_volume_24h ?: 0.0,
+                highPrice = ticker.high_price ?: 0.0,
+                lowPrice = ticker.low_price ?: 0.0,
+                prevClosingPrice = ticker.prev_closing_price ?: 0.0,
+                warning = marketInfo.market_event?.warning ?: false,
+            )
+        }.sortedByDescending { it.accTradePrice24h }
+    }
+
+    fun cryptoRankStream() {
+        val krwMarkets = marketClient.getKrwMarkets()
+        val markets = krwMarkets.map { it.market }
+        cryptoStreamClient.cryptoListStream(markets)
+    }
 }

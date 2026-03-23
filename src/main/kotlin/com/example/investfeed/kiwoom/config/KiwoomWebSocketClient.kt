@@ -69,7 +69,7 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
                 handlerMap.remove(trnm)
             }
         } catch (e: Exception) {
-            log.error { "[WebSocket] JSON 파싱 오류: ${e.message}" }
+
         }
     }
 

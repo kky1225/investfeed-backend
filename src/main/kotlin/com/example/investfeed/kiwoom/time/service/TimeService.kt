@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.time.service
 
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.config.ExchangeType
 import com.example.investfeed.kiwoom.config.MarketType
 import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
@@ -11,7 +12,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 @Service
-class TimeService() {
+class TimeService(
+    private val holidayService: HolidayService,
+) {
     fun timeNow(
         req: TimeNowReq
     ): TimeNowRes {
@@ -28,8 +31,10 @@ class TimeService() {
         val nxtOpen  = LocalTime.of(8, 0)
         val nxtClose = LocalTime.of(20, 0)
 
+        val isHoliday = holidayService.isHoliday()
+
         if (req.marketType in listOf(MarketType.INDEX, MarketType.COMMODITY)) {
-            if(!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
+            if(!isHoliday && !nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
                 exchangeType = ExchangeType.KRX.name
                 isMarketOpen = true
             }
@@ -48,15 +53,17 @@ class TimeService() {
                 .toInstant()
                 .toEpochMilli()
         } else {
-            if (!nowTime.isBefore(nxtOpen) && nowTime.isBefore(krxOpen)) {
-                exchangeType = ExchangeType.NXT.name
-                isMarketOpen = true
-            } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
-                exchangeType = ExchangeType.SOR.name
-                isMarketOpen = true
-            } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(nxtClose)) {
-                exchangeType = ExchangeType.NXT.name
-                isMarketOpen = true
+            if (!isHoliday) {
+                if (!nowTime.isBefore(nxtOpen) && nowTime.isBefore(krxOpen)) {
+                    exchangeType = ExchangeType.NXT.name
+                    isMarketOpen = true
+                } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(krxClose)) {
+                    exchangeType = ExchangeType.SOR.name
+                    isMarketOpen = true
+                } else if (!nowTime.isBefore(krxOpen) && nowTime.isBefore(nxtClose)) {
+                    exchangeType = ExchangeType.NXT.name
+                    isMarketOpen = true
+                }
             }
 
             if (nowTime.isAfter(LocalTime.of(20, 0))) {

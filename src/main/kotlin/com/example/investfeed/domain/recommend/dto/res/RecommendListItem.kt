@@ -6,4 +6,5 @@ data class RecommendListItem(
     var fluRt: String? = null, // 등락률
     var curPrc: String? = null, // 현재가
     var preSig: String? = null, // 대비기호
+    var predPre: String? = null, // 전일대비
 )

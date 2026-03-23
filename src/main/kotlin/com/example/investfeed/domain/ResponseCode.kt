@@ -65,8 +65,9 @@ enum class ResponseCode(
     CRYPTO_LIST(message = "암호화폐 목록 조회에 성공하셨습니다."),
     CRYPTO_LIST_STREAM(message = "실시간 암호화폐 목록 조회에 성공하셨습니다."),
     CRYPTO_DETAIL(message = "암호화폐 상세 조회에 성공하셨습니다."),
-    CRYPTO_FEAR_GREED(message = "공포탐욕지수 조회에 성공하셨습니다."),
     CRYPTO_SEARCH(message = "암호화폐 검색에 성공하셨습니다."),
+    CRYPTO_RANK_LIST(message = "암호화폐 거래대금 순위 조회에 성공하셨습니다."),
+    CRYPTO_RANK_STREAM(message = "실시간 암호화폐 거래대금 순위 조회에 성공하셨습니다."),
 
     CRYPTO_INTEREST_GROUP_LIST(message = "암호화폐 관심종목 그룹 목록 조회에 성공하셨습니다."),
     CRYPTO_INTEREST_GROUP_CREATE(message = "암호화폐 관심종목 그룹 생성에 성공하셨습니다."),
