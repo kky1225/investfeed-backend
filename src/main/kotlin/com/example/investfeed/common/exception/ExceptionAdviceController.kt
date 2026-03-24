@@ -1,5 +1,7 @@
-package com.example.investfeed.kiwoom.exception
+package com.example.investfeed.common.exception
 
+import com.example.investfeed.domain.auth.exception.AuthException
+import com.example.investfeed.kiwoom.exception.InvestFeedException
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

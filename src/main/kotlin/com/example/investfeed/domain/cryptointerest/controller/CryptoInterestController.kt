@@ -6,7 +6,7 @@ import com.example.investfeed.domain.cryptointerest.dto.res.CryptoInterestGroupR
 import com.example.investfeed.domain.cryptointerest.dto.res.CryptoInterestItemRes
 import com.example.investfeed.domain.cryptointerest.service.CryptoInterestService
 import com.example.investfeed.domain.security.CustomUserDetails
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal

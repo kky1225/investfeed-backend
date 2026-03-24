@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
 import java.time.Duration
 
 @Service
@@ -64,7 +65,7 @@ class AuthService(
                 )
                 .retrieve()
                 .onStatus({ it -> it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(AccessTokenRes::class.java)
+                .bodyToMono<AccessTokenRes>()
                 .block()
 
             if(accessTokenRes?.return_code != 0) {

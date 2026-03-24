@@ -9,7 +9,7 @@ import com.example.investfeed.domain.stock.dto.res.StockListRes
 import com.example.investfeed.domain.stock.dto.res.StockSearchItem
 import com.example.investfeed.domain.stock.service.StockService
 import com.example.investfeed.domain.ResponseCode
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

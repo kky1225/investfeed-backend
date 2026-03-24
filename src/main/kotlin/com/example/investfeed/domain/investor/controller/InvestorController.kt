@@ -5,7 +5,7 @@ import com.example.investfeed.domain.investor.dto.req.InvestorStreamReq
 import com.example.investfeed.domain.investor.dto.res.InvestorListRes
 import com.example.investfeed.domain.investor.service.InvestorService
 import com.example.investfeed.domain.ResponseCode
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

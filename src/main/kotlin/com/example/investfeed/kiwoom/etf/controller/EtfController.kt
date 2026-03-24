@@ -8,7 +8,7 @@ import com.example.investfeed.kiwoom.etf.dto.res.EtfInfoRes
 import com.example.investfeed.kiwoom.etf.dto.res.EtfPriceListRes
 import com.example.investfeed.kiwoom.etf.dto.res.EtfTradeDailyListRes
 import com.example.investfeed.kiwoom.etf.service.EtfService
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

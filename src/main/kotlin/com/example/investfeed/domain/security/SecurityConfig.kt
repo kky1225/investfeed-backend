@@ -1,12 +1,15 @@
 package com.example.investfeed.domain.security
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.domain.auth.exception.AccessDeniedException
+import com.example.investfeed.domain.auth.exception.UnauthorizedException
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -20,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val objectMapper: ObjectMapper
@@ -38,19 +42,21 @@ class SecurityConfig(
             .httpBasic { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/password").authenticated()
+                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/admin/**").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .anyRequest().authenticated()
             }
             .exceptionHandling { ex ->
+                val unauthorized = UnauthorizedException()
+                val accessDenied = AccessDeniedException()
                 ex.authenticationEntryPoint { _: HttpServletRequest, response: HttpServletResponse, _ ->
                     response.status = HttpServletResponse.SC_UNAUTHORIZED
                     response.contentType = MediaType.APPLICATION_JSON_VALUE
                     response.characterEncoding = "UTF-8"
                     objectMapper.writeValue(
                         response.writer,
-                        ApiResponse(code = "AUTH_4010", message = "인증이 필요합니다.", result = null)
+                        ApiResponse(code = unauthorized.code, message = unauthorized.message, result = null)
                     )
                 }
                 ex.accessDeniedHandler { _: HttpServletRequest, response: HttpServletResponse, _ ->
@@ -59,7 +65,7 @@ class SecurityConfig(
                     response.characterEncoding = "UTF-8"
                     objectMapper.writeValue(
                         response.writer,
-                        ApiResponse(code = "AUTH_4030", message = "접근 권한이 없습니다.", result = null)
+                        ApiResponse(code = accessDenied.code, message = accessDenied.message, result = null)
                     )
                 }
             }

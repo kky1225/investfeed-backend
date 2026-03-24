@@ -58,7 +58,7 @@ class PriceAlertScheduler(
         }
 
         val now = LocalTime.now()
-        if (now.isBefore(LocalTime.of(9, 0)) || now.isAfter(LocalTime.of(15, 30))) {
+        if (now.isBefore(LocalTime.of(9, 1)) || now.isAfter(LocalTime.of(15, 30))) {
             return
         }
 
@@ -88,7 +88,9 @@ class PriceAlertScheduler(
             val basePric = kotlin.math.abs(stockData.base_pric?.toDoubleOrNull() ?: continue)
             if (basePric == 0.0) continue
             val highPric = kotlin.math.abs(stockData.high_pric?.toDoubleOrNull() ?: continue)
+            if (highPric == 0.0) continue
             val lowPric = kotlin.math.abs(stockData.low_pric?.toDoubleOrNull() ?: continue)
+            if (lowPric == 0.0) continue
             val uplPric = stockData.upl_pric?.toDoubleOrNull()
             val lstPric = stockData.lst_pric?.toDoubleOrNull()
 
@@ -103,11 +105,11 @@ class PriceAlertScheduler(
                 checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.DOWN, STOCK_THRESHOLDS)
             }
 
-            if (uplPric != null && highPric >= uplPric) {
+            if (uplPric != null && highPric >= kotlin.math.abs(uplPric)) {
                 checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UPPER_LIMIT, listOf(0.0))
             }
 
-            if (lstPric != null && lowPric <= lstPric) {
+            if (lstPric != null && lowPric <= kotlin.math.abs(lstPric)) {
                 checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
             }
         }

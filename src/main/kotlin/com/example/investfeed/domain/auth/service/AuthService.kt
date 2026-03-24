@@ -3,11 +3,13 @@ package com.example.investfeed.domain.auth.service
 import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
 import com.example.investfeed.domain.auth.dto.req.LoginReq
 import com.example.investfeed.domain.auth.dto.req.SignupReq
+import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
+import com.example.investfeed.domain.auth.dto.res.MemberRes
 import com.example.investfeed.domain.auth.dto.res.TokenRes
 import com.example.investfeed.domain.auth.entity.Member
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
-import com.example.investfeed.kiwoom.exception.AuthException
+import com.example.investfeed.domain.auth.exception.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -20,6 +22,7 @@ class AuthService(
     @param:Value("\${security.password-change-cycle}")
     private val passwordChangeCycle: Long,
     private val memberRepository: MemberRepository,
+    private val loginAttemptService: LoginAttemptService,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
 ) {
@@ -30,16 +33,16 @@ class AuthService(
         req: SignupReq
     ) {
         if (memberRepository.existsByLoginId(req.loginId)) {
-            throw AuthException("AUTH_4090", "이미 사용 중인 아이디입니다.")
+            throw DuplicateLoginIdException()
         }
         if (memberRepository.existsByEmail(req.email)) {
-            throw AuthException("AUTH_4091", "이미 사용 중인 이메일입니다.")
+            throw DuplicateEmailException()
         }
         if (memberRepository.existsByNickname(req.nickname)) {
-            throw AuthException("AUTH_4092", "이미 사용 중인 닉네임입니다.")
+            throw DuplicateNicknameException()
         }
         if (memberRepository.existsByPhone(req.phone)) {
-            throw AuthException("AUTH_4093", "이미 사용 중인 전화번호입니다.")
+            throw DuplicatePhoneException()
         }
 
         val member = Member(
@@ -54,16 +57,26 @@ class AuthService(
         memberRepository.save(member)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun login(
         req: LoginReq
     ): Pair<TokenRes, String> {
         val member = memberRepository.findByLoginId(req.loginId)
-            .orElseThrow { AuthException("AUTH_4011", "아이디 또는 비밀번호가 올바르지 않습니다.") }
+            .orElseThrow { InvalidCredentialsException() }
+
+        checkAccountLock(member)
 
         if (!passwordEncoder.matches(req.password, member.password)) {
-            throw AuthException("AUTH_4011", "아이디 또는 비밀번호가 올바르지 않습니다.")
+            val locked = loginAttemptService.handleFailedLogin(member.loginId)
+            if (locked) {
+                throw AccountLockedByFailureException()
+            }
+            throw InvalidCredentialsException()
         }
+
+        member.failedLoginAttempts = 0
+        member.lockedAt = null
+        member.lockExpiresAt = null
 
         val passwordChangeRequired = member.passwordChangedAt
             .plusDays(passwordChangeCycle)
@@ -72,26 +85,124 @@ class AuthService(
         return Pair(
             TokenRes(
                 accessToken = jwtProvider.generateAccessToken(member.loginId),
-                passwordChangeRequired = passwordChangeRequired
+                passwordChangeRequired = passwordChangeRequired,
+                role = member.role.name,
+                nickname = member.nickname,
+                email = maskEmail(member.email)
             ),
             jwtProvider.generateRefreshToken(member.loginId)
         )
+    }
+
+    private fun checkAccountLock(member: Member) {
+        member.lockedAt ?: return
+
+        if (member.lockExpiresAt == null) {
+            throw AccountPermanentlyLockedException()
+        }
+
+        if (member.lockExpiresAt!!.isAfter(LocalDateTime.now())) {
+            val remainingMinutes = java.time.Duration.between(
+                LocalDateTime.now(), member.lockExpiresAt
+            ).toMinutes() + 1
+            throw AccountLockedException("계정이 일시 잠금되었습니다. ${remainingMinutes}분 후에 다시 시도하세요.")
+        }
+
+        member.lockedAt = null
+        member.lockExpiresAt = null
+    }
+
+
+    @Transactional(readOnly = true)
+    fun getMembers(): List<MemberRes> {
+        return memberRepository.findAll().map { it.toMemberRes() }
+    }
+
+    @Transactional(readOnly = true)
+    fun getProfile(loginId: String): MemberRes {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+        return member.toMemberRes()
+    }
+
+    private fun Member.toMemberRes(): MemberRes {
+        return MemberRes(
+            id = id,
+            loginId = loginId,
+            email = email,
+            nickname = nickname,
+            name = name,
+            phone = phone,
+            role = role.name,
+            failedLoginAttempts = failedLoginAttempts,
+            lockedAt = lockedAt,
+            lockExpiresAt = lockExpiresAt,
+            permanentLock = lockedAt != null && lockExpiresAt == null,
+            createdAt = createdAt
+        )
+    }
+
+    @Transactional
+    fun updateProfile(loginId: String, req: UpdateProfileReq) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        if (req.email != member.email && memberRepository.existsByEmailAndLoginIdNot(req.email, loginId)) {
+            throw DuplicateEmailException()
+        }
+
+        if (req.phone != member.phone && memberRepository.existsByPhoneAndLoginIdNot(req.phone, loginId)) {
+            throw DuplicatePhoneException()
+        }
+
+        member.nickname = req.nickname
+        member.email = req.email
+        member.name = req.name
+        member.phone = req.phone
+
+        log.info { "프로필 수정: loginId=$loginId" }
+    }
+
+    @Transactional
+    fun lockAccount(loginId: String) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        member.lockedAt = LocalDateTime.now()
+        member.lockExpiresAt = null
+    }
+
+    @Transactional
+    fun unlockAccount(loginId: String) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        member.failedLoginAttempts = 0
+        member.lockedAt = null
+        member.lockExpiresAt = null
     }
 
     fun reissue(
         refreshToken: String?
     ): TokenRes {
         if (refreshToken == null) {
-            throw AuthException("AUTH_4012", "리프레시 토큰이 없습니다.")
+            throw RefreshTokenMissingException()
         }
 
         if (!jwtProvider.validateRefreshToken(refreshToken)) {
-            throw AuthException("AUTH_4012", "유효하지 않은 리프레시 토큰입니다.")
+            throw RefreshTokenInvalidException()
         }
 
         val loginId = jwtProvider.getLoginId(refreshToken)
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
 
-        return TokenRes(accessToken = jwtProvider.generateAccessToken(loginId))
+        return TokenRes(
+            accessToken = jwtProvider.generateAccessToken(loginId),
+            role = member.role.name,
+            nickname = member.nickname,
+            email = maskEmail(member.email)
+        )
     }
 
     @Transactional
@@ -100,14 +211,14 @@ class AuthService(
         req: ChangePasswordReq
     ) {
         val member = memberRepository.findByLoginId(loginId)
-            .orElseThrow { AuthException("AUTH_4010", "회원 정보를 찾을 수 없습니다.") }
+            .orElseThrow { MemberNotFoundException() }
 
         if (!passwordEncoder.matches(req.currentPassword, member.password)) {
-            throw AuthException("AUTH_4011", "현재 비밀번호가 올바르지 않습니다.")
+            throw InvalidPasswordException()
         }
 
         if (req.currentPassword == req.newPassword) {
-            throw AuthException("AUTH_4012", "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
+            throw SamePasswordException()
         }
 
         member.password = passwordEncoder.encode(req.newPassword)
@@ -118,5 +229,14 @@ class AuthService(
         loginId: String
     ) {
         jwtProvider.deleteRefreshToken(loginId)
+    }
+
+    private fun maskEmail(email: String): String {
+        val parts = email.split("@")
+        if (parts.size != 2) return "***"
+        val local = parts[0]
+        val domain = parts[1]
+        val visible = if (local.length <= 2) 1 else 2
+        return local.take(visible) + "*".repeat(local.length - visible) + "@" + domain
     }
 }

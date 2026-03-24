@@ -17,16 +17,16 @@ class Member(
     var password: String,
 
     @Column(unique = true, nullable = false)
-    val email: String,
+    var email: String,
 
     @Column(nullable = false)
-    val nickname: String,
+    var nickname: String,
 
     @Column(nullable = false)
-    val name: String,
+    var name: String,
 
     @Column(nullable = false)
-    val phone: String,
+    var phone: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -36,7 +36,14 @@ class Member(
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(nullable = false)
-    var passwordChangedAt: LocalDateTime = LocalDateTime.now()
+    var passwordChangedAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(nullable = false)
+    var failedLoginAttempts: Int = 0,
+
+    var lockedAt: LocalDateTime? = null,
+
+    var lockExpiresAt: LocalDateTime? = null
 )
 
 enum class Role {

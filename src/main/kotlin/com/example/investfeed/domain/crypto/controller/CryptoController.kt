@@ -9,7 +9,7 @@ import com.example.investfeed.domain.crypto.dto.res.CryptoListRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoRankItem
 import com.example.investfeed.domain.crypto.dto.res.CryptoSearchItem
 import com.example.investfeed.domain.crypto.service.CryptoService
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

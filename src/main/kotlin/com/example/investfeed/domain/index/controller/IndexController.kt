@@ -6,7 +6,7 @@ import com.example.investfeed.domain.index.dto.res.IndexDetailRes
 import com.example.investfeed.domain.index.dto.res.IndexListRes
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.ResponseCode
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
 import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
 import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq

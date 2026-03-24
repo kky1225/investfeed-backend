@@ -50,7 +50,7 @@ class DashboardService(
                     req = KiwoomSectInvestorReq(
                         mrkt_tp = it.marketType,
                         amt_qty_tp = "0",
-                        stex_tp = "0"
+                        stex_tp = "3"
                     )
                 );
             }

@@ -6,7 +6,7 @@ import com.example.investfeed.domain.commodity.dto.res.CommodityDetailRes
 import com.example.investfeed.domain.commodity.dto.res.CommodityListRes
 import com.example.investfeed.domain.commodity.service.CommodityService
 import com.example.investfeed.domain.ResponseCode
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
 import com.example.investfeed.kiwoom.realtime.dto.KiwoomGoldPriceStream
 import com.example.investfeed.kiwoom.realtime.dto.KiwoomGoldPriceStreamReq

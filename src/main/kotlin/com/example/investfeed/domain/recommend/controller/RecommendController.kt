@@ -4,8 +4,7 @@ import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
 import com.example.investfeed.domain.recommend.service.RecommendService
-import com.example.investfeed.domain.stock.dto.req.StockStreamReq
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping

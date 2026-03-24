@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.exception
+package com.example.investfeed.common.exception
 
 data class ApiResponse<T> (
     var code: String,

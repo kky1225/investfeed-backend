@@ -7,7 +7,7 @@ import com.example.investfeed.domain.sect.dto.req.SectStockListReq
 import com.example.investfeed.domain.sect.dto.res.SectListRes
 import com.example.investfeed.domain.sect.dto.res.SectStockListRes
 import com.example.investfeed.domain.sect.service.SectService
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

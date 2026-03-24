@@ -5,7 +5,7 @@ import com.example.investfeed.domain.notification.dto.req.NotificationListReq
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.security.CustomUserDetails
-import com.example.investfeed.kiwoom.exception.ApiResponse
+import com.example.investfeed.common.exception.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
