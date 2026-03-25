@@ -1,12 +1,18 @@
 package com.example.investfeed.domain.auth.service
 
+import com.example.investfeed.domain.auth.dto.req.ApiKeyReq
 import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
+import com.example.investfeed.domain.auth.dto.req.CreateMemberReq
 import com.example.investfeed.domain.auth.dto.req.LoginReq
 import com.example.investfeed.domain.auth.dto.req.SignupReq
 import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
+import com.example.investfeed.domain.auth.dto.res.ApiKeyRes
 import com.example.investfeed.domain.auth.dto.res.MemberRes
 import com.example.investfeed.domain.auth.dto.res.TokenRes
+import com.example.investfeed.domain.auth.entity.MemberApiKey
+import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.entity.Member
+import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.domain.auth.exception.*
@@ -21,7 +27,10 @@ import java.time.LocalDateTime
 class AuthService(
     @param:Value("\${security.password-change-cycle}")
     private val passwordChangeCycle: Long,
+    @param:Value("\${security.default-password}")
+    private val defaultPassword: String,
     private val memberRepository: MemberRepository,
+    private val memberApiKeyRepository: MemberApiKeyRepository,
     private val loginAttemptService: LoginAttemptService,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
@@ -112,6 +121,41 @@ class AuthService(
         member.lockExpiresAt = null
     }
 
+
+    @Transactional
+    fun createMember(req: CreateMemberReq) {
+        if (memberRepository.existsByLoginId(req.loginId)) {
+            throw DuplicateLoginIdException()
+        }
+        if (memberRepository.existsByEmail(req.email)) {
+            throw DuplicateEmailException()
+        }
+        if (memberRepository.existsByNickname(req.nickname)) {
+            throw DuplicateNicknameException()
+        }
+        if (memberRepository.existsByPhone(req.phone)) {
+            throw DuplicatePhoneException()
+        }
+
+        val role = try {
+            Role.valueOf(req.role)
+        } catch (e: IllegalArgumentException) {
+            Role.GUEST
+        }
+
+        val member = Member(
+            loginId = req.loginId,
+            password = passwordEncoder.encode(defaultPassword),
+            email = req.email,
+            nickname = req.nickname,
+            name = req.name,
+            phone = req.phone,
+            role = role,
+            passwordChangedAt = LocalDateTime.of(2000, 1, 1, 0, 0)
+        )
+
+        memberRepository.save(member)
+    }
 
     @Transactional(readOnly = true)
     fun getMembers(): List<MemberRes> {
@@ -229,6 +273,56 @@ class AuthService(
         loginId: String
     ) {
         jwtProvider.deleteRefreshToken(loginId)
+    }
+
+    @Transactional(readOnly = true)
+    fun getApiKeys(loginId: String): List<ApiKeyRes> {
+        return memberApiKeyRepository.findByMemberLoginId(loginId).map { it.toApiKeyRes() }
+    }
+
+    @Transactional
+    fun createApiKey(loginId: String, req: ApiKeyReq) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        if (memberApiKeyRepository.existsByMemberLoginIdAndProvider(loginId, req.provider)) {
+            throw DuplicateApiKeyException()
+        }
+
+        memberApiKeyRepository.save(
+            MemberApiKey(
+                member = member,
+                provider = req.provider,
+                appKey = req.appKey,
+                secretKey = req.secretKey
+            )
+        )
+    }
+
+    @Transactional
+    fun deleteApiKey(loginId: String, id: Long) {
+        val apiKey = memberApiKeyRepository.findById(id)
+            .orElseThrow { ApiKeyNotFoundException() }
+
+        if (apiKey.member.loginId != loginId) {
+            throw AccessDeniedException()
+        }
+
+        memberApiKeyRepository.delete(apiKey)
+    }
+
+    private fun MemberApiKey.toApiKeyRes(): ApiKeyRes {
+        return ApiKeyRes(
+            id = id,
+            provider = provider,
+            appKey = maskApiKey(appKey),
+            createdAt = createdAt
+        )
+    }
+
+    private fun maskApiKey(key: String): String {
+        if (key.length <= 4) return "****"
+        return key.take(4) + "*".repeat(key.length - 4)
     }
 
     private fun maskEmail(email: String): String {

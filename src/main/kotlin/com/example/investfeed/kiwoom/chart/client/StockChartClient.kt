@@ -1,12 +1,12 @@
 package com.example.investfeed.kiwoom.chart.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.dto.stock.res.*
 import com.example.investfeed.kiwoom.exception.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -17,7 +17,7 @@ class StockChartClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -25,8 +25,7 @@ class StockChartClient(
     fun chartMinuteList(
         req: KiwoomStockChartMinuteReq
     ): KiwoomStockChartMinuteRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -59,8 +58,7 @@ class StockChartClient(
     fun chartDayList(
         req: KiwoomStockChartDayReq
     ): KiwoomStockChartDayRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -93,8 +91,7 @@ class StockChartClient(
     fun chartWeekList(
         req: KiwoomStockChartWeekReq
     ): KiwoomStockChartWeekRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -127,8 +124,7 @@ class StockChartClient(
     fun chartMonthList(
         req: KiwoomStockChartMonthReq
     ): KiwoomStockChartMonthRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -161,8 +157,7 @@ class StockChartClient(
     fun chartYearList(
         req: KiwoomStockChartYearReq
     ): KiwoomStockChartYearRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -195,8 +190,7 @@ class StockChartClient(
     fun stockChartInvestor(
         req: KiwoomStockChartInvestorReq
     ): KiwoomStockChartInvestorRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

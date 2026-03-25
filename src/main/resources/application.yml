@@ -28,11 +28,14 @@ jwt:
   refresh-token-expiration: 1
 
 security:
-  password-change-cycle: 30
+  password-change-cycle: ${PASSWORD_CHANGE_CYCLE}
+  default-password: ${DEFAULT_PASSWORD}
+  encryption-key: ${ENCRYPTION_KEY}
+
+scheduler:
+  login-id: ${SCHEDULER_LOGIN_ID}
 
 kiwoom:
-  app-key: ${KIWOOM_APP_KEY}
-  secret-key: ${KIWOOM_SECRET_KEY}
   default-url: https://api.kiwoom.com
 
 upbit:

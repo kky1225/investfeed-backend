@@ -9,6 +9,7 @@ import com.example.investfeed.domain.stock.dto.res.StockJumpListRes
 import com.example.investfeed.domain.stock.dto.res.StockNewPriceListRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockTradeDailyRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomSectCodeListReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomSectCodeListRes
@@ -22,7 +23,6 @@ import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterestRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestorRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -33,7 +33,7 @@ class StockClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
     private final val STOCK_URL = "/api/dostk/stkinfo"
@@ -42,8 +42,7 @@ class StockClient(
     fun stockInfoList(
         req: StockInfoListReq
     ): StockInfoListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -76,8 +75,7 @@ class StockClient(
     fun stockDefaultInfo(
         req: KiwoomDefaultStockInfoReq
     ): KiwoomStockDefaultInfoRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -110,8 +108,7 @@ class StockClient(
     fun stockInfo(
         req: KiwoomStockInfoReq
     ): KiwoomStockInfoRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -144,8 +141,7 @@ class StockClient(
     fun stockInvestor(
         req: KiwoomStockInvestorReq
     ): KiwoomStockInvestorRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -178,8 +174,7 @@ class StockClient(
     fun stockTradeDailyList(
         req: KiwoomStockTradeDailyListReq
     ): KiwoomStockTradeDailyRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -212,8 +207,7 @@ class StockClient(
     fun stockJumpList(
         req: StockJumpListReq
     ): StockJumpListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -246,8 +240,7 @@ class StockClient(
     fun stockNewPriceList(
         req: StockNewPriceListReq
     ): StockNewPriceListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -280,8 +273,7 @@ class StockClient(
     fun sectCodeList(
         req: KiwoomSectCodeListReq
     ): KiwoomSectCodeListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -314,8 +306,7 @@ class StockClient(
     fun stockInterest(
         req: KiwoomStockInterestReq
     ): KiwoomStockInterestRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

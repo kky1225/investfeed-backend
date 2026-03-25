@@ -1,14 +1,13 @@
 package com.example.investfeed.kiwoom.shortselling.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.ShortSellingException
 import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
 import com.example.investfeed.kiwoom.shortselling.dto.res.KiwoomStockShortSellingRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -19,7 +18,7 @@ class ShortSellingClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
     private final val SHORT_SELLING_URL = "/api/dostk/shsa"
@@ -28,8 +27,7 @@ class ShortSellingClient(
     fun stockShortSelling(
         req: KiwoomStockShortSellingReq
     ): KiwoomStockShortSellingRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

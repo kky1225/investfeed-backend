@@ -1,12 +1,12 @@
 package com.example.investfeed.kiwoom.price.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.price.dto.req.*
 import com.example.investfeed.kiwoom.price.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -18,7 +18,7 @@ class PriceClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -28,8 +28,7 @@ class PriceClient(
     fun stockTradeInfo(
         req: KiwoomStockTradeInfoReq
     ): KiwoomStockTradeInfoRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -62,8 +61,7 @@ class PriceClient(
     fun stockSinglePriceList(
         req: KiwoomStockSinglePriceReq
     ): KiwoomStockSinglePriceRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -96,8 +94,7 @@ class PriceClient(
     fun goldPriceNow(
         req: KiwoomGoldPriceNowReq
     ): KiwoomGoldPriceNowRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -130,8 +127,7 @@ class PriceClient(
     fun goldPriceNowMinute(
         req: KiwoomGoldPriceNowMinuteReq
     ): KiwoomGoldPriceNowMinuteRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -164,8 +160,7 @@ class PriceClient(
     fun investorTradeOpenMarket(
         req: KiwoomInvestorTradeOpenMarketReq
     ): KiwoomInvestorTradeOpenMarketRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val opmr_invsr_trde = mutableListOf<KiwoomInvestorTradeOpenMarketItemList>()
@@ -224,8 +219,7 @@ class PriceClient(
     fun investorTradeCloseMarket(
         req: KiwoomInvestorTradeCloseMarketReq
     ): KiwoomInvestorTradeCloseMarketRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val opaf_invsr_trde = mutableListOf<KiwoomInvestorTradeCloseMarketItemList>()
@@ -286,8 +280,7 @@ class PriceClient(
     fun programTrade(
         req: KiwoomProgramTradeReq
     ): KiwoomProgramTradeRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -319,8 +312,7 @@ class PriceClient(
     fun stockProgramTradeDay(
         req: KiwoomStockProgramTradeDayReq
     ): KiwoomStockProgramTradeDayRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val stk_daly_prm_trde_trnsn = mutableListOf<KiwoomStockProgramTradeDay>()
@@ -384,8 +376,7 @@ class PriceClient(
     fun indexProgramTradeDay(
         req: KiwoomIndexProgramTradeDayReq
     ): KiwoomIndexProgramTradeDayRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -417,8 +408,7 @@ class PriceClient(
     fun indexProgramTradeMinute(
         req: KiwoomIndexProgramTradeMinuteReq
     ): KiwoomIndexProgramTradeMinuteRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val prm_trde_trnsn = mutableListOf<KiwoomIndexProgramTradeMinute>()

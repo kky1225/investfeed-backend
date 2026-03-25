@@ -3,18 +3,17 @@ package com.example.investfeed.kiwoom.stock.client
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.time.LocalTime
 
 @Service
 class StockSocketClient(
     private val objectMapper: ObjectMapper,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
     private val webSocketHandler: WebSocketHandler,
 ) {
     private val log = KotlinLogging.logger {}
@@ -25,8 +24,7 @@ class StockSocketClient(
     ) {
         log.debug { "stockListStream $req" }
 
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         val nxtOpen  = LocalTime.of(8, 0)
         val nxtClose = LocalTime.of(20, 0)

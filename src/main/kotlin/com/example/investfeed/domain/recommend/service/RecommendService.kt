@@ -16,8 +16,12 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -30,13 +34,26 @@ class RecommendService(
     private val stockClient: StockClient,
     private val stockSocketClient: StockSocketClient,
     private val stockRecommendRepository: StockRecommendRepository,
-    private val stockAvoidRepository: StockAvoidRepository
+    private val stockAvoidRepository: StockAvoidRepository,
+    private val authClient: AuthClient,
+    @param:Value("\${scheduler.login-id:admin}")
+    private val schedulerLoginId: String
 ) {
     private val log = KotlinLogging.logger {}
 
     @Scheduled(cron = "0 30 * * * *")
     @Transactional
     fun recommendStock() {
+        setSchedulerSecurityContext()
+        try {
+            authClient.accessToken()
+            doRecommendStock()
+        } finally {
+            SecurityContextHolder.clearContext()
+        }
+    }
+
+    private fun doRecommendStock() {
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
@@ -230,5 +247,10 @@ class RecommendService(
         val pattern = DateTimeFormatter.ofPattern(pattern)
 
         return pattern.format(now)
+    }
+
+    private fun setSchedulerSecurityContext() {
+        val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
+        SecurityContextHolder.getContext().authentication = auth
     }
 }

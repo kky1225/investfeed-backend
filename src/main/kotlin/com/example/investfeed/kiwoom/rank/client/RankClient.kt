@@ -1,12 +1,12 @@
 package com.example.investfeed.kiwoom.rank.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.rank.dto.req.*
 import com.example.investfeed.kiwoom.rank.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -17,7 +17,7 @@ class RankClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
     private final val RANK_URL = "/api/dostk/rkinfo"
@@ -26,8 +26,7 @@ class RankClient(
     fun stockTradeValueList(
         req: KiwoomStockTradeValueListReq
     ): KiwoomStockTradeValueListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -60,8 +59,7 @@ class RankClient(
     fun stockTradeVolumeList(
         req: KiwoomStockTradeVolumeListReq
     ): KiwoomStockTradeVolumeListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -94,8 +92,7 @@ class RankClient(
     fun stockSurgeTradeVolumeList(
         req: KiwoomSurgeTradeVolumeListReq
     ): KiwoomSurgeTradeVolumeListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -128,8 +125,7 @@ class RankClient(
     fun investorTradeDaily(
         req: KiwoomInvestorTradeDailyReq
     ): KiwoomInvestorTradeDailyRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -162,8 +158,7 @@ class RankClient(
     fun investorTrade(
         req: KiwoomInvestorTradeReq
     ): KiwoomInvestorTradeRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             var frgnr_orgn_trde_upper = mutableListOf<KiwoomInvestorTrade>()

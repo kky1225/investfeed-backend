@@ -26,6 +26,10 @@ class SamePasswordException : AuthException(code = "AUTH_4016", message = "현�
 class RefreshTokenMissingException : AuthException(code = "AUTH_4017", message = "리프레시 토큰이 없습니다.")
 class RefreshTokenInvalidException : AuthException(code = "AUTH_4018", message = "유효하지 않은 리프레시 토큰입니다.")
 
+// API Key
+class ApiKeyNotFoundException : AuthException(code = "AUTH_4020", message = "API Key를 찾을 수 없습니다.")
+class DuplicateApiKeyException : AuthException(code = "AUTH_4021", message = "이미 등록된 제공자의 API Key입니다.")
+
 // 중복
 class DuplicateLoginIdException : AuthException(code = "AUTH_4090", message = "이미 사용 중인 아이디입니다.")
 class DuplicateEmailException : AuthException(code = "AUTH_4091", message = "이미 사용 중인 이메일입니다.")

@@ -3,19 +3,18 @@ package com.example.investfeed.kiwoom.realtime.client
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.realtime.dto.KiwoomGoldPriceStreamReq
 import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.time.LocalTime
 
 @Service
 class RealTimeClient(
     private val objectMapper: ObjectMapper,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
     private val webSocketHandler: WebSocketHandler,
 ) {
     private val log = KotlinLogging.logger {}
@@ -26,8 +25,7 @@ class RealTimeClient(
     ) {
         log.info { "sectIndexListStream $req" }
 
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         if(isMarketOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
@@ -54,8 +52,7 @@ class RealTimeClient(
     ) {
         log.info { "goldPriceListStream $req" }
 
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         if(isMarketOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()

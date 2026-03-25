@@ -46,16 +46,20 @@ enum class ResponseCode(
     RECOMMEND_LIST(message = "주식 추천 목록 조회에 성공하셨습니다."),
     RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다."),
 
-    AUTH_SIGNUP(message = "회원가입에 성공하셨습니다."),
     AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
     AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다."),
     AUTH_CHANGE_PASSWORD(message = "비밀번호 변경에 성공하셨습니다."),
     AUTH_LOCK(message = "계정 잠금에 성공하셨습니다."),
     AUTH_UNLOCK(message = "계정 잠금 해제에 성공하셨습니다."),
+    AUTH_CREATE_MEMBER(message = "회원 생성에 성공하셨습니다."),
     AUTH_MEMBER_LIST(message = "회원 목록 조회에 성공하셨습니다."),
     AUTH_PROFILE(message = "프로필 조회에 성공하셨습니다."),
     AUTH_PROFILE_UPDATE(message = "프로필 수정에 성공하셨습니다."),
+
+    AUTH_API_KEY_LIST(message = "API Key 목록 조회에 성공하셨습니다."),
+    AUTH_API_KEY_CREATE(message = "API Key 등록에 성공하셨습니다."),
+    AUTH_API_KEY_DELETE(message = "API Key 삭제에 성공하셨습니다."),
 
     INTEREST_GROUP_LIST(message = "관심종목 그룹 목록 조회에 성공하셨습니다."),
     INTEREST_GROUP_CREATE(message = "관심종목 그룹 생성에 성공하셨습니다."),

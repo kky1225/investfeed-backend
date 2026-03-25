@@ -1,6 +1,7 @@
 package com.example.investfeed.kiwoom.investor.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeDayReq
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeOrganizeReq
@@ -11,7 +12,6 @@ import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
 import com.example.investfeed.kiwoom.investor.dto.res.KiwoomGoldInvestorRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -21,7 +21,7 @@ class InvestorClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -29,8 +29,7 @@ class InvestorClient(
     fun investorTradeDay(
         req: KiwoomInvestorTradeDayReq
     ): KiwoomInvestorTradeDayRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -63,8 +62,7 @@ class InvestorClient(
     fun investorTradeOrganize(
         req: KiwoomInvestorTradeOrganizeReq
     ): InvestorTradeOrganizeRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -97,8 +95,7 @@ class InvestorClient(
     fun investorTradeRankList(
         req: KiwoomInvestorTradeRankListReq
     ): InvestorTradeRankListRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -129,8 +126,7 @@ class InvestorClient(
 
     @KiwoomToken
     fun goldInvestor(): KiwoomGoldInvestorRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

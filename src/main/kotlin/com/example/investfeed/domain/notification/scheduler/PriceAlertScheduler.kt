@@ -7,12 +7,16 @@ import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import java.time.LocalTime
 
@@ -25,7 +29,10 @@ class PriceAlertScheduler(
     private val stockClient: StockClient,
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
-    private val holidayService: HolidayService
+    private val holidayService: HolidayService,
+    private val authClient: AuthClient,
+    @param:Value("\${scheduler.login-id:admin}")
+    private val schedulerLoginId: String
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -36,6 +43,15 @@ class PriceAlertScheduler(
 
     @Scheduled(cron = "0 * * * * *")
     fun checkPriceAlerts() {
+        setSchedulerSecurityContext()
+        try {
+            authClient.accessToken()
+        } catch (e: Exception) {
+            log.error(e) { "스케줄러 토큰 발급 실패" }
+            SecurityContextHolder.clearContext()
+            return
+        }
+
         val start = System.currentTimeMillis()
         try {
             checkStockAlerts()
@@ -49,6 +65,7 @@ class PriceAlertScheduler(
             log.error(e) { "암호화폐 가격 알림 체크 실패" }
         }
 
+        SecurityContextHolder.clearContext()
         log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
     }
 
@@ -181,5 +198,10 @@ class PriceAlertScheduler(
                 )
             }
         }
+    }
+
+    private fun setSchedulerSecurityContext() {
+        val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
+        SecurityContextHolder.getContext().authentication = auth
     }
 }

@@ -7,14 +7,13 @@ import com.example.investfeed.kiwoom.etf.dto.req.EtfTradeDailyListReq
 import com.example.investfeed.kiwoom.etf.dto.res.EtfPriceListRes
 import com.example.investfeed.kiwoom.etf.dto.res.EtfInfoRes
 import com.example.investfeed.kiwoom.etf.dto.res.EtfTradeDailyListRes
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.EtfInfoException
 import com.example.investfeed.kiwoom.exception.EtfTradeDailyListException
 import com.example.investfeed.kiwoom.exception.EtfPriceListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -24,7 +23,7 @@ class EtfService(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -32,8 +31,7 @@ class EtfService(
     fun etfPriceList(
         req: EtfPriceListReq
     ): EtfPriceListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -66,8 +64,7 @@ class EtfService(
     fun etfInfo(
         req: EtfInfoReq
     ): EtfInfoRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -100,8 +97,7 @@ class EtfService(
     fun etfTradeDailyList(
         req: EtfTradeDailyListReq
     ): EtfTradeDailyListRes? {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

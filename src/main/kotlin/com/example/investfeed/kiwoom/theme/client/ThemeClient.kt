@@ -1,7 +1,7 @@
 package com.example.investfeed.kiwoom.theme.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.ThemeGroupListException
 import com.example.investfeed.kiwoom.exception.ThemeGroupStockListException
@@ -12,7 +12,6 @@ import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupRes
 import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupStockRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -23,7 +22,7 @@ class ThemeClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>
+    private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
     private final val THEME_URL = "/api/dostk/thme"
@@ -32,8 +31,7 @@ class ThemeClient(
     fun themeGroupList(
         req: KiwoomThemeGroupReq
     ): KiwoomThemeGroupRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val thema_grp = mutableListOf<KiwoomThemeGroup>()
@@ -92,8 +90,7 @@ class ThemeClient(
     fun themeGroupStockList(
         req: KiwoomThemeGroupStockReq
     ): KiwoomThemeGroupStockRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()

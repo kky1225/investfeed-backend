@@ -1,10 +1,12 @@
 package com.example.investfeed.domain.auth.controller
 
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.auth.dto.req.ApiKeyReq
 import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
+import com.example.investfeed.domain.auth.dto.req.CreateMemberReq
 import com.example.investfeed.domain.auth.dto.req.LoginReq
-import com.example.investfeed.domain.auth.dto.req.SignupReq
 import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
+import com.example.investfeed.domain.auth.dto.res.ApiKeyRes
 import com.example.investfeed.domain.auth.dto.res.MemberRes
 import com.example.investfeed.domain.auth.dto.res.TokenRes
 import com.example.investfeed.domain.auth.service.AuthService
@@ -19,6 +21,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.CookieValue
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -35,21 +38,6 @@ class AuthController(
     private val authService: AuthService
 ) {
     private val log = KotlinLogging.logger {}
-
-    @PostMapping("/signup")
-    fun signup(@RequestBody req: SignupReq): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "signup: ${req.loginId}" }
-
-        authService.signup(req)
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.AUTH_SIGNUP.code,
-                message = ResponseCode.AUTH_SIGNUP.message,
-                result = null
-            ), HttpStatus.CREATED
-        )
-    }
 
     @PostMapping("/login")
     fun login(
@@ -150,6 +138,69 @@ class AuthController(
                 message = ResponseCode.AUTH_PROFILE_UPDATE.message,
                 result = null
             ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/api-keys")
+    fun getApiKeys(
+        @AuthenticationPrincipal userDetails: CustomUserDetails
+    ): ResponseEntity<ApiResponse<List<ApiKeyRes>>> {
+        val apiKeys = authService.getApiKeys(userDetails.username)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_API_KEY_LIST.code,
+                message = ResponseCode.AUTH_API_KEY_LIST.message,
+                result = apiKeys
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("/api-keys")
+    fun createApiKey(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @RequestBody req: ApiKeyReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        authService.createApiKey(userDetails.username, req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_API_KEY_CREATE.code,
+                message = ResponseCode.AUTH_API_KEY_CREATE.message,
+                result = null
+            ), HttpStatus.CREATED
+        )
+    }
+
+    @DeleteMapping("/api-keys/{id}")
+    fun deleteApiKey(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @PathVariable id: Long
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        authService.deleteApiKey(userDetails.username, id)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_API_KEY_DELETE.code,
+                message = ResponseCode.AUTH_API_KEY_DELETE.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("/admin/members")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun createMember(@RequestBody req: CreateMemberReq): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "create member: ${req.loginId}" }
+
+        authService.createMember(req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_CREATE_MEMBER.code,
+                message = ResponseCode.AUTH_CREATE_MEMBER.message,
+                result = null
+            ), HttpStatus.CREATED
         )
     }
 

@@ -42,7 +42,7 @@ class SecurityConfig(
             .httpBasic { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/admin/**").authenticated()
+                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/api-keys/**", "/api/auth/admin/**").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .anyRequest().authenticated()

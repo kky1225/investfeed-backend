@@ -1,12 +1,12 @@
 package com.example.investfeed.kiwoom.sect.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.sect.dto.req.*
 import com.example.investfeed.kiwoom.sect.dto.res.*
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -17,7 +17,7 @@ class SectClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
-    private val redisTemplate: RedisTemplate<String, String>,
+    private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
     private final val SECT_URL = "/api/dostk/sect"
@@ -26,8 +26,7 @@ class SectClient(
     fun sectInvestor(
         req: KiwoomSectInvestorReq
     ): KiwoomSectInvestorRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -60,8 +59,7 @@ class SectClient(
     fun sectPriceNow(
         req: KiwoomSectPriceNowReq
     ): KiwoomSectPriceNowRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -100,8 +98,7 @@ class SectClient(
     fun sectPrice(
         req: KiwoomSectPriceReq
     ): KiwoomSectPriceRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val inds_stkpc = mutableListOf<KiwoomSectPrice>()
@@ -162,8 +159,7 @@ class SectClient(
     fun sectIndexList(
         req: KiwoomSectIndexReq
     ): KiwoomSectIndexRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
@@ -196,8 +192,7 @@ class SectClient(
     fun sectIndexDailyList(
         req: KiwoomSectIndexDailyReq
     ): KiwoomSectIndexDailyRes {
-        val accessToken = redisTemplate.opsForValue().get("kiwoom:access_token")
-        accessToken ?: throw AccessTokenNotFoundException()
+        val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = webClient.post()
