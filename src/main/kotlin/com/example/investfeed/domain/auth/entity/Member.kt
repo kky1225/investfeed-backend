@@ -30,7 +30,7 @@ class Member(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val role: Role = Role.USER,
+    var role: Role = Role.USER,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),

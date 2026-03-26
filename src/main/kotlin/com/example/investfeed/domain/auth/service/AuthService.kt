@@ -226,6 +226,14 @@ class AuthService(
         member.lockExpiresAt = null
     }
 
+    @Transactional
+    fun changeRole(loginId: String, role: String) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        member.role = Role.valueOf(role)
+    }
+
     fun reissue(
         refreshToken: String?
     ): TokenRes {

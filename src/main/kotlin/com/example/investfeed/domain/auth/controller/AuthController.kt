@@ -3,6 +3,7 @@ package com.example.investfeed.domain.auth.controller
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.auth.dto.req.ApiKeyReq
 import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
+import com.example.investfeed.domain.auth.dto.req.ChangeRoleReq
 import com.example.investfeed.domain.auth.dto.req.CreateMemberReq
 import com.example.investfeed.domain.auth.dto.req.LoginReq
 import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
@@ -214,6 +215,25 @@ class AuthController(
                 code = ResponseCode.AUTH_MEMBER_LIST.code,
                 message = ResponseCode.AUTH_MEMBER_LIST.message,
                 result = members
+            ), HttpStatus.OK
+        )
+    }
+
+    @PutMapping("/admin/members/{loginId}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun changeRole(
+        @PathVariable loginId: String,
+        @RequestBody req: ChangeRoleReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "change role: $loginId -> ${req.role}" }
+
+        authService.changeRole(loginId, req.role)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_CHANGE_ROLE.code,
+                message = ResponseCode.AUTH_CHANGE_ROLE.message,
+                result = null
             ), HttpStatus.OK
         )
     }

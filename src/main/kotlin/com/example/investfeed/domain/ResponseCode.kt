@@ -52,6 +52,7 @@ enum class ResponseCode(
     AUTH_CHANGE_PASSWORD(message = "비밀번호 변경에 성공하셨습니다."),
     AUTH_LOCK(message = "계정 잠금에 성공하셨습니다."),
     AUTH_UNLOCK(message = "계정 잠금 해제에 성공하셨습니다."),
+    AUTH_CHANGE_ROLE(message = "계정 권한 변경에 성공하셨습니다."),
     AUTH_CREATE_MEMBER(message = "회원 생성에 성공하셨습니다."),
     AUTH_MEMBER_LIST(message = "회원 목록 조회에 성공하셨습니다."),
     AUTH_PROFILE(message = "프로필 조회에 성공하셨습니다."),
