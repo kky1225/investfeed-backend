@@ -16,6 +16,7 @@ import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.domain.auth.exception.*
+import org.springframework.security.access.AccessDeniedException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -66,10 +67,14 @@ class AuthService(
         memberRepository.save(member)
     }
 
+    data class LoginResult(
+        val tokenRes: TokenRes,
+        val accessToken: String,
+        val refreshToken: String
+    )
+
     @Transactional
-    fun login(
-        req: LoginReq
-    ): Pair<TokenRes, String> {
+    fun login(req: LoginReq): LoginResult {
         val member = memberRepository.findByLoginId(req.loginId)
             .orElseThrow { InvalidCredentialsException() }
 
@@ -91,15 +96,15 @@ class AuthService(
             .plusDays(passwordChangeCycle)
             .isBefore(LocalDateTime.now())
 
-        return Pair(
-            TokenRes(
-                accessToken = jwtProvider.generateAccessToken(member.loginId),
+        return LoginResult(
+            tokenRes = TokenRes(
                 passwordChangeRequired = passwordChangeRequired,
                 role = member.role.name,
                 nickname = member.nickname,
                 email = maskEmail(member.email)
             ),
-            jwtProvider.generateRefreshToken(member.loginId)
+            accessToken = jwtProvider.generateAccessToken(member.loginId),
+            refreshToken = jwtProvider.generateRefreshToken(member.loginId)
         )
     }
 
@@ -234,9 +239,12 @@ class AuthService(
         member.role = Role.valueOf(role)
     }
 
-    fun reissue(
-        refreshToken: String?
-    ): TokenRes {
+    data class ReissueResult(
+        val tokenRes: TokenRes,
+        val accessToken: String
+    )
+
+    fun reissue(refreshToken: String?): ReissueResult {
         if (refreshToken == null) {
             throw RefreshTokenMissingException()
         }
@@ -249,18 +257,21 @@ class AuthService(
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
 
-        return TokenRes(
-            accessToken = jwtProvider.generateAccessToken(loginId),
-            role = member.role.name,
-            nickname = member.nickname,
-            email = maskEmail(member.email)
+        return ReissueResult(
+            tokenRes = TokenRes(
+                role = member.role.name,
+                nickname = member.nickname,
+                email = maskEmail(member.email)
+            ),
+            accessToken = jwtProvider.generateAccessToken(loginId)
         )
     }
 
     @Transactional
     fun changePassword(
         loginId: String,
-        req: ChangePasswordReq
+        req: ChangePasswordReq,
+        accessToken: String? = null
     ) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
@@ -275,12 +286,13 @@ class AuthService(
 
         member.password = passwordEncoder.encode(req.newPassword)
         member.passwordChangedAt = LocalDateTime.now()
+        jwtProvider.deleteRefreshToken(loginId)
+        accessToken?.let { jwtProvider.blacklistAccessToken(it) }
     }
 
-    fun logout(
-        loginId: String
-    ) {
+    fun logout(loginId: String, accessToken: String? = null) {
         jwtProvider.deleteRefreshToken(loginId)
+        accessToken?.let { jwtProvider.blacklistAccessToken(it) }
     }
 
     @Transactional(readOnly = true)
@@ -313,7 +325,7 @@ class AuthService(
             .orElseThrow { ApiKeyNotFoundException() }
 
         if (apiKey.member.loginId != loginId) {
-            throw AccessDeniedException()
+            throw AccessDeniedException("접근 권한이 없습니다.")
         }
 
         memberApiKeyRepository.delete(apiKey)

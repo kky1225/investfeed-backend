@@ -4,7 +4,7 @@ import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
 import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
-import com.example.investfeed.domain.auth.exception.UnauthorizedException
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
@@ -132,6 +132,6 @@ class AuthClient(
         if (authentication != null && authentication.isAuthenticated && authentication.name != "anonymousUser") {
             return authentication.name
         }
-        throw UnauthorizedException()
+        throw AuthenticationCredentialsNotFoundException("인증이 필요합니다.")
     }
 }

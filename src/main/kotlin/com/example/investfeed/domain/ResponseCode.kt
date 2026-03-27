@@ -12,7 +12,7 @@ enum class ResponseCode(
     SECT_LIST_STREAM(message = "실시간 전업종 지수 목록 조회에 성공하셨습니다."),
     SECT_STOCK_LIST(message = "업종별 주식 목록 조회에 성공하셨습니다."),
 
-    STOCK_LIST(message = "주식 목록 조회에 성공하셨습니다."),
+    RANK_LIST(message = "주식 순위 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
     STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
     STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
@@ -45,6 +45,9 @@ enum class ResponseCode(
 
     RECOMMEND_LIST(message = "주식 추천 목록 조회에 성공하셨습니다."),
     RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다."),
+
+    AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
+    AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),
 
     AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
@@ -95,4 +98,12 @@ enum class ResponseCode(
     NOTIFICATION_UNREAD_COUNT(message = "안읽은 알림 수 조회에 성공하셨습니다."),
     NOTIFICATION_READ(message = "알림 읽음 처리에 성공하셨습니다."),
     NOTIFICATION_READ_ALL(message = "전체 알림 읽음 처리에 성공하셨습니다."),
+
+    MENU_LIST(message = "메뉴 목록 조회에 성공하셨습니다."),
+    MENU_MY_LIST(message = "사용자 메뉴 목록 조회에 성공하셨습니다."),
+    MENU_CREATE(message = "메뉴 생성에 성공하셨습니다."),
+    MENU_UPDATE(message = "메뉴 수정에 성공하셨습니다."),
+    MENU_DELETE(message = "메뉴 삭제에 성공하셨습니다."),
+    MENU_STRUCTURE_UPDATE(message = "메뉴 구조 변경에 성공하셨습니다."),
+    MENU_PERMISSION_UPDATE(message = "메뉴 권한 변경에 성공하셨습니다."),
 }

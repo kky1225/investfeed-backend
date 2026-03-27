@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*
 
 
 @RestController
-@RequestMapping("/api/investor")
+@RequestMapping("/api/stock/investor")
 class InvestorController(
     private val investorService: InvestorService
 ) {

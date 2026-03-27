@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.notification.config
 
+import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.security.JwtProvider
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -26,7 +27,6 @@ class NotificationWebSocketHandler(
         }
 
         userSessions.computeIfAbsent(memberId) { ConcurrentHashMap.newKeySet() }.add(session)
-        log.info { "알림 WebSocket 연결: memberId=$memberId, sessionId=${session.id}" }
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
@@ -56,18 +56,17 @@ class NotificationWebSocketHandler(
 
     private fun extractMemberId(session: WebSocketSession): Long? {
         return try {
-            val uri = session.uri ?: return null
-            val query = uri.query ?: return null
-            val token = query.split("&")
-                .map { it.split("=") }
-                .find { it[0] == "token" }
-                ?.getOrNull(1) ?: return null
+            val cookieHeader = session.handshakeHeaders["Cookie"]?.firstOrNull() ?: return null
+            val token = cookieHeader.split(";")
+                .map { it.trim() }
+                .find { it.startsWith("accessToken=") }
+                ?.substringAfter("accessToken=") ?: return null
 
             if (!jwtProvider.validateToken(token)) return null
 
             val authentication = jwtProvider.getAuthentication(token)
-            val userDetails = authentication.principal as? com.example.investfeed.domain.security.CustomUserDetails
-            userDetails?.member?.id
+            val userDetails = authentication.principal as CustomUserDetails
+            userDetails.member.id
         } catch (e: Exception) {
             log.error { "WebSocket 토큰 파싱 실패: ${e.message}" }
             null

@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/crypto-interest")
+@RequestMapping("/api/crypto/interest")
 class CryptoInterestController(
     private val cryptoInterestService: CryptoInterestService
 ) {

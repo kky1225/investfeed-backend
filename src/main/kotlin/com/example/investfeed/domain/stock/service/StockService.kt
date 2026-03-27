@@ -2,24 +2,14 @@ package com.example.investfeed.domain.stock.service
 
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
-import com.example.investfeed.domain.stock.dto.req.StockListReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartDayReq
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartMinuteReq
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartMonthReq
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartWeekReq
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartYearReq
-import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartInvestorReq
+import com.example.investfeed.kiwoom.chart.client.StockChartClient
+import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
-import com.example.investfeed.kiwoom.rank.client.RankClient
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
-import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
-import com.example.investfeed.kiwoom.chart.client.StockChartClient
 import com.example.investfeed.kiwoom.shortselling.client.ShortSellingClient
 import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
@@ -30,107 +20,16 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import kotlin.String
 
 @Service
 class StockService(
     private val stockClient: StockClient,
     private val priceClient: PriceClient,
-    private val rankClient: RankClient,
     private val stockChartClient: StockChartClient,
     private val stockSocketClient: StockSocketClient,
     private val shortSellingClient: ShortSellingClient
 ) {
     private val log = KotlinLogging.logger {}
-
-    fun stockList(
-        req: StockListReq
-    ): StockListRes {
-        when (req.type) {
-            "0" -> {
-                val kiwoomStockTradeValueListRes = rankClient.stockTradeValueList(
-                    req = KiwoomStockTradeValueListReq(
-                        mrkt_tp = "000",
-                        mang_stk_incls = "1",
-                        stex_tp = "3"
-                    )
-                )
-
-                return StockListRes(
-                    return_code = kiwoomStockTradeValueListRes.return_code,
-                    return_msg = kiwoomStockTradeValueListRes.return_msg,
-                    stockList = kiwoomStockTradeValueListRes.trde_prica_upper?.map {
-                        StockListItem(
-                            stkCd = it.stk_cd,
-                            rank = it.now_rank,
-                            stkNm = it.stk_nm,
-                            fluRt = it.flu_rt,
-                            curPrc = it.cur_prc,
-                            trdePrica = it.trde_prica,
-                        )
-                    } ?: emptyList()
-                )
-            }
-            "1" -> {
-                val kiwoomStockTradeVolumeListRes = rankClient.stockTradeVolumeList(
-                    req = KiwoomStockTradeVolumeListReq(
-                        mrkt_tp = "000",
-                        sort_tp = "1",
-                        mang_stk_incls = "0",
-                        crd_tp = "0",
-                        trde_qty_tp = "0",
-                        pric_tp = "0",
-                        trde_prica_tp = "0",
-                        mrkt_open_tp = "0",
-                        stex_tp = "3"
-                    )
-                )
-
-                return StockListRes(
-                    return_code = kiwoomStockTradeVolumeListRes.return_code,
-                    return_msg = kiwoomStockTradeVolumeListRes.return_msg,
-                    stockList = kiwoomStockTradeVolumeListRes.tdy_trde_qty_upper?.mapIndexed { index, it ->
-                        StockListItem(
-                            stkCd = it.stk_cd,
-                            rank = (index + 1).toString(),
-                            stkNm = it.stk_nm,
-                            fluRt = it.flu_rt,
-                            curPrc = it.cur_prc,
-                            trdePrica = it.trde_qty,
-                        )
-                    } ?: emptyList()
-                )
-            }
-            else -> {
-                val kiwoomStockTradeValueListRes = rankClient.stockSurgeTradeVolumeList(
-                    req = KiwoomSurgeTradeVolumeListReq(
-                        mrkt_tp = "000",
-                        sort_tp = "2",
-                        tm_tp = "2",
-                        trde_qty_tp = "5",
-                        stk_cnd = "0",
-                        pric_tp = "0",
-                        stex_tp = "3"
-                    )
-                )
-
-                return StockListRes(
-                    return_code = kiwoomStockTradeValueListRes.return_code,
-                    return_msg = kiwoomStockTradeValueListRes.return_msg,
-                    stockList = kiwoomStockTradeValueListRes.trde_qty_sdnin?.mapIndexed { index, it ->
-                        StockListItem(
-                            stkCd = it.stk_cd,
-                            rank = (index + 1).toString(),
-                            stkNm = it.stk_nm,
-                            fluRt = it.flu_rt,
-                            curPrc = it.cur_prc,
-                            trdePrica = it.sdnin_rt,
-                        )
-                    } ?: emptyList()
-                )
-            }
-        }
-    }
 
     fun stockDetail(
         req: StockDetailReq

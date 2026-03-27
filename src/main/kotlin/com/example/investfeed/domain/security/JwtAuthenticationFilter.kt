@@ -17,9 +17,9 @@ class JwtAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-        val token = jwtProvider.resolveToken(request.getHeader("Authorization"))
+        val token = request.cookies?.find { it.name == "accessToken" }?.value
 
-        if (token != null && jwtProvider.validateToken(token)) {
+        if (token != null && jwtProvider.validateToken(token) && !jwtProvider.isBlacklisted(token)) {
             val authentication = jwtProvider.getAuthentication(token)
             SecurityContextHolder.getContext().authentication = authentication
         }

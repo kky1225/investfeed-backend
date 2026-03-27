@@ -1,6 +1,6 @@
-package com.example.investfeed.kiwoom.exception
+package com.example.investfeed.common.exception
 
 open class InvestFeedException(
     val code: String,
     override val message: String
-): RuntimeException(message)
+) : RuntimeException(message)

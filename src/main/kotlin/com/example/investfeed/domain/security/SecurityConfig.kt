@@ -2,8 +2,7 @@ package com.example.investfeed.domain.security
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.example.investfeed.common.exception.ApiResponse
-import com.example.investfeed.domain.auth.exception.AccessDeniedException
-import com.example.investfeed.domain.auth.exception.UnauthorizedException
+import com.example.investfeed.domain.ResponseCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
@@ -19,13 +18,17 @@ import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 class SecurityConfig(
+    @param:Value("\${cors.allowed-origins}")
+    private val allowedOrigins: String,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val menuPermissionFilter: MenuPermissionFilter,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -43,20 +46,20 @@ class SecurityConfig(
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/api-keys/**", "/api/auth/admin/**").authenticated()
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/api/menus/me").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .anyRequest().authenticated()
             }
             .exceptionHandling { ex ->
-                val unauthorized = UnauthorizedException()
-                val accessDenied = AccessDeniedException()
                 ex.authenticationEntryPoint { _: HttpServletRequest, response: HttpServletResponse, _ ->
                     response.status = HttpServletResponse.SC_UNAUTHORIZED
                     response.contentType = MediaType.APPLICATION_JSON_VALUE
                     response.characterEncoding = "UTF-8"
                     objectMapper.writeValue(
                         response.writer,
-                        ApiResponse(code = unauthorized.code, message = unauthorized.message, result = null)
+                        ApiResponse(code = ResponseCode.AUTH_UNAUTHORIZED.code, message = ResponseCode.AUTH_UNAUTHORIZED.message, result = null)
                     )
                 }
                 ex.accessDeniedHandler { _: HttpServletRequest, response: HttpServletResponse, _ ->
@@ -65,19 +68,21 @@ class SecurityConfig(
                     response.characterEncoding = "UTF-8"
                     objectMapper.writeValue(
                         response.writer,
-                        ApiResponse(code = accessDenied.code, message = accessDenied.message, result = null)
+                        ApiResponse(code = ResponseCode.AUTH_FORBIDDEN.code, message = ResponseCode.AUTH_FORBIDDEN.message, result = null)
                     )
                 }
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(menuPermissionFilter, JwtAuthenticationFilter::class.java)
 
         return http.build()
     }
 
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
+        val origins = allowedOrigins.split(",").map(String::trim)
         val config = CorsConfiguration().apply {
-            allowedOriginPatterns = listOf("*")
+            allowedOriginPatterns = origins
             allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
             allowedHeaders = listOf("*")
             allowCredentials = true

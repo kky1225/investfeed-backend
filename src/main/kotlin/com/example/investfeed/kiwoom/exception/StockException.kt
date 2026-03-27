@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.exception
 
+import com.example.investfeed.common.exception.InvestFeedException
+
 class StockInfoListException(): InvestFeedException(code = "STOCK_0001", message = "정목 정보 리스트 조회에 실패하셨습니다.")
 class StockTradeInfoException(): InvestFeedException(code = "STOCK_0002", message = "주식 시분 요청에 실패하셨습니다.")
 class StockDefaultInfoException(): InvestFeedException(code = "STOCK_0003", message = "주식 기본 정보 조회에 실패하셨습니다.")

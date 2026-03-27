@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/index")
+@RequestMapping("/api/stock/index")
 class IndexController(
     private val indexService: IndexService,
     private val realTimeClient: RealTimeClient,

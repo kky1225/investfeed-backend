@@ -67,17 +67,22 @@ class JwtProvider(
     fun validateToken(token: String): Boolean {
         return try {
             val claims = getClaims(token)
-            !claims.expiration.before(Date())
+            !claims.expiration.before(Date()) && claims["type"] == "access"
         } catch (e: Exception) {
             false
         }
     }
 
     fun validateRefreshToken(refreshToken: String): Boolean {
-        if (!validateToken(refreshToken)) return false
-        val loginId = getClaims(refreshToken).subject
-        val stored = redisTemplate.opsForValue().get("RT:$loginId")
-        return stored == refreshToken
+        return try {
+            val claims = getClaims(refreshToken)
+            if (claims.expiration.before(Date()) || claims["type"] != "refresh") return false
+            val loginId = claims.subject
+            val stored = redisTemplate.opsForValue().get("RT:$loginId")
+            stored == refreshToken
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun getLoginId(token: String): String = getClaims(token).subject
@@ -86,10 +91,21 @@ class JwtProvider(
         redisTemplate.delete("RT:$loginId")
     }
 
-    fun resolveToken(bearerToken: String?): String? {
-        return if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            bearerToken.substring(7)
-        } else null
+    fun blacklistAccessToken(token: String) {
+        val claims = getClaims(token)
+        val remainingMs = claims.expiration.time - System.currentTimeMillis()
+        if (remainingMs > 0) {
+            redisTemplate.opsForValue().set(
+                "BL:$token",
+                "blacklisted",
+                remainingMs,
+                TimeUnit.MILLISECONDS
+            )
+        }
+    }
+
+    fun isBlacklisted(token: String): Boolean {
+        return redisTemplate.hasKey("BL:$token")
     }
 
     private fun getClaims(token: String): Claims {

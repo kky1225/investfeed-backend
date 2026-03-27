@@ -1,6 +1,6 @@
-package com.example.investfeed.domain.stock.dto.res
+package com.example.investfeed.domain.rank.dto.res
 
-data class StockListItem(
+data class RankListItem(
     var stkCd: String? = null, // 종목코드
     var rank: String? = null, // 현재순위
     var stkNm: String? = null, // 종목명

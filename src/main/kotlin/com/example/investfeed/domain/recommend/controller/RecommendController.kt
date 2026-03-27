@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController
 
 
 @RestController
-@RequestMapping("api/recommend")
+@RequestMapping("/api/stock/recommend")
 class RecommendController(
     private val recommendService: RecommendService
 ) {

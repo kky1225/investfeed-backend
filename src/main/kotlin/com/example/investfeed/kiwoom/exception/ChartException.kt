@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.exception
 
+import com.example.investfeed.common.exception.InvestFeedException
+
 class StockChartMinuteListException(): InvestFeedException(code = "CHART_0002", message = "주식 분봉 차트 조회에 실패하셨습니다.")
 class StockChartDayListException(): InvestFeedException(code = "CHART_0003", message = "주식 일봉 차트 조회에 실패하셨습니다.")
 class StockChartWeekListException(): InvestFeedException(code = "CHART_0004", message = "주식 주봉 차트 조회에 실패하셨습니다.")

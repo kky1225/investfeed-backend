@@ -1,10 +1,10 @@
 package com.example.investfeed.common.exception
 
-import com.example.investfeed.domain.auth.exception.AuthException
-import com.example.investfeed.kiwoom.exception.InvestFeedException
+import com.example.investfeed.domain.ResponseCode
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -30,21 +30,21 @@ class ExceptionAdviceController {
         )
     }
 
-    @ExceptionHandler(InvestFeedException::class)
-    fun investFeedException(e: InvestFeedException): ResponseEntity<ApiResponse<Nothing?>> {
-        log.error { "investFeedException $e" }
+    @ExceptionHandler(AccessDeniedException::class)
+    fun accessDeniedException(e: AccessDeniedException): ResponseEntity<ApiResponse<Nothing?>> {
+        log.warn { "accessDeniedException: ${e.message}" }
 
         return ResponseEntity(
-            ApiResponse(code = e.code, message = e.message, null), HttpStatus.INTERNAL_SERVER_ERROR
+            ApiResponse(code = ResponseCode.AUTH_FORBIDDEN.code, message = ResponseCode.AUTH_FORBIDDEN.message, null), HttpStatus.FORBIDDEN
         )
     }
 
-    @ExceptionHandler(AuthException::class)
-    fun authException(e: AuthException): ResponseEntity<ApiResponse<Nothing?>> {
-        log.warn { "authException: [${e.code}] ${e.message}" }
+    @ExceptionHandler(InvestFeedException::class)
+    fun investFeedException(e: InvestFeedException): ResponseEntity<ApiResponse<Nothing?>> {
+        log.error { "investFeedException: [${e.code}] ${e.message}" }
 
         return ResponseEntity(
-            ApiResponse(code = e.code, message = e.message, null), HttpStatus.BAD_REQUEST
+            ApiResponse(code = e.code, message = e.message, null), HttpStatus.INTERNAL_SERVER_ERROR
         )
     }
 }
