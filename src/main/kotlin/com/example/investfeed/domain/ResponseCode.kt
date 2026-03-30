@@ -61,6 +61,18 @@ enum class ResponseCode(
     AUTH_PROFILE(message = "프로필 조회에 성공하셨습니다."),
     AUTH_PROFILE_UPDATE(message = "프로필 수정에 성공하셨습니다."),
 
+    AUTH_TOTP_REQUIRED(message = "TOTP 인증이 필요합니다."),
+    AUTH_TOTP_SETUP(message = "TOTP 설정 QR코드가 생성되었습니다."),
+    AUTH_TOTP_VERIFY(message = "TOTP 인증에 성공하셨습니다."),
+    AUTH_TOTP_RESET(message = "TOTP 초기화에 성공하셨습니다."),
+
+    AUTH_SECONDARY_REQUIRED(code = "AUTH_4040", message = "2차 비밀번호 인증이 필요합니다."),
+    AUTH_SECONDARY_NOT_SET(code = "AUTH_4041", message = "2차 비밀번호가 설정되지 않았습니다."),
+    AUTH_SECONDARY_SETUP(message = "2차 비밀번호가 설정되었습니다."),
+    AUTH_SECONDARY_CHANGE(message = "2차 비밀번호가 변경되었습니다."),
+    AUTH_SECONDARY_LOCK_STATUS(message = "2차 비밀번호 잠금 상태를 조회하였습니다."),
+    AUTH_SECONDARY_VERIFY(message = "2차 비밀번호 인증에 성공하셨습니다."),
+
     AUTH_API_KEY_LIST(message = "API Key 목록 조회에 성공하셨습니다."),
     AUTH_API_KEY_CREATE(message = "API Key 등록에 성공하셨습니다."),
     AUTH_API_KEY_DELETE(message = "API Key 삭제에 성공하셨습니다."),

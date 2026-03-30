@@ -23,10 +23,15 @@ class LoginAttemptService(
         const val LOCK_STAGE_3_MINUTES = 60L
     }
 
+    data class LoginAttemptResult(
+        val locked: Boolean,
+        val lockDurationSeconds: Long? // null이면 영구잠금, 양수면 잠금 시간(초)
+    )
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun handleFailedLogin(loginId: String): Boolean {
+    fun handleFailedLogin(loginId: String): LoginAttemptResult {
         val member = memberRepository.findByLoginId(loginId)
-            .orElse(null) ?: return false
+            .orElse(null) ?: return LoginAttemptResult(false, null)
 
         member.failedLoginAttempts++
 
@@ -39,7 +44,10 @@ class LoginAttemptService(
             log.warn { "계정 잠금: loginId=${member.loginId}, 실패횟수=${member.failedLoginAttempts}, 해제시각=${member.lockExpiresAt ?: "영구"}" }
         }
 
-        return lockMinutes != null
+        return LoginAttemptResult(
+            locked = lockMinutes != null,
+            lockDurationSeconds = lockMinutes?.let { if (it < 0) null else it * 60 }
+        )
     }
 
     private fun getLockDurationMinutes(attempts: Int, role: Role): Long? {

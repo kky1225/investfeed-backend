@@ -14,5 +14,7 @@ data class MemberRes(
     val lockedAt: LocalDateTime?,
     val lockExpiresAt: LocalDateTime?,
     val permanentLock: Boolean = false,
+    val totpEnabled: Boolean = false,
+    val secondaryPasswordEnabled: Boolean = false,
     val createdAt: LocalDateTime
 )

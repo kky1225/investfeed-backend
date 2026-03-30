@@ -29,6 +29,7 @@ class SecurityConfig(
     private val allowedOrigins: String,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val menuPermissionFilter: MenuPermissionFilter,
+    private val secondaryAuthFilter: SecondaryAuthFilter,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -45,7 +46,7 @@ class SecurityConfig(
             .httpBasic { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/api-keys/**", "/api/auth/admin/**").authenticated()
+                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/api-keys/**", "/api/auth/secondary-password/**", "/api/auth/admin/**").authenticated()
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/menus/me").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
@@ -74,6 +75,7 @@ class SecurityConfig(
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterAfter(menuPermissionFilter, JwtAuthenticationFilter::class.java)
+            .addFilterAfter(secondaryAuthFilter, MenuPermissionFilter::class.java)
 
         return http.build()
     }

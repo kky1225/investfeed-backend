@@ -4,5 +4,6 @@ data class TokenRes(
     val passwordChangeRequired: Boolean = false,
     val role: String? = null,
     val nickname: String? = null,
-    val email: String? = null
+    val email: String? = null,
+    val secondaryPasswordEnabled: Boolean = false
 )

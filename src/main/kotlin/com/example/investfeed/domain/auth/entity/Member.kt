@@ -43,7 +43,11 @@ class Member(
 
     var lockedAt: LocalDateTime? = null,
 
-    var lockExpiresAt: LocalDateTime? = null
+    var lockExpiresAt: LocalDateTime? = null,
+
+    var totpSecret: String? = null,
+
+    var secondaryPassword: String? = null
 )
 
 enum class Role {

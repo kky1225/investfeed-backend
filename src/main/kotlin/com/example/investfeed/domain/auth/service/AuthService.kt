@@ -4,11 +4,16 @@ import com.example.investfeed.domain.auth.dto.req.ApiKeyReq
 import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
 import com.example.investfeed.domain.auth.dto.req.CreateMemberReq
 import com.example.investfeed.domain.auth.dto.req.LoginReq
+import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordChangeReq
+import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordSetupReq
+import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordVerifyReq
 import com.example.investfeed.domain.auth.dto.req.SignupReq
 import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
 import com.example.investfeed.domain.auth.dto.res.ApiKeyRes
 import com.example.investfeed.domain.auth.dto.res.MemberRes
+import com.example.investfeed.domain.auth.dto.res.PreAuthRes
 import com.example.investfeed.domain.auth.dto.res.TokenRes
+import com.example.investfeed.domain.auth.dto.res.TotpSetupRes
 import com.example.investfeed.domain.auth.entity.MemberApiKey
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.entity.Member
@@ -16,13 +21,17 @@ import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.domain.auth.exception.*
+import com.example.investfeed.totp.TotpService
 import org.springframework.security.access.AccessDeniedException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 @Service("memberAuthService")
 class AuthService(
@@ -35,8 +44,12 @@ class AuthService(
     private val loginAttemptService: LoginAttemptService,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
+    private val totpService: TotpService,
+    private val redisTemplate: StringRedisTemplate,
 ) {
     private val log = KotlinLogging.logger {}
+    private val preAuthTokenTtl = 310L // seconds (5분 10초)
+    private val secondaryAuthTtl = 30L // minutes
 
     @Transactional
     fun signup(
@@ -73,17 +86,25 @@ class AuthService(
         val refreshToken: String
     )
 
+    data class PreAuthResult(
+        val preAuthRes: PreAuthRes,
+        val preAuthToken: String
+    )
+
     @Transactional
-    fun login(req: LoginReq): LoginResult {
+    fun login(req: LoginReq): PreAuthResult {
         val member = memberRepository.findByLoginId(req.loginId)
             .orElseThrow { InvalidCredentialsException() }
 
         checkAccountLock(member)
 
         if (!passwordEncoder.matches(req.password, member.password)) {
-            val locked = loginAttemptService.handleFailedLogin(member.loginId)
-            if (locked) {
-                throw AccountLockedByFailureException()
+            val result = loginAttemptService.handleFailedLogin(member.loginId)
+            if (result.locked) {
+                if (result.lockDurationSeconds == null) {
+                    throw AccountPermanentlyLockedException()
+                }
+                throw AccountLockedByFailureException(result.lockDurationSeconds)
             }
             throw InvalidCredentialsException()
         }
@@ -91,6 +112,63 @@ class AuthService(
         member.failedLoginAttempts = 0
         member.lockedAt = null
         member.lockExpiresAt = null
+
+        val preAuthToken = UUID.randomUUID().toString()
+        redisTemplate.opsForValue().set(
+            "PRE_AUTH:$preAuthToken",
+            member.loginId,
+            preAuthTokenTtl,
+            TimeUnit.SECONDS
+        )
+
+        return PreAuthResult(
+            preAuthRes = PreAuthRes(
+                totpRequired = true,
+                totpSetupRequired = member.totpSecret == null
+            ),
+            preAuthToken = preAuthToken
+        )
+    }
+
+    fun totpSetup(preAuthToken: String): TotpSetupRes {
+        val loginId = validatePreAuthToken(preAuthToken)
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        val secret = member.totpSecret ?: totpService.generateSecret().also { newSecret ->
+            redisTemplate.opsForValue().set(
+                "PRE_AUTH_SECRET:$preAuthToken",
+                newSecret,
+                preAuthTokenTtl,
+                TimeUnit.MINUTES
+            )
+        }
+
+        return TotpSetupRes(
+            qrCodeImage = totpService.generateQrCodeBase64(secret, loginId)
+        )
+    }
+
+    @Transactional
+    fun totpVerify(preAuthToken: String, code: String): LoginResult {
+        val loginId = validatePreAuthToken(preAuthToken)
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        val secret = member.totpSecret
+            ?: redisTemplate.opsForValue().get("PRE_AUTH_SECRET:$preAuthToken")
+            ?: throw TotpNotSetupException()
+
+        if (!totpService.verifyCode(secret, code)) {
+            throw InvalidTotpCodeException()
+        }
+
+        if (member.totpSecret == null) {
+            member.totpSecret = secret
+        }
+
+        redisTemplate.delete("PRE_AUTH:$preAuthToken")
+        redisTemplate.delete("PRE_AUTH_SECRET:$preAuthToken")
 
         val passwordChangeRequired = member.passwordChangedAt
             .plusDays(passwordChangeCycle)
@@ -101,11 +179,17 @@ class AuthService(
                 passwordChangeRequired = passwordChangeRequired,
                 role = member.role.name,
                 nickname = member.nickname,
-                email = maskEmail(member.email)
+                email = maskEmail(member.email),
+                secondaryPasswordEnabled = member.secondaryPassword != null
             ),
             accessToken = jwtProvider.generateAccessToken(member.loginId),
             refreshToken = jwtProvider.generateRefreshToken(member.loginId)
         )
+    }
+
+    private fun validatePreAuthToken(preAuthToken: String): String {
+        return redisTemplate.opsForValue().get("PRE_AUTH:$preAuthToken")
+            ?: throw PreAuthTokenInvalidException()
     }
 
     private fun checkAccountLock(member: Member) {
@@ -116,10 +200,10 @@ class AuthService(
         }
 
         if (member.lockExpiresAt!!.isAfter(LocalDateTime.now())) {
-            val remainingMinutes = java.time.Duration.between(
+            val remainingSeconds = java.time.Duration.between(
                 LocalDateTime.now(), member.lockExpiresAt
-            ).toMinutes() + 1
-            throw AccountLockedException("계정이 일시 잠금되었습니다. ${remainingMinutes}분 후에 다시 시도하세요.")
+            ).seconds
+            throw AccountLockedException(remainingSeconds)
         }
 
         member.lockedAt = null
@@ -187,6 +271,8 @@ class AuthService(
             lockedAt = lockedAt,
             lockExpiresAt = lockExpiresAt,
             permanentLock = lockedAt != null && lockExpiresAt == null,
+            totpEnabled = totpSecret != null,
+            secondaryPasswordEnabled = secondaryPassword != null,
             createdAt = createdAt
         )
     }
@@ -232,6 +318,96 @@ class AuthService(
     }
 
     @Transactional
+    fun resetTotp(loginId: String) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        member.totpSecret = null
+    }
+
+    @Transactional
+    fun setupSecondaryPassword(loginId: String, req: SecondaryPasswordSetupReq) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        member.secondaryPassword = passwordEncoder.encode(req.password)
+    }
+
+    @Transactional
+    fun changeSecondaryPassword(loginId: String, req: SecondaryPasswordChangeReq) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        if (member.secondaryPassword == null) {
+            throw SecondaryPasswordNotSetException()
+        }
+
+        if (!passwordEncoder.matches(req.currentPassword, member.secondaryPassword)) {
+            throw InvalidSecondaryPasswordException()
+        }
+
+        if (req.currentPassword == req.newPassword) {
+            throw SameSecondaryPasswordException()
+        }
+
+        member.secondaryPassword = passwordEncoder.encode(req.newPassword)
+        invalidateSecondaryAuth(loginId)
+    }
+
+    fun getSecondaryPasswordLockStatus(loginId: String): Long {
+        val lockTtl = redisTemplate.getExpire("SEC_LOCK:$loginId", TimeUnit.SECONDS)
+        return if (lockTtl > 0) lockTtl else 0
+    }
+
+    fun verifySecondaryPassword(loginId: String, req: SecondaryPasswordVerifyReq): String {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+
+        if (member.secondaryPassword == null) {
+            throw SecondaryPasswordNotSetException()
+        }
+
+        val lockKey = "SEC_LOCK:$loginId"
+        val lockTtl = redisTemplate.getExpire(lockKey, TimeUnit.SECONDS)
+        if (lockTtl > 0) {
+            throw SecondaryPasswordLockedException(lockTtl)
+        }
+
+        if (!passwordEncoder.matches(req.password, member.secondaryPassword)) {
+            val failKey = "SEC_FAIL:$loginId"
+            val count = redisTemplate.opsForValue().increment(failKey) ?: 1
+            if (count == 1L) {
+                redisTemplate.expire(failKey, 10, TimeUnit.MINUTES)
+            }
+            if (count >= 5) {
+                redisTemplate.opsForValue().set(lockKey, "locked", 10, TimeUnit.MINUTES)
+                redisTemplate.delete(failKey)
+                throw SecondaryPasswordLockedException(600)
+            }
+            throw InvalidSecondaryPasswordException()
+        }
+
+        redisTemplate.delete("SEC_FAIL:$loginId")
+        val token = UUID.randomUUID().toString()
+        redisTemplate.opsForValue().set(
+            "SEC_AUTH:$loginId",
+            token,
+            secondaryAuthTtl,
+            TimeUnit.MINUTES
+        )
+        return token
+    }
+
+    fun invalidateSecondaryAuth(loginId: String) {
+        redisTemplate.delete("SEC_AUTH:$loginId")
+    }
+
+    fun isSecondaryAuthValid(loginId: String, token: String): Boolean {
+        val stored = redisTemplate.opsForValue().get("SEC_AUTH:$loginId") ?: return false
+        return stored == token
+    }
+
+    @Transactional
     fun changeRole(loginId: String, role: String) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
@@ -261,7 +437,8 @@ class AuthService(
             tokenRes = TokenRes(
                 role = member.role.name,
                 nickname = member.nickname,
-                email = maskEmail(member.email)
+                email = maskEmail(member.email),
+                secondaryPasswordEnabled = member.secondaryPassword != null
             ),
             accessToken = jwtProvider.generateAccessToken(loginId)
         )
@@ -288,11 +465,13 @@ class AuthService(
         member.passwordChangedAt = LocalDateTime.now()
         jwtProvider.deleteRefreshToken(loginId)
         accessToken?.let { jwtProvider.blacklistAccessToken(it) }
+        invalidateSecondaryAuth(loginId)
     }
 
     fun logout(loginId: String, accessToken: String? = null) {
         jwtProvider.deleteRefreshToken(loginId)
         accessToken?.let { jwtProvider.blacklistAccessToken(it) }
+        invalidateSecondaryAuth(loginId)
     }
 
     @Transactional(readOnly = true)
