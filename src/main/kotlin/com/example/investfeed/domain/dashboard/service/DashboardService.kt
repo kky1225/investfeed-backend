@@ -7,6 +7,8 @@ import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
 import com.example.investfeed.domain.dashboard.dto.res.InvestorTradeRankListItem
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeRankListReq
+import com.example.investfeed.kiwoom.price.client.PriceClient
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
@@ -14,11 +16,14 @@ import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Service
 class DashboardService(
     private val sectClient: SectClient,
     private val investorClient: InvestorClient,
+    private val priceClient: PriceClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -67,6 +72,35 @@ class DashboardService(
                     )
                 }
 
+                var dfrtTrdeNetprps: String? = null
+                var ndiffproTrdeNetprps: String? = null
+                var allNetprps: String? = null
+
+                if (it.marketType.isNotEmpty()) {
+                    try {
+                        val mrktTp = if (it.indsCd == "001") "P001_AL01" else "P101_AL02"
+                        val programTradeRes = priceClient.programTrade(
+                            req = KiwoomProgramTradeReq(
+                                date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")),
+                                amt_qty_tp = "1",
+                                mrkt_tp = mrktTp,
+                                min_tic_tp = "1",
+                                stex_tp = "3",
+                            )
+                        )
+
+                        if (programTradeRes.return_code == 0) {
+                            programTradeRes.prm_trde_trnsn?.firstOrNull()?.let { trade ->
+                                dfrtTrdeNetprps = trade.dfrt_trde_netprps
+                                ndiffproTrdeNetprps = trade.ndiffpro_trde_netprps
+                                allNetprps = trade.all_netprps
+                            }
+                        }
+                    } catch (e: Exception) {
+                        log.error { "대시보드 프로그램매매 조회 실패 (${it.indsNm}): ${e.message}" }
+                    }
+                }
+
                 indexList.add(
                     DashboardIndexListItem(
                         indsCd = it.indsCd,
@@ -79,6 +113,9 @@ class DashboardService(
                         orgn = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.orgn_netprps,
                         frgnr = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.frgnr_netprps,
                         chartList = chartList,
+                        dfrtTrdeNetprps = dfrtTrdeNetprps,
+                        ndiffproTrdeNetprps = ndiffproTrdeNetprps,
+                        allNetprps = allNetprps,
                     )
                 )
             }

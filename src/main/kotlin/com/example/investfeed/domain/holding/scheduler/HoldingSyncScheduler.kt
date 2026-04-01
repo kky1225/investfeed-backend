@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.holding.scheduler
 
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component
 @Component
 class HoldingSyncScheduler(
     private val memberApiKeyRepository: MemberApiKeyRepository,
+    private val brokerRepository: BrokerRepository,
     private val memberHoldingSyncService: MemberHoldingSyncService,
     private val holdingClient: HoldingClient,
 ) {
@@ -23,7 +25,8 @@ class HoldingSyncScheduler(
         log.info { "보유종목 동기화 스케줄러 시작" }
         val start = System.currentTimeMillis()
 
-        val kiwoomApiKeys = memberApiKeyRepository.findAllByProvider("KIWOOM")
+        val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return
+        val kiwoomApiKeys = memberApiKeyRepository.findAllByBrokerId(kiwoomBroker.id)
 
         kiwoomApiKeys.forEach { apiKey ->
             try {
@@ -42,7 +45,7 @@ class HoldingSyncScheduler(
                 memberHoldingSyncService.sync(
                     memberId = apiKey.member.id,
                     holdings = holdings,
-                    provider = "KIWOOM"
+                    broker = kiwoomBroker
                 )
 
                 log.info { "보유종목 동기화 완료: ${apiKey.member.loginId} (${holdings.size}건)" }

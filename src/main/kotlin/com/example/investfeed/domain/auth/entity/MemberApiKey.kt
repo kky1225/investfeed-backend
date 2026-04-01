@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.auth.entity
 
 import com.example.investfeed.common.util.AesEncryptor
+import com.example.investfeed.domain.holding.entity.Broker
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -15,8 +16,9 @@ class MemberApiKey(
     @JoinColumn(name = "member_id", nullable = false)
     val member: Member,
 
-    @Column(nullable = false)
-    val provider: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "broker_id", nullable = false)
+    val broker: Broker,
 
     @Convert(converter = AesEncryptor::class)
     @Column(nullable = false)

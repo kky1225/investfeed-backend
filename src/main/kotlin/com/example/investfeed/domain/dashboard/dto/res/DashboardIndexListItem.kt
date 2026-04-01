@@ -11,4 +11,7 @@ data class DashboardIndexListItem(
     var orgn: String? = null,
     var frgnr: String? = null,
     var chartList: List<ChartDay>? = null,
+    var dfrtTrdeNetprps: String? = null,
+    var ndiffproTrdeNetprps: String? = null,
+    var allNetprps: String? = null,
 )

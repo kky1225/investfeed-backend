@@ -19,8 +19,17 @@ class MemberHolding(
     @Column(name = "stk_nm", nullable = false)
     var stkNm: String,
 
-    @Column(nullable = false)
-    var provider: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "broker_id", nullable = false)
+    val broker: Broker,
+
+    @Column(name = "pur_price")
+    var purPrice: Long? = null,
+
+    var quantity: Long? = null,
+
+    @Column(name = "pur_amt")
+    var purAmt: Long? = null,
 
     var updatedAt: LocalDateTime = LocalDateTime.now()
 )

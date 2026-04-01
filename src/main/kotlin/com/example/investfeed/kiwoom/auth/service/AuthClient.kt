@@ -1,6 +1,7 @@
 package com.example.investfeed.kiwoom.auth.service
 
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
 import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
@@ -22,14 +23,15 @@ class AuthClient(
     private val DEFAULT_URL: String,
     private val webClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>,
-    private val memberApiKeyRepository: MemberApiKeyRepository
+    private val memberApiKeyRepository: MemberApiKeyRepository,
+    private val brokerRepository: BrokerRepository
 ) {
     private val log = KotlinLogging.logger {}
 
     companion object {
         private const val REDIS_KEY_PREFIX = "kiwoom:access_token"
         private const val LOCK_KEY_PREFIX = "lock:kiwoom:access_token"
-        private const val PROVIDER = "KIWOOM"
+        private const val BROKER_NAME = "키움증권"
     }
 
     fun accessToken() {
@@ -113,7 +115,10 @@ class AuthClient(
     }
 
     private fun resolveApiKeys(loginId: String): Pair<String, String> {
-        val memberApiKey = memberApiKeyRepository.findByMemberLoginIdAndProvider(loginId, PROVIDER)
+        val broker = brokerRepository.findByName(BROKER_NAME)
+            ?: throw ApiKeyNotFoundException()
+
+        val memberApiKey = memberApiKeyRepository.findByMemberLoginIdAndBrokerId(loginId, broker.id)
             ?: throw ApiKeyNotFoundException()
 
         return Pair(memberApiKey.appKey, memberApiKey.secretKey)

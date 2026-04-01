@@ -1,0 +1,160 @@
+package com.example.investfeed.domain.holding.service
+
+import com.example.investfeed.domain.holding.dto.req.ManualHoldingCreateReq
+import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
+import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
+import com.example.investfeed.domain.holding.dto.res.ManualHoldingListRes
+import com.example.investfeed.domain.holding.entity.BrokerType
+import com.example.investfeed.domain.holding.entity.MemberHolding
+import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
+import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest
+import mu.KotlinLogging
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
+
+@Service
+class ManualHoldingService(
+    private val memberHoldingRepository: MemberHoldingRepository,
+    private val memberBrokerRepository: MemberBrokerRepository,
+    private val stockClient: StockClient,
+) {
+    private val log = KotlinLogging.logger {}
+
+    fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, brokerId)
+            ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
+
+        if (memberBroker.broker.type != BrokerType.MANUAL) {
+            throw IllegalArgumentException("수동 입력 증권사가 아닙니다.")
+        }
+
+        val holdings = memberHoldingRepository.findByMemberIdAndBrokerId(memberId, memberBroker.broker.id)
+
+        if (holdings.isEmpty()) {
+            return ManualHoldingListRes(holdings = emptyList())
+        }
+
+        val priceMap = fetchCurrentPrices(holdings.map { it.stkCd })
+
+        return ManualHoldingListRes(
+            holdings = holdings.map { holding ->
+                val price = priceMap[holding.stkCd]
+                ManualHoldingItem(
+                    id = holding.id,
+                    stkCd = holding.stkCd,
+                    stkNm = holding.stkNm,
+                    purPrice = holding.purPrice ?: 0,
+                    quantity = holding.quantity ?: 0,
+                    purAmt = holding.purAmt ?: 0,
+                    curPrc = price?.cur_prc ?: "0",
+                    fluRt = price?.flu_rt ?: "0",
+                    predPre = price?.pred_pre ?: "0",
+                    predPreSig = price?.pred_pre_sig ?: "0"
+                )
+            }
+        )
+    }
+
+    @Transactional
+    fun createManualHolding(req: ManualHoldingCreateReq): ManualHoldingItem {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
+            ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
+
+        if (memberBroker.broker.type != BrokerType.MANUAL) {
+            throw IllegalArgumentException("수동 입력 증권사가 아닙니다.")
+        }
+
+        val holding = memberHoldingRepository.save(
+            MemberHolding(
+                memberId = memberId,
+                stkCd = req.stkCd,
+                stkNm = req.stkNm,
+                broker = memberBroker.broker,
+                purPrice = req.purPrice,
+                quantity = req.quantity,
+                purAmt = req.purAmt,
+                updatedAt = LocalDateTime.now()
+            )
+        )
+
+        val priceMap = fetchCurrentPrices(listOf(holding.stkCd))
+        val price = priceMap[holding.stkCd]
+
+        return ManualHoldingItem(
+            id = holding.id,
+            stkCd = holding.stkCd,
+            stkNm = holding.stkNm,
+            purPrice = holding.purPrice ?: 0,
+            quantity = holding.quantity ?: 0,
+            purAmt = holding.purAmt ?: 0,
+            curPrc = price?.cur_prc ?: "0",
+            fluRt = price?.flu_rt ?: "0",
+            predPre = price?.pred_pre ?: "0",
+            predPreSig = price?.pred_pre_sig ?: "0"
+        )
+    }
+
+    @Transactional
+    fun updateManualHolding(holdingId: Long, req: ManualHoldingUpdateReq): ManualHoldingItem {
+        val memberId = getMemberId()
+        val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+            ?: throw IllegalArgumentException("보유주식을 찾을 수 없습니다.")
+
+        holding.purPrice = req.purPrice
+        holding.quantity = req.quantity
+        holding.purAmt = req.purAmt
+        holding.updatedAt = LocalDateTime.now()
+
+        val priceMap = fetchCurrentPrices(listOf(holding.stkCd))
+        val price = priceMap[holding.stkCd]
+
+        return ManualHoldingItem(
+            id = holding.id,
+            stkCd = holding.stkCd,
+            stkNm = holding.stkNm,
+            purPrice = holding.purPrice ?: 0,
+            quantity = holding.quantity ?: 0,
+            purAmt = holding.purAmt ?: 0,
+            curPrc = price?.cur_prc ?: "0",
+            fluRt = price?.flu_rt ?: "0",
+            predPre = price?.pred_pre ?: "0",
+            predPreSig = price?.pred_pre_sig ?: "0"
+        )
+    }
+
+    @Transactional
+    fun deleteManualHolding(holdingId: Long) {
+        val memberId = getMemberId()
+        val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+            ?: throw IllegalArgumentException("보유주식을 찾을 수 없습니다.")
+
+        memberHoldingRepository.delete(holding)
+    }
+
+    private fun fetchCurrentPrices(stkCds: List<String>): Map<String, KiwoomStockInterest> {
+        if (stkCds.isEmpty()) return emptyMap()
+
+        return try {
+            val stkCdParam = stkCds.joinToString("|")
+            val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+
+            res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
+        } catch (e: Exception) {
+            log.error { "수동 보유주식 현재가 조회 실패: ${e.message}" }
+            emptyMap()
+        }
+    }
+
+    private fun getMemberId(): Long {
+        val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
+        return userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
+    }
+}

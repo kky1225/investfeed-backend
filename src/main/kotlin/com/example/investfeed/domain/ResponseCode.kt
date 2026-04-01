@@ -32,6 +32,20 @@ enum class ResponseCode(
     HOLDING_LIST(message = "보유 주식 조회에 성공하셨습니다."),
     HOLDING_STREAM(message = "실시간 보유 주식 조회에 성공하셨습니다."),
 
+    BROKER_LIST(message = "증권사 목록 조회에 성공하셨습니다."),
+    BROKER_CREATE(message = "증권사 등록에 성공하셨습니다."),
+    BROKER_UPDATE(message = "증권사 수정에 성공하셨습니다."),
+    BROKER_DELETE(message = "증권사 삭제에 성공하셨습니다."),
+
+    MY_BROKER_LIST(message = "내 증권사 목록 조회에 성공하셨습니다."),
+    MY_BROKER_ADD(message = "내 증권사 추가에 성공하셨습니다."),
+    MY_BROKER_REMOVE(message = "내 증권사 삭제에 성공하셨습니다."),
+
+    MANUAL_HOLDING_LIST(message = "수동 보유주식 조회에 성공하셨습니다."),
+    MANUAL_HOLDING_CREATE(message = "수동 보유주식 등록에 성공하셨습니다."),
+    MANUAL_HOLDING_UPDATE(message = "수동 보유주식 수정에 성공하셨습니다."),
+    MANUAL_HOLDING_DELETE(message = "수동 보유주식 삭제에 성공하셨습니다."),
+
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
     INDEX_WS_LIST(message = "지수 목록 소켓 조회에 성공하셨습니다."),
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다."),

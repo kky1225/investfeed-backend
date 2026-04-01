@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.Query
 
 interface MemberHoldingRepository : JpaRepository<MemberHolding, Long> {
     @Modifying
-    @Query("DELETE FROM MemberHolding m WHERE m.memberId = :memberId AND m.provider = :provider")
-    fun deleteByMemberIdAndProvider(memberId: Long, provider: String)
+    @Query("DELETE FROM MemberHolding m WHERE m.memberId = :memberId AND m.broker.id = :brokerId")
+    fun deleteByMemberIdAndBrokerId(memberId: Long, brokerId: Long)
+
+    fun findByMemberIdAndBrokerId(memberId: Long, brokerId: Long): List<MemberHolding>
+    fun findByMemberIdAndId(memberId: Long, id: Long): MemberHolding?
 }

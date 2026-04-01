@@ -4,6 +4,7 @@ import com.example.investfeed.common.util.MarketTimeUtil.isKrxHoldingClose
 import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
 import com.example.investfeed.domain.holding.dto.res.HoldingListRes
+import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.client.HoldingSocketClient
@@ -17,6 +18,7 @@ class HoldingService(
     private val holdingClient: HoldingClient,
     private val holdingSocketClient: HoldingSocketClient,
     private val memberHoldingSyncService: MemberHoldingSyncService,
+    private val brokerRepository: BrokerRepository,
 ) {
     fun holdingList(): HoldingListRes {
         val res = holdingClient.holdingList(
@@ -44,11 +46,14 @@ class HoldingService(
 
         val memberId = getMemberId()
         if (memberId != null && holdingList.isNotEmpty()) {
-            memberHoldingSyncService.sync(
-                memberId = memberId,
-                holdings = holdingList.map { it.stkCd to it.stkNm },
-                provider = "KIWOOM"
-            )
+            val kiwoomBroker = brokerRepository.findByName("키움증권")
+            if (kiwoomBroker != null) {
+                memberHoldingSyncService.sync(
+                    memberId = memberId,
+                    holdings = holdingList.map { it.stkCd to it.stkNm },
+                    broker = kiwoomBroker
+                )
+            }
         }
 
         return HoldingListRes(

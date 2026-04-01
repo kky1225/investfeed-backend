@@ -16,6 +16,7 @@ import com.example.investfeed.domain.auth.dto.res.TokenRes
 import com.example.investfeed.domain.auth.dto.res.TotpSetupRes
 import com.example.investfeed.domain.auth.entity.MemberApiKey
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.auth.entity.Member
 import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
@@ -41,6 +42,7 @@ class AuthService(
     private val defaultPassword: String,
     private val memberRepository: MemberRepository,
     private val memberApiKeyRepository: MemberApiKeyRepository,
+    private val brokerRepository: BrokerRepository,
     private val loginAttemptService: LoginAttemptService,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
@@ -484,14 +486,17 @@ class AuthService(
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
 
-        if (memberApiKeyRepository.existsByMemberLoginIdAndProvider(loginId, req.provider)) {
+        val broker = brokerRepository.findById(req.brokerId)
+            .orElseThrow { IllegalArgumentException("증권사를 찾을 수 없습니다.") }
+
+        if (memberApiKeyRepository.existsByMemberLoginIdAndBrokerId(loginId, req.brokerId)) {
             throw DuplicateApiKeyException()
         }
 
         memberApiKeyRepository.save(
             MemberApiKey(
                 member = member,
-                provider = req.provider,
+                broker = broker,
                 appKey = req.appKey,
                 secretKey = req.secretKey
             )
@@ -513,7 +518,8 @@ class AuthService(
     private fun MemberApiKey.toApiKeyRes(): ApiKeyRes {
         return ApiKeyRes(
             id = id,
-            provider = provider,
+            brokerId = broker.id,
+            brokerName = broker.name,
             appKey = maskApiKey(appKey),
             createdAt = createdAt
         )
