@@ -29,6 +29,9 @@ enum class ResponseCode(
     ETF_INFO(message = "ETF 정목 정보 조회에 성공하셨습니다."),
     ETF_TRADE_DAILY_LIST(message = "ETF 일자별 체결 조회에 성공하셨습니다."),
 
+    HOLDING_LIST(message = "보유 주식 조회에 성공하셨습니다."),
+    HOLDING_STREAM(message = "실시간 보유 주식 조회에 성공하셨습니다."),
+
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
     INDEX_WS_LIST(message = "지수 목록 소켓 조회에 성공하셨습니다."),
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다."),
@@ -49,7 +52,6 @@ enum class ResponseCode(
     AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
     AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),
 
-    AUTH_LOGIN(message = "로그인에 성공하셨습니다."),
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
     AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다."),
     AUTH_CHANGE_PASSWORD(message = "비밀번호 변경에 성공하셨습니다."),
@@ -118,4 +120,5 @@ enum class ResponseCode(
     MENU_DELETE(message = "메뉴 삭제에 성공하셨습니다."),
     MENU_STRUCTURE_UPDATE(message = "메뉴 구조 변경에 성공하셨습니다."),
     MENU_PERMISSION_UPDATE(message = "메뉴 권한 변경에 성공하셨습니다."),
+
 }

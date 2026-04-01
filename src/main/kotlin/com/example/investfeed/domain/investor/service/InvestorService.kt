@@ -13,6 +13,7 @@ import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarket
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.example.investfeed.common.util.MarketTimeUtil
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -43,7 +44,7 @@ class InvestorService(
     ): InvestorListRes? {
         val now = LocalTime.now()
 
-        if (isKRXTradeClose(now = now)) {
+        if (MarketTimeUtil.isKrxTradeClose(now)) {
             return getCloseMarketWithCache(req, now)
         }
 
@@ -79,7 +80,7 @@ class InvestorService(
                 mrkt_tp = "000",
                 amt_qty_tp = "1",
                 trde_tp = "0",
-                stex_tp = if (isTradeClose(now)) "3" else "1",
+                stex_tp = if (MarketTimeUtil.isNxtTradeClose(now)) "3" else "1",
             )
         )
     }
@@ -260,15 +261,5 @@ class InvestorService(
                 )
             )
         )
-    }
-
-    // ─── 시간 판별 ────────────────────────────────────────────────────────────
-
-    private fun isKRXTradeClose(now: LocalTime): Boolean {
-        return now.isAfter(LocalTime.of(15, 30))
-    }
-
-    private fun isTradeClose(now: LocalTime): Boolean {
-        return now.isAfter(LocalTime.of(20, 0))
     }
 }

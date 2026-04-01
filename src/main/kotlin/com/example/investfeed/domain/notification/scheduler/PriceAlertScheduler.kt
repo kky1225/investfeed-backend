@@ -10,6 +10,8 @@ import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import mu.KotlinLogging
@@ -18,7 +20,6 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
-import java.time.LocalTime
 
 @Component
 class PriceAlertScheduler(
@@ -30,6 +31,7 @@ class PriceAlertScheduler(
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
     private val holidayService: HolidayService,
+    private val memberHoldingRepository: MemberHoldingRepository,
     private val authClient: AuthClient,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
@@ -74,21 +76,34 @@ class PriceAlertScheduler(
             return
         }
 
-        val now = LocalTime.now()
-        if (now.isBefore(LocalTime.of(9, 1)) || now.isAfter(LocalTime.of(15, 30))) {
+        if (!MarketTimeUtil.isStockAlertTime()) {
             return
         }
 
+        data class MemberStock(val memberId: Long, val stkCd: String, val stkNm: String)
+
+        val memberStocks = mutableListOf<MemberStock>()
+
         val allGroups = interestGroupRepository.findAll()
-        if (allGroups.isEmpty()) return
+        if (allGroups.isNotEmpty()) {
+            val groupIds = allGroups.map { it.id }
+            val allItems = interestItemRepository.findByGroupIdIn(groupIds)
+            val groupToMember = allGroups.associate { it.id to it.memberId }
 
-        val groupIds = allGroups.map { it.id }
-        val allItems = interestItemRepository.findByGroupIdIn(groupIds)
-        if (allItems.isEmpty()) return
+            allItems.forEach { item ->
+                val memberId = groupToMember[item.groupId] ?: return@forEach
+                memberStocks.add(MemberStock(memberId, item.stkCd, item.stkNm))
+            }
+        }
 
-        val groupToMember = allGroups.associate { it.id to it.memberId }
+        val allHoldings = memberHoldingRepository.findAll()
+        allHoldings.forEach { holding ->
+            memberStocks.add(MemberStock(holding.memberId, holding.stkCd, holding.stkNm))
+        }
 
-        val uniqueStkCds = allItems.map { it.stkCd }.distinct()
+        if (memberStocks.isEmpty()) return
+
+        val uniqueStkCds = memberStocks.map { it.stkCd }.distinct()
         val stkCdParam = uniqueStkCds.joinToString("|")
 
         val kiwoomStockInterestRes = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
@@ -96,9 +111,8 @@ class PriceAlertScheduler(
 
         val memberStockSet = mutableSetOf<Pair<Long, String>>()
 
-        for (item in allItems) {
-            val memberId = groupToMember[item.groupId] ?: continue
-            val key = Pair(memberId, item.stkCd)
+        for (item in memberStocks) {
+            val key = Pair(item.memberId, item.stkCd)
             if (!memberStockSet.add(key)) continue
 
             val stockData = stockDataMap[item.stkCd] ?: continue
@@ -115,19 +129,19 @@ class PriceAlertScheduler(
             val maxDownRt = ((lowPric - basePric) / basePric) * 100
 
             if (maxUpRt > 0) {
-                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UP, STOCK_THRESHOLDS)
+                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UP, STOCK_THRESHOLDS)
             }
 
             if (maxDownRt < 0) {
-                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.DOWN, STOCK_THRESHOLDS)
+                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.DOWN, STOCK_THRESHOLDS)
             }
 
             if (uplPric != null && highPric >= kotlin.math.abs(uplPric)) {
-                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UPPER_LIMIT, listOf(0.0))
+                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UPPER_LIMIT, listOf(0.0))
             }
 
             if (lstPric != null && lowPric <= kotlin.math.abs(lstPric)) {
-                checkThresholds(memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
+                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
             }
         }
     }

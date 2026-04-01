@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.realtime.client
 
+import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
@@ -9,7 +10,6 @@ import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import java.time.LocalTime
 
 @Service
 class RealTimeClient(
@@ -27,7 +27,7 @@ class RealTimeClient(
 
         val accessToken = authClient.getCurrentAccessToken()
 
-        if(isMarketOpen()) {
+        if(MarketTimeUtil.isKrxOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()
@@ -54,7 +54,7 @@ class RealTimeClient(
 
         val accessToken = authClient.getCurrentAccessToken()
 
-        if(isMarketOpen()) {
+        if(MarketTimeUtil.isKrxOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()
@@ -71,11 +71,5 @@ class RealTimeClient(
                 trnm = req.trnm,
             )
         }
-    }
-
-    private fun isMarketOpen(): Boolean {
-        val now = LocalTime.now()
-
-        return !now.isBefore(LocalTime.of(9, 0)) && !now.isAfter(LocalTime.of(15, 30))
     }
 }

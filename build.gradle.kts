@@ -56,7 +56,7 @@ dependencies {
 
     // Playwright (크롤링)
     implementation("com.microsoft.playwright:playwright:1.50.0")
-가
+
     // QR Code (ZXing)
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.zxing:javase:3.5.3")
