@@ -13,6 +13,5 @@ data class ManualHoldingItem(
     val purAmt: Long,
     val curPrc: String,
     val fluRt: String,
-    val predPre: String,
-    val predPreSig: String
+    val basePric: String
 )

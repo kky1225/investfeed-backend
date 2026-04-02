@@ -53,10 +53,9 @@ class ManualHoldingService(
                     purPrice = holding.purPrice ?: 0,
                     quantity = holding.quantity ?: 0,
                     purAmt = holding.purAmt ?: 0,
-                    curPrc = price?.cur_prc ?: "0",
+                    curPrc = price?.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0",
                     fluRt = price?.flu_rt ?: "0",
-                    predPre = price?.pred_pre ?: "0",
-                    predPreSig = price?.pred_pre_sig ?: "0"
+                    basePric = price?.base_pric ?: "0"
                 )
             }
         )
@@ -95,10 +94,9 @@ class ManualHoldingService(
             purPrice = holding.purPrice ?: 0,
             quantity = holding.quantity ?: 0,
             purAmt = holding.purAmt ?: 0,
-            curPrc = price?.cur_prc ?: "0",
+            curPrc = price?.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0",
             fluRt = price?.flu_rt ?: "0",
-            predPre = price?.pred_pre ?: "0",
-            predPreSig = price?.pred_pre_sig ?: "0"
+            basePric = price?.base_pric ?: "0"
         )
     }
 
@@ -123,10 +121,9 @@ class ManualHoldingService(
             purPrice = holding.purPrice ?: 0,
             quantity = holding.quantity ?: 0,
             purAmt = holding.purAmt ?: 0,
-            curPrc = price?.cur_prc ?: "0",
+            curPrc = price?.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0",
             fluRt = price?.flu_rt ?: "0",
-            predPre = price?.pred_pre ?: "0",
-            predPreSig = price?.pred_pre_sig ?: "0"
+            basePric = price?.base_pric ?: "0"
         )
     }
 
