@@ -9,6 +9,7 @@ data class HoldingListRes(
 )
 
 data class HoldingItem(
+    val id: Long = 0, // MemberHolding ID (DnD 정렬용)
     val stkCd: String, // 종목번호
     val stkNm: String, // 종목명
     val curPrc: String, // 현재가

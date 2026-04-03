@@ -31,5 +31,10 @@ class MemberHolding(
     @Column(name = "pur_amt")
     var purAmt: Long? = null,
 
+    @Column(name = "display_order")
+    var displayOrder: Int = 0,
+
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
     var updatedAt: LocalDateTime = LocalDateTime.now()
 )

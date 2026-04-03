@@ -13,18 +13,34 @@ class MemberHoldingSyncService(
 ) {
     @Transactional
     fun sync(memberId: Long, holdings: List<Pair<String, String>>, broker: Broker) {
-        memberHoldingRepository.deleteByMemberIdAndBrokerId(memberId, broker.id)
+        val existing = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, broker.id)
+        val existingMap = existing.associateBy { it.stkCd }
+        val incomingStkCds = holdings.map { it.first }.toSet()
 
-        val entities = holdings.map { (stkCd, stkNm) ->
-            MemberHolding(
-                memberId = memberId,
-                stkCd = stkCd,
-                stkNm = stkNm,
-                broker = broker,
-                updatedAt = LocalDateTime.now()
-            )
+        // 매도된 종목 삭제
+        existing.filter { it.stkCd !in incomingStkCds }.forEach { memberHoldingRepository.delete(it) }
+
+        // 새로 편입된 종목 추가 (마지막 순서로)
+        val maxOrder = existing.maxOfOrNull { it.displayOrder } ?: -1
+        var nextOrder = maxOrder + 1
+
+        holdings.forEach { (stkCd, stkNm) ->
+            val existingHolding = existingMap[stkCd]
+            if (existingHolding != null) {
+                existingHolding.stkNm = stkNm
+                existingHolding.updatedAt = LocalDateTime.now()
+            } else {
+                memberHoldingRepository.save(
+                    MemberHolding(
+                        memberId = memberId,
+                        stkCd = stkCd,
+                        stkNm = stkNm,
+                        broker = broker,
+                        displayOrder = nextOrder++,
+                        updatedAt = LocalDateTime.now()
+                    )
+                )
+            }
         }
-
-        memberHoldingRepository.saveAll(entities)
     }
 }

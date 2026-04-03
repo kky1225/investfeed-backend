@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.bodyToMono
 import org.springframework.web.reactive.function.client.toEntity
 
 @Service
@@ -36,7 +37,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectInvestorRes::class.java)
+                .bodyToMono<KiwoomSectInvestorRes>()
                 .block()
 
             if (res?.return_code != 0) {
@@ -72,7 +73,7 @@ class SectClient(
                         throw KiwoomApiException()
                     }
 
-                    res.bodyToMono(KiwoomSectPriceNowRes::class.java)
+                    res.bodyToMono<KiwoomSectPriceNowRes>()
                 }
                 .block()
 
@@ -169,7 +170,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectIndexRes::class.java)
+                .bodyToMono<KiwoomSectIndexRes>()
                 .block()
 
             if(res?.return_code != 0) {
@@ -202,7 +203,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectIndexDailyRes::class.java)
+                .bodyToMono<KiwoomSectIndexDailyRes>()
                 .block()
 
             if(res?.return_code != 0) {

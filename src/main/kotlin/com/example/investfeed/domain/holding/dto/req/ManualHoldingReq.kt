@@ -14,3 +14,7 @@ data class ManualHoldingUpdateReq(
     val quantity: Long,
     val purAmt: Long
 )
+
+data class HoldingReorderReq(
+    val orderedIds: List<Long>
+)

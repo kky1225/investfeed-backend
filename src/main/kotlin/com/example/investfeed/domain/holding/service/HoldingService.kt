@@ -5,6 +5,7 @@ import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
 import com.example.investfeed.domain.holding.dto.res.HoldingListRes
 import com.example.investfeed.domain.holding.repository.BrokerRepository
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.client.HoldingSocketClient
@@ -19,6 +20,7 @@ class HoldingService(
     private val holdingSocketClient: HoldingSocketClient,
     private val memberHoldingSyncService: MemberHoldingSyncService,
     private val brokerRepository: BrokerRepository,
+    private val memberHoldingRepository: MemberHoldingRepository,
 ) {
     fun holdingList(): HoldingListRes {
         val res = holdingClient.holdingList(
@@ -45,6 +47,7 @@ class HoldingService(
         } ?: emptyList()
 
         val memberId = getMemberId()
+        var sortedHoldingList = holdingList
         if (memberId != null && holdingList.isNotEmpty()) {
             val kiwoomBroker = brokerRepository.findByName("키움증권")
             if (kiwoomBroker != null) {
@@ -53,6 +56,12 @@ class HoldingService(
                     holdings = holdingList.map { it.stkCd to it.stkNm },
                     broker = kiwoomBroker
                 )
+
+                val memberHoldings = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, kiwoomBroker.id)
+                val holdingMap = holdingList.associateBy { it.stkCd }
+                sortedHoldingList = memberHoldings.mapNotNull { mh ->
+                    holdingMap[mh.stkCd]?.copy(id = mh.id)
+                }
             }
         }
 
@@ -61,7 +70,7 @@ class HoldingService(
             totEvltAmt = res?.tot_evlt_amt ?: "0",
             totEvltPl = res?.tot_evlt_pl ?: "0",
             totPrftRt = res?.tot_prft_rt ?: "0",
-            holdingList = holdingList
+            holdingList = sortedHoldingList
         )
     }
 

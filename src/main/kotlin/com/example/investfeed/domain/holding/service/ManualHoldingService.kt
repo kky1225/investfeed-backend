@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.holding.service
 
+import com.example.investfeed.domain.holding.dto.req.HoldingReorderReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingCreateReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
@@ -35,7 +36,7 @@ class ManualHoldingService(
             throw IllegalArgumentException("수동 입력 증권사가 아닙니다.")
         }
 
-        val holdings = memberHoldingRepository.findByMemberIdAndBrokerId(memberId, memberBroker.broker.id)
+        val holdings = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, memberBroker.broker.id)
 
         if (holdings.isEmpty()) {
             return ManualHoldingListRes(holdings = emptyList())
@@ -71,6 +72,8 @@ class ManualHoldingService(
             throw IllegalArgumentException("수동 입력 증권사가 아닙니다.")
         }
 
+        val nextOrder = memberHoldingRepository.findMaxDisplayOrder(memberId, memberBroker.broker.id) + 1
+
         val holding = memberHoldingRepository.save(
             MemberHolding(
                 memberId = memberId,
@@ -80,6 +83,7 @@ class ManualHoldingService(
                 purPrice = req.purPrice,
                 quantity = req.quantity,
                 purAmt = req.purAmt,
+                displayOrder = nextOrder,
                 updatedAt = LocalDateTime.now()
             )
         )
@@ -134,6 +138,16 @@ class ManualHoldingService(
             ?: throw IllegalArgumentException("보유주식을 찾을 수 없습니다.")
 
         memberHoldingRepository.delete(holding)
+    }
+
+    @Transactional
+    fun reorderHoldings(req: HoldingReorderReq) {
+        val memberId = getMemberId()
+        req.orderedIds.forEachIndexed { index, holdingId ->
+            val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+                ?: throw IllegalArgumentException("보유주식을 찾을 수 없습니다.")
+            holding.displayOrder = index
+        }
     }
 
     private fun fetchCurrentPrices(stkCds: List<String>): Map<String, KiwoomStockInterest> {

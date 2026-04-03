@@ -2,6 +2,7 @@ package com.example.investfeed.domain.holding.controller
 
 import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.holding.dto.req.HoldingReorderReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingCreateReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
@@ -69,6 +70,21 @@ class ManualHoldingController(
             ApiResponse(
                 code = ResponseCode.MANUAL_HOLDING_DELETE.code,
                 message = ResponseCode.MANUAL_HOLDING_DELETE.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PutMapping("reorder")
+    fun reorderHoldings(
+        @RequestBody req: HoldingReorderReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        manualHoldingService.reorderHoldings(req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.HOLDING_REORDER.code,
+                message = ResponseCode.HOLDING_REORDER.message,
                 result = null
             ), HttpStatus.OK
         )
