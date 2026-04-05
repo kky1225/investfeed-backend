@@ -7,9 +7,11 @@ import com.example.investfeed.domain.stock.dto.res.*
 import com.example.investfeed.kiwoom.chart.client.StockChartClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
+import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
+import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeMinuteReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.shortselling.client.ShortSellingClient
@@ -19,9 +21,6 @@ import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
 @Service
 class StockService(
@@ -53,7 +52,7 @@ class StockService(
         )
         val kiwoomStockInvestor = stockClient.stockInvestor(
             req = KiwoomStockInvestorReq(
-                dt = today("yyyyMMdd"),
+                dt = DateUtil.today("yyyyMMdd"),
                 stk_cd = req.stkCd,
                 amt_qty_tp = "2",
                 trde_tp = "0",
@@ -84,7 +83,7 @@ class StockService(
                 fluRt = kiwoomStockDefaultInfoRes.flu_rt,
                 trdeQty = kiwoomStockDefaultInfoRes.trde_qty,
                 trdePrica = kiwoomStockTradeInfoRes.trde_prica,
-                tm = kiwoomStockTradeInfoRes.date + time("HHmm"),
+                tm = kiwoomStockTradeInfoRes.date + DateUtil.time("HHmm"),
                 nxtEnable = kiwoomStockInfoRes.nxtEnable,
                 orderWarning = kiwoomStockInfoRes.orderWarning,
                 marketCode = kiwoomStockInfoRes.marketCode,
@@ -92,7 +91,7 @@ class StockService(
                 upName = kiwoomStockInfoRes.upName,
             ).apply {
                 when {
-                    MarketTimeUtil.isOvtSinglePrice() -> {
+                    MarketTimeUtil.isOvtSinglePrice() && marketName == "ETF" -> {
                         try {
                             val ovtRes = priceClient.stockSinglePriceList(
                                 req = KiwoomStockSinglePriceReq(
@@ -150,7 +149,7 @@ class StockService(
                 val kiwoomStockChartDayRes = stockChartClient.chartDayList(
                     req = KiwoomStockChartDayReq(
                         stk_cd = req.stkCd,
-                        base_dt = today("yyyyMMdd"),
+                        base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
                 )
@@ -175,7 +174,7 @@ class StockService(
                 val kiwoomStockChartWeekRes = stockChartClient.chartWeekList(
                     req = KiwoomStockChartWeekReq(
                         stk_cd = req.stkCd,
-                        base_dt = today("yyyyMMdd"),
+                        base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
                 )
@@ -200,7 +199,7 @@ class StockService(
                 val kiwoomStockChartMonthRes = stockChartClient.chartMonthList(
                     req = KiwoomStockChartMonthReq(
                         stk_cd = req.stkCd,
-                        base_dt = today("yyyyMMdd"),
+                        base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
                 )
@@ -225,7 +224,7 @@ class StockService(
                 val kiwoomStockChartYearRes = stockChartClient.chartYearList(
                     req = KiwoomStockChartYearReq(
                         stk_cd = req.stkCd,
-                        base_dt = today("yyyyMMdd"),
+                        base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
                 )
@@ -303,7 +302,7 @@ class StockService(
             req = KiwoomStockProgramTradeDayReq(
                 amt_qty_tp = "2",
                 stk_cd = req.stkCd,
-                date = today("yyyyMMdd")
+                date = DateUtil.today("yyyyMMdd")
             )
         )
 
@@ -326,8 +325,8 @@ class StockService(
             req = KiwoomStockShortSellingReq(
                 stk_cd = req.stkCd,
                 tm_tp = "1",
-                strt_dt = stockProgramList.lastOrNull()?.dt ?: today("yyyyMMdd"),
-                end_dt = stockProgramList.firstOrNull()?.dt ?: today("yyyyMMdd"),
+                strt_dt = stockProgramList.lastOrNull()?.dt ?: DateUtil.today("yyyyMMdd"),
+                end_dt = stockProgramList.firstOrNull()?.dt ?: DateUtil.today("yyyyMMdd"),
             )
         )
 
@@ -355,6 +354,39 @@ class StockService(
             stockProgramList = stockProgramList,
             stockShortSellingList = stockShortSellingList
         )
+    }
+
+
+    fun stockProgramChart(
+        stkCd: String
+    ): List<StockProgramChart> {
+        val stockProgramChartList: MutableList<StockProgramChart> = mutableListOf()
+
+        val kiwoomStockProgramTradeMinuteRes = priceClient.stockProgramTradeMinute(
+            req = KiwoomStockProgramTradeMinuteReq(
+                amt_qty_tp = "2",
+                stk_cd = stkCd,
+                date = DateUtil.today("yyyyMMdd")
+            )
+        )
+
+        if (kiwoomStockProgramTradeMinuteRes.return_code == 0) {
+            kiwoomStockProgramTradeMinuteRes.stk_tm_prm_trde_trnsn
+                ?.groupBy { it.tm?.substring(0, 4) }
+                ?.map { (_, items) -> items.last() }
+                ?.forEach {
+                    stockProgramChartList.add(
+                        StockProgramChart(
+                            tm = it.tm?.substring(0, 4),
+                            prmSellAmt = it.prm_sell_qty,
+                            prmBuyAmt = it.prm_buy_qty,
+                            prmNetprpsAmt = it.prm_netprps_qty?.replace("--", "-"),
+                        )
+                    )
+                }
+        }
+
+        return stockProgramChartList.reversed()
     }
 
     fun stockSearch(
@@ -394,21 +426,4 @@ class StockService(
         )
     }
 
-    fun today(
-        pattern: String
-    ): String {
-        val now = LocalDate.now()
-        val pattern = DateTimeFormatter.ofPattern(pattern)
-
-        return pattern.format(now)
-    }
-
-    fun time(
-        pattern: String
-    ): String {
-        val now = LocalTime.now()
-        val pattern = DateTimeFormatter.ofPattern(pattern)
-
-        return pattern.format(now)
-    }
 }

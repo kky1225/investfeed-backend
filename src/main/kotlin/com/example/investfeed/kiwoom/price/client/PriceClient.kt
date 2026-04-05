@@ -405,6 +405,68 @@ class PriceClient(
         }
     }
 
+    @KiwoomToken
+    fun stockProgramTradeMinute(
+        req: KiwoomStockProgramTradeMinuteReq
+    ): KiwoomStockProgramTradeMinuteRes {
+        val accessToken = authClient.getCurrentAccessToken()
+
+        try {
+            val stk_tm_prm_trde_trnsn = mutableListOf<KiwoomStockProgramTradeMinute>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
+
+            while (true) {
+                val entity = webClient.post()
+                    .uri(DEFAULT_URL + PRICE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "ka90008")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomStockProgramTradeMinuteRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw StockProgramTradeMinuteException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.stk_tm_prm_trde_trnsn?.forEach { stk_tm_prm_trde_trnsn.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N") {
+                    break
+                }
+
+                Thread.sleep(100)
+            }
+
+            return KiwoomStockProgramTradeMinuteRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                stk_tm_prm_trde_trnsn = stk_tm_prm_trde_trnsn
+            )
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: StockProgramTradeMinuteException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "stockProgramTradeMinute Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
     fun indexProgramTradeMinute(
         req: KiwoomIndexProgramTradeMinuteReq
     ): KiwoomIndexProgramTradeMinuteRes {

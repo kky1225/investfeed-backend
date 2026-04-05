@@ -1,11 +1,14 @@
 package com.example.investfeed.domain.index.service
 
+import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.res.*
+import com.example.investfeed.domain.index.entity.IndexInvestorDaily
+import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
+import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.chart.dto.sect.req.*
 import com.example.investfeed.kiwoom.chart.enum.IndexChartType
-import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomIndexProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomIndexProgramTradeMinuteReq
@@ -13,18 +16,19 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomProgramTradeReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
+import mu.KotlinLogging
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Collections.emptyList
-import kotlin.String
 
 @Service
 class IndexService(
     private val sectClient: SectClient,
     private val sectChartClient: SectChartClient,
-    private val priceClient: PriceClient
+    private val priceClient: PriceClient,
+    private val indexInvestorDailyRepository: IndexInvestorDailyRepository
 ) {
+    private val log = KotlinLogging.logger {}
     fun indexList(): IndexListRes? {
         val indexTypeList = IndexType.entries
         val indexList: MutableList<IndexListItem> = mutableListOf()
@@ -89,7 +93,7 @@ class IndexService(
                 val kiwoomSectChartDayRes = sectChartClient.sectChartDayList(
                     req = SectChartDayListReq(
                         inds_cd = req.inds_cd,
-                        base_dt = today("yyyyMMdd")
+                        base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
 
@@ -113,7 +117,7 @@ class IndexService(
                 val kiwoomSectChartWeekRes = sectChartClient.sectChartWeekList(
                     req = SectChartWeekListReq(
                         inds_cd = req.inds_cd,
-                        base_dt = today("yyyyMMdd")
+                        base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
 
@@ -137,7 +141,7 @@ class IndexService(
                 val kiwoomSectChartMonthRes = sectChartClient.sectChartMonthList(
                     req = SectChartMonthListReq(
                         inds_cd = req.inds_cd,
-                        base_dt = today("yyyyMMdd")
+                        base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
 
@@ -161,7 +165,7 @@ class IndexService(
                 val kiwoomSectChartYearRes = sectChartClient.sectChartYearList(
                     req = SectChartYearListReq(
                         inds_cd = req.inds_cd,
-                        base_dt = today("yyyyMMdd")
+                        base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
 
@@ -226,7 +230,7 @@ class IndexService(
 
         val kiwoomProgramTradeRes = priceClient.programTrade(
             req = KiwoomProgramTradeReq(
-                date = today("yyyyMMdd"),
+                date = DateUtil.today("yyyyMMdd"),
                 amt_qty_tp = "1",
                 mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
                 min_tic_tp = "1",
@@ -256,9 +260,9 @@ class IndexService(
                     programList.add(
                         ProgramListItem(
                             dt = it.dt,
-                            dfrtTrdeTdy = it.dfrt_trde_tdy,
-                            ndiffproTrdeTdy = it.ndiffpro_trde_tdy,
-                            allTdy = it.all_tdy,
+                            dfrtTrdeTdy = it.dfrt_trde_tdy?.replace("--", "-"),
+                            ndiffproTrdeTdy = it.ndiffpro_trde_tdy?.replace("--", "-"),
+                            allTdy = it.all_tdy?.replace("--", "-"),
                         )
                     )
                 }
@@ -267,7 +271,7 @@ class IndexService(
 
         val kiwoomIndexProgramTradeMinuteRes = priceClient.indexProgramTradeMinute(
             req = KiwoomIndexProgramTradeMinuteReq(
-                date = today("yyyyMMdd"),
+                date = DateUtil.today("yyyyMMdd"),
                 amt_qty_tp = "1",
                 mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
                 min_tic_tp = "1",
@@ -315,15 +319,154 @@ class IndexService(
             chartList = chartList,
             programChartList = programChartList.reversed(),
             programList = programList,
+            investorDailyList = getIndexInvestorDailyList(req.inds_cd),
         )
     }
 
-    fun today(
-        pattern: String
-    ): String {
-        val now = LocalDate.now()
-        val pattern = DateTimeFormatter.ofPattern(pattern)
+    fun getIndexInvestorDailyList(indsCd: String): List<IndexInvestorDailyItem> {
+        val result = mutableListOf<IndexInvestorDailyItem>()
 
-        return pattern.format(now)
+        val mappedIndsCd = when (indsCd) {
+            "201" -> "001"
+            "150" -> "101"
+            else -> indsCd
+        }
+
+        try {
+            val mrktTp = if (mappedIndsCd == "101") "1" else "0"
+            val res = sectClient.sectInvestor(
+                req = KiwoomSectInvestorReq(
+                    mrkt_tp = mrktTp,
+                    amt_qty_tp = "0",
+                    stex_tp = "3"
+                )
+            )
+
+            val investor = res.inds_netprps?.find {
+                it.inds_cd.replace("_AL", "") == mappedIndsCd
+            }
+
+            if (investor != null) {
+                val indNetprps = investor.ind_netprps.replace("--", "-")
+                val frgnrNetprps = investor.frgnr_netprps.replace("--", "-")
+                val orgnNetprps = investor.orgn_netprps.replace("--", "-")
+
+                val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(mappedIndsCd)
+                val isDuplicate = latest != null && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps
+
+                if (!isDuplicate) {
+                    result.add(
+                        IndexInvestorDailyItem(
+                            dt = DateUtil.today("yyyyMMdd"),
+                            indNetprps = indNetprps,
+                            frgnrNetprps = frgnrNetprps,
+                            orgnNetprps = orgnNetprps,
+                            scNetprps = investor.sc_netprps.replace("--", "-"),
+                            insrncNetprps = investor.insrnc_netprps.replace("--", "-"),
+                            invtrtNetprps = investor.invtrt_netprps.replace("--", "-"),
+                            bankNetprps = investor.bank_netprps.replace("--", "-"),
+                            endwNetprps = investor.endw_netprps.replace("--", "-"),
+                            etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-"),
+                            samoFundNetprps = investor.samo_fund_netprps.replace("--", "-"),
+                            natnNetprps = investor.natn_netprps.replace("--", "-"),
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            log.error { "지수 당일 투자자 데이터 조회 실패: ${e.message}" }
+        }
+
+        // DB 일별 데이터
+        result.addAll(
+            indexInvestorDailyRepository
+                .findByIndsCdOrderByDtDesc(mappedIndsCd, PageRequest.of(0, 100))
+                .map {
+                    IndexInvestorDailyItem(
+                        dt = it.dt,
+                        indNetprps = it.indNetprps,
+                        frgnrNetprps = it.frgnrNetprps,
+                        orgnNetprps = it.orgnNetprps,
+                        scNetprps = it.scNetprps,
+                        insrncNetprps = it.insrncNetprps,
+                        invtrtNetprps = it.invtrtNetprps,
+                        bankNetprps = it.bankNetprps,
+                        endwNetprps = it.endwNetprps,
+                        etcCorpNetprps = it.etcCorpNetprps,
+                        samoFundNetprps = it.samoFundNetprps,
+                        natnNetprps = it.natnNetprps,
+                    )
+                }
+        )
+
+        return result
     }
+
+    fun collectIndexInvestorDaily(date: String) {
+        val targetIndexes = listOf(IndexType.KOSPI, IndexType.KOSDAQ)
+
+        targetIndexes.forEach { indexType ->
+            try {
+                if (indexInvestorDailyRepository.existsByIndsCdAndDt(indexType.indsCd, date)) {
+                    return@forEach
+                }
+
+                val mrktTp = if (indexType.indsCd == "101") "1" else "0"
+                val res = sectClient.sectInvestor(
+                    req = KiwoomSectInvestorReq(
+                        mrkt_tp = mrktTp,
+                        amt_qty_tp = "0",
+                        base_dt = date,
+                        stex_tp = "3"
+                    )
+                )
+
+                val investor = res.inds_netprps?.find {
+                    it.inds_cd.replace("_AL", "") == indexType.indsCd
+                }
+
+                if (investor != null) {
+                    val indNetprps = investor.ind_netprps.replace("--", "-")
+                    val frgnrNetprps = investor.frgnr_netprps.replace("--", "-")
+                    val orgnNetprps = investor.orgn_netprps.replace("--", "-")
+                    val scNetprps = investor.sc_netprps.replace("--", "-")
+                    val insrncNetprps = investor.insrnc_netprps.replace("--", "-")
+                    val invtrtNetprps = investor.invtrt_netprps.replace("--", "-")
+                    val bankNetprps = investor.bank_netprps.replace("--", "-")
+                    val endwNetprps = investor.endw_netprps.replace("--", "-")
+                    val etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-")
+                    val samoFundNetprps = investor.samo_fund_netprps.replace("--", "-")
+                    val natnNetprps = investor.natn_netprps.replace("--", "-")
+
+                    val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(indexType.indsCd)
+                    if (latest != null && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps) {
+                        return@forEach
+                    }
+
+                    indexInvestorDailyRepository.save(
+                        IndexInvestorDaily(
+                            indsCd = indexType.indsCd,
+                            dt = date,
+                            indNetprps = indNetprps,
+                            frgnrNetprps = frgnrNetprps,
+                            orgnNetprps = orgnNetprps,
+                            scNetprps = scNetprps,
+                            insrncNetprps = insrncNetprps,
+                            invtrtNetprps = invtrtNetprps,
+                            bankNetprps = bankNetprps,
+                            endwNetprps = endwNetprps,
+                            etcCorpNetprps = etcCorpNetprps,
+                            samoFundNetprps = samoFundNetprps,
+                            natnNetprps = natnNetprps,
+                        )
+                    )
+                }
+
+                Thread.sleep(100)
+            } catch (e: Exception) {
+                log.error { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
+            }
+        }
+    }
+
 }

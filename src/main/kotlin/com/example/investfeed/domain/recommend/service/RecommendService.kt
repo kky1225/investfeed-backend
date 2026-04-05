@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.recommend.service
 
+import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
@@ -85,7 +86,7 @@ class RecommendService(
 
                 val kiwoomStockInvestor = stockClient.stockInvestor(
                     req = KiwoomStockInvestorReq(
-                        dt = today("yyyyMMdd"),
+                        dt = DateUtil.today("yyyyMMdd"),
                         stk_cd = it.stk_cd,
                         amt_qty_tp = "2",
                         trde_tp = "0",
@@ -129,7 +130,7 @@ class RecommendService(
 
                 val kiwoomStockInvestor = stockClient.stockInvestor(
                     req = KiwoomStockInvestorReq(
-                        dt = today("yyyyMMdd"),
+                        dt = DateUtil.today("yyyyMMdd"),
                         stk_cd = it.stk_cd,
                         amt_qty_tp = "2",
                         trde_tp = "0",
@@ -240,14 +241,6 @@ class RecommendService(
         )
     }
 
-    fun today(
-        pattern: String
-    ): String {
-        val now = LocalDate.now()
-        val pattern = DateTimeFormatter.ofPattern(pattern)
-
-        return pattern.format(now)
-    }
 
     private fun setSchedulerSecurityContext() {
         val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
