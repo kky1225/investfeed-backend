@@ -1,10 +1,12 @@
 package com.example.investfeed.kiwoom.sect.dto.res
 
+import com.example.investfeed.kiwoom.KiwoomRes
+
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class KiwoomSectPriceNowRes (
-    var return_code: Int, // 결과 코드
-    var return_msg: String, // 결과 메세지
+    override var return_code: Int, // 결과 코드
+    override var return_msg: String, // 결과 메세지
     var cur_prc: String? = null, // 현재가
     var pred_pre_sig: String? = null, // 전일대비기호
     var pred_pre: String? = null, // 전일대비
@@ -34,4 +36,4 @@ data class KiwoomSectPriceNowRes (
     @JsonProperty("52wk_lwst_pric_pre_rt")
     var _52wk_lwst_pric_pre_rt: String? = null, // 52주최저가대비율
     var inds_cur_prc_tm: List<KiwoomSectPriceNow>? = null // 업종현재가_시간별
-)
+): KiwoomRes(return_code, return_msg)

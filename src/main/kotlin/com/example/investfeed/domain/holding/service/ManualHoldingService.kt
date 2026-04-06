@@ -39,12 +39,13 @@ class ManualHoldingService(
         val holdings = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, memberBroker.broker.id)
 
         if (holdings.isEmpty()) {
-            return ManualHoldingListRes(holdings = emptyList())
+            return ManualHoldingListRes(balance = memberBroker.balance, holdings = emptyList())
         }
 
         val priceMap = fetchCurrentPrices(holdings.map { it.stkCd })
 
         return ManualHoldingListRes(
+            balance = memberBroker.balance,
             holdings = holdings.map { holding ->
                 val price = priceMap[holding.stkCd]
                 ManualHoldingItem(
@@ -148,6 +149,15 @@ class ManualHoldingService(
                 ?: throw IllegalArgumentException("보유주식을 찾을 수 없습니다.")
             holding.displayOrder = index
         }
+    }
+
+    @Transactional
+    fun updateBalance(memberBrokerId: Long, balance: Long): Long {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, memberBrokerId)
+            ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
+        memberBroker.balance = balance
+        return memberBroker.balance
     }
 
     private fun fetchCurrentPrices(stkCds: List<String>): Map<String, KiwoomStockInterest> {

@@ -5,6 +5,7 @@ data class HoldingListRes(
     val totEvltAmt: String, // 총평가금액
     val totEvltPl: String, // 총평가손익금액
     val totPrftRt: String, // 총수익률(%)
+    val balance: String = "0", // 계좌 잔액(예수금)
     val holdingList: List<HoldingItem>
 )
 

@@ -20,6 +20,9 @@ class MemberBroker(
     @Column(name = "order_index", nullable = false)
     var orderIndex: Int = 0,
 
+    @Column(name = "balance", nullable = false)
+    var balance: Long = 0,
+
     @Column(name = "created_at")
     val createdAt: LocalDateTime = LocalDateTime.now()
 )

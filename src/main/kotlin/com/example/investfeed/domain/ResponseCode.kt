@@ -47,6 +47,7 @@ enum class ResponseCode(
     MANUAL_HOLDING_UPDATE(message = "수동 보유주식 수정에 성공하셨습니다."),
     MANUAL_HOLDING_DELETE(message = "수동 보유주식 삭제에 성공하셨습니다."),
     HOLDING_REORDER(message = "보유주식 순서 변경에 성공하셨습니다."),
+    MEMBER_BROKER_BALANCE_UPDATE(message = "계좌 잔액 수정에 성공하셨습니다."),
 
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
     INDEX_WS_LIST(message = "지수 목록 소켓 조회에 성공하셨습니다."),

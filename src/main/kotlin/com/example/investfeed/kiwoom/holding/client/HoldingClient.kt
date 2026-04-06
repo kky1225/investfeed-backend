@@ -1,7 +1,9 @@
 package com.example.investfeed.kiwoom.holding.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
+import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
+import com.example.investfeed.kiwoom.holding.dto.res.KiwoomDepositRes
 import com.example.investfeed.kiwoom.holding.dto.res.KiwoomHoldingRes
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.HoldingListException
@@ -52,6 +54,32 @@ class HoldingClient(
             log.error { "holdingList Error" }
 
             throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun deposit(
+        req: KiwoomDepositReq
+    ): KiwoomDepositRes? {
+        val accessToken = authClient.getCurrentAccessToken()
+
+        try {
+            val res = webClient.post()
+                .uri("$DEFAULT_URL/api/dostk/acnt")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "kt00001")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomDepositRes>()
+                .block()
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "deposit Error: ${e.message}" }
+            return null
         }
     }
 }

@@ -1,8 +1,10 @@
 package com.example.investfeed.kiwoom.price.dto.res
 
+import com.example.investfeed.kiwoom.KiwoomRes
+
 data class KiwoomStockSinglePriceRes(
-    var return_code: Int, // 응답 코드
-    var return_msg: String, // 응답 메세지
+    override var return_code: Int, // 응답 코드
+    override var return_msg: String, // 응답 메세지
     var bid_req_base_tm: String? = null, // 호가잔량기준시간
     var ovt_sigpric_sel_bid_jub_pre_5: String? = null, // 시간외단일가_매도호가직전대비5
     var ovt_sigpric_sel_bid_jub_pre_4: String? = null, // 시간외단일가_매도호가직전대비4
@@ -49,4 +51,4 @@ data class KiwoomStockSinglePriceRes(
     var ovt_sigpric_pred_pre: String? = null, // 시간외단일가_전일대비
     var ovt_sigpric_flu_rt: String? = null, // 시간외단일가_등락률
     var ovt_sigpric_acc_trde_qty: String? = null // 시간외단일가_누적거래량
-)
+): KiwoomRes(return_code, return_msg)

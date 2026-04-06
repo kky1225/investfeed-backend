@@ -18,3 +18,7 @@ data class ManualHoldingUpdateReq(
 data class HoldingReorderReq(
     val orderedIds: List<Long>
 )
+
+data class MemberBrokerBalanceUpdateReq(
+    val balance: Long
+)

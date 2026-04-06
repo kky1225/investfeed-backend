@@ -4,6 +4,7 @@ import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.holding.dto.req.HoldingReorderReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingCreateReq
+import com.example.investfeed.domain.holding.dto.req.MemberBrokerBalanceUpdateReq
 import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingListRes
@@ -71,6 +72,20 @@ class ManualHoldingController(
                 code = ResponseCode.MANUAL_HOLDING_DELETE.code,
                 message = ResponseCode.MANUAL_HOLDING_DELETE.message,
                 result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PutMapping("balance/{memberBrokerId}")
+    fun updateBalance(
+        @PathVariable memberBrokerId: Long,
+        @RequestBody req: MemberBrokerBalanceUpdateReq
+    ): ResponseEntity<ApiResponse<Long>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MEMBER_BROKER_BALANCE_UPDATE.code,
+                message = ResponseCode.MEMBER_BROKER_BALANCE_UPDATE.message,
+                result = manualHoldingService.updateBalance(memberBrokerId, req.balance)
             ), HttpStatus.OK
         )
     }

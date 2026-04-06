@@ -9,6 +9,7 @@ import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.client.HoldingSocketClient
+import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingStreamReq
 import org.springframework.security.core.context.SecurityContextHolder
@@ -65,11 +66,14 @@ class HoldingService(
             }
         }
 
+        val depositRes = holdingClient.deposit(KiwoomDepositReq(qry_tp = "3"))
+
         return HoldingListRes(
             totPurAmt = res?.tot_pur_amt ?: "0",
             totEvltAmt = res?.tot_evlt_amt ?: "0",
             totEvltPl = res?.tot_evlt_pl ?: "0",
             totPrftRt = res?.tot_prft_rt ?: "0",
+            balance = depositRes?.entr ?: "0",
             holdingList = sortedHoldingList
         )
     }

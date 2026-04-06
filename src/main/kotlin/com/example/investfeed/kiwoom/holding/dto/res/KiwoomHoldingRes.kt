@@ -1,15 +1,17 @@
 package com.example.investfeed.kiwoom.holding.dto.res
 
+import com.example.investfeed.kiwoom.KiwoomRes
+
 data class KiwoomHoldingRes(
-    var return_code: Int,
-    var return_msg: String,
+    override var return_code: Int,
+    override var return_msg: String,
     var tot_pur_amt: String? = null, // 총매입금액
     var tot_evlt_amt: String? = null, // 총평가금액
     var tot_evlt_pl: String? = null, // 총평가손익금액
     var tot_prft_rt: String? = null, // 총수익률(%)
     var prsm_dpst_aset_amt: String? = null, // 추정예탁자산
     var acnt_evlt_remn_indv_tot: List<KiwoomHoldingStock>? = null // 계좌평가잔고개별합산
-)
+): KiwoomRes(return_code, return_msg)
 
 data class KiwoomHoldingStock(
     var stk_cd: String? = null, // 종목번호
