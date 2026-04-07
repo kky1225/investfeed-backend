@@ -1,4 +1,4 @@
-리package com.example.investfeed.kiwoom.holding.dto.res
+package com.example.investfeed.kiwoom.holding.dto.res
 
 import com.example.investfeed.kiwoom.KiwoomRes
 

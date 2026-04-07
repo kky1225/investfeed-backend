@@ -2,6 +2,7 @@ package com.example.investfeed.domain.holding.service
 
 import com.example.investfeed.domain.holding.dto.req.MyBrokerAddReq
 import com.example.investfeed.domain.holding.dto.res.*
+import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.entity.MemberBroker
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
@@ -38,6 +39,39 @@ class BrokerService(
     fun myBrokerList(): MyBrokerListRes {
         val memberId = getMemberId()
         val memberBrokers = memberBrokerRepository.findByMemberIdOrderByOrderIndex(memberId)
+
+        return MyBrokerListRes(
+            brokers = memberBrokers.map { mb ->
+                MyBrokerItem(
+                    id = mb.id,
+                    brokerId = mb.broker.id,
+                    name = mb.broker.name,
+                    type = mb.broker.type,
+                    market = mb.broker.market,
+                    orderIndex = mb.orderIndex
+                )
+            }
+        )
+    }
+
+    fun brokerListByMarket(market: MarketType): BrokerListRes {
+        val brokers = brokerRepository.findAllByMarketOrderByIdAsc(market)
+
+        return BrokerListRes(
+            brokers = brokers.map { broker ->
+                BrokerItem(
+                    id = broker.id,
+                    name = broker.name,
+                    type = broker.type,
+                    market = broker.market
+                )
+            }
+        )
+    }
+
+    fun myBrokerListByMarket(market: MarketType): MyBrokerListRes {
+        val memberId = getMemberId()
+        val memberBrokers = memberBrokerRepository.findByMemberIdAndBrokerMarketOrderByOrderIndex(memberId, market)
 
         return MyBrokerListRes(
             brokers = memberBrokers.map { mb ->

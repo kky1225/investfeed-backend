@@ -5,6 +5,7 @@ enum class ResponseCode(
     val message: String
 ) {
     DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
+    ASSET_DASHBOARD(message = "통합 자산 대시보드 조회에 성공하셨습니다."),
 
     TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
 
@@ -106,6 +107,19 @@ enum class ResponseCode(
     INTEREST_ITEM_DELETE(message = "관심종목 삭제에 성공하셨습니다."),
     INTEREST_ITEM_REORDER(message = "관심종목 순서 변경에 성공하셨습니다."),
     INTEREST_ITEM_STREAM(message = "실시간 관심종목 조회에 성공하셨습니다."),
+
+    CRYPTO_HOLDING_LIST(message = "보유 코인 조회에 성공하셨습니다."),
+    CRYPTO_HOLDING_STREAM(message = "실시간 보유 코인 조회에 성공하셨습니다."),
+    CRYPTO_BROKER_LIST(message = "거래소 목록 조회에 성공하셨습니다."),
+    CRYPTO_MY_BROKER_LIST(message = "내 거래소 목록 조회에 성공하셨습니다."),
+    CRYPTO_MY_BROKER_ADD(message = "내 거래소 추가에 성공하셨습니다."),
+    CRYPTO_MY_BROKER_REMOVE(message = "내 거래소 삭제에 성공하셨습니다."),
+    CRYPTO_MANUAL_HOLDING_LIST(message = "수동 보유코인 조회에 성공하셨습니다."),
+    CRYPTO_MANUAL_HOLDING_CREATE(message = "수동 보유코인 등록에 성공하셨습니다."),
+    CRYPTO_MANUAL_HOLDING_UPDATE(message = "수동 보유코인 수정에 성공하셨습니다."),
+    CRYPTO_MANUAL_HOLDING_DELETE(message = "수동 보유코인 삭제에 성공하셨습니다."),
+    CRYPTO_HOLDING_REORDER(message = "보유코인 순서 변경에 성공하셨습니다."),
+    CRYPTO_MEMBER_BROKER_BALANCE_UPDATE(message = "거래소 잔액 수정에 성공하셨습니다."),
 
     CRYPTO_LIST(message = "암호화폐 목록 조회에 성공하셨습니다."),
     CRYPTO_LIST_STREAM(message = "실시간 암호화폐 목록 조회에 성공하셨습니다."),

@@ -1,0 +1,180 @@
+package com.example.investfeed.domain.holding.service
+
+import com.example.investfeed.domain.holding.dto.req.HoldingReorderReq
+import com.example.investfeed.domain.holding.dto.req.ManualHoldingCreateReq
+import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
+import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
+import com.example.investfeed.domain.holding.dto.res.ManualHoldingListRes
+import com.example.investfeed.domain.holding.entity.BrokerType
+import com.example.investfeed.domain.holding.entity.MemberHolding
+import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
+import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.upbit.ticker.client.TickerClient
+import com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes
+import mu.KotlinLogging
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
+
+@Service
+class CryptoManualHoldingService(
+    private val memberHoldingRepository: MemberHoldingRepository,
+    private val memberBrokerRepository: MemberBrokerRepository,
+    private val tickerClient: TickerClient,
+) {
+    private val log = KotlinLogging.logger {}
+
+    fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, brokerId)
+            ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
+
+        if (memberBroker.broker.type != BrokerType.MANUAL) {
+            throw IllegalArgumentException("수동 입력 거래소가 아닙니다.")
+        }
+
+        val holdings = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, memberBroker.broker.id)
+
+        if (holdings.isEmpty()) {
+            return ManualHoldingListRes(balance = memberBroker.balance, holdings = emptyList())
+        }
+
+        val priceMap = fetchCurrentPrices(holdings.map { it.stkCd })
+
+        return ManualHoldingListRes(
+            balance = memberBroker.balance,
+            holdings = holdings.map { holding ->
+                val ticker = priceMap[holding.stkCd]
+                ManualHoldingItem(
+                    id = holding.id,
+                    stkCd = holding.stkCd,
+                    stkNm = holding.stkNm,
+                    purPrice = holding.purPrice ?: 0,
+                    quantity = holding.quantity ?: 0,
+                    purAmt = holding.purAmt ?: 0,
+                    curPrc = ticker?.trade_price?.toLong()?.toString() ?: "0",
+                    fluRt = ticker?.signed_change_rate?.let { String.format("%.2f", it * 100) } ?: "0",
+                    basePric = ticker?.prev_closing_price?.toLong()?.toString() ?: "0"
+                )
+            }
+        )
+    }
+
+    @Transactional
+    fun createManualHolding(req: ManualHoldingCreateReq): ManualHoldingItem {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
+            ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
+
+        if (memberBroker.broker.type != BrokerType.MANUAL) {
+            throw IllegalArgumentException("수동 입력 거래소가 아닙니다.")
+        }
+
+        val nextOrder = memberHoldingRepository.findMaxDisplayOrder(memberId, memberBroker.broker.id) + 1
+
+        val holding = memberHoldingRepository.save(
+            MemberHolding(
+                memberId = memberId,
+                stkCd = req.stkCd,
+                stkNm = req.stkNm,
+                broker = memberBroker.broker,
+                purPrice = req.purPrice,
+                quantity = req.quantity,
+                purAmt = req.purAmt,
+                displayOrder = nextOrder,
+                updatedAt = LocalDateTime.now()
+            )
+        )
+
+        val priceMap = fetchCurrentPrices(listOf(holding.stkCd))
+        val ticker = priceMap[holding.stkCd]
+
+        return ManualHoldingItem(
+            id = holding.id,
+            stkCd = holding.stkCd,
+            stkNm = holding.stkNm,
+            purPrice = holding.purPrice ?: 0,
+            quantity = holding.quantity ?: 0,
+            purAmt = holding.purAmt ?: 0,
+            curPrc = ticker?.trade_price?.toLong()?.toString() ?: "0",
+            fluRt = ticker?.signed_change_rate?.let { String.format("%.2f", it * 100) } ?: "0",
+            basePric = ticker?.prev_closing_price?.toLong()?.toString() ?: "0"
+        )
+    }
+
+    @Transactional
+    fun updateManualHolding(holdingId: Long, req: ManualHoldingUpdateReq): ManualHoldingItem {
+        val memberId = getMemberId()
+        val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+            ?: throw IllegalArgumentException("보유코인을 찾을 수 없습니다.")
+
+        holding.purPrice = req.purPrice
+        holding.quantity = req.quantity
+        holding.purAmt = req.purAmt
+        holding.updatedAt = LocalDateTime.now()
+
+        val priceMap = fetchCurrentPrices(listOf(holding.stkCd))
+        val ticker = priceMap[holding.stkCd]
+
+        return ManualHoldingItem(
+            id = holding.id,
+            stkCd = holding.stkCd,
+            stkNm = holding.stkNm,
+            purPrice = holding.purPrice ?: 0,
+            quantity = holding.quantity ?: 0,
+            purAmt = holding.purAmt ?: 0,
+            curPrc = ticker?.trade_price?.toLong()?.toString() ?: "0",
+            fluRt = ticker?.signed_change_rate?.let { String.format("%.2f", it * 100) } ?: "0",
+            basePric = ticker?.prev_closing_price?.toLong()?.toString() ?: "0"
+        )
+    }
+
+    @Transactional
+    fun deleteManualHolding(holdingId: Long) {
+        val memberId = getMemberId()
+        val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+            ?: throw IllegalArgumentException("보유코인을 찾을 수 없습니다.")
+
+        memberHoldingRepository.delete(holding)
+    }
+
+    @Transactional
+    fun reorderHoldings(req: HoldingReorderReq) {
+        val memberId = getMemberId()
+        req.orderedIds.forEachIndexed { index, holdingId ->
+            val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
+                ?: throw IllegalArgumentException("보유코인을 찾을 수 없습니다.")
+            holding.displayOrder = index
+        }
+    }
+
+    @Transactional
+    fun updateBalance(memberBrokerId: Long, balance: Long): Long {
+        val memberId = getMemberId()
+        val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, memberBrokerId)
+            ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
+        memberBroker.balance = balance
+        return memberBroker.balance
+    }
+
+    private fun fetchCurrentPrices(stkCds: List<String>): Map<String, UpbitTickerRes> {
+        if (stkCds.isEmpty()) return emptyMap()
+
+        return try {
+            val markets = stkCds.joinToString(",")
+            val res = tickerClient.getTickers(markets)
+
+            res.associateBy { it.market ?: "" }
+        } catch (e: Exception) {
+            log.error { "수동 보유코인 현재가 조회 실패: ${e.message}" }
+            emptyMap()
+        }
+    }
+
+    private fun getMemberId(): Long {
+        val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
+        return userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
+    }
+}
