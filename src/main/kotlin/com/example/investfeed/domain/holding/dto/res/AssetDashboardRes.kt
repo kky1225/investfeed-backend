@@ -9,6 +9,7 @@ data class AssetDashboardRes(
     val totalCash: Long,
     val stockSummary: AssetGroupSummary,
     val cryptoSummary: AssetGroupSummary,
+    val brokerSummaries: List<BrokerSummaryItem>,
 )
 
 data class AssetGroupSummary(
@@ -19,6 +20,26 @@ data class AssetGroupSummary(
     val cash: Long,
     val ratio: String,
     val holdings: List<UnifiedHoldingItem>,
+)
+
+data class BrokerSummaryItem(
+    val brokerName: String,
+    val market: String,
+    val type: String,
+    val evltAmt: Long,
+    val purAmt: Long,
+    val evltPl: Long,
+    val prftRt: String,
+    val cash: Long,
+    val holdingCount: Int,
+    val holdings: List<BrokerHoldingItem>,
+)
+
+data class BrokerHoldingItem(
+    val stkCd: String,
+    val curPrc: String,
+    val purAmt: Long,
+    val quantity: Double,
 )
 
 data class UnifiedHoldingItem(

@@ -2,5 +2,6 @@ package com.example.investfeed.domain.notification.entity
 
 enum class NotificationType {
     PRICE,
-    TRADE
+    TRADE,
+    TARGET_PRICE
 }

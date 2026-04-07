@@ -3,6 +3,7 @@ package com.example.investfeed.domain.notification.service
 import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.notification.entity.*
+import com.example.investfeed.domain.notification.repository.PriceTargetRepository
 import com.example.investfeed.domain.notification.repository.NotificationAlertLogRepository
 import com.example.investfeed.domain.notification.repository.NotificationRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -15,6 +16,7 @@ import java.time.LocalDate
 class NotificationService(
     private val notificationRepository: NotificationRepository,
     private val alertLogRepository: NotificationAlertLogRepository,
+    private val priceTargetRepository: PriceTargetRepository,
     private val notificationWebSocketHandler: NotificationWebSocketHandler,
     private val objectMapper: ObjectMapper
 ) {
@@ -95,6 +97,32 @@ class NotificationService(
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
             log.error { "WebSocket 알림 전송 실패: ${e.message}" }
+        }
+    }
+
+    @Transactional
+    fun createPriceTargetAlert(priceTarget: PriceTarget, currentPrice: Double) {
+        val notification = Notification(
+            memberId = priceTarget.memberId,
+            type = NotificationType.TARGET_PRICE,
+            assetType = priceTarget.assetType,
+            assetCode = priceTarget.assetCode,
+            assetName = priceTarget.assetName,
+            threshold = priceTarget.targetPrice.toDouble(),
+            direction = if (priceTarget.direction == PriceTargetDirection.ABOVE) Direction.TARGET_ABOVE else Direction.TARGET_BELOW,
+            fluRt = currentPrice
+        )
+        notificationRepository.save(notification)
+
+        // 1회 알림 후 자동 삭제
+        priceTargetRepository.delete(priceTarget)
+
+        try {
+            val res = NotificationRes.from(notification)
+            val message = objectMapper.writeValueAsString(res)
+            notificationWebSocketHandler.sendToUser(priceTarget.memberId, message)
+        } catch (e: Exception) {
+            log.error { "목표가 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 }

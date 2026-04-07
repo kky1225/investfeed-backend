@@ -115,12 +115,14 @@ class CryptoService(
         val ticker = tickerClient.getTickers(req.market).firstOrNull()
 
         val chartList: List<CryptoChart> = when (req.chartType) {
+            CryptoChartType.MINUTE_1,
             CryptoChartType.MINUTE_3,
             CryptoChartType.MINUTE_5,
             CryptoChartType.MINUTE_10,
             CryptoChartType.MINUTE_30 -> {
                 val unit = req.chartType.unit!!
                 val totalNeeded = when (req.chartType) {
+                    CryptoChartType.MINUTE_1 -> 200   // 약 3.3시간
                     CryptoChartType.MINUTE_3 -> 480   // 24시간
                     CryptoChartType.MINUTE_5 -> 288   // 24시간
                     CryptoChartType.MINUTE_10 -> 144  // 24시간

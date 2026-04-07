@@ -26,20 +26,36 @@ class AssetDashboardService(
         val stockBrokers = allBrokers.filter { it.broker.market == MarketType.STOCK }
         val cryptoBrokers = allBrokers.filter { it.broker.market == MarketType.CRYPTO }
 
-        // 주식 자산 수집
         val stockHoldings = mutableListOf<UnifiedHoldingItem>()
         var stockEvltAmt = 0L
         var stockPurAmt = 0L
         var stockCash = 0L
+        val brokerSummaries = mutableListOf<BrokerSummaryItem>()
 
         for (broker in stockBrokers) {
+            var bEvltAmt = 0L
+            var bPurAmt = 0L
+            var bCash = 0L
+            var bHoldingCount = 0
+            val bHoldings = mutableListOf<BrokerHoldingItem>()
+
             if (broker.broker.type == BrokerType.API) {
                 try {
                     val res = holdingService.holdingList()
-                    stockEvltAmt += res.totEvltAmt.toLongOrNull() ?: 0
-                    stockPurAmt += res.totPurAmt.toLongOrNull() ?: 0
-                    stockCash += res.balance.toLongOrNull() ?: 0
+                    bEvltAmt = res.totEvltAmt.toLongOrNull() ?: 0
+                    bPurAmt = res.totPurAmt.toLongOrNull() ?: 0
+                    bCash = res.balance.toLongOrNull() ?: 0
+                    bHoldingCount = res.holdingList.size
+                    stockEvltAmt += bEvltAmt
+                    stockPurAmt += bPurAmt
+                    stockCash += bCash
                     stockHoldings.addAll(res.holdingList.map { item ->
+                        bHoldings.add(BrokerHoldingItem(
+                            stkCd = item.stkCd,
+                            curPrc = item.curPrc,
+                            purAmt = item.purAmt.toLongOrNull() ?: 0,
+                            quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
+                        ))
                         UnifiedHoldingItem(
                             stkCd = item.stkCd,
                             stkNm = item.stkNm,
@@ -58,13 +74,23 @@ class AssetDashboardService(
             } else {
                 try {
                     val res = manualHoldingService.manualHoldingList(broker.id)
-                    stockCash += res.balance
+                    bCash = res.balance
+                    stockCash += bCash
+                    bHoldingCount = res.holdings.size
                     for (item in res.holdings) {
                         val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
                         val evltPl = evltAmt - item.purAmt
                         val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
+                        bEvltAmt += evltAmt
+                        bPurAmt += item.purAmt
                         stockEvltAmt += evltAmt
                         stockPurAmt += item.purAmt
+                        bHoldings.add(BrokerHoldingItem(
+                            stkCd = item.stkCd,
+                            curPrc = item.curPrc,
+                            purAmt = item.purAmt,
+                            quantity = item.quantity.toDouble(),
+                        ))
                         stockHoldings.add(UnifiedHoldingItem(
                             stkCd = item.stkCd,
                             stkNm = item.stkNm,
@@ -81,22 +107,51 @@ class AssetDashboardService(
                     log.error { "주식 수동 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
                 }
             }
+
+            val bEvltPl = bEvltAmt - bPurAmt
+            brokerSummaries.add(BrokerSummaryItem(
+                brokerName = broker.broker.name,
+                market = broker.broker.market.name,
+                type = broker.broker.type.name,
+                evltAmt = bEvltAmt,
+                purAmt = bPurAmt,
+                evltPl = bEvltPl,
+                prftRt = if (bPurAmt > 0) String.format("%.2f", bEvltPl.toDouble() / bPurAmt * 100) else "0",
+                cash = bCash,
+                holdingCount = bHoldingCount,
+                holdings = bHoldings,
+            ))
         }
 
-        // 코인 자산 수집
         val cryptoHoldings = mutableListOf<UnifiedHoldingItem>()
         var cryptoEvltAmt = 0L
         var cryptoPurAmt = 0L
         var cryptoCash = 0L
 
         for (broker in cryptoBrokers) {
+            var bEvltAmt = 0L
+            var bPurAmt = 0L
+            var bCash = 0L
+            var bHoldingCount = 0
+            val bHoldings = mutableListOf<BrokerHoldingItem>()
+
             if (broker.broker.type == BrokerType.API) {
                 try {
                     val res = cryptoHoldingService.cryptoHoldingList()
-                    cryptoEvltAmt += res.totEvltAmt.toDoubleOrNull()?.toLong() ?: 0
-                    cryptoPurAmt += res.totPurAmt.toDoubleOrNull()?.toLong() ?: 0
-                    cryptoCash += res.balance.toDoubleOrNull()?.toLong() ?: 0
+                    bEvltAmt = res.totEvltAmt.toDoubleOrNull()?.toLong() ?: 0
+                    bPurAmt = res.totPurAmt.toDoubleOrNull()?.toLong() ?: 0
+                    bCash = res.balance.toDoubleOrNull()?.toLong() ?: 0
+                    bHoldingCount = res.holdingList.size
+                    cryptoEvltAmt += bEvltAmt
+                    cryptoPurAmt += bPurAmt
+                    cryptoCash += bCash
                     cryptoHoldings.addAll(res.holdingList.map { item ->
+                        bHoldings.add(BrokerHoldingItem(
+                            stkCd = item.stkCd,
+                            curPrc = item.curPrc,
+                            purAmt = item.purAmt.toLongOrNull() ?: 0,
+                            quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
+                        ))
                         UnifiedHoldingItem(
                             stkCd = item.stkCd,
                             stkNm = item.stkNm,
@@ -115,13 +170,23 @@ class AssetDashboardService(
             } else {
                 try {
                     val res = cryptoManualHoldingService.manualHoldingList(broker.id)
-                    cryptoCash += res.balance
+                    bCash = res.balance
+                    cryptoCash += bCash
+                    bHoldingCount = res.holdings.size
                     for (item in res.holdings) {
                         val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
                         val evltPl = evltAmt - item.purAmt
                         val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
+                        bEvltAmt += evltAmt
+                        bPurAmt += item.purAmt
                         cryptoEvltAmt += evltAmt
                         cryptoPurAmt += item.purAmt
+                        bHoldings.add(BrokerHoldingItem(
+                            stkCd = item.stkCd,
+                            curPrc = item.curPrc,
+                            purAmt = item.purAmt,
+                            quantity = item.quantity.toDouble(),
+                        ))
                         cryptoHoldings.add(UnifiedHoldingItem(
                             stkCd = item.stkCd,
                             stkNm = item.stkNm,
@@ -138,13 +203,25 @@ class AssetDashboardService(
                     log.error { "코인 수동 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
                 }
             }
+
+            val bEvltPl = bEvltAmt - bPurAmt
+            brokerSummaries.add(BrokerSummaryItem(
+                brokerName = broker.broker.name,
+                market = broker.broker.market.name,
+                type = broker.broker.type.name,
+                evltAmt = bEvltAmt,
+                purAmt = bPurAmt,
+                evltPl = bEvltPl,
+                prftRt = if (bPurAmt > 0) String.format("%.2f", bEvltPl.toDouble() / bPurAmt * 100) else "0",
+                cash = bCash,
+                holdingCount = bHoldingCount,
+                holdings = bHoldings,
+            ))
         }
 
-        // 비중(possRt) 재계산
         recalcPossRt(stockHoldings, stockEvltAmt)
         recalcPossRt(cryptoHoldings, cryptoEvltAmt)
 
-        // 전체 합산
         val totalEvltAmt = stockEvltAmt + cryptoEvltAmt
         val totalPurAmt = stockPurAmt + cryptoPurAmt
         val totalCash = stockCash + cryptoCash
@@ -185,6 +262,7 @@ class AssetDashboardService(
                 ratio = cryptoRatio,
                 holdings = cryptoHoldings,
             ),
+            brokerSummaries = brokerSummaries,
         )
     }
 

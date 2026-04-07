@@ -144,6 +144,10 @@ enum class ResponseCode(
     NOTIFICATION_READ(message = "알림 읽음 처리에 성공하셨습니다."),
     NOTIFICATION_READ_ALL(message = "전체 알림 읽음 처리에 성공하셨습니다."),
 
+    PRICE_TARGET_CREATE(message = "목표가 알림 등록에 성공하셨습니다."),
+    PRICE_TARGET_LIST(message = "목표가 알림 목록 조회에 성공하셨습니다."),
+    PRICE_TARGET_DELETE(message = "목표가 알림 삭제에 성공하셨습니다."),
+
     MENU_LIST(message = "메뉴 목록 조회에 성공하셨습니다."),
     MENU_MY_LIST(message = "사용자 메뉴 목록 조회에 성공하셨습니다."),
     MENU_CREATE(message = "메뉴 생성에 성공하셨습니다."),

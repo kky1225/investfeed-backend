@@ -6,6 +6,7 @@ data class CryptoDetailReq(
 )
 
 enum class CryptoChartType(val unit: Int?) {
+    MINUTE_1(1),
     MINUTE_3(3),
     MINUTE_5(5),
     MINUTE_10(10),

@@ -2,8 +2,11 @@ package com.example.investfeed.domain.notification.controller
 
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.notification.dto.req.NotificationListReq
+import com.example.investfeed.domain.notification.dto.req.PriceTargetCreateReq
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
+import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.domain.notification.service.NotificationService
+import com.example.investfeed.domain.notification.service.PriceTargetService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.common.exception.ApiResponse
 import org.springframework.http.HttpStatus
@@ -14,7 +17,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("api/notifications")
 class NotificationController(
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val priceTargetService: PriceTargetService,
 ) {
 
     @GetMapping
@@ -68,6 +72,48 @@ class NotificationController(
             ApiResponse(
                 code = ResponseCode.NOTIFICATION_READ_ALL.code,
                 message = ResponseCode.NOTIFICATION_READ_ALL.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("price-targets")
+    fun createPriceTarget(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @RequestBody req: PriceTargetCreateReq
+    ): ResponseEntity<ApiResponse<PriceTargetRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.PRICE_TARGET_CREATE.code,
+                message = ResponseCode.PRICE_TARGET_CREATE.message,
+                result = priceTargetService.createPriceTarget(user.member.id, req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("price-targets")
+    fun getPriceTargets(
+        @AuthenticationPrincipal user: CustomUserDetails
+    ): ResponseEntity<ApiResponse<List<PriceTargetRes>>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.PRICE_TARGET_LIST.code,
+                message = ResponseCode.PRICE_TARGET_LIST.message,
+                result = priceTargetService.getPriceTargets(user.member.id)
+            ), HttpStatus.OK
+        )
+    }
+
+    @DeleteMapping("price-targets/{id}")
+    fun deletePriceTarget(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable id: Long
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        priceTargetService.deletePriceTarget(user.member.id, id)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.PRICE_TARGET_DELETE.code,
+                message = ResponseCode.PRICE_TARGET_DELETE.message,
                 result = null
             ), HttpStatus.OK
         )

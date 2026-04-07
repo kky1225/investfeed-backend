@@ -1,18 +1,20 @@
 package com.example.investfeed.domain.notification.scheduler
 
+import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestGroupRepository
 import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestItemRepository
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
+import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.notification.service.NotificationService
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomNewHighLowReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
-import com.example.investfeed.common.util.MarketTimeUtil
-import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
-import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -30,6 +32,7 @@ class PriceAlertScheduler(
     private val stockClient: StockClient,
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
+    private val priceTargetRepository: com.example.investfeed.domain.notification.repository.PriceTargetRepository,
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val authClient: AuthClient,
@@ -55,29 +58,44 @@ class PriceAlertScheduler(
         }
 
         val start = System.currentTimeMillis()
+        var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
+        var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
+
         try {
-            checkStockAlerts()
+            stockDataMap = checkStockAlerts()
         } catch (e: Exception) {
             log.error(e) { "주식 가격 알림 체크 실패" }
         }
 
         try {
-            checkCryptoAlerts()
+            tickerMap = checkCryptoAlerts()
         } catch (e: Exception) {
             log.error(e) { "암호화폐 가격 알림 체크 실패" }
+        }
+
+        try {
+            checkStockPriceTargets(stockDataMap ?: emptyMap())
+        } catch (e: Exception) {
+            log.error(e) { "주식 목표가 알림 체크 실패" }
+        }
+
+        try {
+            checkCryptoPriceTargets(tickerMap ?: emptyMap())
+        } catch (e: Exception) {
+            log.error(e) { "암호화폐 목표가 알림 체크 실패" }
         }
 
         SecurityContextHolder.clearContext()
         log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
     }
 
-    private fun checkStockAlerts() {
+    private fun checkStockAlerts(): Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest> {
         if (holidayService.isHoliday()) {
-            return
+            return emptyMap()
         }
 
         if (!MarketTimeUtil.isStockAlertTime()) {
-            return
+            return emptyMap()
         }
 
         data class MemberStock(val memberId: Long, val stkCd: String, val stkNm: String)
@@ -101,13 +119,13 @@ class PriceAlertScheduler(
             memberStocks.add(MemberStock(holding.memberId, holding.stkCd, holding.stkNm))
         }
 
-        if (memberStocks.isEmpty()) return
+        if (memberStocks.isEmpty()) return emptyMap()
 
         val uniqueStkCds = memberStocks.map { it.stkCd }.distinct()
         val stkCdParam = uniqueStkCds.joinToString("|")
 
         val kiwoomStockInterestRes = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
-        val stockDataMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd } ?: return
+        val stockDataMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: return emptyMap()
 
         val memberStockSet = mutableSetOf<Pair<Long, String>>()
 
@@ -144,15 +162,44 @@ class PriceAlertScheduler(
                 checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
             }
         }
+
+        // 250일 신고가/신저가 체크 (ka10016)
+        try {
+            val newHighRes = stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "1"))
+            val newHighCodes = newHighRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
+            log.info { "250일 신고가 종목 수: ${newHighCodes.size}, 종목: ${newHighCodes.take(10)}" }
+
+            val newLowRes = stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "2"))
+            val newLowCodes = newLowRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
+            log.info { "250일 신저가 종목 수: ${newLowCodes.size}, 종목: ${newLowCodes.take(10)}" }
+
+            val processedSet = mutableSetOf<Pair<Long, String>>()
+            for (item in memberStocks) {
+                val key = Pair(item.memberId, item.stkCd)
+                if (!processedSet.add(key)) continue
+
+                val rawCode = item.stkCd.replace("_AL", "")
+                if (rawCode in newHighCodes) {
+                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, 0.0, Direction.HIGH_52W, listOf(0.0))
+                }
+                if (rawCode in newLowCodes) {
+                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, 0.0, Direction.LOW_52W, listOf(0.0))
+                }
+            }
+        } catch (e: Exception) {
+            log.error { "250일 신고저가 체크 실패: ${e.message}" }
+        }
+
+        return stockDataMap
     }
 
-    private fun checkCryptoAlerts() {
+    private fun checkCryptoAlerts(): Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes> {
         val allGroups = cryptoInterestGroupRepository.findAll()
-        if (allGroups.isEmpty()) return
+        if (allGroups.isEmpty()) return emptyMap()
 
         val groupIds = allGroups.map { it.id }
         val allItems = cryptoInterestItemRepository.findByGroupIdIn(groupIds)
-        if (allItems.isEmpty()) return
+        if (allItems.isEmpty()) return emptyMap()
 
         val groupToMember = allGroups.associate { it.id to it.memberId }
 
@@ -185,7 +232,18 @@ class PriceAlertScheduler(
             if (maxDownRt < 0) {
                 checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxDownRt, Direction.DOWN, CRYPTO_THRESHOLDS)
             }
+
+            // 52주 신고가/신저가 체크
+            val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
+            if (ticker.highest_52_week_date == today) {
+                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxUpRt, Direction.HIGH_52W, listOf(0.0))
+            }
+            if (ticker.lowest_52_week_date == today) {
+                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxDownRt, Direction.LOW_52W, listOf(0.0))
+            }
         }
+
+        return tickerMap
     }
 
     private fun checkThresholds(
@@ -210,6 +268,73 @@ class PriceAlertScheduler(
                     direction = direction,
                     fluRt = fluRt
                 )
+            }
+        }
+    }
+
+    private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>) {
+        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK)
+        if (targets.isEmpty()) return
+
+        // stockDataMap에 없는 종목은 별도 조회
+        val missingCodes = targets.map { it.assetCode }.filter { it !in stockDataMap }.distinct()
+        val additionalMap = if (missingCodes.isNotEmpty()) {
+            try {
+                val stkCdParam = missingCodes.joinToString("|")
+                val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+                res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
+            } catch (e: Exception) {
+                log.error { "목표가 주식 현재가 조회 실패: ${e.message}" }
+                emptyMap()
+            }
+        } else emptyMap()
+
+        val combinedMap = stockDataMap + additionalMap
+
+        for (target in targets) {
+            val stockData = combinedMap[target.assetCode] ?: continue
+            val curPrc = kotlin.math.abs(stockData.cur_prc?.toDoubleOrNull() ?: continue)
+
+            val reached = when (target.direction) {
+                PriceTargetDirection.ABOVE -> curPrc >= target.targetPrice
+                PriceTargetDirection.BELOW -> curPrc <= target.targetPrice
+            }
+
+            if (reached) {
+                notificationService.createPriceTargetAlert(target, curPrc)
+            }
+        }
+    }
+
+    private fun checkCryptoPriceTargets(tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>) {
+        val targets = priceTargetRepository.findByAssetType(AssetType.CRYPTO)
+        if (targets.isEmpty()) return
+
+        // tickerMap에 없는 종목은 별도 조회
+        val missingMarkets = targets.map { it.assetCode }.filter { it !in tickerMap }.distinct()
+        val additionalMap = if (missingMarkets.isNotEmpty()) {
+            try {
+                tickerClient.getTickers(missingMarkets.joinToString(","))
+                    .associateBy { it.market }
+            } catch (e: Exception) {
+                log.error { "목표가 코인 현재가 조회 실패: ${e.message}" }
+                emptyMap()
+            }
+        } else emptyMap()
+
+        val combinedMap = tickerMap + additionalMap
+
+        for (target in targets) {
+            val ticker = combinedMap[target.assetCode] ?: continue
+            val tradePrice = ticker.trade_price ?: continue
+
+            val reached = when (target.direction) {
+                PriceTargetDirection.ABOVE -> tradePrice >= target.targetPrice
+                PriceTargetDirection.BELOW -> tradePrice <= target.targetPrice
+            }
+
+            if (reached) {
+                notificationService.createPriceTargetAlert(target, tradePrice)
             }
         }
     }

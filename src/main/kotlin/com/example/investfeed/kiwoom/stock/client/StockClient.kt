@@ -11,6 +11,7 @@ import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockTradeDailyRes
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomNewHighLowReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomSectCodeListReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomSectCodeListRes
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
@@ -19,6 +20,7 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockDefaultInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInfoRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomNewHighLowRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterestRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestorRes
 import mu.KotlinLogging
@@ -331,6 +333,36 @@ class StockClient(
         }catch (e: Exception) {
             log.error { "stockInterest Error" }
 
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun newHighLow(
+        req: KiwoomNewHighLowReq
+    ): KiwoomNewHighLowRes {
+        val accessToken = authClient.getCurrentAccessToken()
+
+        try {
+            val res = webClient.post()
+                .uri(DEFAULT_URL + STOCK_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10016")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomNewHighLowRes>()
+                .block()
+
+            if (res?.return_code != 0) {
+                throw RuntimeException("newHighLow Error: ${res?.return_msg}")
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "newHighLow Error: ${e.message}" }
             throw RuntimeException(e.message)
         }
     }
