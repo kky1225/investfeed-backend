@@ -3,9 +3,12 @@ package com.example.investfeed.global.holiday
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.WebClient
 import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
+import java.net.HttpURLConnection
+import java.net.URI
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import javax.xml.parsers.DocumentBuilderFactory
 
 @Component
@@ -14,7 +17,6 @@ class HolidayClient(
     private val DEFAULT_URL: String,
     @param:Value("\${data-go-kr.service-key}")
     private val serviceKey: String,
-    private val webClient: WebClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -24,11 +26,15 @@ class HolidayClient(
         val solMonth = String.format("%02d", month)
 
         try {
-            val xml = webClient.get()
-                .uri("$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$serviceKey&solYear=$year&solMonth=$solMonth&numOfRows=30")
-                .retrieve()
-                .bodyToMono(String::class.java)
-                .block() ?: return emptyList()
+            val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
+            val urlStr = "$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&solMonth=$solMonth&numOfRows=30"
+            val connection = URI(urlStr).toURL().openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+
+            val xml = connection.inputStream.bufferedReader().use { it.readText() }
+            connection.disconnect()
 
             return parseHolidayDates(xml)
         } catch (e: Exception) {

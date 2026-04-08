@@ -19,6 +19,7 @@ import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellin
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
+import com.example.investfeed.domain.dividend.service.StockDividendService
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
@@ -28,7 +29,8 @@ class StockService(
     private val priceClient: PriceClient,
     private val stockChartClient: StockChartClient,
     private val stockSocketClient: StockSocketClient,
-    private val shortSellingClient: ShortSellingClient
+    private val shortSellingClient: ShortSellingClient,
+    private val stockDividendService: StockDividendService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -346,13 +348,21 @@ class StockService(
             }
         }
 
+        val dividendList = try {
+            stockDividendService.getDividendList(req.stkCd, kiwoomStockInfoRes.marketCode)
+        } catch (e: Exception) {
+            log.error { "배당 정보 조회 실패: ${e.message}" }
+            emptyList()
+        }
+
         return StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
             stockInvestorChartList = stockInvestorChartList,
             stockInvestorList = stockInvestorList,
             stockProgramList = stockProgramList,
-            stockShortSellingList = stockShortSellingList
+            stockShortSellingList = stockShortSellingList,
+            dividendList = dividendList,
         )
     }
 

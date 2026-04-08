@@ -1,5 +1,7 @@
 package com.example.investfeed.domain.stock.dto.res
 
+import com.example.investfeed.domain.dividend.dto.res.StockDividendRes
+
 data class StockDetailRes(
     var stockInfo: StockInfo? = null,
     var stockChartList: List<StockChart>? = null,
@@ -7,5 +9,6 @@ data class StockDetailRes(
     var stockInvestorList: List<StockInvestor>? = null,
     var stockProgramList: List<StockProgram>? = null,
     var stockProgramChartList: List<StockProgramChart>? = null,
-    var stockShortSellingList: List<StockShortSelling>? = null
+    var stockShortSellingList: List<StockShortSelling>? = null,
+    var dividendList: List<StockDividendRes>? = null,
 )
