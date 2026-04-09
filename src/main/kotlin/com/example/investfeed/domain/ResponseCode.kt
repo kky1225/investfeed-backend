@@ -139,6 +139,13 @@ enum class ResponseCode(
     CRYPTO_INTEREST_ITEM_REORDER(message = "암호화폐 관심종목 순서 변경에 성공하셨습니다."),
     CRYPTO_INTEREST_ITEM_STREAM(message = "실시간 암호화폐 관심종목 조회에 성공하셨습니다."),
 
+    REALIZED_PNL_LIST(message = "실현손익 목록 조회에 성공하셨습니다."),
+    REALIZED_PNL_SYNC(message = "실현손익 동기화에 성공하셨습니다."),
+    REALIZED_PNL_SUMMARY(message = "실현손익 요약 조회에 성공하셨습니다."),
+    REALIZED_PNL_MANUAL_CREATE(message = "수동 실현손익 등록에 성공하셨습니다."),
+    REALIZED_PNL_MANUAL_UPDATE(message = "수동 실현손익 수정에 성공하셨습니다."),
+    REALIZED_PNL_MANUAL_DELETE(message = "수동 실현손익 삭제에 성공하셨습니다."),
+
     NOTIFICATION_LIST(message = "알림 목록 조회에 성공하셨습니다."),
     NOTIFICATION_UNREAD_COUNT(message = "안읽은 알림 수 조회에 성공하셨습니다."),
     NOTIFICATION_READ(message = "알림 읽음 처리에 성공하셨습니다."),

@@ -19,7 +19,7 @@ class SecondaryAuthFilter(
     private val objectMapper: ObjectMapper
 ) : OncePerRequestFilter() {
 
-    private val protectedPaths = listOf("/api/auth/admin/", "/api/admin/", "/api/stock/holding/", "/api/crypto/holding/", "/api/asset/")
+    private val protectedPaths = listOf("/api/auth/admin/", "/api/admin/", "/api/stock/holding/", "/api/crypto/holding/", "/api/asset/", "/api/stock/realizedpnl/", "/api/crypto/realizedpnl/", "/api/realizedpnl/")
 
     override fun doFilterInternal(
         request: HttpServletRequest,

@@ -178,12 +178,13 @@ class PriceAlertScheduler(
                 val key = Pair(item.memberId, item.stkCd)
                 if (!processedSet.add(key)) continue
 
-                val rawCode = item.stkCd.replace("_AL", "")
-                if (rawCode in newHighCodes) {
-                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, 0.0, Direction.HIGH_52W, listOf(0.0))
+                if (item.stkCd in newHighCodes) {
+                    val highPric = kotlin.math.abs(stockDataMap[item.stkCd]?.high_pric?.toDoubleOrNull() ?: 0.0)
+                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, highPric, Direction.HIGH_52W, listOf(0.0))
                 }
-                if (rawCode in newLowCodes) {
-                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, 0.0, Direction.LOW_52W, listOf(0.0))
+                if (item.stkCd in newLowCodes) {
+                    val lowPric = kotlin.math.abs(stockDataMap[item.stkCd]?.low_pric?.toDoubleOrNull() ?: 0.0)
+                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, lowPric, Direction.LOW_52W, listOf(0.0))
                 }
             }
         } catch (e: Exception) {
@@ -236,10 +237,10 @@ class PriceAlertScheduler(
             // 52주 신고가/신저가 체크
             val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
             if (ticker.highest_52_week_date == today) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxUpRt, Direction.HIGH_52W, listOf(0.0))
+                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, ticker.highest_52_week_price ?: 0.0, Direction.HIGH_52W, listOf(0.0))
             }
             if (ticker.lowest_52_week_date == today) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxDownRt, Direction.LOW_52W, listOf(0.0))
+                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, ticker.lowest_52_week_price ?: 0.0, Direction.LOW_52W, listOf(0.0))
             }
         }
 
