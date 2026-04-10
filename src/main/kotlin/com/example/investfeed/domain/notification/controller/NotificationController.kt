@@ -2,10 +2,13 @@ package com.example.investfeed.domain.notification.controller
 
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.notification.dto.req.NotificationListReq
+import com.example.investfeed.domain.notification.dto.req.NotificationSettingReq
 import com.example.investfeed.domain.notification.dto.req.PriceTargetCreateReq
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
+import com.example.investfeed.domain.notification.dto.res.NotificationSettingRes
 import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.domain.notification.service.NotificationService
+import com.example.investfeed.domain.notification.service.NotificationSettingService
 import com.example.investfeed.domain.notification.service.PriceTargetService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.common.exception.ApiResponse
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.*
 class NotificationController(
     private val notificationService: NotificationService,
     private val priceTargetService: PriceTargetService,
+    private val notificationSettingService: NotificationSettingService,
 ) {
 
     @GetMapping
@@ -115,6 +119,30 @@ class NotificationController(
                 code = ResponseCode.PRICE_TARGET_DELETE.code,
                 message = ResponseCode.PRICE_TARGET_DELETE.message,
                 result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("settings")
+    fun getNotificationSetting(): ResponseEntity<ApiResponse<NotificationSettingRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.NOTIFICATION_SETTING.code,
+                message = ResponseCode.NOTIFICATION_SETTING.message,
+                result = notificationSettingService.getSetting()
+            ), HttpStatus.OK
+        )
+    }
+
+    @PutMapping("settings")
+    fun saveNotificationSetting(
+        @RequestBody req: NotificationSettingReq
+    ): ResponseEntity<ApiResponse<NotificationSettingRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.NOTIFICATION_SETTING_SAVE.code,
+                message = ResponseCode.NOTIFICATION_SETTING_SAVE.message,
+                result = notificationSettingService.saveSetting(req)
             ), HttpStatus.OK
         )
     }

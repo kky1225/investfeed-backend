@@ -52,6 +52,10 @@ naver-stock:
   mobile-url: https://m.stock.naver.com
   pc-url: https://stock.naver.com
 
+naver-news:
+  client-id: ${NAVER_NEWS_CLIENT_ID}
+  client-secret: ${NAVER_NEWS_CLIENT_SECRET}
+
 data-go-kr:
   default-url: http://apis.data.go.kr
   service-key: ${DATA_GO_KR_SERVICE_KEY}

@@ -32,6 +32,7 @@ class PriceAlertScheduler(
     private val stockClient: StockClient,
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
+    private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
     private val priceTargetRepository: com.example.investfeed.domain.notification.repository.PriceTargetRepository,
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
@@ -256,6 +257,18 @@ class PriceAlertScheduler(
         direction: Direction,
         thresholds: List<Double>
     ) {
+        // 알림 설정 체크
+        val setting = notificationSettingService.getSettingByMemberId(memberId)
+        when (direction) {
+            Direction.UP -> if (!setting.priceUpEnabled) return
+            Direction.DOWN -> if (!setting.priceDownEnabled) return
+            Direction.UPPER_LIMIT -> if (!setting.upperLimitEnabled) return
+            Direction.LOWER_LIMIT -> if (!setting.lowerLimitEnabled) return
+            Direction.HIGH_52W -> if (!setting.high52wEnabled) return
+            Direction.LOW_52W -> if (!setting.low52wEnabled) return
+            else -> {}
+        }
+
         val absFluRt = kotlin.math.abs(fluRt)
 
         for (threshold in thresholds) {

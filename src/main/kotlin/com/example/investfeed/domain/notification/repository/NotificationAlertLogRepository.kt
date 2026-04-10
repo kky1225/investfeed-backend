@@ -15,4 +15,11 @@ interface NotificationAlertLogRepository : JpaRepository<NotificationAlertLog, L
         direction: Direction,
         alertDate: LocalDate
     ): Boolean
+
+    fun deleteByMemberIdAndAssetTypeAndAssetCodeAndDirection(
+        memberId: Long,
+        assetType: AssetType,
+        assetCode: String,
+        direction: Direction
+    )
 }

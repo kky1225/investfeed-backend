@@ -6,6 +6,7 @@ import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockProgramChartReq
 import com.example.investfeed.domain.stock.dto.req.StockSearchReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
+import com.example.investfeed.domain.stock.dto.res.StockChartRes
 import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockProgramChart
 import com.example.investfeed.domain.stock.dto.res.StockSearchItem
@@ -33,6 +34,19 @@ class StockController(
                 code = ResponseCode.STOCK_DETAIL.code,
                 message = ResponseCode.STOCK_DETAIL.message,
                 result = stockService.stockDetail(req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("chart")
+    fun stockChart(
+        req: StockDetailReq
+    ): ResponseEntity<ApiResponse<StockChartRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.STOCK_DETAIL.code,
+                message = ResponseCode.STOCK_DETAIL.message,
+                result = stockService.stockChart(req = req)
             ), HttpStatus.OK
         )
     }

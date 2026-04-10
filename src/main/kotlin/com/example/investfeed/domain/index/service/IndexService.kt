@@ -439,7 +439,7 @@ class IndexService(
                     val natnNetprps = investor.natn_netprps.replace("--", "-")
 
                     val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(indexType.indsCd)
-                    if (latest != null && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps) {
+                    if (latest != null && latest.dt == date && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps) {
                         return@forEach
                     }
 

@@ -8,5 +8,8 @@ enum class Direction {
     HIGH_52W,
     LOW_52W,
     TARGET_ABOVE,
-    TARGET_BELOW
+    TARGET_BELOW,
+    GOAL_ACHIEVED,
+    REBALANCING_ASSET,
+    REBALANCING_STOCK
 }

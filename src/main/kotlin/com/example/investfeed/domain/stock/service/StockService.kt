@@ -367,6 +367,80 @@ class StockService(
     }
 
 
+    fun stockChart(req: StockDetailReq): StockChartRes {
+        val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
+            req = KiwoomDefaultStockInfoReq(stk_cd = req.stkCd)
+        )
+        val kiwoomStockInfoRes = stockClient.stockInfo(
+            req = KiwoomStockInfoReq(stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""))
+        )
+        val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
+            req = KiwoomStockTradeInfoReq(stk_cd = req.stkCd)
+        )
+
+        var stockInfo: StockInfo? = null
+        if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
+            stockInfo = StockInfo(
+                stkCd = kiwoomStockDefaultInfoRes.stk_cd,
+                stkNm = kiwoomStockDefaultInfoRes.stk_nm,
+                per = kiwoomStockDefaultInfoRes.per,
+                eps = kiwoomStockDefaultInfoRes.eps,
+                roe = kiwoomStockDefaultInfoRes.roe,
+                pbr = kiwoomStockDefaultInfoRes.pbr,
+                mac = kiwoomStockDefaultInfoRes.mac,
+                macWght = kiwoomStockDefaultInfoRes.mac_wght,
+                forExhRt = kiwoomStockDefaultInfoRes.for_exh_rt,
+                _250hgst = kiwoomStockDefaultInfoRes._250hgst,
+                _250lwst = kiwoomStockDefaultInfoRes._250lwst,
+                highPric = kiwoomStockDefaultInfoRes.high_pric,
+                openPric = kiwoomStockDefaultInfoRes.open_pric,
+                lowPric = kiwoomStockDefaultInfoRes.low_pric,
+                curPrc = kiwoomStockDefaultInfoRes.cur_prc,
+                preSig = kiwoomStockDefaultInfoRes.pre_sig,
+                predPre = kiwoomStockDefaultInfoRes.pred_pre,
+                fluRt = kiwoomStockDefaultInfoRes.flu_rt,
+                trdeQty = kiwoomStockDefaultInfoRes.trde_qty,
+                trdePrica = kiwoomStockTradeInfoRes.trde_prica,
+                tm = kiwoomStockTradeInfoRes.date + DateUtil.time("HHmm"),
+                nxtEnable = kiwoomStockInfoRes.nxtEnable,
+                orderWarning = kiwoomStockInfoRes.orderWarning,
+                marketCode = kiwoomStockInfoRes.marketCode,
+                marketName = kiwoomStockInfoRes.marketName,
+                upName = kiwoomStockInfoRes.upName,
+            )
+        }
+
+        val chartListRes: MutableList<StockChart> = mutableListOf()
+        when (req.chartType) {
+            StockChartType.DAY -> {
+                val res = stockChartClient.chartDayList(KiwoomStockChartDayReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                if (res.return_code == 0) res.stk_dt_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+            }
+            StockChartType.WEEK -> {
+                val res = stockChartClient.chartWeekList(KiwoomStockChartWeekReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                if (res.return_code == 0) res.stk_stk_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+            }
+            StockChartType.MONTH -> {
+                val res = stockChartClient.chartMonthList(KiwoomStockChartMonthReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                if (res.return_code == 0) res.stk_mth_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+            }
+            StockChartType.YEAR -> {
+                val res = stockChartClient.chartYearList(KiwoomStockChartYearReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                if (res.return_code == 0) res.stk_yr_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+            }
+            else -> {
+                req.chartType.value?.let { tic ->
+                    val res = stockChartClient.chartMinuteList(KiwoomStockChartMinuteReq(stk_cd = req.stkCd, tic_scope = tic, upd_stkpc_tp = "1"))
+                    if (res.return_code == 0) res.stk_min_pole_chart_qry?.filter { kiwoomStockTradeInfoRes.date?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
+                        chartListRes.add(StockChart(dt = it.cntr_tm, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty))
+                    }
+                }
+            }
+        }
+
+        return StockChartRes(stockInfo = stockInfo, stockChartList = chartListRes)
+    }
+
     fun stockProgramChart(
         stkCd: String
     ): List<StockProgramChart> {

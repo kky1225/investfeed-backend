@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.notification.service
 
+import com.example.investfeed.domain.goal.entity.GoalType
 import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.notification.entity.*
@@ -123,6 +124,62 @@ class NotificationService(
             notificationWebSocketHandler.sendToUser(priceTarget.memberId, message)
         } catch (e: Exception) {
             log.error { "목표가 WebSocket 알림 전송 실패: ${e.message}" }
+        }
+    }
+
+    @Transactional
+    fun createGoalAlert(
+        memberId: Long,
+        goalType: GoalType,
+        targetAmount: Long,
+        currentAmount: Long
+    ) {
+        val now = LocalDate.now()
+
+        // 중복 방지: 월간은 월 1번, 연간은 연 1번, 총 자산은 목표 변경 전까지 1번
+        val alertDate = when (goalType) {
+            GoalType.MONTHLY_REALIZED_PNL -> LocalDate.of(now.year, now.monthValue, 1)
+            GoalType.YEARLY_REALIZED_PNL -> LocalDate.of(now.year, 1, 1)
+            GoalType.TOTAL_ASSET -> LocalDate.of(2000, 1, 1)
+        }
+        val alreadySent = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
+            memberId, AssetType.TOTAL, goalType.name, targetAmount.toDouble(), Direction.GOAL_ACHIEVED, alertDate
+        )
+        if (alreadySent) return
+
+        val notification = Notification(
+            memberId = memberId,
+            type = NotificationType.GOAL,
+            assetType = AssetType.TOTAL,
+            assetCode = goalType.name,
+            assetName = when (goalType) {
+                GoalType.TOTAL_ASSET -> "목표 총 자산"
+                GoalType.MONTHLY_REALIZED_PNL -> "월간 실현손익 목표"
+                GoalType.YEARLY_REALIZED_PNL -> "연간 실현손익 목표"
+            },
+            threshold = targetAmount.toDouble(),
+            direction = Direction.GOAL_ACHIEVED,
+            fluRt = currentAmount.toDouble()
+        )
+        notificationRepository.save(notification)
+
+        alertLogRepository.save(
+            NotificationAlertLog(
+                memberId = memberId,
+                assetType = AssetType.TOTAL,
+                assetCode = goalType.name,
+                threshold = targetAmount.toDouble(),
+                direction = Direction.GOAL_ACHIEVED,
+                alertDate = alertDate
+            )
+        )
+
+        try {
+            val res = NotificationRes.from(notification)
+            val message = objectMapper.writeValueAsString(res)
+            notificationWebSocketHandler.sendToUser(memberId, message)
+        } catch (e: Exception) {
+            log.error { "투자 목표 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 }

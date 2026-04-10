@@ -151,9 +151,23 @@ enum class ResponseCode(
     NOTIFICATION_READ(message = "알림 읽음 처리에 성공하셨습니다."),
     NOTIFICATION_READ_ALL(message = "전체 알림 읽음 처리에 성공하셨습니다."),
 
+    NEWS_SEARCH(message = "뉴스 검색에 성공하셨습니다."),
+
+    NOTIFICATION_SETTING(message = "알림 설정 조회에 성공하셨습니다."),
+    NOTIFICATION_SETTING_SAVE(message = "알림 설정 저장에 성공하셨습니다."),
+
     PRICE_TARGET_CREATE(message = "목표가 알림 등록에 성공하셨습니다."),
     PRICE_TARGET_LIST(message = "목표가 알림 목록 조회에 성공하셨습니다."),
     PRICE_TARGET_DELETE(message = "목표가 알림 삭제에 성공하셨습니다."),
+
+    REBALANCING_SETTING_SAVE(message = "리밸런싱 설정 저장에 성공하셨습니다."),
+    REBALANCING_STATUS(message = "리밸런싱 현황 조회에 성공하셨습니다."),
+    REBALANCING_SETTING_DELETE(message = "리밸런싱 설정 삭제에 성공하셨습니다."),
+
+    GOAL_CREATE(message = "투자 목표 등록에 성공하셨습니다."),
+    GOAL_UPDATE(message = "투자 목표 수정에 성공하셨습니다."),
+    GOAL_DELETE(message = "투자 목표 삭제에 성공하셨습니다."),
+    GOAL_LIST(message = "투자 목표 조회에 성공하셨습니다."),
 
     MENU_LIST(message = "메뉴 목록 조회에 성공하셨습니다."),
     MENU_MY_LIST(message = "사용자 메뉴 목록 조회에 성공하셨습니다."),

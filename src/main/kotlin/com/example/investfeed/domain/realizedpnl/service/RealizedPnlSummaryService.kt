@@ -8,6 +8,7 @@ import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlDashboardIte
 import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlItem
 import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlSummaryRes
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
+import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -16,6 +17,7 @@ import java.time.LocalDate
 @Service
 class RealizedPnlSummaryService(
     private val memberRealizedPnlRepository: MemberRealizedPnlRepository,
+    private val memberBrokerRepository: MemberBrokerRepository,
     private val stockRealizedPnlService: StockRealizedPnlService,
 ) {
 
@@ -92,12 +94,16 @@ class RealizedPnlSummaryService(
         val totalYtd = allItems.filter { it.year == now.year }.sumOf { it.realizedPnl }
         val totalAllTime = allItems.sumOf { it.realizedPnl }
 
-        // 증권사/거래소별 집계
-        val brokerPnlList = allItems.groupBy { Pair(it.brokerId, it.brokerName) }.map { (key, items) ->
+        // 증권사/거래소별 집계 (모든 등록된 브로커 포함)
+        val allBrokers = memberBrokerRepository.findByMemberIdOrderByOrderIndex(memberId)
+        val pnlByBroker = allItems.groupBy { it.brokerId }
+
+        val brokerPnlList = allBrokers.map { memberBroker ->
+            val items = pnlByBroker[memberBroker.broker.id] ?: emptyList()
             BrokerRealizedPnlItem(
-                brokerName = key.second,
-                brokerId = key.first,
-                market = items.first().market,
+                brokerName = memberBroker.broker.name,
+                brokerId = memberBroker.broker.id,
+                market = memberBroker.broker.market.name,
                 currentMonthPnl = items.filter { it.year == now.year && it.month == now.monthValue }.sumOf { it.realizedPnl },
                 ytdPnl = items.filter { it.year == now.year }.sumOf { it.realizedPnl },
                 allTimePnl = items.sumOf { it.realizedPnl }
