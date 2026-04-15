@@ -14,7 +14,7 @@ class MarketIndexScheduler(
 
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
     fun crawlAndSave() {
         try {
             val list = crawler.crawl()

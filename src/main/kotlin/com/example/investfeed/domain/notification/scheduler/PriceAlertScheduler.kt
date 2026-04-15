@@ -47,7 +47,7 @@ class PriceAlertScheduler(
         val CRYPTO_THRESHOLDS = listOf(5.0, 10.0, 20.0, 30.0)
     }
 
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
     fun checkPriceAlerts() {
         setSchedulerSecurityContext()
         try {

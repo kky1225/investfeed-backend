@@ -16,7 +16,7 @@ class HolidayService(
     private var holidays: Set<String> = emptySet()
     private var loadedMonth: String? = null
 
-    @Scheduled(cron = "0 5 0 1 * *")
+    @Scheduled(cron = "0 5 0 1 * *", scheduler = "slowScheduler")
     fun refreshHolidays() {
         val now = LocalDate.now()
         loadHolidays(now.year, now.monthValue)

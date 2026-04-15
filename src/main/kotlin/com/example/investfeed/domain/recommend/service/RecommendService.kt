@@ -42,7 +42,7 @@ class RecommendService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 30 * * * *")
+    @Scheduled(cron = "0 30 * * * *", scheduler = "slowScheduler")
     @Transactional
     fun recommendStock() {
         setSchedulerSecurityContext()

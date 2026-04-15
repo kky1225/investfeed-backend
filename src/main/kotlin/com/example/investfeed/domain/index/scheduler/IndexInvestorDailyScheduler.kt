@@ -26,7 +26,7 @@ class IndexInvestorDailyScheduler(
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
-    @Scheduled(cron = "0 0 7 * * *")
+    @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
         try {
             val yesterday = LocalDate.now().minusDays(1).format(formatter)

@@ -11,7 +11,7 @@ class StockDividendScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 30 13 * * *")
+    @Scheduled(cron = "0 30 13 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
         try {
             stockDividendService.collectDailyDividends()

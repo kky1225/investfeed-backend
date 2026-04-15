@@ -35,7 +35,7 @@ class RebalancingAlertScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkRebalancing() {
         setSchedulerSecurityContext()
         try {

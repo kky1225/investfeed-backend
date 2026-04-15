@@ -29,7 +29,7 @@ class GoalAlertScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkGoals() {
         setSchedulerSecurityContext()
         try {

@@ -1,8 +1,10 @@
 package com.example.investfeed.naver.news.client
 
+import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.naver.news.dto.res.NaverNewsRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
@@ -16,6 +18,7 @@ class NaverNewsClient(
 ) {
     private val log = KotlinLogging.logger {}
     private val webClient = WebClient.builder()
+        .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
         .baseUrl("https://openapi.naver.com")
         .build()
 

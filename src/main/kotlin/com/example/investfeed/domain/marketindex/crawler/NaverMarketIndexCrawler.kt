@@ -2,10 +2,12 @@ package com.example.investfeed.domain.marketindex.crawler
 
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
+import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
@@ -25,6 +27,7 @@ class NaverMarketIndexCrawler(
     private val log = KotlinLogging.logger {}
 
     private val webClient = WebClient.builder()
+        .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
         .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
         .build()

@@ -20,7 +20,7 @@ class HoldingSyncScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", scheduler = "slowScheduler")
     fun syncAllHoldings() {
         log.info { "보유종목 동기화 스케줄러 시작" }
         val start = System.currentTimeMillis()
