@@ -13,7 +13,6 @@ import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,7 +24,6 @@ class ManualHoldingService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val stockClient: StockClient,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
         val memberId = getMemberId()
@@ -163,15 +161,10 @@ class ManualHoldingService(
     private fun fetchCurrentPrices(stkCds: List<String>): Map<String, KiwoomStockInterest> {
         if (stkCds.isEmpty()) return emptyMap()
 
-        return try {
-            val stkCdParam = stkCds.joinToString("|")
-            val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+        val stkCdParam = stkCds.joinToString("|")
+        val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
 
-            res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
-        } catch (e: Exception) {
-            log.error { "수동 보유주식 현재가 조회 실패: ${e.message}" }
-            emptyMap()
-        }
+        return res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
     }
 
     private fun getMemberId(): Long {

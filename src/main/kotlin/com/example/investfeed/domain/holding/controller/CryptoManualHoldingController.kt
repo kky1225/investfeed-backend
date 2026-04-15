@@ -9,6 +9,7 @@ import com.example.investfeed.domain.holding.dto.req.ManualHoldingUpdateReq
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingListRes
 import com.example.investfeed.domain.holding.service.CryptoManualHoldingService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -34,7 +35,7 @@ class CryptoManualHoldingController(
 
     @PostMapping("create")
     fun createManualHolding(
-        @RequestBody req: ManualHoldingCreateReq
+        @Valid @RequestBody req: ManualHoldingCreateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
         return ResponseEntity(
             ApiResponse(
@@ -48,7 +49,7 @@ class CryptoManualHoldingController(
     @PutMapping("{holdingId}")
     fun updateManualHolding(
         @PathVariable holdingId: Long,
-        @RequestBody req: ManualHoldingUpdateReq
+        @Valid @RequestBody req: ManualHoldingUpdateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
         return ResponseEntity(
             ApiResponse(

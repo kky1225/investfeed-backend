@@ -11,6 +11,7 @@ import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeOrganizeRes
 import com.example.investfeed.kiwoom.investor.dto.res.InvestorTradeRankListRes
 import com.example.investfeed.kiwoom.investor.dto.res.KiwoomGoldInvestorRes
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -20,7 +21,8 @@ import org.springframework.web.reactive.function.client.WebClient
 class InvestorClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
@@ -32,7 +34,7 @@ class InvestorClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header("Authorization", "Bearer $accessToken")
                 .header("api-id", "ka10058")
@@ -65,7 +67,7 @@ class InvestorClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/stkinfo")
                 .header("Authorization", "Bearer $accessToken")
                 .header("api-id", "ka10061")
@@ -98,7 +100,7 @@ class InvestorClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/frgnistt")
                 .header("Authorization", "Bearer $accessToken")
                 .header("api-id", "ka10131")
@@ -129,7 +131,7 @@ class InvestorClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/frgnistt")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka52301")

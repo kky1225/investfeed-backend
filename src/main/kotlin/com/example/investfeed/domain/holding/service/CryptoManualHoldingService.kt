@@ -12,7 +12,6 @@ import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,8 +23,6 @@ class CryptoManualHoldingService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val tickerClient: TickerClient,
 ) {
-    private val log = KotlinLogging.logger {}
-
     fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, brokerId)
@@ -162,15 +159,10 @@ class CryptoManualHoldingService(
     private fun fetchCurrentPrices(stkCds: List<String>): Map<String, UpbitTickerRes> {
         if (stkCds.isEmpty()) return emptyMap()
 
-        return try {
-            val markets = stkCds.joinToString(",")
-            val res = tickerClient.getTickers(markets)
+        val markets = stkCds.joinToString(",")
+        val res = tickerClient.getTickers(markets)
 
-            res.associateBy { it.market ?: "" }
-        } catch (e: Exception) {
-            log.error { "수동 보유코인 현재가 조회 실패: ${e.message}" }
-            emptyMap()
-        }
+        return res.associateBy { it.market ?: "" }
     }
 
     private fun getMemberId(): Long {

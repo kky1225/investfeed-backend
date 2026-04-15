@@ -75,16 +75,12 @@ class CryptoInterestService(
         if (items.isEmpty()) return items
 
         val markets = items.joinToString(",") { it.market }
-        try {
-            val tickers = tickerClient.getTickers(markets)
-            items.forEach { item ->
-                val ticker = tickers.find { it.market == item.market }
-                item.tradePrice = ticker?.trade_price
-                item.signedChangeRate = ticker?.signed_change_rate
-                item.change = ticker?.change
-            }
-        } catch (_: Exception) {
-            // ticker 조회 실패 시 가격 없이 반환
+        val tickers = tickerClient.getTickers(markets)
+        items.forEach { item ->
+            val ticker = tickers.find { it.market == item.market }
+            item.tradePrice = ticker?.trade_price
+            item.signedChangeRate = ticker?.signed_change_rate
+            item.change = ticker?.change
         }
 
         return items

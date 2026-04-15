@@ -7,6 +7,7 @@ import com.example.investfeed.domain.holding.dto.req.BrokerUpdateReq
 import com.example.investfeed.domain.holding.dto.res.BrokerItem
 import com.example.investfeed.domain.holding.dto.res.BrokerListRes
 import com.example.investfeed.domain.holding.service.AdminBrokerService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -33,7 +34,7 @@ class AdminBrokerController(
     @PostMapping("create")
     @PreAuthorize("hasRole('ADMIN')")
     fun createBroker(
-        @RequestBody req: BrokerCreateReq
+        @Valid @RequestBody req: BrokerCreateReq
     ): ResponseEntity<ApiResponse<BrokerItem>> {
         return ResponseEntity(
             ApiResponse(
@@ -48,7 +49,7 @@ class AdminBrokerController(
     @PreAuthorize("hasRole('ADMIN')")
     fun updateBroker(
         @PathVariable brokerId: Long,
-        @RequestBody req: BrokerUpdateReq
+        @Valid @RequestBody req: BrokerUpdateReq
     ): ResponseEntity<ApiResponse<BrokerItem>> {
         return ResponseEntity(
             ApiResponse(

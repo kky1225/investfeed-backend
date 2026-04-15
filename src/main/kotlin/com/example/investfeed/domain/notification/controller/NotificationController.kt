@@ -12,6 +12,7 @@ import com.example.investfeed.domain.notification.service.NotificationSettingSer
 import com.example.investfeed.domain.notification.service.PriceTargetService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.common.exception.ApiResponse
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -84,7 +85,7 @@ class NotificationController(
     @PostMapping("price-targets")
     fun createPriceTarget(
         @AuthenticationPrincipal user: CustomUserDetails,
-        @RequestBody req: PriceTargetCreateReq
+        @Valid @RequestBody req: PriceTargetCreateReq
     ): ResponseEntity<ApiResponse<PriceTargetRes>> {
         return ResponseEntity(
             ApiResponse(

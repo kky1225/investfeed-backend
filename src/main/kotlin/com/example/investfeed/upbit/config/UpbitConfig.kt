@@ -11,7 +11,7 @@ class UpbitConfig(
     private val defaultUrl: String,
 ) {
 
-    @Bean("upbitWebClient")
+    @Bean
     fun upbitWebClient(): WebClient {
         return WebClient.builder()
             .baseUrl(defaultUrl)

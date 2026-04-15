@@ -10,6 +10,7 @@ import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -21,7 +22,8 @@ import java.time.Duration
 class AuthClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val redisTemplate: RedisTemplate<String, String>,
     private val memberApiKeyRepository: MemberApiKeyRepository,
     private val brokerRepository: BrokerRepository
@@ -88,7 +90,7 @@ class AuthClient(
             val (appKey, secretKey) = resolveApiKeys(loginId)
             val redisKey = getRedisKey(loginId)
 
-            val accessTokenRes = webClient.post()
+            val accessTokenRes = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/oauth2/token")
                 .bodyValue(
                     AccessTokenReq(
@@ -102,7 +104,7 @@ class AuthClient(
                 .block()
 
             if (accessTokenRes?.return_code != 0) {
-                throw RuntimeException("access token 오류")
+                throw RuntimeException("access token 오류: return_code=${accessTokenRes?.return_code}, return_msg=${accessTokenRes?.return_msg}")
             }
 
             accessTokenRes.token?.let {

@@ -15,7 +15,6 @@ import com.example.investfeed.domain.realizedpnl.dto.req.RealizedPnlSyncReq
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
 import com.example.investfeed.domain.realizedpnl.service.StockRealizedPnlService
 import com.example.investfeed.domain.security.CustomUserDetails
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,7 +30,6 @@ class InvestmentGoalService(
     private val memberRealizedPnlRepository: MemberRealizedPnlRepository,
     private val alertLogRepository: NotificationAlertLogRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     @Transactional
     fun create(req: InvestmentGoalCreateReq): InvestmentGoalRes {
@@ -96,36 +94,31 @@ class InvestmentGoalService(
     }
 
     fun calculateCurrentAmount(memberId: Long, type: GoalType): Long {
-        return try {
-            when (type) {
-                GoalType.TOTAL_ASSET -> {
-                    val dashboard = assetDashboardService.dashboard()
-                    dashboard.totalAsset
-                }
-                GoalType.MONTHLY_REALIZED_PNL -> {
-                    val now = LocalDate.now()
-                    val apiPnl = stockRealizedPnlService.fetchApiPnl(
-                        RealizedPnlSyncReq(year = now.year, month = now.monthValue)
-                    ).totalRealizedPnl
-                    val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)
-                        .filter { it.year == now.year && it.month == now.monthValue }
-                        .sumOf { it.realizedPnl }
-                    apiPnl + manualPnl
-                }
-                GoalType.YEARLY_REALIZED_PNL -> {
-                    val now = LocalDate.now()
-                    val apiPnl = stockRealizedPnlService.fetchApiPnl(
-                        RealizedPnlSyncReq(year = now.year)
-                    ).totalRealizedPnl
-                    val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)
-                        .filter { it.year == now.year }
-                        .sumOf { it.realizedPnl }
-                    apiPnl + manualPnl
-                }
+        return when (type) {
+            GoalType.TOTAL_ASSET -> {
+                val dashboard = assetDashboardService.dashboard()
+                dashboard.totalAsset
             }
-        } catch (e: Exception) {
-            log.error { "목표 달성률 계산 실패: ${e.message}" }
-            0L
+            GoalType.MONTHLY_REALIZED_PNL -> {
+                val now = LocalDate.now()
+                val apiPnl = stockRealizedPnlService.fetchApiPnl(
+                    RealizedPnlSyncReq(year = now.year, month = now.monthValue)
+                ).totalRealizedPnl
+                val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)
+                    .filter { it.year == now.year && it.month == now.monthValue }
+                    .sumOf { it.realizedPnl }
+                apiPnl + manualPnl
+            }
+            GoalType.YEARLY_REALIZED_PNL -> {
+                val now = LocalDate.now()
+                val apiPnl = stockRealizedPnlService.fetchApiPnl(
+                    RealizedPnlSyncReq(year = now.year)
+                ).totalRealizedPnl
+                val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)
+                    .filter { it.year == now.year }
+                    .sumOf { it.realizedPnl }
+                apiPnl + manualPnl
+            }
         }
     }
 

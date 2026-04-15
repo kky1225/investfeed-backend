@@ -6,6 +6,7 @@ import com.example.investfeed.domain.rebalancing.dto.req.RebalancingSettingReq
 import com.example.investfeed.domain.rebalancing.dto.res.RebalancingSettingRes
 import com.example.investfeed.domain.rebalancing.dto.res.RebalancingStatusRes
 import com.example.investfeed.domain.rebalancing.service.RebalancingService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -18,7 +19,7 @@ class RebalancingController(
 
     @PostMapping("setting")
     fun saveSetting(
-        @RequestBody req: RebalancingSettingReq
+        @Valid @RequestBody req: RebalancingSettingReq
     ): ResponseEntity<ApiResponse<RebalancingSettingRes>> {
         return ResponseEntity(
             ApiResponse(

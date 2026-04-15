@@ -77,27 +77,23 @@ class DashboardService(
                 var allNetprps: String? = null
 
                 if (it.marketType.isNotEmpty()) {
-                    try {
-                        val mrktTp = if (it.indsCd == "001") "P001_AL01" else "P101_AL02"
-                        val programTradeRes = priceClient.programTrade(
-                            req = KiwoomProgramTradeReq(
-                                date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")),
-                                amt_qty_tp = "1",
-                                mrkt_tp = mrktTp,
-                                min_tic_tp = "1",
-                                stex_tp = "3",
-                            )
+                    val mrktTp = if (it.indsCd == "001") "P001_AL01" else "P101_AL02"
+                    val programTradeRes = priceClient.programTrade(
+                        req = KiwoomProgramTradeReq(
+                            date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")),
+                            amt_qty_tp = "1",
+                            mrkt_tp = mrktTp,
+                            min_tic_tp = "1",
+                            stex_tp = "3",
                         )
+                    )
 
-                        if (programTradeRes.return_code == 0) {
-                            programTradeRes.prm_trde_trnsn?.firstOrNull()?.let { trade ->
-                                dfrtTrdeNetprps = trade.dfrt_trde_netprps
-                                ndiffproTrdeNetprps = trade.ndiffpro_trde_netprps
-                                allNetprps = trade.all_netprps
-                            }
+                    if (programTradeRes.return_code == 0) {
+                        programTradeRes.prm_trde_trnsn?.firstOrNull()?.let { trade ->
+                            dfrtTrdeNetprps = trade.dfrt_trde_netprps
+                            ndiffproTrdeNetprps = trade.ndiffpro_trde_netprps
+                            allNetprps = trade.all_netprps
                         }
-                    } catch (e: Exception) {
-                        log.error { "대시보드 프로그램매매 조회 실패 (${it.indsNm}): ${e.message}" }
                     }
                 }
 

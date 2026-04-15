@@ -7,6 +7,7 @@ import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlItem
 import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlListRes
 import com.example.investfeed.domain.realizedpnl.service.ManualRealizedPnlService
 import com.example.investfeed.domain.realizedpnl.service.StockRealizedPnlService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -46,7 +47,7 @@ class StockRealizedPnlController(
 
     @PostMapping("manual/create")
     fun createManual(
-        @RequestBody req: ManualRealizedPnlCreateReq
+        @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
         return ResponseEntity(
             ApiResponse(

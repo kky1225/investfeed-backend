@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -73,6 +74,28 @@ class ExceptionAdviceController {
 
         return ResponseEntity(
             ApiResponse(code = e.code, message = e.message, null), HttpStatus.INTERNAL_SERVER_ERROR
+        )
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun validationException(
+        e: MethodArgumentNotValidException
+    ): ResponseEntity<ApiResponse<Map<String, String>>> {
+        val errors = e.bindingResult.fieldErrors.associate { fe ->
+            fe.field to (fe.defaultMessage ?: when (fe.code) {
+                "NotBlank", "NotNull", "NotEmpty" -> "필수 값입니다."
+                else -> "유효하지 않은 값입니다."
+            })
+        }
+        log.warn { "validationException: $errors" }
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.VALIDATION_FAILED.code,
+                message = ResponseCode.VALIDATION_FAILED.message,
+                result = errors,
+            ),
+            HttpStatus.BAD_REQUEST
         )
     }
 }

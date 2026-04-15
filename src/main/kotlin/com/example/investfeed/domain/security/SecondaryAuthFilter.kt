@@ -19,7 +19,7 @@ class SecondaryAuthFilter(
     private val objectMapper: ObjectMapper
 ) : OncePerRequestFilter() {
 
-    private val protectedPaths = listOf("/api/auth/admin/", "/api/admin/", "/api/stock/holding/", "/api/crypto/holding/", "/api/asset/", "/api/stock/realizedpnl/", "/api/crypto/realizedpnl/", "/api/realizedpnl/", "/api/goal/", "/api/rebalancing/")
+    private val protectedPaths = listOf("/api/auth/admin/", "/api/admin/", "/api/stock/holding/", "/api/crypto/holding/", "/api/asset/", "/api/stock/realizedpnl/", "/api/crypto/realizedpnl/", "/api/realizedpnl/", "/api/goal/", "/api/rebalancing/", "/api/calendar/events/")
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -65,8 +65,9 @@ class SecondaryAuthFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun requiresSecondaryAuth(uri: String): Boolean =
-        protectedPaths.any { uri.startsWith(it) }
+    private fun requiresSecondaryAuth(uri: String): Boolean {
+        return protectedPaths.any { uri.startsWith(it) }
+    }
 
     private fun writeResponse(response: HttpServletResponse, code: ResponseCode) {
         response.status = HttpServletResponse.SC_FORBIDDEN

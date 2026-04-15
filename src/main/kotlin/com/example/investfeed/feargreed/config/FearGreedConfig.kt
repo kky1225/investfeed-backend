@@ -11,7 +11,7 @@ class FearGreedConfig(
     private val defaultUrl: String,
 ) {
 
-    @Bean("fearGreedWebClient")
+    @Bean
     fun fearGreedWebClient(): WebClient {
         return WebClient.builder()
             .baseUrl(defaultUrl)

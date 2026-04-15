@@ -94,22 +94,18 @@ class StockService(
             ).apply {
                 when {
                     MarketTimeUtil.isOvtSinglePrice() && marketName == "ETF" -> {
-                        try {
-                            val ovtRes = priceClient.stockSinglePriceList(
-                                req = KiwoomStockSinglePriceReq(
-                                    stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")
-                                )
+                        val ovtRes = priceClient.stockSinglePriceList(
+                            req = KiwoomStockSinglePriceReq(
+                                stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")
                             )
-                            ovtRes?.let {
-                                val pric = it.ovt_sigpric_cur_prc
-                                if (!pric.isNullOrBlank() && pric != "0") {
-                                    expCntrPric = pric
-                                    expCntrFluRt = it.ovt_sigpric_flu_rt
-                                    expCntrPreSig = it.ovt_sigpric_pred_pre_sig
-                                }
+                        )
+                        ovtRes?.let {
+                            val pric = it.ovt_sigpric_cur_prc
+                            if (!pric.isNullOrBlank() && pric != "0") {
+                                expCntrPric = pric
+                                expCntrFluRt = it.ovt_sigpric_flu_rt
+                                expCntrPreSig = it.ovt_sigpric_pred_pre_sig
                             }
-                        } catch (e: Exception) {
-                            log.error { "시간외단일가 조회 실패: ${e.message}" }
                         }
                     }
                     MarketTimeUtil.isCallAuction() -> {
@@ -348,12 +344,7 @@ class StockService(
             }
         }
 
-        val dividendList = try {
-            stockDividendService.getDividendList(req.stkCd, kiwoomStockInfoRes.marketCode)
-        } catch (e: Exception) {
-            log.error { "배당 정보 조회 실패: ${e.message}" }
-            emptyList()
-        }
+        val dividendList = stockDividendService.getDividendList(req.stkCd, kiwoomStockInfoRes.marketCode)
 
         return StockDetailRes(
             stockInfo = stockInfo,
@@ -479,12 +470,7 @@ class StockService(
         val marketTypes = listOf("0", "10", "8", "60")
         return marketTypes
             .flatMap { mrktTp ->
-                try {
-                    stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp))?.list ?: emptyList()
-                } catch (e: Exception) {
-                    log.warn { "stockSearch mrkt_tp=$mrktTp 조회 실패: ${e.message}" }
-                    emptyList()
-                }
+                stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp))?.list ?: emptyList()
             }
             .filter { it.name?.contains(keyword, ignoreCase = true) == true }
             .distinctBy { it.code }

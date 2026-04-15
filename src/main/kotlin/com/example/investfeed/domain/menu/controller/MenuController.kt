@@ -10,6 +10,7 @@ import com.example.investfeed.domain.menu.dto.req.UpdateMenuStructureReq
 import com.example.investfeed.domain.menu.dto.res.MenuRes
 import com.example.investfeed.domain.menu.service.MenuService
 import com.example.investfeed.domain.security.CustomUserDetails
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -38,7 +39,7 @@ class MenuController(
 
     @PostMapping("/admin/menus")
     @PreAuthorize("hasRole('ADMIN')")
-    fun createMenu(@RequestBody req: CreateMenuReq): ResponseEntity<ApiResponse<MenuRes>> {
+    fun createMenu(@Valid @RequestBody req: CreateMenuReq): ResponseEntity<ApiResponse<MenuRes>> {
         val menu = menuService.createMenu(req)
 
         return ResponseEntity(
@@ -54,7 +55,7 @@ class MenuController(
     @PreAuthorize("hasRole('ADMIN')")
     fun updateMenu(
         @PathVariable id: Long,
-        @RequestBody req: UpdateMenuReq
+        @Valid @RequestBody req: UpdateMenuReq
     ): ResponseEntity<ApiResponse<MenuRes>> {
         val menu = menuService.updateMenu(id, req)
 

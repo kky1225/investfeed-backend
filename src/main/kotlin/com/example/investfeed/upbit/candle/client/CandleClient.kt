@@ -38,10 +38,14 @@ class CandleClient(
         }
     }
 
-    fun getCandlesDays(market: String, count: Int = 200): List<UpbitCandleDayRes> {
+    fun getCandlesDays(market: String, count: Int = 200, to: String? = null): List<UpbitCandleDayRes> {
         try {
+            val uri = buildString {
+                append("/v1/candles/days?market=$market&count=$count")
+                if (to != null) append("&to=$to")
+            }
             val res = upbitWebClient.get()
-                .uri("/v1/candles/days?market=$market&count=$count")
+                .uri(uri)
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleDayRes>>() {})
                 .block()
@@ -55,10 +59,14 @@ class CandleClient(
         }
     }
 
-    fun getCandlesWeeks(market: String, count: Int = 200): List<UpbitCandleWeekMonthRes> {
+    fun getCandlesWeeks(market: String, count: Int = 200, to: String? = null): List<UpbitCandleWeekMonthRes> {
         try {
+            val uri = buildString {
+                append("/v1/candles/weeks?market=$market&count=$count")
+                if (to != null) append("&to=$to")
+            }
             val res = upbitWebClient.get()
-                .uri("/v1/candles/weeks?market=$market&count=$count")
+                .uri(uri)
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()
@@ -72,10 +80,14 @@ class CandleClient(
         }
     }
 
-    fun getCandlesYears(market: String, count: Int = 200): List<UpbitCandleWeekMonthRes> {
+    fun getCandlesYears(market: String, count: Int = 200, to: String? = null): List<UpbitCandleWeekMonthRes> {
         try {
+            val uri = buildString {
+                append("/v1/candles/years?market=$market&count=$count")
+                if (to != null) append("&to=$to")
+            }
             val res = upbitWebClient.get()
-                .uri("/v1/candles/years?market=$market&count=$count")
+                .uri(uri)
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()
@@ -89,10 +101,14 @@ class CandleClient(
         }
     }
 
-    fun getCandlesMonths(market: String, count: Int = 200): List<UpbitCandleWeekMonthRes> {
+    fun getCandlesMonths(market: String, count: Int = 200, to: String? = null): List<UpbitCandleWeekMonthRes> {
         try {
+            val uri = buildString {
+                append("/v1/candles/months?market=$market&count=$count")
+                if (to != null) append("&to=$to")
+            }
             val res = upbitWebClient.get()
-                .uri("/v1/candles/months?market=$market&count=$count")
+                .uri(uri)
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()

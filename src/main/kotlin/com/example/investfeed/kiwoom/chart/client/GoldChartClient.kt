@@ -16,6 +16,7 @@ import com.example.investfeed.kiwoom.exception.GoldChartMonthListException
 import com.example.investfeed.kiwoom.exception.GoldChartWeekListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -26,7 +27,8 @@ import org.springframework.web.reactive.function.client.bodyToMono
 class GoldChartClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
@@ -40,7 +42,7 @@ class GoldChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + CHART_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50092")
@@ -73,7 +75,7 @@ class GoldChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + CHART_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50081")
@@ -106,7 +108,7 @@ class GoldChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + CHART_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50082")
@@ -139,7 +141,7 @@ class GoldChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + CHART_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50083")

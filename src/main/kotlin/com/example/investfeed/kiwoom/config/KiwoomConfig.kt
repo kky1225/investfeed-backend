@@ -5,10 +5,10 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 
 @Component
-class WebClientConfig {
+class KiwoomConfig {
 
     @Bean
-    fun webClient(): WebClient {
+    fun kiwoomWebClient(): WebClient {
         return WebClient.builder()
             .defaultHeader("Content-Type", "application/json")
             .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) } // 5mb

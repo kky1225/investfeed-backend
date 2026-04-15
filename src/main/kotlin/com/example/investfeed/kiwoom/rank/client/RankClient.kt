@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.rank.dto.req.*
 import com.example.investfeed.kiwoom.rank.dto.res.*
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
@@ -16,7 +17,8 @@ import org.springframework.web.reactive.function.client.toEntity
 class RankClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
@@ -29,7 +31,7 @@ class RankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10032")
@@ -62,7 +64,7 @@ class RankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10030")
@@ -95,7 +97,7 @@ class RankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10023")
@@ -128,7 +130,7 @@ class RankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + RANK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10065")
@@ -168,7 +170,7 @@ class RankClient(
             var returnMsg = ""
 
             while(true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + RANK_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka90009")

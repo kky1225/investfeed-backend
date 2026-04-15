@@ -1,5 +1,8 @@
 package com.example.investfeed.domain.holding.dto.res
 
+import com.example.investfeed.domain.goal.dto.res.InvestmentGoalRes
+import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlDashboardItem
+
 data class AssetDashboardRes(
     val totalAsset: Long,
     val totalEvltAmt: Long,
@@ -10,6 +13,8 @@ data class AssetDashboardRes(
     val stockSummary: AssetGroupSummary,
     val cryptoSummary: AssetGroupSummary,
     val brokerSummaries: List<BrokerSummaryItem>,
+    var realizedPnl: RealizedPnlDashboardItem? = null,
+    var goals: List<InvestmentGoalRes>? = null,
 )
 
 data class AssetGroupSummary(

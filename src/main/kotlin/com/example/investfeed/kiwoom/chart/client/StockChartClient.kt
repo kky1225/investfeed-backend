@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.dto.stock.res.*
 import com.example.investfeed.kiwoom.exception.*
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -16,7 +17,8 @@ import org.springframework.web.reactive.function.client.bodyToMono
 class StockChartClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
@@ -28,7 +30,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10080")
@@ -61,7 +63,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10081")
@@ -94,7 +96,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10082")
@@ -127,7 +129,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10083")
@@ -160,7 +162,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10094")
@@ -193,7 +195,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10064")

@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.price.dto.req.*
 import com.example.investfeed.kiwoom.price.dto.res.*
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
@@ -17,7 +18,8 @@ import org.springframework.web.reactive.function.client.toEntity
 class PriceClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
@@ -31,7 +33,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10006")
@@ -64,7 +66,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10087")
@@ -97,7 +99,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50100")
@@ -130,7 +132,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka50101")
@@ -170,7 +172,7 @@ class PriceClient(
             var returnMsg = ""
 
             while (true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka10063")
@@ -229,7 +231,7 @@ class PriceClient(
             var returnMsg = ""
 
             while (true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka10066")
@@ -283,7 +285,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka90010")
@@ -322,7 +324,7 @@ class PriceClient(
             var returnMsg = ""
 
             while (true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka90013")
@@ -379,7 +381,7 @@ class PriceClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + PRICE_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka90007")
@@ -419,7 +421,7 @@ class PriceClient(
             var returnMsg = ""
 
             while (true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka90008")
@@ -480,7 +482,7 @@ class PriceClient(
             var returnMsg = ""
 
             while (true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + PRICE_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka90005")

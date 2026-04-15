@@ -27,6 +27,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     implementation("org.springframework.boot:spring-boot-starter-web")
+    //validation (jakarta.validation)
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     //webClient
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")

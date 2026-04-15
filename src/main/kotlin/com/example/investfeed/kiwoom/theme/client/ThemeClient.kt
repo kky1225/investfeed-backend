@@ -11,6 +11,7 @@ import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroup
 import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupRes
 import com.example.investfeed.kiwoom.theme.dto.res.KiwoomThemeGroupStockRes
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -21,7 +22,8 @@ import org.springframework.web.reactive.function.client.toEntity
 class ThemeClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
@@ -41,7 +43,7 @@ class ThemeClient(
             var returnMsg = ""
 
             while(true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + THEME_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka90001")
@@ -93,7 +95,7 @@ class ThemeClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + THEME_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka90002")

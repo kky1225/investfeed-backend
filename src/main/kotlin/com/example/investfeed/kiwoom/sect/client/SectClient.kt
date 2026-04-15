@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.exception.*
 import com.example.investfeed.kiwoom.sect.dto.req.*
 import com.example.investfeed.kiwoom.sect.dto.res.*
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -17,7 +18,8 @@ import org.springframework.web.reactive.function.client.toEntity
 class SectClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
@@ -30,7 +32,7 @@ class SectClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + SECT_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10051")
@@ -63,7 +65,7 @@ class SectClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + SECT_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20001")
@@ -109,7 +111,7 @@ class SectClient(
             var returnMsg = ""
 
             while(true) {
-                val entity = webClient.post()
+                val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + SECT_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                     .header("api-id", "ka20002")
@@ -163,7 +165,7 @@ class SectClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + SECT_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20003")
@@ -196,7 +198,7 @@ class SectClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + SECT_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20009")

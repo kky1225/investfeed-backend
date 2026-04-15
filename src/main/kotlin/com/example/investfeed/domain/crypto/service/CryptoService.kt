@@ -133,7 +133,15 @@ class CryptoService(
             }
 
             CryptoChartType.DAY -> {
-                candleClient.getCandlesDays(market = req.market, count = 200).reversed().map {
+                val allCandles = mutableListOf<com.example.investfeed.upbit.candle.dto.res.UpbitCandleDayRes>()
+                var to: String? = null
+                repeat(5) {
+                    val batch = candleClient.getCandlesDays(market = req.market, count = 200, to = to)
+                    if (batch.isEmpty()) return@repeat
+                    allCandles.addAll(batch)
+                    to = batch.last().candle_date_time_utc
+                }
+                allCandles.reversed().map {
                     CryptoChart(
                         dt = it.candle_date_time_kst,
                         tradePrice = it.trade_price,
@@ -147,7 +155,15 @@ class CryptoService(
             }
 
             CryptoChartType.WEEK -> {
-                candleClient.getCandlesWeeks(market = req.market, count = 200).reversed().map {
+                val allCandles = mutableListOf<com.example.investfeed.upbit.candle.dto.res.UpbitCandleWeekMonthRes>()
+                var to: String? = null
+                repeat(3) {
+                    val batch = candleClient.getCandlesWeeks(market = req.market, count = 200, to = to)
+                    if (batch.isEmpty()) return@repeat
+                    allCandles.addAll(batch)
+                    to = batch.last().candle_date_time_utc
+                }
+                allCandles.reversed().map {
                     CryptoChart(
                         dt = it.candle_date_time_kst,
                         tradePrice = it.trade_price,
@@ -161,7 +177,10 @@ class CryptoService(
             }
 
             CryptoChartType.MONTH -> {
-                candleClient.getCandlesMonths(market = req.market, count = 200).reversed().map {
+                val first = candleClient.getCandlesMonths(market = req.market, count = 200)
+                val oldestTime = first.lastOrNull()?.candle_date_time_utc
+                val second = if (oldestTime != null) candleClient.getCandlesMonths(market = req.market, count = 200, to = oldestTime) else emptyList()
+                (second + first).reversed().map {
                     CryptoChart(
                         dt = it.candle_date_time_kst,
                         tradePrice = it.trade_price,

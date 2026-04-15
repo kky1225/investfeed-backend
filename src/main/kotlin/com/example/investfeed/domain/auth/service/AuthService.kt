@@ -7,7 +7,6 @@ import com.example.investfeed.domain.auth.dto.req.LoginReq
 import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordChangeReq
 import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordSetupReq
 import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordVerifyReq
-import com.example.investfeed.domain.auth.dto.req.SignupReq
 import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
 import com.example.investfeed.domain.auth.dto.res.ApiKeyRes
 import com.example.investfeed.domain.auth.dto.res.MemberRes
@@ -52,35 +51,6 @@ class AuthService(
     private val log = KotlinLogging.logger {}
     private val preAuthTokenTtl = 310L // seconds (5분 10초)
     private val secondaryAuthTtl = 30L // minutes
-
-    @Transactional
-    fun signup(
-        req: SignupReq
-    ) {
-        if (memberRepository.existsByLoginId(req.loginId)) {
-            throw DuplicateLoginIdException()
-        }
-        if (memberRepository.existsByEmail(req.email)) {
-            throw DuplicateEmailException()
-        }
-        if (memberRepository.existsByNickname(req.nickname)) {
-            throw DuplicateNicknameException()
-        }
-        if (memberRepository.existsByPhone(req.phone)) {
-            throw DuplicatePhoneException()
-        }
-
-        val member = Member(
-            loginId = req.loginId,
-            password = passwordEncoder.encode(req.password),
-            email = req.email,
-            nickname = req.nickname,
-            name = req.name,
-            phone = req.phone
-        )
-
-        memberRepository.save(member)
-    }
 
     data class LoginResult(
         val tokenRes: TokenRes,
@@ -228,12 +198,6 @@ class AuthService(
             throw DuplicatePhoneException()
         }
 
-        val role = try {
-            Role.valueOf(req.role)
-        } catch (e: IllegalArgumentException) {
-            Role.GUEST
-        }
-
         val member = Member(
             loginId = req.loginId,
             password = passwordEncoder.encode(defaultPassword),
@@ -241,7 +205,7 @@ class AuthService(
             nickname = req.nickname,
             name = req.name,
             phone = req.phone,
-            role = role,
+            role = req.role,
             passwordChangedAt = LocalDateTime.of(2000, 1, 1, 0, 0)
         )
 

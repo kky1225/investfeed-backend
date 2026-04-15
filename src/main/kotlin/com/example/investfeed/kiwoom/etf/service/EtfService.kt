@@ -13,6 +13,7 @@ import com.example.investfeed.kiwoom.exception.EtfTradeDailyListException
 import com.example.investfeed.kiwoom.exception.EtfPriceListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -22,7 +23,8 @@ import org.springframework.web.reactive.function.client.WebClient
 class EtfService(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
@@ -34,7 +36,7 @@ class EtfService(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/etf")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka40004")
@@ -67,7 +69,7 @@ class EtfService(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/etf")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka40002")
@@ -100,7 +102,7 @@ class EtfService(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/etf")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka40008")

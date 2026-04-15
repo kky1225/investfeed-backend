@@ -5,7 +5,6 @@ import com.example.investfeed.domain.holding.entity.BrokerType
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.security.CustomUserDetails
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 
@@ -17,7 +16,6 @@ class AssetDashboardService(
     private val manualHoldingService: ManualHoldingService,
     private val cryptoManualHoldingService: CryptoManualHoldingService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun dashboard(): AssetDashboardRes {
         val memberId = getMemberId()
@@ -40,71 +38,63 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                try {
-                    val res = holdingService.holdingList()
-                    bEvltAmt = res.totEvltAmt.toLongOrNull() ?: 0
-                    bPurAmt = res.totPurAmt.toLongOrNull() ?: 0
-                    bCash = res.balance.toLongOrNull() ?: 0
-                    bHoldingCount = res.holdingList.size
-                    stockEvltAmt += bEvltAmt
-                    stockPurAmt += bPurAmt
-                    stockCash += bCash
-                    stockHoldings.addAll(res.holdingList.map { item ->
-                        bHoldings.add(BrokerHoldingItem(
-                            stkCd = item.stkCd,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt.toLongOrNull() ?: 0,
-                            quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
-                        ))
-                        UnifiedHoldingItem(
-                            stkCd = item.stkCd,
-                            stkNm = item.stkNm,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt.toLongOrNull() ?: 0,
-                            evltAmt = item.evltAmt.toLongOrNull() ?: 0,
-                            evltPl = item.evltvPrft.toLongOrNull() ?: 0,
-                            prftRt = item.prftRt,
-                            possRt = "0",
-                            brokerName = broker.broker.name,
-                        )
-                    })
-                } catch (e: Exception) {
-                    log.error { "주식 API 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
-                }
+                val res = holdingService.holdingList()
+                bEvltAmt = res.totEvltAmt.toLongOrNull() ?: 0
+                bPurAmt = res.totPurAmt.toLongOrNull() ?: 0
+                bCash = res.balance.toLongOrNull() ?: 0
+                bHoldingCount = res.holdingList.size
+                stockEvltAmt += bEvltAmt
+                stockPurAmt += bPurAmt
+                stockCash += bCash
+                stockHoldings.addAll(res.holdingList.map { item ->
+                    bHoldings.add(BrokerHoldingItem(
+                        stkCd = item.stkCd,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt.toLongOrNull() ?: 0,
+                        quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
+                    ))
+                    UnifiedHoldingItem(
+                        stkCd = item.stkCd,
+                        stkNm = item.stkNm,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt.toLongOrNull() ?: 0,
+                        evltAmt = item.evltAmt.toLongOrNull() ?: 0,
+                        evltPl = item.evltvPrft.toLongOrNull() ?: 0,
+                        prftRt = item.prftRt,
+                        possRt = "0",
+                        brokerName = broker.broker.name,
+                    )
+                })
             } else {
-                try {
-                    val res = manualHoldingService.manualHoldingList(broker.id)
-                    bCash = res.balance
-                    stockCash += bCash
-                    bHoldingCount = res.holdings.size
-                    for (item in res.holdings) {
-                        val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
-                        val evltPl = evltAmt - item.purAmt
-                        val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
-                        bEvltAmt += evltAmt
-                        bPurAmt += item.purAmt
-                        stockEvltAmt += evltAmt
-                        stockPurAmt += item.purAmt
-                        bHoldings.add(BrokerHoldingItem(
-                            stkCd = item.stkCd,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt,
-                            quantity = item.quantity.toDouble(),
-                        ))
-                        stockHoldings.add(UnifiedHoldingItem(
-                            stkCd = item.stkCd,
-                            stkNm = item.stkNm,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt,
-                            evltAmt = evltAmt,
-                            evltPl = evltPl,
-                            prftRt = String.format("%.2f", prftRt),
-                            possRt = "0",
-                            brokerName = broker.broker.name,
-                        ))
-                    }
-                } catch (e: Exception) {
-                    log.error { "주식 수동 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
+                val res = manualHoldingService.manualHoldingList(broker.id)
+                bCash = res.balance
+                stockCash += bCash
+                bHoldingCount = res.holdings.size
+                for (item in res.holdings) {
+                    val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
+                    val evltPl = evltAmt - item.purAmt
+                    val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
+                    bEvltAmt += evltAmt
+                    bPurAmt += item.purAmt
+                    stockEvltAmt += evltAmt
+                    stockPurAmt += item.purAmt
+                    bHoldings.add(BrokerHoldingItem(
+                        stkCd = item.stkCd,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt,
+                        quantity = item.quantity.toDouble(),
+                    ))
+                    stockHoldings.add(UnifiedHoldingItem(
+                        stkCd = item.stkCd,
+                        stkNm = item.stkNm,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt,
+                        evltAmt = evltAmt,
+                        evltPl = evltPl,
+                        prftRt = String.format("%.2f", prftRt),
+                        possRt = "0",
+                        brokerName = broker.broker.name,
+                    ))
                 }
             }
 
@@ -136,71 +126,63 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                try {
-                    val res = cryptoHoldingService.cryptoHoldingList()
-                    bEvltAmt = res.totEvltAmt.toDoubleOrNull()?.toLong() ?: 0
-                    bPurAmt = res.totPurAmt.toDoubleOrNull()?.toLong() ?: 0
-                    bCash = res.balance.toDoubleOrNull()?.toLong() ?: 0
-                    bHoldingCount = res.holdingList.size
-                    cryptoEvltAmt += bEvltAmt
-                    cryptoPurAmt += bPurAmt
-                    cryptoCash += bCash
-                    cryptoHoldings.addAll(res.holdingList.map { item ->
-                        bHoldings.add(BrokerHoldingItem(
-                            stkCd = item.stkCd,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt.toLongOrNull() ?: 0,
-                            quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
-                        ))
-                        UnifiedHoldingItem(
-                            stkCd = item.stkCd,
-                            stkNm = item.stkNm,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt.toLongOrNull() ?: 0,
-                            evltAmt = item.evltAmt.toLongOrNull() ?: 0,
-                            evltPl = item.evltvPrft.toLongOrNull() ?: 0,
-                            prftRt = item.prftRt,
-                            possRt = "0",
-                            brokerName = broker.broker.name,
-                        )
-                    })
-                } catch (e: Exception) {
-                    log.error { "코인 API 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
-                }
+                val res = cryptoHoldingService.cryptoHoldingList()
+                bEvltAmt = res.totEvltAmt.toDoubleOrNull()?.toLong() ?: 0
+                bPurAmt = res.totPurAmt.toDoubleOrNull()?.toLong() ?: 0
+                bCash = res.balance.toDoubleOrNull()?.toLong() ?: 0
+                bHoldingCount = res.holdingList.size
+                cryptoEvltAmt += bEvltAmt
+                cryptoPurAmt += bPurAmt
+                cryptoCash += bCash
+                cryptoHoldings.addAll(res.holdingList.map { item ->
+                    bHoldings.add(BrokerHoldingItem(
+                        stkCd = item.stkCd,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt.toLongOrNull() ?: 0,
+                        quantity = item.rmndQty.toDoubleOrNull() ?: 0.0,
+                    ))
+                    UnifiedHoldingItem(
+                        stkCd = item.stkCd,
+                        stkNm = item.stkNm,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt.toLongOrNull() ?: 0,
+                        evltAmt = item.evltAmt.toLongOrNull() ?: 0,
+                        evltPl = item.evltvPrft.toLongOrNull() ?: 0,
+                        prftRt = item.prftRt,
+                        possRt = "0",
+                        brokerName = broker.broker.name,
+                    )
+                })
             } else {
-                try {
-                    val res = cryptoManualHoldingService.manualHoldingList(broker.id)
-                    bCash = res.balance
-                    cryptoCash += bCash
-                    bHoldingCount = res.holdings.size
-                    for (item in res.holdings) {
-                        val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
-                        val evltPl = evltAmt - item.purAmt
-                        val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
-                        bEvltAmt += evltAmt
-                        bPurAmt += item.purAmt
-                        cryptoEvltAmt += evltAmt
-                        cryptoPurAmt += item.purAmt
-                        bHoldings.add(BrokerHoldingItem(
-                            stkCd = item.stkCd,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt,
-                            quantity = item.quantity.toDouble(),
-                        ))
-                        cryptoHoldings.add(UnifiedHoldingItem(
-                            stkCd = item.stkCd,
-                            stkNm = item.stkNm,
-                            curPrc = item.curPrc,
-                            purAmt = item.purAmt,
-                            evltAmt = evltAmt,
-                            evltPl = evltPl,
-                            prftRt = String.format("%.2f", prftRt),
-                            possRt = "0",
-                            brokerName = broker.broker.name,
-                        ))
-                    }
-                } catch (e: Exception) {
-                    log.error { "코인 수동 보유자산 조회 실패 (${broker.broker.name}): ${e.message}" }
+                val res = cryptoManualHoldingService.manualHoldingList(broker.id)
+                bCash = res.balance
+                cryptoCash += bCash
+                bHoldingCount = res.holdings.size
+                for (item in res.holdings) {
+                    val evltAmt = (item.curPrc.toLongOrNull() ?: 0) * item.quantity
+                    val evltPl = evltAmt - item.purAmt
+                    val prftRt = if (item.purAmt > 0) evltPl.toDouble() / item.purAmt * 100 else 0.0
+                    bEvltAmt += evltAmt
+                    bPurAmt += item.purAmt
+                    cryptoEvltAmt += evltAmt
+                    cryptoPurAmt += item.purAmt
+                    bHoldings.add(BrokerHoldingItem(
+                        stkCd = item.stkCd,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt,
+                        quantity = item.quantity.toDouble(),
+                    ))
+                    cryptoHoldings.add(UnifiedHoldingItem(
+                        stkCd = item.stkCd,
+                        stkNm = item.stkNm,
+                        curPrc = item.curPrc,
+                        purAmt = item.purAmt,
+                        evltAmt = evltAmt,
+                        evltPl = evltPl,
+                        prftRt = String.format("%.2f", prftRt),
+                        possRt = "0",
+                        brokerName = broker.broker.name,
+                    ))
                 }
             }
 

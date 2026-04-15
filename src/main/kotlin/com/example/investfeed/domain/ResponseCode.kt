@@ -69,6 +69,7 @@ enum class ResponseCode(
 
     AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
     AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),
+    VALIDATION_FAILED(code = "VALIDATION_4001", message = "입력값 검증에 실패했습니다."),
 
     AUTH_REISSUE(message = "토큰 재발급에 성공하셨습니다."),
     AUTH_LOGOUT(message = "로그아웃에 성공하셨습니다."),
@@ -141,7 +142,6 @@ enum class ResponseCode(
 
     REALIZED_PNL_LIST(message = "실현손익 목록 조회에 성공하셨습니다."),
     REALIZED_PNL_SYNC(message = "실현손익 동기화에 성공하셨습니다."),
-    REALIZED_PNL_SUMMARY(message = "실현손익 요약 조회에 성공하셨습니다."),
     REALIZED_PNL_MANUAL_CREATE(message = "수동 실현손익 등록에 성공하셨습니다."),
     REALIZED_PNL_MANUAL_UPDATE(message = "수동 실현손익 수정에 성공하셨습니다."),
     REALIZED_PNL_MANUAL_DELETE(message = "수동 실현손익 삭제에 성공하셨습니다."),
@@ -152,6 +152,14 @@ enum class ResponseCode(
     NOTIFICATION_READ_ALL(message = "전체 알림 읽음 처리에 성공하셨습니다."),
 
     NEWS_SEARCH(message = "뉴스 검색에 성공하셨습니다."),
+
+    ECONOMIC_INDICATORS(message = "경제 지표 조회에 성공하셨습니다."),
+    ECONOMIC_HISTORY(message = "경제 지표 추이 조회에 성공하셨습니다."),
+    CALENDAR_EVENT_LIST(message = "일정 목록 조회에 성공하셨습니다."),
+    CALENDAR_EVENT_CREATE(message = "일정 등록에 성공하셨습니다."),
+    CALENDAR_EVENT_UPDATE(message = "일정 수정에 성공하셨습니다."),
+    CALENDAR_EVENT_DELETE(message = "일정 삭제에 성공하셨습니다."),
+    CALENDAR_REFRESH(message = "캘린더 데이터 갱신에 성공하셨습니다."),
 
     NOTIFICATION_SETTING(message = "알림 설정 조회에 성공하셨습니다."),
     NOTIFICATION_SETTING_SAVE(message = "알림 설정 저장에 성공하셨습니다."),

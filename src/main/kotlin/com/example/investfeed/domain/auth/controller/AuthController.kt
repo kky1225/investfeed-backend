@@ -8,6 +8,7 @@ import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
 import com.example.investfeed.domain.auth.service.AuthService
 import com.example.investfeed.domain.security.CustomUserDetails
 import jakarta.servlet.http.HttpServletResponse
+import jakarta.validation.Valid
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
@@ -110,7 +111,7 @@ class AuthController(
     fun changePassword(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @CookieValue(name = "accessToken", required = false) accessToken: String?,
-        @RequestBody req: ChangePasswordReq,
+        @Valid @RequestBody req: ChangePasswordReq,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<Nothing?>> {
         authService.changePassword(userDetails.username, req, accessToken)
@@ -167,7 +168,7 @@ class AuthController(
     @PutMapping("/profile")
     fun updateProfile(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
-        @RequestBody req: UpdateProfileReq
+        @Valid @RequestBody req: UpdateProfileReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         authService.updateProfile(userDetails.username, req)
 
@@ -198,7 +199,7 @@ class AuthController(
     @PostMapping("/api-keys")
     fun createApiKey(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
-        @RequestBody req: ApiKeyReq
+        @Valid @RequestBody req: ApiKeyReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         authService.createApiKey(userDetails.username, req)
 
@@ -296,7 +297,7 @@ class AuthController(
 
     @PostMapping("/admin/members")
     @PreAuthorize("hasRole('ADMIN')")
-    fun createMember(@RequestBody req: CreateMemberReq): ResponseEntity<ApiResponse<Nothing?>> {
+    fun createMember(@Valid @RequestBody req: CreateMemberReq): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "create member: ${req.loginId}" }
 
         authService.createMember(req)

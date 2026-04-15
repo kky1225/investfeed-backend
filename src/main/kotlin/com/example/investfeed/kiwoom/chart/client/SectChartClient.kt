@@ -19,6 +19,7 @@ import com.example.investfeed.kiwoom.exception.SectChartMonthListException
 import com.example.investfeed.kiwoom.exception.SectChartWeekListException
 import com.example.investfeed.kiwoom.exception.SectChartYearListException
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
@@ -28,7 +29,8 @@ import org.springframework.web.reactive.function.client.WebClient
 class SectChartClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient
 ) {
     private val log = KotlinLogging.logger {}
@@ -40,7 +42,7 @@ class SectChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20005")
@@ -77,7 +79,7 @@ class SectChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20006")
@@ -110,7 +112,7 @@ class SectChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20007")
@@ -143,7 +145,7 @@ class SectChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20008")
@@ -176,7 +178,7 @@ class SectChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20019")

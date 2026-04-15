@@ -11,6 +11,7 @@ import com.example.investfeed.domain.interest.dto.res.InterestItemRes
 import com.example.investfeed.domain.interest.service.InterestService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.common.exception.ApiResponse
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -38,7 +39,7 @@ class InterestController(
     @PostMapping("groups")
     fun createGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
-        @RequestBody req: CreateGroupReq
+        @Valid @RequestBody req: CreateGroupReq
     ): ResponseEntity<ApiResponse<InterestGroupRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -53,7 +54,7 @@ class InterestController(
     fun updateGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
-        @RequestBody req: UpdateGroupReq
+        @Valid @RequestBody req: UpdateGroupReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         interestService.updateGroup(user.member.id, groupId, req)
         return ResponseEntity(
@@ -113,7 +114,7 @@ class InterestController(
     fun addItem(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
-        @RequestBody req: AddItemReq
+        @Valid @RequestBody req: AddItemReq
     ): ResponseEntity<ApiResponse<InterestItemRes>> {
         return ResponseEntity(
             ApiResponse(

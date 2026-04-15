@@ -7,6 +7,7 @@ import com.example.investfeed.domain.goal.dto.req.InvestmentGoalUpdateReq
 import com.example.investfeed.domain.goal.dto.res.GoalDashboardRes
 import com.example.investfeed.domain.goal.dto.res.InvestmentGoalRes
 import com.example.investfeed.domain.goal.service.InvestmentGoalService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -19,7 +20,7 @@ class InvestmentGoalController(
 
     @PostMapping("create")
     fun create(
-        @RequestBody req: InvestmentGoalCreateReq
+        @Valid @RequestBody req: InvestmentGoalCreateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -33,7 +34,7 @@ class InvestmentGoalController(
     @PutMapping("{id}")
     fun update(
         @PathVariable id: Long,
-        @RequestBody req: InvestmentGoalUpdateReq
+        @Valid @RequestBody req: InvestmentGoalUpdateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
         return ResponseEntity(
             ApiResponse(

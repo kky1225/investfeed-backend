@@ -7,6 +7,7 @@ import com.example.investfeed.domain.cryptointerest.dto.res.CryptoInterestItemRe
 import com.example.investfeed.domain.cryptointerest.service.CryptoInterestService
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.common.exception.ApiResponse
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -34,7 +35,7 @@ class CryptoInterestController(
     @PostMapping("groups")
     fun createGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
-        @RequestBody req: CreateCryptoGroupReq
+        @Valid @RequestBody req: CreateCryptoGroupReq
     ): ResponseEntity<ApiResponse<CryptoInterestGroupRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -49,7 +50,7 @@ class CryptoInterestController(
     fun updateGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
-        @RequestBody req: UpdateCryptoGroupReq
+        @Valid @RequestBody req: UpdateCryptoGroupReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         cryptoInterestService.updateGroup(user.member.id, groupId, req)
         return ResponseEntity(
@@ -109,7 +110,7 @@ class CryptoInterestController(
     fun addItem(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
-        @RequestBody req: AddCryptoItemReq
+        @Valid @RequestBody req: AddCryptoItemReq
     ): ResponseEntity<ApiResponse<CryptoInterestItemRes>> {
         return ResponseEntity(
             ApiResponse(

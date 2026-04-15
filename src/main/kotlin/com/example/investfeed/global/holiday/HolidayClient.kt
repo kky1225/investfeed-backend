@@ -22,7 +22,13 @@ class HolidayClient(
 
     private val HOLIDAY_PATH = "/B090041/openapi/service/SpcdeInfoService/getRestDeInfo"
 
+    data class HolidayInfo(val date: String, val name: String)
+
     fun getHolidays(year: Int, month: Int): List<String> {
+        return getHolidayInfos(year, month).map { it.date }
+    }
+
+    fun getHolidayInfos(year: Int, month: Int): List<HolidayInfo> {
         val solMonth = String.format("%02d", month)
 
         try {
@@ -36,15 +42,15 @@ class HolidayClient(
             val xml = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
-            return parseHolidayDates(xml)
+            return parseHolidayInfos(xml)
         } catch (e: Exception) {
             log.error(e) { "공휴일 API 호출 실패: $year-$solMonth" }
             return emptyList()
         }
     }
 
-    private fun parseHolidayDates(xml: String): List<String> {
-        val dates = mutableListOf<String>()
+    private fun parseHolidayInfos(xml: String): List<HolidayInfo> {
+        val holidays = mutableListOf<HolidayInfo>()
 
         try {
             val factory = DocumentBuilderFactory.newInstance()
@@ -56,15 +62,16 @@ class HolidayClient(
                 val item = items.item(i) as Element
                 val isHoliday = item.getElementsByTagName("isHoliday").item(0)?.textContent
                 val locdate = item.getElementsByTagName("locdate").item(0)?.textContent
+                val dateName = item.getElementsByTagName("dateName").item(0)?.textContent
 
                 if (isHoliday == "Y" && locdate != null) {
-                    dates.add(locdate)
+                    holidays.add(HolidayInfo(date = locdate, name = dateName ?: "공휴일"))
                 }
             }
         } catch (e: Exception) {
             log.error(e) { "공휴일 XML 파싱 실패" }
         }
 
-        return dates
+        return holidays
     }
 }

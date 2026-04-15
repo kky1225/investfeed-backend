@@ -1,7 +1,7 @@
 spring:
   application:
     name: InvestFeed
-  jackson:
+  Jackson:
     serialization:
       write-dates-as-timestamps: false
   data:
@@ -59,6 +59,14 @@ naver-news:
 data-go-kr:
   default-url: http://apis.data.go.kr
   service-key: ${DATA_GO_KR_SERVICE_KEY}
+
+ecos:
+  default-url: https://ecos.bok.or.kr
+  api-key: ${ECOS_API_KEY}
+
+fred:
+  default-url: https://api.stlouisfed.org
+  api-key: ${FRED_API_KEY}
 
 fear-greed:
   default-url: https://api.alternative.me

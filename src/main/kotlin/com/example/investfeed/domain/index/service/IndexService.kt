@@ -332,49 +332,45 @@ class IndexService(
             else -> indsCd
         }
 
-        try {
-            val mrktTp = if (mappedIndsCd == "101") "1" else "0"
-            val res = sectClient.sectInvestor(
-                req = KiwoomSectInvestorReq(
-                    mrkt_tp = mrktTp,
-                    amt_qty_tp = "0",
-                    stex_tp = "3"
-                )
+        val mrktTp = if (mappedIndsCd == "101") "1" else "0"
+        val res = sectClient.sectInvestor(
+            req = KiwoomSectInvestorReq(
+                mrkt_tp = mrktTp,
+                amt_qty_tp = "0",
+                stex_tp = "3"
             )
+        )
 
-            val investor = res.inds_netprps?.find {
-                it.inds_cd.replace("_AL", "") == mappedIndsCd
-            }
+        val investor = res.inds_netprps?.find {
+            it.inds_cd.replace("_AL", "") == mappedIndsCd
+        }
 
-            if (investor != null) {
-                val indNetprps = investor.ind_netprps.replace("--", "-")
-                val frgnrNetprps = investor.frgnr_netprps.replace("--", "-")
-                val orgnNetprps = investor.orgn_netprps.replace("--", "-")
+        if (investor != null) {
+            val indNetprps = investor.ind_netprps.replace("--", "-")
+            val frgnrNetprps = investor.frgnr_netprps.replace("--", "-")
+            val orgnNetprps = investor.orgn_netprps.replace("--", "-")
 
-                val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(mappedIndsCd)
-                val isDuplicate = latest != null && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps
+            val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(mappedIndsCd)
+            val isDuplicate = latest != null && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps
 
-                if (!isDuplicate) {
-                    result.add(
-                        IndexInvestorDailyItem(
-                            dt = DateUtil.today("yyyyMMdd"),
-                            indNetprps = indNetprps,
-                            frgnrNetprps = frgnrNetprps,
-                            orgnNetprps = orgnNetprps,
-                            scNetprps = investor.sc_netprps.replace("--", "-"),
-                            insrncNetprps = investor.insrnc_netprps.replace("--", "-"),
-                            invtrtNetprps = investor.invtrt_netprps.replace("--", "-"),
-                            bankNetprps = investor.bank_netprps.replace("--", "-"),
-                            endwNetprps = investor.endw_netprps.replace("--", "-"),
-                            etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-"),
-                            samoFundNetprps = investor.samo_fund_netprps.replace("--", "-"),
-                            natnNetprps = investor.natn_netprps.replace("--", "-"),
-                        )
+            if (!isDuplicate) {
+                result.add(
+                    IndexInvestorDailyItem(
+                        dt = DateUtil.today("yyyyMMdd"),
+                        indNetprps = indNetprps,
+                        frgnrNetprps = frgnrNetprps,
+                        orgnNetprps = orgnNetprps,
+                        scNetprps = investor.sc_netprps.replace("--", "-"),
+                        insrncNetprps = investor.insrnc_netprps.replace("--", "-"),
+                        invtrtNetprps = investor.invtrt_netprps.replace("--", "-"),
+                        bankNetprps = investor.bank_netprps.replace("--", "-"),
+                        endwNetprps = investor.endw_netprps.replace("--", "-"),
+                        etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-"),
+                        samoFundNetprps = investor.samo_fund_netprps.replace("--", "-"),
+                        natnNetprps = investor.natn_netprps.replace("--", "-"),
                     )
-                }
+                )
             }
-        } catch (e: Exception) {
-            log.error { "지수 당일 투자자 데이터 조회 실패: ${e.message}" }
         }
 
         // DB 일별 데이터

@@ -7,6 +7,7 @@ import com.example.investfeed.kiwoom.exception.ShortSellingException
 import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
 import com.example.investfeed.kiwoom.shortselling.dto.res.KiwoomStockShortSellingRes
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
@@ -17,7 +18,8 @@ import org.springframework.web.reactive.function.client.bodyToMono
 class ShortSellingClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
-    private val webClient: WebClient,
+    @Qualifier("kiwoomWebClient")
+    private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
@@ -30,7 +32,7 @@ class ShortSellingClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = webClient.post()
+            val res = kiwoomWebClient.post()
                 .uri(DEFAULT_URL + SHORT_SELLING_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10014")
