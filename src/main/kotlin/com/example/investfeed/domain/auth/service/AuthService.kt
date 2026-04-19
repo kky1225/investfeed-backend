@@ -462,7 +462,8 @@ class AuthService(
                 member = member,
                 broker = broker,
                 appKey = req.appKey,
-                secretKey = req.secretKey
+                secretKey = req.secretKey,
+                expiresAt = req.expiresAt.atStartOfDay()
             )
         )
     }
@@ -485,6 +486,7 @@ class AuthService(
             brokerId = broker.id,
             brokerName = broker.name,
             appKey = maskApiKey(appKey),
+            expiresAt = expiresAt,
             createdAt = createdAt
         )
     }

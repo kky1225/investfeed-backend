@@ -20,7 +20,7 @@ class InterestItem(
     val stkNm: String,
 
     @Column(nullable = false)
-    val addedAt: LocalDateTime = LocalDateTime.now(),
+    val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(nullable = false, columnDefinition = "integer default 0")
     var displayOrder: Int = 0

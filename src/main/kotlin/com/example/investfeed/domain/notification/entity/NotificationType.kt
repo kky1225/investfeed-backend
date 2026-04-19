@@ -5,5 +5,6 @@ enum class NotificationType {
     TRADE,
     TARGET_PRICE,
     GOAL,
-    REBALANCING
+    REBALANCING,
+    API_KEY
 }

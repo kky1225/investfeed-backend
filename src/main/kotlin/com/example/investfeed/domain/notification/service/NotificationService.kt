@@ -182,4 +182,60 @@ class NotificationService(
             log.error { "투자 목표 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
+
+    @Transactional
+    fun createApiKeyExpiryAlert(
+        memberId: Long,
+        apiKeyId: Long,
+        brokerName: String,
+        direction: Direction,
+        daysLeft: Int
+    ) {
+        val assetCode = "API_KEY_$apiKeyId"
+
+        // 중복 방지: 같은 API Key + 같은 direction 에 대해 1회만 (alertDate 를 만료일 고정)
+        val alertDate = LocalDate.of(2000, 1, 1) // 고정값 — API Key 삭제/재등록 시 새 id 부여되므로 assetCode 로 구분
+        val alreadySent = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
+            memberId, AssetType.TOTAL, assetCode, 0.0, direction, alertDate
+        )
+        if (alreadySent) return
+
+        val assetName = when (direction) {
+            Direction.API_KEY_EXPIRY_30D -> "${brokerName} API Key 유효기간이 30일 남았습니다"
+            Direction.API_KEY_EXPIRY_7D -> "${brokerName} API Key 유효기간이 7일 남았습니다"
+            Direction.API_KEY_EXPIRED -> "${brokerName} API Key 유효기간이 만료되었습니다"
+            else -> "${brokerName} API Key 알림"
+        }
+
+        val notification = Notification(
+            memberId = memberId,
+            type = NotificationType.API_KEY,
+            assetType = AssetType.TOTAL,
+            assetCode = assetCode,
+            assetName = assetName,
+            threshold = 0.0,
+            direction = direction,
+            fluRt = daysLeft.toDouble()
+        )
+        notificationRepository.save(notification)
+
+        alertLogRepository.save(
+            NotificationAlertLog(
+                memberId = memberId,
+                assetType = AssetType.TOTAL,
+                assetCode = assetCode,
+                threshold = 0.0,
+                direction = direction,
+                alertDate = alertDate
+            )
+        )
+
+        try {
+            val res = NotificationRes.from(notification)
+            val message = objectMapper.writeValueAsString(res)
+            notificationWebSocketHandler.sendToUser(memberId, message)
+        } catch (e: Exception) {
+            log.error { "API Key 만료 WebSocket 알림 전송 실패: ${e.message}" }
+        }
+    }
 }

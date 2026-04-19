@@ -20,8 +20,6 @@ class NewsService(
     private val CACHE_TTL = 30L // 30분
 
     fun searchNews(query: String, page: Int = 1): NewsListRes {
-        val display = 20
-        val start = (page - 1) * display + 1
         val cacheKey = "$CACHE_PREFIX${query}:$page"
 
         // Redis 캐시 조회
@@ -31,26 +29,35 @@ class NewsService(
                 objectMapper.readValue(cached, NewsListRes::class.java)
             } catch (e: Exception) {
                 log.error { "뉴스 캐시 파싱 실패: ${e.message}" }
-                fetchAndCache(query, display, start, cacheKey)
+                fetchAndCache(query, page, cacheKey)
             }
         }
 
-        return fetchAndCache(query, display, start, cacheKey)
+        return fetchAndCache(query, page, cacheKey)
     }
 
-    private fun fetchAndCache(query: String, display: Int, start: Int, cacheKey: String): NewsListRes {
-        val naverRes = naverNewsClient.searchNews(query = query, display = display, start = start)
+    private fun fetchAndCache(query: String, page: Int, cacheKey: String): NewsListRes {
+        val displayPerPage = 20
+        // 제목 필터링 후 결과가 줄어들므로 넉넉하게 조회
+        val fetchSize = 100
+        val start = (page - 1) * fetchSize + 1
 
-        val items = naverRes?.items?.map { item ->
-            NewsItem(
-                title = stripHtml(item.title ?: ""),
-                link = item.originallink ?: item.link ?: "",
-                description = stripHtml(item.description ?: ""),
-                pubDate = item.pubDate ?: "",
-            )
-        } ?: emptyList()
+        val naverRes = naverNewsClient.searchNews(query = query, display = fetchSize, start = start)
 
-        val result = NewsListRes(items = items, total = naverRes?.total ?: 0)
+        val items = naverRes?.items
+            ?.map { item ->
+                NewsItem(
+                    title = stripHtml(item.title ?: ""),
+                    link = item.originallink ?: item.link ?: "",
+                    description = stripHtml(item.description ?: ""),
+                    pubDate = item.pubDate ?: "",
+                )
+            }
+            ?.filter { it.title.contains(query, ignoreCase = true) }
+            ?.take(displayPerPage)
+            ?: emptyList()
+
+        val result = NewsListRes(items = items, total = items.size)
 
         // Redis 캐시 저장
         try {

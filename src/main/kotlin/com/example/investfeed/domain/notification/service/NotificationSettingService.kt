@@ -40,6 +40,7 @@ class NotificationSettingService(
             existing.lowerLimitEnabled = req.lowerLimitEnabled
             existing.goalEnabled = req.goalEnabled
             existing.rebalancingEnabled = req.rebalancingEnabled
+            existing.apiKeyEnabled = req.apiKeyEnabled
             existing.updatedAt = LocalDateTime.now()
             existing
         } else {
@@ -54,6 +55,7 @@ class NotificationSettingService(
                     lowerLimitEnabled = req.lowerLimitEnabled,
                     goalEnabled = req.goalEnabled,
                     rebalancingEnabled = req.rebalancingEnabled,
+                    apiKeyEnabled = req.apiKeyEnabled,
                 )
             )
         }
@@ -71,6 +73,7 @@ class NotificationSettingService(
             lowerLimitEnabled = setting.lowerLimitEnabled,
             goalEnabled = setting.goalEnabled,
             rebalancingEnabled = setting.rebalancingEnabled,
+            apiKeyEnabled = setting.apiKeyEnabled,
         )
     }
 
@@ -80,6 +83,7 @@ class NotificationSettingService(
             high52wEnabled = true, low52wEnabled = true,
             upperLimitEnabled = true, lowerLimitEnabled = true,
             goalEnabled = true, rebalancingEnabled = true,
+            apiKeyEnabled = true,
         )
     }
 

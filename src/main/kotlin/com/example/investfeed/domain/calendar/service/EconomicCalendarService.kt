@@ -33,6 +33,7 @@ class EconomicCalendarService(
     private val CACHE_TTL = 60L // 분
     private val FREEZE_GRACE_MONTHS = 2L // 2개월 유예 (3개월 이전부터 DB 확정)
     private val DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    private val DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
     data class KrIndicatorDef(val tableCode: String, val itemCode: String, val name: String, val unit: String, val frequency: String, val computeYoY: Boolean = false)
     data class UsIndicatorDef(val seriesId: String, val name: String, val unit: String, val frequency: String = "M")
@@ -88,6 +89,38 @@ class EconomicCalendarService(
     }
 
     // ==================================================================================
+    // 백그라운드 캐시 동기화 (스케줄러에서 호출)
+    // ==================================================================================
+
+    /**
+     * 5개월분(현재 기준 -2 ~ +2) 이벤트 + 지표 카드를 외부 API 에서 가져와 Redis 에 저장한다.
+     * 스케줄러가 30분 주기로 호출하여 Redis 를 항상 warm 상태로 유지한다.
+     *
+     * 범위: freeze 유예 기간(FREEZE_GRACE_MONTHS) 내 과거 + 현재 + 미래 2개월
+     * 예) 4월 기준 → 2월, 3월, 4월, 5월, 6월
+     */
+    fun syncCurrentData() {
+        val now = YearMonth.now()
+        val updatedAt = LocalDateTime.now().format(DATETIME_FMT)
+
+        // 지표 카드 갱신
+        runCatching {
+            val indicators = fetchIndicators()
+            cacheIndicators("${CACHE_PREFIX}indicators", indicators.copy(lastUpdated = updatedAt))
+        }.onFailure { log.error { "일정 동기화 - 지표 카드 갱신 실패: ${it.message}" } }
+
+        // 5개월분 이벤트 갱신 (현재 -2 ~ +2)
+        for (offset in -FREEZE_GRACE_MONTHS..2L) {
+            val target = now.plusMonths(offset)
+            runCatching {
+                val events = fetchApiEvents(target.year, target.monthValue)
+                val result = CalendarEventsRes(events = events.sortedBy { it.date }, lastUpdated = updatedAt)
+                cacheEvents("${CACHE_PREFIX}events:${target.year}:${target.monthValue}", result)
+            }.onFailure { log.error { "일정 동기화 - ${target.year}-${target.monthValue} 이벤트 갱신 실패: ${it.message}" } }
+        }
+    }
+
+    // ==================================================================================
     // 지표 카드 (최신 값 + 전기 대비 변동)
     // ==================================================================================
 
@@ -96,7 +129,8 @@ class EconomicCalendarService(
         redisTemplate.opsForValue().get(cacheKey)?.let {
             runCatching { return objectMapper.readValue(it, EconomicIndicatorsRes::class.java) }
         }
-        return fetchIndicators().also { cacheIndicators(cacheKey, it) }
+        val updatedAt = LocalDateTime.now().format(DATETIME_FMT)
+        return fetchIndicators().copy(lastUpdated = updatedAt).also { cacheIndicators(cacheKey, it) }
     }
 
     private fun cacheIndicators(key: String, res: EconomicIndicatorsRes) {
@@ -558,7 +592,8 @@ class EconomicCalendarService(
         runCatching { freezeMonth(year, month, apiEvents) }
             .onFailure { log.error { "freeze 실패 ($year-$month): ${it.message}" } }
 
-        val apiResult = CalendarEventsRes(events = apiEvents.sortedBy { it.date })
+        val updatedAt = LocalDateTime.now().format(DATETIME_FMT)
+        val apiResult = CalendarEventsRes(events = apiEvents.sortedBy { it.date }, lastUpdated = updatedAt)
         cacheEvents(cacheKey, apiResult)
         return mergeManualEvents(apiResult, year, month)
     }
@@ -577,7 +612,8 @@ class EconomicCalendarService(
 
     private fun getEventsFromApi(year: Int, month: Int, cacheKey: String): CalendarEventsRes {
         val apiEvents = fetchApiEvents(year, month)
-        val result = CalendarEventsRes(events = apiEvents.sortedBy { it.date })
+        val updatedAt = LocalDateTime.now().format(DATETIME_FMT)
+        val result = CalendarEventsRes(events = apiEvents.sortedBy { it.date }, lastUpdated = updatedAt)
         cacheEvents(cacheKey, result)
         return mergeManualEvents(result, year, month)
     }
@@ -597,7 +633,7 @@ class EconomicCalendarService(
             val event = entity.toCalendarEvent(today)
             if (isManualEnrichable(entity)) enrichManualEvent(event) else event
         }
-        return CalendarEventsRes(events = (apiResult.events + enriched).sortedBy { it.date })
+        return CalendarEventsRes(events = (apiResult.events + enriched).sortedBy { it.date }, lastUpdated = apiResult.lastUpdated)
     }
 
     private fun isManualEnrichable(entity: CalendarEventEntity): Boolean =

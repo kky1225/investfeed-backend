@@ -8,5 +8,6 @@ data class NotificationSettingRes(
     val upperLimitEnabled: Boolean,
     val lowerLimitEnabled: Boolean,
     val goalEnabled: Boolean,
-    val rebalancingEnabled: Boolean
+    val rebalancingEnabled: Boolean,
+    val apiKeyEnabled: Boolean
 )

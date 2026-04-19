@@ -4,10 +4,8 @@ import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
-import com.example.investfeed.domain.recommend.entity.StockAvoid
-import com.example.investfeed.domain.recommend.entity.StockRecommend
-import com.example.investfeed.domain.recommend.repository.StockAvoidRepository
-import com.example.investfeed.domain.recommend.repository.StockRecommendRepository
+import com.example.investfeed.domain.recommend.entity.StockPick
+import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
@@ -34,8 +32,7 @@ class RecommendService(
     private val priceClient: PriceClient,
     private val stockClient: StockClient,
     private val stockSocketClient: StockSocketClient,
-    private val stockRecommendRepository: StockRecommendRepository,
-    private val stockAvoidRepository: StockAvoidRepository,
+    private val stockPickRepository: StockPickRepository,
     private val authClient: AuthClient,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
@@ -167,28 +164,17 @@ class RecommendService(
         }
 
         // 기존 데이터 삭제 후 새로 저장
-        stockRecommendRepository.deleteAll()
-        stockAvoidRepository.deleteAll()
+        stockPickRepository.deleteAll()
 
-        stockRecommendRepository.saveAll(
+        stockPickRepository.saveAll(
             recommendResult.filter { item ->
                 item.stk_cd != null && item.stk_nm != null
             }.map { item ->
-                StockRecommend(
-                    stkCd = item.stk_cd!!,
-                    stkNm = item.stk_nm!!,
-                )
-            }
-        )
-
-        stockAvoidRepository.saveAll(
-            avoidResult.filter { item ->
+                StockPick(type = "RECOMMEND", stkCd = item.stk_cd!!, stkNm = item.stk_nm!!)
+            } + avoidResult.filter { item ->
                 item.stk_cd != null && item.stk_nm != null
             }.map { item ->
-                StockAvoid(
-                    stkCd = item.stk_cd!!,
-                    stkNm = item.stk_nm!!,
-                )
+                StockPick(type = "AVOID", stkCd = item.stk_cd!!, stkNm = item.stk_nm!!)
             }
         )
 
@@ -196,11 +182,13 @@ class RecommendService(
     }
 
     fun recommendList(): RecommendListRes {
-        val recommendList = stockRecommendRepository.findAll().map { entity ->
+        val allPicks = stockPickRepository.findAll()
+
+        val recommendList = allPicks.filter { it.type == "RECOMMEND" }.map { entity ->
             RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
         }.toMutableList()
 
-        val avoidList = stockAvoidRepository.findAll().map { entity ->
+        val avoidList = allPicks.filter { it.type == "AVOID" }.map { entity ->
             RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
         }.toMutableList()
 

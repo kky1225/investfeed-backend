@@ -28,5 +28,8 @@ class MemberApiKey(
     @Column(nullable = false)
     var secretKey: String,
 
+    @Column(nullable = false)
+    var expiresAt: LocalDateTime = LocalDateTime.now().plusYears(1),
+
     val createdAt: LocalDateTime = LocalDateTime.now()
 )

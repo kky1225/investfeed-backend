@@ -7,5 +7,6 @@ data class ApiKeyRes(
     val brokerId: Long,
     val brokerName: String,
     val appKey: String,
+    val expiresAt: LocalDateTime,
     val createdAt: LocalDateTime
 )

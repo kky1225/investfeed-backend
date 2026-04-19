@@ -1,7 +1,8 @@
 package com.example.investfeed.domain.calendar.dto.res
 
 data class EconomicIndicatorsRes(
-    val indicators: List<EconomicIndicator>
+    val indicators: List<EconomicIndicator>,
+    val lastUpdated: String? = null
 )
 
 data class EconomicIndicator(
@@ -32,7 +33,8 @@ data class IndicatorDataPoint(
 )
 
 data class CalendarEventsRes(
-    val events: List<CalendarEvent>
+    val events: List<CalendarEvent>,
+    val lastUpdated: String? = null
 )
 
 data class CalendarEvent(

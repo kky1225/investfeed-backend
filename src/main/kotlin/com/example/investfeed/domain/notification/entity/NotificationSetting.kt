@@ -37,6 +37,9 @@ class NotificationSetting(
     @Column(name = "rebalancing_enabled", nullable = false)
     var rebalancingEnabled: Boolean = true,
 
+    @Column(name = "api_key_enabled", nullable = false)
+    var apiKeyEnabled: Boolean = true,
+
     @Column(name = "created_at")
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
