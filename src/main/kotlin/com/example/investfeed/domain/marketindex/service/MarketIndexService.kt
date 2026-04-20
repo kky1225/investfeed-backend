@@ -14,7 +14,7 @@ class MarketIndexService(
 ) {
     companion object {
         private const val KEY_PREFIX = "market-index"
-        private val TTL = Duration.ofMinutes(5)
+        private val TTL = Duration.ofDays(1)
     }
 
     fun saveAll(list: List<MarketIndexRes>) {
