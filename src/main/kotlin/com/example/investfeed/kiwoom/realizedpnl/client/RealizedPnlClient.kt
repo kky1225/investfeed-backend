@@ -49,7 +49,7 @@ class RealizedPnlClient(
         } catch (e: RealizedPnlException) {
             throw e
         } catch (e: Exception) {
-            log.error { "realizedPnl Error: ${e.message}" }
+            log.warn { "realizedPnl Error: ${e.message}" }
             throw RuntimeException(e.message)
         }
     }

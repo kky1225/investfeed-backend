@@ -7,7 +7,6 @@ import com.example.investfeed.domain.dividend.dto.res.StockDividendRes
 import com.example.investfeed.domain.dividend.entity.StockDividend
 import com.example.investfeed.domain.dividend.repository.StockDividendRepository
 import mu.KotlinLogging
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -27,44 +26,25 @@ class StockDividendService(
     private val TYPE_ETF = "ETF"
     private val MARKET_CODE_ETF = "8"
 
-    fun collectAllDividends() {
-        val today = today()
-        val minDvdnBasDt = minDvdnBasDt()
-
-        var pageNo = 1
-        var totalCount: Int
-        var savedCount = 0
-
-        do {
-            val (items, total) = stockDividendClient.getDividendInfo(pageNo = pageNo, numOfRows = NUM_OF_ROWS)
-            totalCount = total
-
-            if (items.isEmpty()) break
-
-            val recentItems = items.filter { (it.dvdnBasDt ?: "") >= minDvdnBasDt }
-            val saved = saveStockItems(recentItems, today)
-            savedCount += saved
-
-            pageNo++
-            Thread.sleep(200)
-        } while ((pageNo - 1) * NUM_OF_ROWS < totalCount)
-
-        log.info { "배당 정보 전체 수집 완료: 총 $savedCount 건 저장" }
-    }
-
     fun collectDailyDividends() {
         val today = today()
         val minDvdnBasDt = minDvdnBasDt()
+        val existingKeys = stockDividendRepository
+            .findExistingKeysByTypeAndMinDvdnBasDt(TYPE_STOCK, minDvdnBasDt)
+            .toMutableSet()
 
         val (items, _) = stockDividendClient.getDividendInfo(pageNo = 1, numOfRows = NUM_OF_ROWS)
         val recentItems = items.filter { (it.dvdnBasDt ?: "") >= minDvdnBasDt }
-        val saved = saveStockItems(recentItems, today)
+        val saved = saveStockItems(recentItems, today, existingKeys)
         log.info { "배당 정보 일별 수집: $saved 건 저장" }
     }
 
     fun collectEtfDividends(stkCd: String): Int {
         val today = today()
         val minDvdnBasDt = minDvdnBasDt()
+        val existingDates = stockDividendRepository
+            .findDvdnBasDtsByStkCdAndType(stkCd, TYPE_ETF)
+            .toMutableSet()
 
         val items = etfDividendClient.getDividendInfo(stkCd)
         var count = 0
@@ -73,6 +53,7 @@ class StockDividendService(
             try {
                 val dvdnBasDt = item.date?.replace("-", "") ?: return@forEach
                 if (dvdnBasDt < minDvdnBasDt) return@forEach
+                if (!existingDates.add(dvdnBasDt)) return@forEach // 이미 존재 → skip
 
                 stockDividendRepository.save(
                     StockDividend(
@@ -86,10 +67,8 @@ class StockDividendService(
                     )
                 )
                 count++
-            } catch (_: DataIntegrityViolationException) {
-                // 중복 데이터 무시
             } catch (e: Exception) {
-                log.error(e) { "ETF 분배금 저장 실패: stkCd=$stkCd, date=${item.date}" }
+                log.warn(e) { "ETF 분배금 저장 실패: stkCd=$stkCd, date=${item.date}" }
             }
         }
         return count
@@ -126,16 +105,24 @@ class StockDividendService(
             .map { it.toRes() }
     }
 
-    private fun saveStockItems(items: List<DividendApiItem>, today: String): Int {
+    private fun saveStockItems(
+        items: List<DividendApiItem>,
+        today: String,
+        existingKeys: MutableSet<String>,
+    ): Int {
         var count = 0
         items.forEach { item ->
             try {
                 val isinCd = item.isinCd
                 if (isinCd.isNullOrBlank() || isinCd.length < 9) return@forEach
 
+                val stkCd = isinCd.substring(3, 9)
+                val key = "$stkCd|${item.dvdnBasDt ?: ""}|${item.scrsItmsKcd ?: ""}"
+                if (!existingKeys.add(key)) return@forEach // 이미 존재 → skip
+
                 stockDividendRepository.save(
                     StockDividend(
-                        stkCd = isinCd.substring(3, 9),
+                        stkCd = stkCd,
                         type = TYPE_STOCK,
                         basDt = item.basDt ?: "",
                         createdDt = today,
@@ -161,10 +148,8 @@ class StockDividendService(
                     )
                 )
                 count++
-            } catch (_: DataIntegrityViolationException) {
-                // 중복 데이터 무시
             } catch (e: Exception) {
-                log.error(e) { "배당 정보 저장 실패: isinCd=${item.isinCd}" }
+                log.warn(e) { "배당 정보 저장 실패: isinCd=${item.isinCd}" }
             }
         }
         return count

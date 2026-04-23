@@ -50,4 +50,10 @@ class IndexInvestorDaily(
 
     @Column(nullable = false)
     val natnNetprps: String = "0", // 국가순매수
+
+    @Column(nullable = false)
+    val jnsinkmNetprps: String = "0", // 종신금순매수
+
+    @Column(nullable = false)
+    val nativeTrmtFrgnrNetprps: String = "0", // 내국인대우외국인순매수
 )

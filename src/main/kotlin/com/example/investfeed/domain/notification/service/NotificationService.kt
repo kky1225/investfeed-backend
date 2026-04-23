@@ -97,7 +97,7 @@ class NotificationService(
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
-            log.error { "WebSocket 알림 전송 실패: ${e.message}" }
+            log.warn { "WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 
@@ -123,7 +123,7 @@ class NotificationService(
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(priceTarget.memberId, message)
         } catch (e: Exception) {
-            log.error { "목표가 WebSocket 알림 전송 실패: ${e.message}" }
+            log.warn { "목표가 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 
@@ -179,7 +179,7 @@ class NotificationService(
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
-            log.error { "투자 목표 WebSocket 알림 전송 실패: ${e.message}" }
+            log.warn { "투자 목표 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 
@@ -235,7 +235,7 @@ class NotificationService(
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
-            log.error { "API Key 만료 WebSocket 알림 전송 실패: ${e.message}" }
+            log.warn { "API Key 만료 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 }

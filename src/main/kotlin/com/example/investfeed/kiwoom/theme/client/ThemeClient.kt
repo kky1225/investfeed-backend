@@ -82,7 +82,7 @@ class ThemeClient(
         }catch(e: ThemeGroupListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "themeGroupList Error" }
+            log.warn { "themeGroupList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -115,7 +115,7 @@ class ThemeClient(
         }catch(e: ThemeGroupStockListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "themeGroupStockList Error" }
+            log.warn { "themeGroupStockList Error" }
 
             throw RuntimeException(e.message)
         }

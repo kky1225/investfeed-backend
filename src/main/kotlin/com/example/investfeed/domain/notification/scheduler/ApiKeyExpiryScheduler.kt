@@ -1,6 +1,8 @@
 package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
@@ -21,13 +23,14 @@ class ApiKeyExpiryScheduler(
     private val memberApiKeyRepository: MemberApiKeyRepository,
     private val notificationService: NotificationService,
     private val notificationSettingService: NotificationSettingService,
+    private val schedulerLogService: SchedulerLogService,
 ) {
     private val log = KotlinLogging.logger {}
 
     @Scheduled(cron = "0 0 9 * * *", scheduler = "slowScheduler")
     fun checkApiKeyExpiry() {
-        val start = System.currentTimeMillis()
-        try {
+        schedulerLogService.execute("ApiKeyExpiryScheduler", SchedulerType.SLOW) {
+            val start = System.currentTimeMillis()
             val today = LocalDate.now()
             val allApiKeys = memberApiKeyRepository.findAll()
 
@@ -55,12 +58,9 @@ class ApiKeyExpiryScheduler(
                         daysLeft = daysLeft
                     )
                 } catch (e: Exception) {
-                    log.error { "API Key 만료 체크 실패 (apiKeyId=${apiKey.id}): ${e.message}" }
+                    log.warn { "API Key 만료 체크 실패 (apiKeyId=${apiKey.id}): ${e.message}" }
                 }
             }
-        } catch (e: Exception) {
-            log.error { "ApiKeyExpiryScheduler 실행 실패: ${e.message}" }
-        } finally {
             log.info { "ApiKeyExpiryScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
         }
     }

@@ -1,6 +1,8 @@
 package com.example.investfeed.ecos.client
 
 import com.example.investfeed.ecos.dto.res.EcosStatRes
+import com.example.investfeed.ecos.exception.EcosApiException
+import com.example.investfeed.ecos.exception.EcosStatisticsException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -32,20 +34,31 @@ class EcosClient(
         endDate: String,
         itemCode: String = "0",
         maxRows: Int = 100,
-    ): EcosStatRes? {
-        return try {
+    ): EcosStatRes {
+        try {
             val uri = "/api/StatisticSearch/$apiKey/json/kr/1/$maxRows/$tableCode/$frequency/$startDate/$endDate/$itemCode"
             val res = ecosWebClient.get()
                 .uri(uri)
                 .retrieve()
+                .onStatus({ it.isError }, { throw EcosApiException() })
                 .bodyToMono<EcosStatRes>()
                 .block()
 
+            if (res?.statisticSearch == null) {
+                throw EcosStatisticsException()
+            }
+
             log.info { "ECOS getStatistics: tableCode=$tableCode, frequency=$frequency" }
-            res
+
+            return res
+        } catch (e: EcosApiException) {
+            throw e
+        } catch (e: EcosStatisticsException) {
+            throw e
         } catch (e: Exception) {
-            log.error { "ECOS getStatistics Error: ${e.message}" }
-            null
+            log.error { "getStatistics Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
         }
     }
 }

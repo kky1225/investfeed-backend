@@ -134,6 +134,7 @@ class StockService(
                         samoFund = it.samo_fund,
                         penfndEtc = it.penfnd_etc,
                         bank = it.bank,
+                        natn = it.natn,
                         etcCorp = it.etc_corp,
                         natfor = it.natfor
                     )

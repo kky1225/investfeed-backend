@@ -8,6 +8,8 @@ import com.example.investfeed.domain.notification.repository.NotificationReposit
 import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.rebalancing.repository.RebalancingSettingRepository
 import com.example.investfeed.domain.rebalancing.service.RebalancingService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -30,6 +32,7 @@ class RebalancingAlertScheduler(
     private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
     private val objectMapper: ObjectMapper,
     private val authClient: AuthClient,
+    private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -37,18 +40,19 @@ class RebalancingAlertScheduler(
 
     @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkRebalancing() {
-        setSchedulerSecurityContext()
-        try {
-            authClient.accessToken()
-        } catch (e: Exception) {
-            log.error(e) { "리밸런싱 스케줄러 토큰 발급 실패" }
-            SecurityContextHolder.clearContext()
-            return
-        }
+        schedulerLogService.execute("RebalancingAlertScheduler", SchedulerType.SLOW) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+            } catch (e: Exception) {
+                log.error(e) { "리밸런싱 스케줄러 토큰 발급 실패" }
+                SecurityContextHolder.clearContext()
+                return@execute
+            }
 
-        val start = System.currentTimeMillis()
+            val start = System.currentTimeMillis()
 
-        try {
+            try {
             val allSettings = rebalancingSettingRepository.findAll()
 
             for (setting in allSettings) {
@@ -105,14 +109,16 @@ class RebalancingAlertScheduler(
                         sendWebSocket(setting.memberId, notification)
                     }
                 } catch (e: Exception) {
-                    log.error { "리밸런싱 체크 실패 (memberId=${setting.memberId}): ${e.message}" }
+                    log.warn { "리밸런싱 체크 실패 (memberId=${setting.memberId}): ${e.message}" }
                 }
             }
-        } catch (e: Exception) {
-            log.error { "RebalancingAlertScheduler 실행 실패: ${e.message}" }
-        } finally {
-            SecurityContextHolder.clearContext()
-            log.info { "RebalancingAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            } catch (e: Exception) {
+                log.error { "RebalancingAlertScheduler 실행 실패: ${e.message}" }
+                throw e
+            } finally {
+                SecurityContextHolder.clearContext()
+                log.info { "RebalancingAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            }
         }
     }
 
@@ -122,7 +128,7 @@ class RebalancingAlertScheduler(
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
-            log.error { "리밸런싱 WebSocket 알림 전송 실패: ${e.message}" }
+            log.warn { "리밸런싱 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
 

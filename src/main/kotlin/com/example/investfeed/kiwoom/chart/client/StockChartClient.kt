@@ -50,7 +50,7 @@ class StockChartClient(
         }catch(e: StockChartMinuteListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "chartMinuteList Error" }
+            log.warn { "chartMinuteList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -83,7 +83,7 @@ class StockChartClient(
         }catch(e: StockChartDayListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "chartDayList Error" }
+            log.warn { "chartDayList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -116,7 +116,7 @@ class StockChartClient(
         }catch(e: StockChartWeekListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "chartWeekList Error" }
+            log.warn { "chartWeekList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -149,7 +149,7 @@ class StockChartClient(
         }catch(e: StockChartMonthListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "chartMonthList Error" }
+            log.warn { "chartMonthList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -182,7 +182,7 @@ class StockChartClient(
         }catch(e: StockChartYearListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "chartYearList Error" }
+            log.warn { "chartYearList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -215,7 +215,7 @@ class StockChartClient(
         }catch(e: StockChartInvestorException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockChartInvestor Error" }
+            log.warn { "stockChartInvestor Error" }
 
             throw RuntimeException(e.message)
         }

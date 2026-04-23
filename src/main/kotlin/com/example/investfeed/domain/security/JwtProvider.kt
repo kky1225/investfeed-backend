@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.security
 
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
@@ -50,7 +51,7 @@ class JwtProvider(
             .compact()
 
         redisTemplate.opsForValue().set(
-            "RT:$loginId",
+            "${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId",
             refreshToken,
             refreshTokenExpiration,
             TimeUnit.DAYS
@@ -78,7 +79,7 @@ class JwtProvider(
             val claims = getClaims(refreshToken)
             if (claims.expiration.before(Date()) || claims["type"] != "refresh") return false
             val loginId = claims.subject
-            val stored = redisTemplate.opsForValue().get("RT:$loginId")
+            val stored = redisTemplate.opsForValue().get("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
             stored == refreshToken
         } catch (e: Exception) {
             false
@@ -88,7 +89,7 @@ class JwtProvider(
     fun getLoginId(token: String): String = getClaims(token).subject
 
     fun deleteRefreshToken(loginId: String) {
-        redisTemplate.delete("RT:$loginId")
+        redisTemplate.delete("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
     }
 
     fun blacklistAccessToken(token: String) {
@@ -96,7 +97,7 @@ class JwtProvider(
         val remainingMs = claims.expiration.time - System.currentTimeMillis()
         if (remainingMs > 0) {
             redisTemplate.opsForValue().set(
-                "BL:$token",
+                "${RedisKeyPrefix.BLACKLIST.prefix}$token",
                 "blacklisted",
                 remainingMs,
                 TimeUnit.MILLISECONDS
@@ -105,7 +106,7 @@ class JwtProvider(
     }
 
     fun isBlacklisted(token: String): Boolean {
-        return redisTemplate.hasKey("BL:$token")
+        return redisTemplate.hasKey("${RedisKeyPrefix.BLACKLIST.prefix}$token")
     }
 
     private fun getClaims(token: String): Claims {

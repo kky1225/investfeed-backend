@@ -2,6 +2,8 @@ package com.example.investfeed.naver.news.client
 
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.naver.news.dto.res.NaverNewsRes
+import com.example.investfeed.naver.news.exception.NaverNewsApiException
+import com.example.investfeed.naver.news.exception.NaverNewsSearchException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
@@ -22,9 +24,9 @@ class NaverNewsClient(
         .baseUrl("https://openapi.naver.com")
         .build()
 
-    fun searchNews(query: String, display: Int = 20, start: Int = 1, sort: String = "date"): NaverNewsRes? {
-        return try {
-            webClient.get()
+    fun searchNews(query: String, display: Int = 20, start: Int = 1, sort: String = "date"): NaverNewsRes {
+        try {
+            val res = webClient.get()
                 .uri { uriBuilder ->
                     uriBuilder.path("/v1/search/news.json")
                         .queryParam("query", query)
@@ -36,11 +38,23 @@ class NaverNewsClient(
                 .header("X-Naver-Client-Id", clientId)
                 .header("X-Naver-Client-Secret", clientSecret)
                 .retrieve()
+                .onStatus({ it.isError }, { throw NaverNewsApiException() })
                 .bodyToMono<NaverNewsRes>()
                 .block()
+
+            if (res?.items == null) {
+                throw NaverNewsSearchException()
+            }
+
+            return res
+        } catch (e: NaverNewsApiException) {
+            throw e
+        } catch (e: NaverNewsSearchException) {
+            throw e
         } catch (e: Exception) {
-            log.error { "네이버 뉴스 API 호출 실패: ${e.message}" }
-            null
+            log.error { "searchNews Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
         }
     }
 }

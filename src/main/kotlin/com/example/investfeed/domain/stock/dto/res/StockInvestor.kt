@@ -12,6 +12,7 @@ data class StockInvestor(
     var samoFund: String? = null, // 사모펀드
     var penfndEtc: String? = null, // 연기금등
     var bank: String? = null, // 은행
+    var natn: String? = null, // 국가
     var etcCorp: String? = null, // 기타법인
     var natfor: String? = null, // 내외국인
 )

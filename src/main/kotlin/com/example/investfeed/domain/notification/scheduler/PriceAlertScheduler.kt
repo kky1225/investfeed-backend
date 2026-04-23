@@ -9,6 +9,8 @@ import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -37,6 +39,7 @@ class PriceAlertScheduler(
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val authClient: AuthClient,
+    private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -49,45 +52,47 @@ class PriceAlertScheduler(
 
     @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
     fun checkPriceAlerts() {
-        setSchedulerSecurityContext()
-        try {
-            authClient.accessToken()
-        } catch (e: Exception) {
-            log.error(e) { "스케줄러 토큰 발급 실패" }
+        schedulerLogService.execute("PriceAlertScheduler", SchedulerType.FAST) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+            } catch (e: Exception) {
+                log.error(e) { "스케줄러 토큰 발급 실패" }
+                SecurityContextHolder.clearContext()
+                return@execute
+            }
+
+            val start = System.currentTimeMillis()
+            var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
+            var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
+
+            try {
+                stockDataMap = checkStockAlerts()
+            } catch (e: Exception) {
+                log.error(e) { "주식 가격 알림 체크 실패" }
+            }
+
+            try {
+                tickerMap = checkCryptoAlerts()
+            } catch (e: Exception) {
+                log.error(e) { "암호화폐 가격 알림 체크 실패" }
+            }
+
+            try {
+                checkStockPriceTargets(stockDataMap ?: emptyMap())
+            } catch (e: Exception) {
+                log.error(e) { "주식 목표가 알림 체크 실패" }
+            }
+
+            try {
+                checkCryptoPriceTargets(tickerMap ?: emptyMap())
+            } catch (e: Exception) {
+                log.error(e) { "암호화폐 목표가 알림 체크 실패" }
+            }
+
             SecurityContextHolder.clearContext()
-            return
+            log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
         }
-
-        val start = System.currentTimeMillis()
-        var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
-        var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
-
-        try {
-            stockDataMap = checkStockAlerts()
-        } catch (e: Exception) {
-            log.error(e) { "주식 가격 알림 체크 실패" }
-        }
-
-        try {
-            tickerMap = checkCryptoAlerts()
-        } catch (e: Exception) {
-            log.error(e) { "암호화폐 가격 알림 체크 실패" }
-        }
-
-        try {
-            checkStockPriceTargets(stockDataMap ?: emptyMap())
-        } catch (e: Exception) {
-            log.error(e) { "주식 목표가 알림 체크 실패" }
-        }
-
-        try {
-            checkCryptoPriceTargets(tickerMap ?: emptyMap())
-        } catch (e: Exception) {
-            log.error(e) { "암호화폐 목표가 알림 체크 실패" }
-        }
-
-        SecurityContextHolder.clearContext()
-        log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
     }
 
     private fun checkStockAlerts(): Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest> {
@@ -189,7 +194,7 @@ class PriceAlertScheduler(
                 }
             }
         } catch (e: Exception) {
-            log.error { "250일 신고저가 체크 실패: ${e.message}" }
+            log.warn { "250일 신고저가 체크 실패: ${e.message}" }
         }
 
         return stockDataMap
@@ -298,7 +303,7 @@ class PriceAlertScheduler(
                 val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
                 res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
             } catch (e: Exception) {
-                log.error { "목표가 주식 현재가 조회 실패: ${e.message}" }
+                log.warn { "목표가 주식 현재가 조회 실패: ${e.message}" }
                 emptyMap()
             }
         } else emptyMap()
@@ -331,7 +336,7 @@ class PriceAlertScheduler(
                 tickerClient.getTickers(missingMarkets.joinToString(","))
                     .associateBy { it.market }
             } catch (e: Exception) {
-                log.error { "목표가 코인 현재가 조회 실패: ${e.message}" }
+                log.warn { "목표가 코인 현재가 조회 실패: ${e.message}" }
                 emptyMap()
             }
         } else emptyMap()

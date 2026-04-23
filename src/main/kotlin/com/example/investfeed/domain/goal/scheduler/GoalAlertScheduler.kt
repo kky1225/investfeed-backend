@@ -4,6 +4,8 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.goal.entity.GoalType
 import com.example.investfeed.domain.goal.repository.InvestmentGoalRepository
 import com.example.investfeed.domain.goal.service.InvestmentGoalService
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -24,6 +26,7 @@ class GoalAlertScheduler(
     private val notificationService: NotificationService,
     private val notificationSettingService: NotificationSettingService,
     private val authClient: AuthClient,
+    private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -31,18 +34,19 @@ class GoalAlertScheduler(
 
     @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkGoals() {
-        setSchedulerSecurityContext()
-        try {
-            authClient.accessToken()
-        } catch (e: Exception) {
-            log.error(e) { "목표 스케줄러 토큰 발급 실패" }
-            SecurityContextHolder.clearContext()
-            return
-        }
+        schedulerLogService.execute("GoalAlertScheduler", SchedulerType.SLOW) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+            } catch (e: Exception) {
+                log.error(e) { "목표 스케줄러 토큰 발급 실패" }
+                SecurityContextHolder.clearContext()
+                return@execute
+            }
 
-        val start = System.currentTimeMillis()
+            val start = System.currentTimeMillis()
 
-        try {
+            try {
             val allGoals = investmentGoalRepository.findAll()
 
             val memberGoals = allGoals.groupBy { it.memberId }
@@ -84,15 +88,17 @@ class GoalAlertScheduler(
                             }
                         }
                     } catch (e: Exception) {
-                        log.error { "목표 체크 실패 (memberId=$memberId, goalId=${goal.id}): ${e.message}" }
+                        log.warn { "목표 체크 실패 (memberId=$memberId, goalId=${goal.id}): ${e.message}" }
                     }
                 }
             }
-        } catch (e: Exception) {
-            log.error { "GoalAlertScheduler 실행 실패: ${e.message}" }
-        } finally {
-            SecurityContextHolder.clearContext()
-            log.info { "GoalAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            } catch (e: Exception) {
+                log.error { "GoalAlertScheduler 실행 실패: ${e.message}" }
+                throw e
+            } finally {
+                SecurityContextHolder.clearContext()
+                log.info { "GoalAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            }
         }
     }
 

@@ -69,7 +69,7 @@ class StockClient(
         } catch (e: StockInfoListException) {
             throw e
         } catch (e: Exception) {
-            log.error { "stockInfoList Error" }
+            log.warn { "stockInfoList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -102,7 +102,7 @@ class StockClient(
         }catch (e: StockDefaultInfoException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockInfo Error" }
+            log.warn { "stockInfo Error" }
 
             throw RuntimeException(e.message)
         }
@@ -135,7 +135,7 @@ class StockClient(
         }catch (e: StockInfoException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockInfo Error" }
+            log.warn { "stockInfo Error" }
 
             throw RuntimeException(e.message)
         }
@@ -168,7 +168,7 @@ class StockClient(
         }catch (e: StockInvestorException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockInvestor Error" }
+            log.warn { "stockInvestor Error" }
 
             throw RuntimeException(e.message)
         }
@@ -201,7 +201,7 @@ class StockClient(
         }catch (e: StockTradeDailyListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockTradeDailyList Error" }
+            log.warn { "stockTradeDailyList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -234,7 +234,7 @@ class StockClient(
         }catch (e: StockJumpListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockJumpList Error" }
+            log.warn { "stockJumpList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -267,7 +267,7 @@ class StockClient(
         }catch (e: StockNewPriceListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockNewPriceList Error" }
+            log.warn { "stockNewPriceList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -300,7 +300,7 @@ class StockClient(
         }catch (e: SectCodeListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectCodeList Error" }
+            log.warn { "sectCodeList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -333,7 +333,7 @@ class StockClient(
         }catch (e: StockInterestException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockInterest Error" }
+            log.warn { "stockInterest Error" }
 
             throw RuntimeException(e.message)
         }
@@ -364,7 +364,7 @@ class StockClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: Exception) {
-            log.error { "newHighLow Error: ${e.message}" }
+            log.warn { "newHighLow Error: ${e.message}" }
             throw RuntimeException(e.message)
         }
     }

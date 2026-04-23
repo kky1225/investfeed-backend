@@ -62,7 +62,7 @@ class GoldChartClient(
         } catch (e: GoldChartMinuteListException) {
             throw e
         } catch (e: Exception) {
-            log.error { "goldChartMinuteList Error" }
+            log.warn { "goldChartMinuteList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -95,7 +95,7 @@ class GoldChartClient(
         } catch (e: GoldChartDayListException) {
             throw e
         } catch (e: Exception) {
-            log.error { "goldChartDayList Error" }
+            log.warn { "goldChartDayList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -128,7 +128,7 @@ class GoldChartClient(
         } catch (e: GoldChartWeekListException) {
             throw e
         } catch (e: Exception) {
-            log.error { "goldChartWeekList Error" }
+            log.warn { "goldChartWeekList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -161,7 +161,7 @@ class GoldChartClient(
         } catch (e: GoldChartMonthListException) {
             throw e
         } catch (e: Exception) {
-            log.error { "goldChartMonthList Error" }
+            log.warn { "goldChartMonthList Error" }
 
             throw RuntimeException(e.message)
         }

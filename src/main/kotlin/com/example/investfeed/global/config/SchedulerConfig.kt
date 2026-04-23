@@ -3,7 +3,6 @@ package com.example.investfeed.global.config
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
-import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
 /**
@@ -23,24 +22,24 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 class SchedulerConfig {
 
     @Bean("fastScheduler")
-    fun fastScheduler(): TaskScheduler {
+    fun fastScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = 8
+        scheduler.poolSize = 6
         scheduler.setThreadNamePrefix("fast-scheduler-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
-        scheduler.setAwaitTerminationSeconds(10)
+        scheduler.setAwaitTerminationSeconds(30)
         scheduler.initialize()
         return scheduler
     }
 
     @Bean("slowScheduler")
     @Primary
-    fun slowScheduler(): TaskScheduler {
+    fun slowScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = 6
+        scheduler.poolSize = 8
         scheduler.setThreadNamePrefix("slow-scheduler-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
-        scheduler.setAwaitTerminationSeconds(10)
+        scheduler.setAwaitTerminationSeconds(30)
         scheduler.initialize()
         return scheduler
     }

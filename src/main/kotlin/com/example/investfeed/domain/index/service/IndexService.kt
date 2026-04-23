@@ -368,6 +368,8 @@ class IndexService(
                         etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-"),
                         samoFundNetprps = investor.samo_fund_netprps.replace("--", "-"),
                         natnNetprps = investor.natn_netprps.replace("--", "-"),
+                        jnsinkmNetprps = investor.jnsinkm_netprps.replace("--", "-"),
+                        nativeTrmtFrgnrNetprps = investor.native_trmt_frgnr_netprps.replace("--", "-"),
                     )
                 )
             }
@@ -391,6 +393,8 @@ class IndexService(
                         etcCorpNetprps = it.etcCorpNetprps,
                         samoFundNetprps = it.samoFundNetprps,
                         natnNetprps = it.natnNetprps,
+                        jnsinkmNetprps = it.jnsinkmNetprps,
+                        nativeTrmtFrgnrNetprps = it.nativeTrmtFrgnrNetprps,
                     )
                 }
         )
@@ -433,6 +437,8 @@ class IndexService(
                     val etcCorpNetprps = investor.etc_corp_netprps.replace("--", "-")
                     val samoFundNetprps = investor.samo_fund_netprps.replace("--", "-")
                     val natnNetprps = investor.natn_netprps.replace("--", "-")
+                    val jnsinkmNetprps = investor.jnsinkm_netprps.replace("--", "-")
+                    val nativeTrmtFrgnrNetprps = investor.native_trmt_frgnr_netprps.replace("--", "-")
 
                     val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(indexType.indsCd)
                     if (latest != null && latest.dt == date && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps) {
@@ -454,13 +460,15 @@ class IndexService(
                             etcCorpNetprps = etcCorpNetprps,
                             samoFundNetprps = samoFundNetprps,
                             natnNetprps = natnNetprps,
+                            jnsinkmNetprps = jnsinkmNetprps,
+                            nativeTrmtFrgnrNetprps = nativeTrmtFrgnrNetprps,
                         )
                     )
                 }
 
                 Thread.sleep(100)
             } catch (e: Exception) {
-                log.error { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
+                log.warn { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
             }
         }
     }

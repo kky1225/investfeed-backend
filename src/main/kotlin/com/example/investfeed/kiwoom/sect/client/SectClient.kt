@@ -52,7 +52,7 @@ class SectClient(
         }catch (e: SectInvestorException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectInvestor Error" }
+            log.warn { "sectInvestor Error" }
 
             throw RuntimeException(e.message)
         }
@@ -91,7 +91,7 @@ class SectClient(
         } catch (e: SectPriceNowException) {
             throw e
         } catch (e: Exception) {
-            log.error { "sectNowPrice Error" }
+            log.warn { "sectNowPrice Error" }
 
             throw RuntimeException(e.message)
         }
@@ -152,7 +152,7 @@ class SectClient(
         }catch (e: SectPriceException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectPrice Error" }
+            log.warn { "sectPrice Error" }
 
             throw RuntimeException(e.message)
         }
@@ -185,7 +185,7 @@ class SectClient(
         }catch (e: SectIndexListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectIndexList Error" }
+            log.warn { "sectIndexList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -218,7 +218,7 @@ class SectClient(
         }catch (e: SectIndexDailyListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectIndexDailyList Error" }
+            log.warn { "sectIndexDailyList Error" }
 
             throw RuntimeException(e.message)
         }

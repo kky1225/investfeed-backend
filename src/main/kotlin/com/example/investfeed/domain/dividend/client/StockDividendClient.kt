@@ -2,6 +2,8 @@ package com.example.investfeed.domain.dividend.client
 
 import com.example.investfeed.domain.dividend.client.dto.DividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.DividendApiResponse
+import com.example.investfeed.domain.dividend.exception.StockDividendApiException
+import com.example.investfeed.domain.dividend.exception.StockDividendResponseException
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -32,18 +34,30 @@ class StockDividendClient(
             connection.connectTimeout = 30000
             connection.readTimeout = 60000
 
+            val statusCode = connection.responseCode
+            if (statusCode !in 200..299) {
+                connection.disconnect()
+                throw StockDividendApiException()
+            }
+
             val raw = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
             val response = objectMapper.readValue(raw, DividendApiResponse::class.java)
-            val body = response.response?.body
-            val items = body?.items?.item ?: emptyList()
-            val totalCount = body?.totalCount ?: 0
+            val body = response.response?.body ?: throw StockDividendResponseException()
+
+            val items = body.items?.item ?: emptyList()
+            val totalCount = body.totalCount ?: 0
 
             return Pair(items, totalCount)
+        } catch (e: StockDividendApiException) {
+            throw e
+        } catch (e: StockDividendResponseException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "배당 정보 API 호출 실패: pageNo=$pageNo" }
-            return Pair(emptyList(), 0)
+            log.error { "getDividendInfo Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
         }
     }
 }

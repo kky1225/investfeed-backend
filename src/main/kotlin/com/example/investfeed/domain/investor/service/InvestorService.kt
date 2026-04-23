@@ -14,6 +14,7 @@ import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -28,8 +29,9 @@ class InvestorService(
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
 ) {
+    private val CACHE_PREFIX = RedisKeyPrefix.INVESTOR_CLOSE_MARKET.prefix
+
     companion object {
-        private const val CACHE_PREFIX = "investor:closeMarket"
         private val ALL_COMBINATIONS = listOf("6" to "1", "6" to "2", "7" to "1", "7" to "2")
     }
 
@@ -52,7 +54,7 @@ class InvestorService(
     }
 
     private fun getCloseMarketWithCache(req: InvestorListReq, now: LocalTime): InvestorListRes? {
-        val cacheKey = "$CACHE_PREFIX:${req.orgnTp}:${req.trdeTp}"
+        val cacheKey = "$CACHE_PREFIX${req.orgnTp}:${req.trdeTp}"
 
         redisTemplate.opsForValue().get(cacheKey)?.let { cached ->
             return objectMapper.readValue(cached, InvestorListRes::class.java)
@@ -65,7 +67,7 @@ class InvestorService(
         ALL_COMBINATIONS.forEach { (orgnTp, trdeTp) ->
             val result = buildFromRaw(rawRes, orgnTp, trdeTp)
             redisTemplate.opsForValue().set(
-                "$CACHE_PREFIX:$orgnTp:$trdeTp",
+                "$CACHE_PREFIX$orgnTp:$trdeTp",
                 objectMapper.writeValueAsString(result),
                 ttl
             )

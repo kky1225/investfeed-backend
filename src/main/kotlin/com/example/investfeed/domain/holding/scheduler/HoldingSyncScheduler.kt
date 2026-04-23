@@ -3,6 +3,8 @@ package com.example.investfeed.domain.holding.scheduler
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import mu.KotlinLogging
@@ -17,16 +19,18 @@ class HoldingSyncScheduler(
     private val brokerRepository: BrokerRepository,
     private val memberHoldingSyncService: MemberHoldingSyncService,
     private val holdingClient: HoldingClient,
+    private val schedulerLogService: SchedulerLogService,
 ) {
     private val log = KotlinLogging.logger {}
 
     @Scheduled(cron = "0 0 0 * * *", scheduler = "slowScheduler")
     fun syncAllHoldings() {
-        log.info { "보유종목 동기화 스케줄러 시작" }
-        val start = System.currentTimeMillis()
+        schedulerLogService.execute("HoldingSyncScheduler", SchedulerType.SLOW) {
+            log.info { "보유종목 동기화 스케줄러 시작" }
+            val start = System.currentTimeMillis()
 
-        val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return
-        val kiwoomApiKeys = memberApiKeyRepository.findAllByBrokerId(kiwoomBroker.id)
+            val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return@execute
+            val kiwoomApiKeys = memberApiKeyRepository.findAllByBrokerId(kiwoomBroker.id)
 
         kiwoomApiKeys.forEach { apiKey ->
             try {
@@ -56,7 +60,8 @@ class HoldingSyncScheduler(
             }
         }
 
-        log.info { "보유종목 동기화 스케줄러 완료: ${System.currentTimeMillis() - start}ms" }
+            log.info { "보유종목 동기화 스케줄러 완료: ${System.currentTimeMillis() - start}ms" }
+        }
     }
 
     private fun setSecurityContext(loginId: String) {

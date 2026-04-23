@@ -2,6 +2,8 @@ package com.example.investfeed.domain.dividend.client
 
 import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiResponse
+import com.example.investfeed.domain.dividend.exception.EtfDividendApiException
+import com.example.investfeed.domain.dividend.exception.EtfDividendResponseException
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -25,16 +27,30 @@ class EtfDividendClient(
             connection.setRequestProperty("User-Agent", "Mozilla/5.0")
             connection.setRequestProperty("Referer", "https://search-etf.com/$stkCd")
 
+            val statusCode = connection.responseCode
+            if (statusCode !in 200..299) {
+                connection.disconnect()
+                throw EtfDividendApiException()
+            }
+
             val raw = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
             val response = objectMapper.readValue(raw, EtfDividendApiResponse::class.java)
-            if (response.status != "success") return emptyList()
+
+            if (response.status != "success") {
+                throw EtfDividendResponseException()
+            }
 
             return response.dividends ?: emptyList()
+        } catch (e: EtfDividendApiException) {
+            throw e
+        } catch (e: EtfDividendResponseException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "ETF 분배금 API 호출 실패: stkCd=$stkCd" }
-            return emptyList()
+            log.error { "getDividendInfo Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
         }
     }
 }

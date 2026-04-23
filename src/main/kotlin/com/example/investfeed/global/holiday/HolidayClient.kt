@@ -1,5 +1,7 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.global.holiday.exception.HolidayApiException
+import com.example.investfeed.global.holiday.exception.HolidayInfoException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -39,37 +41,56 @@ class HolidayClient(
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
 
+            if (connection.responseCode !in 200..299) {
+                connection.disconnect()
+                throw HolidayApiException()
+            }
+
             val xml = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
+            val resultCode = parseResultCode(xml)
+            if (resultCode != "00") {
+                throw HolidayInfoException()
+            }
+
             return parseHolidayInfos(xml)
+        } catch (e: HolidayApiException) {
+            throw e
+        } catch (e: HolidayInfoException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "공휴일 API 호출 실패: $year-$solMonth" }
-            return emptyList()
+            log.warn { "getHolidayInfos Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
         }
+    }
+
+    private fun parseResultCode(xml: String): String? {
+        val factory = DocumentBuilderFactory.newInstance()
+        val builder = factory.newDocumentBuilder()
+        val document = builder.parse(ByteArrayInputStream(xml.toByteArray()))
+        val resultCodeNode = document.getElementsByTagName("resultCode").item(0)
+        return resultCodeNode?.textContent
     }
 
     private fun parseHolidayInfos(xml: String): List<HolidayInfo> {
         val holidays = mutableListOf<HolidayInfo>()
 
-        try {
-            val factory = DocumentBuilderFactory.newInstance()
-            val builder = factory.newDocumentBuilder()
-            val document = builder.parse(ByteArrayInputStream(xml.toByteArray()))
+        val factory = DocumentBuilderFactory.newInstance()
+        val builder = factory.newDocumentBuilder()
+        val document = builder.parse(ByteArrayInputStream(xml.toByteArray()))
 
-            val items = document.getElementsByTagName("item")
-            for (i in 0 until items.length) {
-                val item = items.item(i) as Element
-                val isHoliday = item.getElementsByTagName("isHoliday").item(0)?.textContent
-                val locdate = item.getElementsByTagName("locdate").item(0)?.textContent
-                val dateName = item.getElementsByTagName("dateName").item(0)?.textContent
+        val items = document.getElementsByTagName("item")
+        for (i in 0 until items.length) {
+            val item = items.item(i) as Element
+            val isHoliday = item.getElementsByTagName("isHoliday").item(0)?.textContent
+            val locdate = item.getElementsByTagName("locdate").item(0)?.textContent
+            val dateName = item.getElementsByTagName("dateName").item(0)?.textContent
 
-                if (isHoliday == "Y" && locdate != null) {
-                    holidays.add(HolidayInfo(date = locdate, name = dateName ?: "공휴일"))
-                }
+            if (isHoliday == "Y" && locdate != null) {
+                holidays.add(HolidayInfo(date = locdate, name = dateName ?: "공휴일"))
             }
-        } catch (e: Exception) {
-            log.error(e) { "공휴일 XML 파싱 실패" }
         }
 
         return holidays

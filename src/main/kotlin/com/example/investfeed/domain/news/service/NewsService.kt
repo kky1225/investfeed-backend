@@ -2,6 +2,7 @@ package com.example.investfeed.domain.news.service
 
 import com.example.investfeed.domain.news.dto.res.NewsItem
 import com.example.investfeed.domain.news.dto.res.NewsListRes
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.naver.news.client.NaverNewsClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
@@ -16,7 +17,7 @@ class NewsService(
     private val objectMapper: ObjectMapper,
 ) {
     private val log = KotlinLogging.logger {}
-    private val CACHE_PREFIX = "NEWS:"
+    private val CACHE_PREFIX = RedisKeyPrefix.NEWS.prefix
     private val CACHE_TTL = 30L // 30분
 
     fun searchNews(query: String, page: Int = 1): NewsListRes {
@@ -28,7 +29,7 @@ class NewsService(
             return try {
                 objectMapper.readValue(cached, NewsListRes::class.java)
             } catch (e: Exception) {
-                log.error { "뉴스 캐시 파싱 실패: ${e.message}" }
+                log.warn { "뉴스 캐시 파싱 실패: ${e.message}" }
                 fetchAndCache(query, page, cacheKey)
             }
         }
@@ -44,7 +45,7 @@ class NewsService(
 
         val naverRes = naverNewsClient.searchNews(query = query, display = fetchSize, start = start)
 
-        val items = naverRes?.items
+        val items = naverRes.items
             ?.map { item ->
                 NewsItem(
                     title = stripHtml(item.title ?: ""),
@@ -64,7 +65,7 @@ class NewsService(
             val json = objectMapper.writeValueAsString(result)
             redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL, TimeUnit.MINUTES)
         } catch (e: Exception) {
-            log.error { "뉴스 캐시 저장 실패: ${e.message}" }
+            log.warn { "뉴스 캐시 저장 실패: ${e.message}" }
         }
 
         return result

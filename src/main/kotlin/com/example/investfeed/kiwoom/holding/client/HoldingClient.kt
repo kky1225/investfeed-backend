@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.holding.dto.res.KiwoomDepositRes
 import com.example.investfeed.kiwoom.holding.dto.res.KiwoomHoldingRes
 import com.example.investfeed.kiwoom.auth.service.AuthClient
+import com.example.investfeed.kiwoom.exception.DepositException
 import com.example.investfeed.kiwoom.exception.HoldingListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
@@ -53,7 +54,7 @@ class HoldingClient(
         }catch (e: HoldingListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "holdingList Error" }
+            log.warn { "holdingList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -62,7 +63,7 @@ class HoldingClient(
     @KiwoomToken
     fun deposit(
         req: KiwoomDepositReq
-    ): KiwoomDepositRes? {
+    ): KiwoomDepositRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
@@ -76,12 +77,19 @@ class HoldingClient(
                 .bodyToMono<KiwoomDepositRes>()
                 .block()
 
+            if (res?.return_code != 0) {
+                throw DepositException()
+            }
+
             return res
         } catch (e: KiwoomApiException) {
             throw e
+        } catch (e: DepositException) {
+            throw e
         } catch (e: Exception) {
-            log.error { "deposit Error: ${e.message}" }
-            return null
+            log.warn { "deposit Error" }
+
+            throw RuntimeException(e.message)
         }
     }
 }

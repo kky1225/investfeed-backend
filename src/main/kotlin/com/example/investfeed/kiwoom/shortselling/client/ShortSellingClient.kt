@@ -52,7 +52,7 @@ class ShortSellingClient(
         } catch (e: ShortSellingException) {
             throw e
         } catch (e: Exception) {
-            log.error { "stockShortSelling Error" }
+            log.warn { "stockShortSelling Error" }
 
             throw RuntimeException(e.message)
         }

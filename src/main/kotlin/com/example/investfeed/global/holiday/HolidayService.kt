@@ -1,5 +1,7 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -9,6 +11,7 @@ import java.time.format.DateTimeFormatter
 @Service
 class HolidayService(
     private val holidayClient: HolidayClient,
+    private val schedulerLogService: SchedulerLogService,
 ) {
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -18,8 +21,10 @@ class HolidayService(
 
     @Scheduled(cron = "0 5 0 1 * *", scheduler = "slowScheduler")
     fun refreshHolidays() {
-        val now = LocalDate.now()
-        loadHolidays(now.year, now.monthValue)
+        schedulerLogService.execute("HolidayRefreshScheduler", SchedulerType.SLOW) {
+            val now = LocalDate.now()
+            loadHolidays(now.year, now.monthValue)
+        }
     }
 
     fun isHoliday(): Boolean {

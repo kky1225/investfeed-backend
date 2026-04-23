@@ -54,7 +54,7 @@ class InvestorClient(
         }catch (e: InvestorTradeDayException) {
             throw e
         }catch (e: Exception) {
-            log.error { "investorTradeDaily Error" }
+            log.warn { "investorTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }
@@ -87,7 +87,7 @@ class InvestorClient(
         }catch (e: InvestorTradeOrganizeException) {
             throw e
         }catch (e: Exception) {
-            log.error { "investorTradeOrganize Error" }
+            log.warn { "investorTradeOrganize Error" }
 
             throw RuntimeException(e.message)
         }
@@ -120,7 +120,7 @@ class InvestorClient(
         }catch (e: InvestorTradeRankListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "investorTradeRankList Error" }
+            log.warn { "investorTradeRankList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -151,7 +151,7 @@ class InvestorClient(
         } catch (e: GoldInvestorException) {
             throw e;
         } catch (e: Exception) {
-            log.error { "goldInvestor Error" }
+            log.warn { "goldInvestor Error" }
 
             throw RuntimeException(e.message)
         }

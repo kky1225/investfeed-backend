@@ -53,7 +53,7 @@ class PriceClient(
         } catch (e: StockTradeInfoException) {
             throw e
         } catch (e: Exception) {
-            log.error { "stockTradeInfo Error" }
+            log.warn { "stockTradeInfo Error" }
 
             throw RuntimeException(e.message)
         }
@@ -86,7 +86,7 @@ class PriceClient(
         }catch (e: StockSinglePriceListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockSinglePriceList Error" }
+            log.warn { "stockSinglePriceList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -119,7 +119,7 @@ class PriceClient(
         } catch (e: GoldPriceNowException) {
             throw e;
         } catch (e: Exception) {
-            log.error { "goldPriceNow Error" }
+            log.warn { "goldPriceNow Error" }
 
             throw RuntimeException(e.message)
         }
@@ -152,7 +152,7 @@ class PriceClient(
         } catch (e: GoldPriceNowMinuteException) {
             throw e
         } catch (e: Exception) {
-            log.error { "goldPriceNowMinute Error" }
+            log.warn { "goldPriceNowMinute Error" }
 
             throw RuntimeException(e.message)
         }
@@ -211,7 +211,7 @@ class PriceClient(
         } catch (e: InvestorTradeOpenMarketException) {
             throw e
         } catch (e: Exception) {
-            log.error { "investorTradeOpenMarket Error" }
+            log.warn { "investorTradeOpenMarket Error" }
 
             throw RuntimeException(e.message)
         }
@@ -272,7 +272,7 @@ class PriceClient(
         } catch (e: InvestorTradeCloseMarketException) {
             throw e
         } catch (e: Exception) {
-            log.error { "investorTradeOpenMarket Error" }
+            log.warn { "investorTradeOpenMarket Error" }
 
             throw RuntimeException(e.message)
         }
@@ -305,7 +305,7 @@ class PriceClient(
         } catch (e: ProgramTradeException) {
           throw e
         } catch (e: Exception) {
-            log.error { "programTrade Error" }
+            log.warn { "programTrade Error" }
 
             throw RuntimeException(e.message)
         }
@@ -369,7 +369,7 @@ class PriceClient(
         } catch (e: StockProgramTradeDayException) {
             throw e
         } catch (e: Exception) {
-            log.error { "stockProgramTradeDay Error" }
+            log.warn { "stockProgramTradeDay Error" }
 
             throw RuntimeException(e.message)
         }
@@ -401,7 +401,7 @@ class PriceClient(
         } catch (e: IndexProgramTradeDayException) {
             throw e
         } catch (e: Exception) {
-            log.error { "indexProgramTradeDay Error" }
+            log.warn { "indexProgramTradeDay Error" }
 
             throw RuntimeException(e.message)
         }
@@ -462,7 +462,7 @@ class PriceClient(
         } catch (e: StockProgramTradeMinuteException) {
             throw e
         } catch (e: Exception) {
-            log.error { "stockProgramTradeMinute Error" }
+            log.warn { "stockProgramTradeMinute Error" }
 
             throw RuntimeException(e.message)
         }
@@ -523,7 +523,7 @@ class PriceClient(
         } catch (e: IndexProgramTradeMinuteException) {
             throw e
         } catch (e: Exception) {
-            log.error { "indexProgramTradeMinute Error" }
+            log.warn { "indexProgramTradeMinute Error" }
 
             throw RuntimeException(e.message)
         }

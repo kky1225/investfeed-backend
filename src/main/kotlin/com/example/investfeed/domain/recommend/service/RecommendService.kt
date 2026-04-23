@@ -1,6 +1,8 @@
 package com.example.investfeed.domain.recommend.service
 
 import com.example.investfeed.common.util.DateUtil
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
@@ -34,6 +36,7 @@ class RecommendService(
     private val stockSocketClient: StockSocketClient,
     private val stockPickRepository: StockPickRepository,
     private val authClient: AuthClient,
+    private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -42,12 +45,14 @@ class RecommendService(
     @Scheduled(cron = "0 30 * * * *", scheduler = "slowScheduler")
     @Transactional
     fun recommendStock() {
-        setSchedulerSecurityContext()
-        try {
-            authClient.accessToken()
-            doRecommendStock()
-        } finally {
-            SecurityContextHolder.clearContext()
+        schedulerLogService.execute("RecommendScheduler", SchedulerType.SLOW) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+                doRecommendStock()
+            } finally {
+                SecurityContextHolder.clearContext()
+            }
         }
     }
 

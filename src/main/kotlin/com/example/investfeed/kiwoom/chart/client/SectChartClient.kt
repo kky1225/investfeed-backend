@@ -66,7 +66,7 @@ class SectChartClient(
         }catch(e: SectChartMinuteListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectChartMinuteList Error" }
+            log.warn { "sectChartMinuteList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -99,7 +99,7 @@ class SectChartClient(
         }catch(e: SectChartDayListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectChartDayList Error" }
+            log.warn { "sectChartDayList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -132,7 +132,7 @@ class SectChartClient(
         }catch(e: SectChartWeekListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectChartWeekList Error" }
+            log.warn { "sectChartWeekList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -165,7 +165,7 @@ class SectChartClient(
         }catch(e: SectChartMonthListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectChartMonthList Error" }
+            log.warn { "sectChartMonthList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -198,7 +198,7 @@ class SectChartClient(
         }catch(e: SectChartYearListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "sectChartYearList Error" }
+            log.warn { "sectChartYearList Error" }
 
             throw RuntimeException(e.message)
         }

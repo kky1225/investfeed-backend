@@ -21,6 +21,7 @@ import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.domain.auth.exception.*
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.totp.TotpService
 import org.springframework.security.access.AccessDeniedException
 import mu.KotlinLogging
@@ -49,7 +50,7 @@ class AuthService(
     private val redisTemplate: StringRedisTemplate,
 ) {
     private val log = KotlinLogging.logger {}
-    private val preAuthTokenTtl = 310L // seconds (5분 10초)
+    private val preAuthTokenTtl = 610L // seconds (10분)
     private val secondaryAuthTtl = 30L // minutes
 
     data class LoginResult(
@@ -87,7 +88,7 @@ class AuthService(
 
         val preAuthToken = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
-            "PRE_AUTH:$preAuthToken",
+            "${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken",
             member.loginId,
             preAuthTokenTtl,
             TimeUnit.SECONDS
@@ -109,10 +110,10 @@ class AuthService(
 
         val secret = member.totpSecret ?: totpService.generateSecret().also { newSecret ->
             redisTemplate.opsForValue().set(
-                "PRE_AUTH_SECRET:$preAuthToken",
+                "${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken",
                 newSecret,
                 preAuthTokenTtl,
-                TimeUnit.MINUTES
+                TimeUnit.SECONDS
             )
         }
 
@@ -128,7 +129,7 @@ class AuthService(
             .orElseThrow { MemberNotFoundException() }
 
         val secret = member.totpSecret
-            ?: redisTemplate.opsForValue().get("PRE_AUTH_SECRET:$preAuthToken")
+            ?: redisTemplate.opsForValue().get("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
             ?: throw TotpNotSetupException()
 
         if (!totpService.verifyCode(secret, code)) {
@@ -139,8 +140,8 @@ class AuthService(
             member.totpSecret = secret
         }
 
-        redisTemplate.delete("PRE_AUTH:$preAuthToken")
-        redisTemplate.delete("PRE_AUTH_SECRET:$preAuthToken")
+        redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
+        redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
 
         val passwordChangeRequired = member.passwordChangedAt
             .plusDays(passwordChangeCycle)
@@ -160,7 +161,7 @@ class AuthService(
     }
 
     private fun validatePreAuthToken(preAuthToken: String): String {
-        return redisTemplate.opsForValue().get("PRE_AUTH:$preAuthToken")
+        return redisTemplate.opsForValue().get("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
             ?: throw PreAuthTokenInvalidException()
     }
 
@@ -321,7 +322,7 @@ class AuthService(
     }
 
     fun getSecondaryPasswordLockStatus(loginId: String): Long {
-        val lockTtl = redisTemplate.getExpire("SEC_LOCK:$loginId", TimeUnit.SECONDS)
+        val lockTtl = redisTemplate.getExpire("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId", TimeUnit.SECONDS)
         return if (lockTtl > 0) lockTtl else 0
     }
 
@@ -333,14 +334,14 @@ class AuthService(
             throw SecondaryPasswordNotSetException()
         }
 
-        val lockKey = "SEC_LOCK:$loginId"
+        val lockKey = "${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId"
         val lockTtl = redisTemplate.getExpire(lockKey, TimeUnit.SECONDS)
         if (lockTtl > 0) {
             throw SecondaryPasswordLockedException(lockTtl)
         }
 
         if (!passwordEncoder.matches(req.password, member.secondaryPassword)) {
-            val failKey = "SEC_FAIL:$loginId"
+            val failKey = "${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId"
             val count = redisTemplate.opsForValue().increment(failKey) ?: 1
             if (count == 1L) {
                 redisTemplate.expire(failKey, 10, TimeUnit.MINUTES)
@@ -353,10 +354,10 @@ class AuthService(
             throw InvalidSecondaryPasswordException()
         }
 
-        redisTemplate.delete("SEC_FAIL:$loginId")
+        redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId")
         val token = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
-            "SEC_AUTH:$loginId",
+            "${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId",
             token,
             secondaryAuthTtl,
             TimeUnit.MINUTES
@@ -365,11 +366,11 @@ class AuthService(
     }
 
     fun invalidateSecondaryAuth(loginId: String) {
-        redisTemplate.delete("SEC_AUTH:$loginId")
+        redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId")
     }
 
     fun isSecondaryAuthValid(loginId: String, token: String): Boolean {
-        val stored = redisTemplate.opsForValue().get("SEC_AUTH:$loginId") ?: return false
+        val stored = redisTemplate.opsForValue().get("${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId") ?: return false
         return stored == token
     }
 

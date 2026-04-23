@@ -51,7 +51,7 @@ class RankClient(
         }catch (e: StockTradeValueListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "stockTradeValueList Error" }
+            log.warn { "stockTradeValueList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -84,7 +84,7 @@ class RankClient(
         }catch(e: StockTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.error { "stockTradeVolumeList Error" }
+            log.warn { "stockTradeVolumeList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -117,7 +117,7 @@ class RankClient(
         }catch(e: StockSurgeTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.error { "stockSurgeTradeVolumeList Error" }
+            log.warn { "stockSurgeTradeVolumeList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -150,7 +150,7 @@ class RankClient(
         } catch(e: InvestorTradeDailyException){
             throw e
         } catch (e: Exception) {
-            log.error { "investorTradeDaily Error" }
+            log.warn { "investorTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }
@@ -209,7 +209,7 @@ class RankClient(
         } catch(e: InvestorTradeException){
             throw e
         } catch (e: Exception) {
-            log.error { "investorTrade Error" }
+            log.warn { "investorTrade Error" }
 
             throw RuntimeException(e.message)
         }

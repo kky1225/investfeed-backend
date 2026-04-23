@@ -2,6 +2,9 @@ package com.example.investfeed.fred.client
 
 import com.example.investfeed.fred.dto.res.FredReleaseDatesRes
 import com.example.investfeed.fred.dto.res.FredSeriesRes
+import com.example.investfeed.fred.exception.FredApiException
+import com.example.investfeed.fred.exception.FredReleaseDatesException
+import com.example.investfeed.fred.exception.FredSeriesObservationsException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -18,6 +21,15 @@ class FredClient(
 ) {
     private val log = KotlinLogging.logger {}
 
+    companion object {
+        /**
+         * FRED rate limit(120/min = 500ms per call) 완화를 위한 호출 간 최소 간격.
+         * 500ms 로 분당 120 요청 한계에 맞춤 → rate limit 안전권.
+         * 실측 50 콜 × 500ms = 약 25초 순수 대기 + API 응답 시간.
+         */
+        private const val THROTTLE_MS = 500L
+    }
+
     /**
      * FRED 시리즈 관측값 조회
      * @param seriesId 시리즈 ID (예: FEDFUNDS, GDP, CPIAUCSL)
@@ -33,10 +45,11 @@ class FredClient(
         realtimeStart: String? = null,
         realtimeEnd: String? = null,
         units: String? = null,
-    ): FredSeriesRes? {
+    ): FredSeriesRes {
+        var lastError: Exception? = null
         repeat(3) { attempt ->
             try {
-                return fredWebClient.get()
+                val res = fredWebClient.get()
                     .uri { uriBuilder ->
                         uriBuilder.path("/fred/series/observations")
                             .queryParam("series_id", seriesId)
@@ -51,14 +64,31 @@ class FredClient(
                         uriBuilder.build()
                     }
                     .retrieve()
+                    .onStatus({ it.isError }, { throw FredApiException() })
                     .bodyToMono<FredSeriesRes>()
                     .block()
+
+                if (res?.observations == null) {
+                    throw FredSeriesObservationsException()
+                }
+
+                Thread.sleep(THROTTLE_MS)
+                return res
+            } catch (e: FredApiException) {
+                lastError = e
+                log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
+                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            } catch (e: FredSeriesObservationsException) {
+                throw e
             } catch (e: Exception) {
-                log.error { "FRED getSeriesObservations Error (seriesId=$seriesId, attempt=${attempt + 1}): ${e.message}" }
+                lastError = e
+                log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
                 if (attempt < 2) Thread.sleep(300L * (attempt + 1))
             }
         }
-        return null
+
+        if (lastError is FredApiException) throw lastError as FredApiException
+        throw RuntimeException(lastError?.message)
     }
 
     /**
@@ -70,10 +100,11 @@ class FredClient(
         realtimeEnd: String? = null,
         sortOrder: String = "asc",
         includeReleaseDatesWithNoData: Boolean = false,
-    ): FredReleaseDatesRes? {
+    ): FredReleaseDatesRes {
+        var lastError: Exception? = null
         repeat(3) { attempt ->
             try {
-                return fredWebClient.get()
+                val res = fredWebClient.get()
                     .uri { uriBuilder ->
                         uriBuilder.path("/fred/release/dates")
                             .queryParam("release_id", releaseId)
@@ -87,13 +118,30 @@ class FredClient(
                         uriBuilder.build()
                     }
                     .retrieve()
+                    .onStatus({ it.isError }, { throw FredApiException() })
                     .bodyToMono<FredReleaseDatesRes>()
                     .block()
+
+                if (res?.release_dates == null) {
+                    throw FredReleaseDatesException()
+                }
+
+                Thread.sleep(THROTTLE_MS)
+                return res
+            } catch (e: FredApiException) {
+                lastError = e
+                log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
+                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            } catch (e: FredReleaseDatesException) {
+                throw e
             } catch (e: Exception) {
-                log.error { "FRED getReleaseDatesByReleaseId Error (releaseId=$releaseId, attempt=${attempt + 1}): ${e.message}" }
+                lastError = e
+                log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
                 if (attempt < 2) Thread.sleep(300L * (attempt + 1))
             }
         }
-        return null
+
+        if (lastError is FredApiException) throw lastError as FredApiException
+        throw RuntimeException(lastError?.message)
     }
 }

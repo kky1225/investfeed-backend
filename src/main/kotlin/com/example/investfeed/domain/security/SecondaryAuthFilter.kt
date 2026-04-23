@@ -2,6 +2,7 @@ package com.example.investfeed.domain.security
 
 import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -51,9 +52,9 @@ class SecondaryAuthFilter(
             ?.firstOrNull { it.name == "secondaryAuthToken" }
             ?.value
 
-        val storedToken = redisTemplate.opsForValue().get("SEC_AUTH:$loginId")
+        val storedToken = redisTemplate.opsForValue().get("${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId")
         if (token == null || storedToken == null || storedToken != token) {
-            val lockTtl = redisTemplate.getExpire("SEC_LOCK:$loginId", TimeUnit.SECONDS)
+            val lockTtl = redisTemplate.getExpire("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId", TimeUnit.SECONDS)
             if (lockTtl > 0) {
                 writeLockedResponse(response)
                 return

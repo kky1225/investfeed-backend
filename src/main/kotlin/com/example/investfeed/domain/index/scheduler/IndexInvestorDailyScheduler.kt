@@ -2,6 +2,8 @@ package com.example.investfeed.domain.index.scheduler
 
 import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.index.service.IndexService
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -20,6 +22,7 @@ class IndexInvestorDailyScheduler(
     private val indexService: IndexService,
     private val indexInvestorDailyRepository: IndexInvestorDailyRepository,
     private val authClient: AuthClient,
+    private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -28,12 +31,15 @@ class IndexInvestorDailyScheduler(
 
     @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
-        try {
-            val yesterday = LocalDate.now().minusDays(1).format(formatter)
-            indexService.collectIndexInvestorDaily(yesterday)
-            log.info { "지수 투자자 일별 데이터 수집 완료: $yesterday" }
-        } catch (e: Exception) {
-            log.error { "지수 투자자 일별 데이터 수집 스케줄러 실패: ${e.message}" }
+        schedulerLogService.execute("IndexInvestorDailyScheduler", SchedulerType.SLOW) {
+            try {
+                val yesterday = LocalDate.now().minusDays(1).format(formatter)
+                indexService.collectIndexInvestorDaily(yesterday)
+                log.info { "지수 투자자 일별 데이터 수집 완료: $yesterday" }
+            } catch (e: Exception) {
+                log.error { "지수 투자자 일별 데이터 수집 스케줄러 실패: ${e.message}" }
+                throw e
+            }
         }
     }
 
@@ -71,7 +77,7 @@ class IndexInvestorDailyScheduler(
                             indexService.collectIndexInvestorDaily(dt)
                             filled++
                         } catch (e: Exception) {
-                            log.error { "지수 투자자 일별 데이터 보정 실패 ($dt): ${e.message}" }
+                            log.warn { "지수 투자자 일별 데이터 보정 실패 ($dt): ${e.message}" }
                         }
                     }
                 }

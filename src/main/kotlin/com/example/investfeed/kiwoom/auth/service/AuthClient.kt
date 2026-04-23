@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
 import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import mu.KotlinLogging
@@ -30,9 +31,10 @@ class AuthClient(
 ) {
     private val log = KotlinLogging.logger {}
 
+    private val REDIS_KEY_PREFIX = RedisKeyPrefix.KIWOOM_ACCESS_TOKEN.prefix
+    private val LOCK_KEY_PREFIX = RedisKeyPrefix.KIWOOM_ACCESS_TOKEN_LOCK.prefix
+
     companion object {
-        private const val REDIS_KEY_PREFIX = "kiwoom:access_token"
-        private const val LOCK_KEY_PREFIX = "lock:kiwoom:access_token"
         private const val BROKER_NAME = "키움증권"
     }
 
@@ -58,7 +60,7 @@ class AuthClient(
                 refreshToken(loginId)
             }
         } catch (e: Exception) {
-            log.error { "accessToken Error: ${e.message}" }
+            log.warn { "accessToken 실패 (loginId=$loginId): ${e.message}" }
             throw RuntimeException(e.message)
         }
     }
@@ -111,7 +113,7 @@ class AuthClient(
                 redisTemplate.opsForValue().set(redisKey, it, Duration.ofMinutes(30))
             }
         } catch (e: Exception) {
-            log.error { "refreshToken Error: ${e.message}" }
+            log.warn { "refreshToken 실패 (loginId=$loginId): ${e.message}" }
             throw RuntimeException(e.message)
         }
     }
@@ -127,11 +129,11 @@ class AuthClient(
     }
 
     private fun getRedisKey(loginId: String): String {
-        return "$REDIS_KEY_PREFIX:$loginId"
+        return "$REDIS_KEY_PREFIX$loginId"
     }
 
     private fun getLockKey(loginId: String): String {
-        return "$LOCK_KEY_PREFIX:$loginId"
+        return "$LOCK_KEY_PREFIX$loginId"
     }
 
     private fun getLoginIdFromSecurityContext(): String {

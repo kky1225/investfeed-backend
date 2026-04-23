@@ -56,7 +56,7 @@ class EtfService(
         }catch (e: EtfPriceListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "etfPriceList Error" }
+            log.warn { "etfPriceList Error" }
 
             throw RuntimeException(e.message)
         }
@@ -89,7 +89,7 @@ class EtfService(
         }catch (e: EtfInfoException) {
             throw e
         }catch (e: Exception) {
-            log.error { "etfInfo Error" }
+            log.warn { "etfInfo Error" }
 
             throw RuntimeException(e.message)
         }
@@ -122,7 +122,7 @@ class EtfService(
         }catch (e: EtfTradeDailyListException) {
             throw e
         }catch (e: Exception) {
-            log.error { "etfTradeDaily Error" }
+            log.warn { "etfTradeDaily Error" }
 
             throw RuntimeException(e.message)
         }

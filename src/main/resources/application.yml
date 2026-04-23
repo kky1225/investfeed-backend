@@ -1,6 +1,8 @@
 spring:
   application:
     name: InvestFeed
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   Jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -21,6 +23,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
+server:
+  shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true   # Tomcat 스레드풀 JMX 지표 노출 (모니터링 페이지에서 조회)
 
 jwt:
   secret: ${JWT_SECRET}

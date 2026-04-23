@@ -13,4 +13,6 @@ data class IndexInvestorDailyItem(
     var etcCorpNetprps: String? = null, // 기타법인순매수
     var samoFundNetprps: String? = null, // 사모펀드순매수
     var natnNetprps: String? = null, // 국가순매수
+    var jnsinkmNetprps: String? = null, // 종신금순매수
+    var nativeTrmtFrgnrNetprps: String? = null, // 내국인대우외국인순매수
 )

@@ -49,7 +49,7 @@ class NotificationWebSocketHandler(
                     session.sendMessage(textMessage)
                 }
             } catch (e: Exception) {
-                log.error { "알림 전송 실패: memberId=$memberId, error=${e.message}" }
+                log.warn { "알림 전송 실패: memberId=$memberId, error=${e.message}" }
             }
         }
     }
@@ -68,7 +68,7 @@ class NotificationWebSocketHandler(
             val userDetails = authentication.principal as CustomUserDetails
             userDetails.member.id
         } catch (e: Exception) {
-            log.error { "WebSocket 토큰 파싱 실패: ${e.message}" }
+            log.warn { "WebSocket 토큰 파싱 실패: ${e.message}" }
             null
         }
     }

@@ -1,42 +1,53 @@
 package com.example.investfeed.domain.calendar.scheduler
 
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
-import jakarta.annotation.PostConstruct
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 
 /**
  * 일정(경제지표) 데이터를 30분 주기로 외부 API 에서 가져와 Redis 에 갱신한다.
  *
- * 사용자가 일정 페이지를 조회할 때 외부 API 호출 없이 Redis 에서 즉시 응답할 수 있도록
- * 백그라운드에서 캐시를 항상 warm 상태로 유지한다.
- *
- * 서버 기동 시 @PostConstruct 로 즉시 1회 실행하여 Redis 가 빈 상태로
- * 사용자 요청을 받는 상황을 방지한다.
+ * 기동 시 초기 warming 은 `ApplicationReadyEvent` 수신 후 slowScheduler 풀에 제출한다.
+ * - 스레드 누수/추적 가능성 확보 (슬로우 풀 지표에 노출)
  */
 @Component
 class CalendarSyncScheduler(
     private val economicCalendarService: EconomicCalendarService,
+    private val schedulerLogService: SchedulerLogService,
+    @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent::class)
     fun initSync() {
-        Thread {
+        slowScheduler.execute {
+            if (economicCalendarService.isCacheWarm()) {
+                log.info { "CalendarSync 초기 warming skip — Redis 캐시 이미 존재" }
+                return@execute
+            }
             syncCalendarData()
-        }.start()
+        }
     }
 
     @Scheduled(cron = "0 */30 * * * *", scheduler = "slowScheduler")
     fun syncCalendarData() {
-        val start = System.currentTimeMillis()
-        try {
-            economicCalendarService.syncCurrentData()
-        } catch (e: Exception) {
-            log.error { "CalendarSyncScheduler 실행 실패: ${e.message}" }
-        } finally {
-            log.info { "CalendarSyncScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+        schedulerLogService.execute("CalendarSyncScheduler", SchedulerType.SLOW) {
+            val start = System.currentTimeMillis()
+            try {
+                economicCalendarService.syncCurrentData()
+            } catch (e: Exception) {
+                log.error { "CalendarSyncScheduler 실행 실패: ${e.message}" }
+                throw e
+            } finally {
+                log.info { "CalendarSyncScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            }
         }
     }
 }

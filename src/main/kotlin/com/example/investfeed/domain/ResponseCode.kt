@@ -160,6 +160,8 @@ enum class ResponseCode(
     CALENDAR_EVENT_UPDATE(message = "일정 수정에 성공하셨습니다."),
     CALENDAR_EVENT_DELETE(message = "일정 삭제에 성공하셨습니다."),
     CALENDAR_REFRESH(message = "캘린더 데이터 갱신에 성공하셨습니다."),
+    CALENDAR_BULK_REFRESH_START(message = "일괄 재생성을 시작했습니다."),
+    CALENDAR_BULK_REFRESH_STATUS(message = "일괄 재생성 진행 상황을 조회하였습니다."),
 
     NOTIFICATION_SETTING(message = "알림 설정 조회에 성공하셨습니다."),
     NOTIFICATION_SETTING_SAVE(message = "알림 설정 저장에 성공하셨습니다."),
@@ -184,5 +186,20 @@ enum class ResponseCode(
     MENU_DELETE(message = "메뉴 삭제에 성공하셨습니다."),
     MENU_STRUCTURE_UPDATE(message = "메뉴 구조 변경에 성공하셨습니다."),
     MENU_PERMISSION_UPDATE(message = "메뉴 권한 변경에 성공하셨습니다."),
+
+    MONITORING_SCHEDULER_STATUS(message = "스케줄러 상태 조회에 성공하셨습니다."),
+    MONITORING_SCHEDULER_LOGS(message = "스케줄러 이력 조회에 성공하셨습니다."),
+    MONITORING_SCHEDULER_TIMEOUT_UPDATE(message = "스케줄러 timeout 수정에 성공하셨습니다."),
+    MONITORING_SCHEDULER_LOG_ACKNOWLEDGE(message = "로그 확인 처리에 성공하셨습니다."),
+    MONITORING_SCHEDULER_LOG_CANCEL_ACKNOWLEDGE(message = "로그 확인 취소에 성공하셨습니다."),
+    MONITORING_SCHEDULER_TRIGGER(message = "스케줄러 수동 실행을 요청했습니다."),
+    MONITORING_ACK_HISTORY(message = "확인 이력 조회에 성공하셨습니다."),
+    MONITORING_SCHEDULER_CONFIG_LOGS(message = "스케줄러 설정 변경 이력 조회에 성공하셨습니다."),
+    MONITORING_REDIS(message = "Redis 캐시 현황 조회에 성공하셨습니다."),
+    MONITORING_REDIS_INVALIDATE(message = "Redis 캐시 무효화에 성공하셨습니다."),
+    MONITORING_ERROR_LOGS(message = "에러 로그 조회에 성공하셨습니다."),
+    MONITORING_ERROR_LOG_ACKNOWLEDGE(message = "에러 로그 확인 처리에 성공하셨습니다."),
+    MONITORING_ERROR_LOG_CANCEL_ACKNOWLEDGE(message = "에러 로그 확인 취소에 성공하셨습니다."),
+    MONITORING_SYSTEM_STATUS(message = "시스템 상태 조회에 성공하셨습니다."),
 
 }
