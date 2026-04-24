@@ -1,9 +1,12 @@
 package com.example.investfeed.domain.investor.service
 
+import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.investor.dto.req.InvestorListReq
 import com.example.investfeed.domain.investor.dto.req.InvestorStreamReq
 import com.example.investfeed.domain.investor.dto.res.InvestorListItem
 import com.example.investfeed.domain.investor.dto.res.InvestorListRes
+import com.example.investfeed.global.constant.RedisKeyPrefix
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarketReq
@@ -13,13 +16,14 @@ import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarket
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
-import com.example.investfeed.common.util.MarketTimeUtil
-import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Collections.emptyList
 
 @Service
@@ -28,17 +32,42 @@ class InvestorService(
     private val stockSocketClient: StockSocketClient,
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
+    private val holidayService: HolidayService,
 ) {
     private val CACHE_PREFIX = RedisKeyPrefix.INVESTOR_CLOSE_MARKET.prefix
 
     companion object {
         private val ALL_COMBINATIONS = listOf("6" to "1", "6" to "2", "7" to "1", "7" to "2")
+
+        private val SCHEDULE_RUN_START: LocalTime = MarketTimeUtil.KRX_TRADE_CLOSE  // 15:36
+        private val SCHEDULE_RUN_END: LocalTime = LocalTime.of(21, 0)
+        /** 다음 거래일 갱신 재개 시각. 스케줄러 재시작(15:36) + 여유 5분 */
+        private val NEXT_DAY_REFRESH_TIME: LocalTime = LocalTime.of(15, 41)
     }
 
-    private fun ttlUntilNextMinute(): Duration {
-        val secondsElapsed = LocalTime.now().second
-        val secondsRemaining = if (secondsElapsed == 0) 60L else (60 - secondsElapsed).toLong()
-        return Duration.ofSeconds(secondsRemaining)
+    /**
+     * 투자자별 장마감 순위 캐시의 동적 TTL 계산.
+     *
+     * - 스케줄러 실행 구간(15:36 ~ 21:00) 저장: 다음 분 + 1분 여유 (매 분 덮어쓰기 사이클)
+     * - 그 외 시각(장 외 시간대/주말/휴일) 저장: 다음 거래일 15:41 까지
+     *   → 15:41 = 스케줄러 재시작(15:36) + 5분 여유. 첫 덮어쓰기 타이밍 공백 방지.
+     */
+    internal fun ttlUntilNextInvestorUpdate(now: LocalDateTime): Duration {
+        val nowTime = now.toLocalTime()
+        val target: LocalDateTime =
+            if (!nowTime.isBefore(SCHEDULE_RUN_START) && nowTime.isBefore(SCHEDULE_RUN_END)) {
+                // 스케줄러 실행 중: 다음 분 + 1분 여유
+                now.plusMinutes(1).truncatedTo(ChronoUnit.MINUTES).plusMinutes(1)
+            } else {
+                // 장 외 시간/주말/휴일: 다음 거래일 15:41
+                val baseDate: LocalDate =
+                    if (!nowTime.isBefore(SCHEDULE_RUN_END)) now.toLocalDate()  // 21:00 이후 → 오늘 이후 거래일
+                    else now.toLocalDate().minusDays(1)  // 15:36 이전 → 어제 이후 거래일(오늘 포함)
+                holidayService.nextTradingDay(baseDate).atTime(NEXT_DAY_REFRESH_TIME)
+            }
+        val duration = Duration.between(now, target)
+        // 안전 하한: 음수/0 방지 (극히 짧은 시간이라도 캐시되도록)
+        return if (duration.isNegative || duration.isZero) Duration.ofMinutes(1) else duration
     }
 
     fun investorList(
@@ -60,10 +89,24 @@ class InvestorService(
             return objectMapper.readValue(cached, InvestorListRes::class.java)
         }
 
-        val rawRes = fetchRawCloseMarket(now)
-        if (rawRes.return_code != 0) return InvestorListRes(investorList = emptyList())
+        // Redis miss → on-demand fallback. 4조합 모두 채워 다음 조회부터 히트.
+        val rawRes = refreshCloseMarketCache(now) ?: return InvestorListRes(investorList = emptyList())
+        return buildFromRaw(rawRes, req.orgnTp, req.trdeTp)
+    }
 
-        val ttl = ttlUntilNextMinute()
+    /**
+     * 4조합(외국인/기관 × 매수/매도) 의 Redis 캐시를 현재 시점 기준으로 새로 채운다.
+     *
+     * - InvestorCloseMarketScheduler 에서 매분 호출 (15:36~21:00 평일)
+     * - on-demand fallback 경로에서도 호출 (cache miss 시)
+     *
+     * @return ka10066 원본 응답. `return_code != 0` 이면 null 반환 (캐시 저장 없이 호출자가 empty 처리).
+     */
+    fun refreshCloseMarketCache(now: LocalTime = LocalTime.now()): KiwoomInvestorTradeCloseMarketRes? {
+        val rawRes = fetchRawCloseMarket(now)
+        if (rawRes.return_code != 0) return null
+
+        val ttl = ttlUntilNextInvestorUpdate(LocalDateTime.now())
         ALL_COMBINATIONS.forEach { (orgnTp, trdeTp) ->
             val result = buildFromRaw(rawRes, orgnTp, trdeTp)
             redisTemplate.opsForValue().set(
@@ -72,8 +115,7 @@ class InvestorService(
                 ttl
             )
         }
-
-        return buildFromRaw(rawRes, req.orgnTp, req.trdeTp)
+        return rawRes
     }
 
     private fun fetchRawCloseMarket(now: LocalTime): KiwoomInvestorTradeCloseMarketRes {

@@ -15,4 +15,6 @@ interface MemberHoldingRepository : JpaRepository<MemberHolding, Long> {
 
     @Query("SELECT COALESCE(MAX(m.displayOrder), -1) FROM MemberHolding m WHERE m.memberId = :memberId AND m.broker.id = :brokerId")
     fun findMaxDisplayOrder(memberId: Long, brokerId: Long): Int
+
+    fun findByBrokerId(brokerId: Long): List<MemberHolding>
 }

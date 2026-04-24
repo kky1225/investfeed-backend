@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface InvestmentGoalRepository : JpaRepository<InvestmentGoal, Long> {
 
-    fun findByMemberId(memberId: Long): List<InvestmentGoal>
+    fun findByMemberIdOrderByIdAsc(memberId: Long): List<InvestmentGoal>
 
     fun findByMemberIdAndId(memberId: Long, id: Long): InvestmentGoal?
 

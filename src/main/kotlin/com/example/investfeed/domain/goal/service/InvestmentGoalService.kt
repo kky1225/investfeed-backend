@@ -80,7 +80,7 @@ class InvestmentGoalService(
 
     fun getGoals(): GoalDashboardRes {
         val memberId = getMemberId()
-        val goals = investmentGoalRepository.findByMemberId(memberId)
+        val goals = investmentGoalRepository.findByMemberIdOrderByIdAsc(memberId)
 
         return GoalDashboardRes(
             goals = goals.map { goal ->

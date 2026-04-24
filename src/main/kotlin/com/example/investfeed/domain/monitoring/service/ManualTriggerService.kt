@@ -5,6 +5,7 @@ import com.example.investfeed.domain.dividend.scheduler.StockDividendScheduler
 import com.example.investfeed.domain.goal.scheduler.GoalAlertScheduler
 import com.example.investfeed.domain.holding.scheduler.HoldingSyncScheduler
 import com.example.investfeed.domain.index.scheduler.IndexInvestorDailyScheduler
+import com.example.investfeed.domain.interest.scheduler.InterestSyncScheduler
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
@@ -41,6 +42,7 @@ class ManualTriggerService(
     private val indexInvestorDailyScheduler: IndexInvestorDailyScheduler,
     private val apiKeyExpiryScheduler: ApiKeyExpiryScheduler,
     private val schedulerLogCleanupScheduler: SchedulerLogCleanupScheduler,
+    private val interestSyncScheduler: InterestSyncScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -57,6 +59,7 @@ class ManualTriggerService(
             "IndexInvestorDailyScheduler"  to { indexInvestorDailyScheduler.collectDaily() },
             "ApiKeyExpiryScheduler"        to { apiKeyExpiryScheduler.checkApiKeyExpiry() },
             "SchedulerLogCleanupScheduler" to { schedulerLogCleanupScheduler.cleanup() },
+            "InterestSyncScheduler"        to { interestSyncScheduler.syncAllStkNm() },
         )
     }
 

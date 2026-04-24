@@ -17,7 +17,7 @@ class InterestItem(
     val stkCd: String,
 
     @Column(nullable = false)
-    val stkNm: String,
+    var stkNm: String,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
