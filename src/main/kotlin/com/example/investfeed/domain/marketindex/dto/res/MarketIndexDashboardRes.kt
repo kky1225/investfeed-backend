@@ -6,6 +6,7 @@ data class MarketIndexDashboardRes(
     val indices: List<MarketIndexRes>,
     val fearGreed: FearGreedRes? = null,
     val bitcoin: BitcoinSummary? = null,
+    val ethereum: BitcoinSummary? = null,
 )
 
 data class BitcoinSummary(

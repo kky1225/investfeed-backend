@@ -7,6 +7,7 @@ import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.upbit.ticker.client.TickerClient
+import com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -26,24 +27,19 @@ class MarketIndexController(
         val indices = marketIndexService.getAll()
         val fearGreed = cryptoService.fearGreedIndex()
 
-        val btcTicker = tickerClient.getTickers("KRW-BTC").firstOrNull()
-        val bitcoin = btcTicker?.let {
-            val changePrice = it.signed_change_price?.toLong() ?: 0
-            val changeRate = (it.signed_change_rate ?: 0.0) * 100
-            val trend = when {
-                changePrice > 0 -> "UP"
-                changePrice < 0 -> "DOWN"
-                else -> "EVEN"
-            }
-            BitcoinSummary(
-                price = (it.trade_price?.toLong() ?: 0).toString(),
-                changeAmount = changePrice.toString(),
-                changeRate = String.format("%.2f", changeRate),
-                trend = trend,
-            )
-        }
+        // BTC, ETH 를 한 번의 Upbit 호출로 동시 조회 (markets 파라미터 콤마 구분)
+        val tickers = tickerClient.getTickers("KRW-BTC,KRW-ETH").associateBy { it.market }
+        val bitcoin = tickers["KRW-BTC"]?.toSummary()
+        val ethereum = tickers["KRW-ETH"]?.toSummary()
 
-        return ResponseEntity.ok(MarketIndexDashboardRes(indices = indices, fearGreed = fearGreed, bitcoin = bitcoin))
+        return ResponseEntity.ok(
+            MarketIndexDashboardRes(
+                indices = indices,
+                fearGreed = fearGreed,
+                bitcoin = bitcoin,
+                ethereum = ethereum,
+            )
+        )
     }
 
     @GetMapping("/{type}")
@@ -51,5 +47,21 @@ class MarketIndexController(
         val result = marketIndexService.getByType(type)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(result)
+    }
+
+    private fun UpbitTickerRes.toSummary(): BitcoinSummary {
+        val changePrice = signed_change_price?.toLong() ?: 0
+        val changeRate = (signed_change_rate ?: 0.0) * 100
+        val trend = when {
+            changePrice > 0 -> "UP"
+            changePrice < 0 -> "DOWN"
+            else -> "EVEN"
+        }
+        return BitcoinSummary(
+            price = (trade_price?.toLong() ?: 0).toString(),
+            changeAmount = changePrice.toString(),
+            changeRate = String.format("%.2f", changeRate),
+            trend = trend,
+        )
     }
 }

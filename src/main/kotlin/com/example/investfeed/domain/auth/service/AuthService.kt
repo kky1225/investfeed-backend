@@ -50,8 +50,9 @@ class AuthService(
     private val redisTemplate: StringRedisTemplate,
 ) {
     private val log = KotlinLogging.logger {}
-    private val preAuthTokenTtl = 610L // seconds (10분)
-    private val secondaryAuthTtl = 30L // minutes
+    private val preAuthTokenTtlSetup = 610L
+    private val preAuthTokenTtlVerify = 310L
+    private val secondaryAuthTtl = 30L
 
     data class LoginResult(
         val tokenRes: TokenRes,
@@ -86,18 +87,22 @@ class AuthService(
         member.lockedAt = null
         member.lockExpiresAt = null
 
+        // TOTP 미등록 사용자는 등록 흐름(10분), 기등록 사용자는 인증 흐름(5분) 으로 TTL 구분
+        val isSetupRequired = member.totpSecret == null
+        val ttl = if (isSetupRequired) preAuthTokenTtlSetup else preAuthTokenTtlVerify
+
         val preAuthToken = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
             "${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken",
             member.loginId,
-            preAuthTokenTtl,
+            ttl,
             TimeUnit.SECONDS
         )
 
         return PreAuthResult(
             preAuthRes = PreAuthRes(
                 totpRequired = true,
-                totpSetupRequired = member.totpSecret == null
+                totpSetupRequired = isSetupRequired
             ),
             preAuthToken = preAuthToken
         )
@@ -112,7 +117,7 @@ class AuthService(
             redisTemplate.opsForValue().set(
                 "${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken",
                 newSecret,
-                preAuthTokenTtl,
+                preAuthTokenTtlSetup,
                 TimeUnit.SECONDS
             )
         }

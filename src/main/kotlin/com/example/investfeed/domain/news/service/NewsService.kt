@@ -18,7 +18,7 @@ class NewsService(
 ) {
     private val log = KotlinLogging.logger {}
     private val CACHE_PREFIX = RedisKeyPrefix.NEWS.prefix
-    private val CACHE_TTL = 30L // 30분
+    private val CACHE_TTL = 5L // 5분
 
     fun searchNews(query: String, page: Int = 1): NewsListRes {
         val cacheKey = "$CACHE_PREFIX${query}:$page"

@@ -89,8 +89,7 @@ class InvestorService(
             return objectMapper.readValue(cached, InvestorListRes::class.java)
         }
 
-        // Redis miss → on-demand fallback. 4조합 모두 채워 다음 조회부터 히트.
-        val rawRes = refreshCloseMarketCache(now) ?: return InvestorListRes(investorList = emptyList())
+        val rawRes = refreshCloseMarketCache(now)
         return buildFromRaw(rawRes, req.orgnTp, req.trdeTp)
     }
 
@@ -99,12 +98,9 @@ class InvestorService(
      *
      * - InvestorCloseMarketScheduler 에서 매분 호출 (15:36~21:00 평일)
      * - on-demand fallback 경로에서도 호출 (cache miss 시)
-     *
-     * @return ka10066 원본 응답. `return_code != 0` 이면 null 반환 (캐시 저장 없이 호출자가 empty 처리).
      */
-    fun refreshCloseMarketCache(now: LocalTime = LocalTime.now()): KiwoomInvestorTradeCloseMarketRes? {
+    fun refreshCloseMarketCache(now: LocalTime = LocalTime.now()): KiwoomInvestorTradeCloseMarketRes {
         val rawRes = fetchRawCloseMarket(now)
-        if (rawRes.return_code != 0) return null
 
         val ttl = ttlUntilNextInvestorUpdate(LocalDateTime.now())
         ALL_COMBINATIONS.forEach { (orgnTp, trdeTp) ->
