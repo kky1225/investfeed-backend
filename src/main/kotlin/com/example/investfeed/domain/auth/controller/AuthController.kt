@@ -107,7 +107,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/password")
+    @PatchMapping("/password")
     fun changePassword(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @CookieValue(name = "accessToken", required = false) accessToken: String?,
@@ -259,7 +259,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/secondary-password/change")
+    @PatchMapping("/secondary-password/change")
     fun changeSecondaryPassword(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @RequestBody req: SecondaryPasswordChangeReq,
@@ -325,7 +325,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/admin/members/{loginId}/role")
+    @PatchMapping("/admin/members/{loginId}/role")
     @PreAuthorize("hasRole('ADMIN')")
     fun changeRole(
         @PathVariable loginId: String,
@@ -344,7 +344,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/admin/members/{loginId}/totp-reset")
+    @PatchMapping("/admin/members/{loginId}/totp-reset")
     @PreAuthorize("hasRole('ADMIN')")
     fun resetTotp(
         @PathVariable loginId: String
@@ -362,7 +362,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/admin/members/{loginId}/lock")
+    @PatchMapping("/admin/members/{loginId}/lock")
     @PreAuthorize("hasRole('ADMIN')")
     fun lockAccount(
         @PathVariable loginId: String
@@ -380,7 +380,7 @@ class AuthController(
         )
     }
 
-    @PutMapping("/admin/members/{loginId}/unlock")
+    @PatchMapping("/admin/members/{loginId}/unlock")
     @PreAuthorize("hasRole('ADMIN')")
     fun unlockAccount(
         @PathVariable loginId: String

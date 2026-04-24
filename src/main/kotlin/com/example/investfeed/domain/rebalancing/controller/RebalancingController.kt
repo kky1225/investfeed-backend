@@ -30,7 +30,7 @@ class RebalancingController(
         )
     }
 
-    @PostMapping("status")
+    @GetMapping("status")
     fun status(): ResponseEntity<ApiResponse<RebalancingStatusRes?>> {
         return ResponseEntity(
             ApiResponse(

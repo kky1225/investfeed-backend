@@ -18,7 +18,7 @@ class InvestmentGoalController(
     private val investmentGoalService: InvestmentGoalService
 ) {
 
-    @PostMapping("create")
+    @PostMapping
     fun create(
         @Valid @RequestBody req: InvestmentGoalCreateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
@@ -31,7 +31,7 @@ class InvestmentGoalController(
         )
     }
 
-    @PutMapping("{id}")
+    @PatchMapping("{id}")
     fun update(
         @PathVariable id: Long,
         @Valid @RequestBody req: InvestmentGoalUpdateReq
@@ -59,7 +59,7 @@ class InvestmentGoalController(
         )
     }
 
-    @PostMapping("list")
+    @GetMapping
     fun list(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -70,7 +70,7 @@ class InvestmentGoalController(
         )
     }
 
-    @PostMapping("dashboard")
+    @GetMapping("dashboard")
     fun dashboard(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(

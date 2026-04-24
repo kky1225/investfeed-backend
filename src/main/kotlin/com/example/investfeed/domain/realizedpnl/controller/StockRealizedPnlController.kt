@@ -19,9 +19,9 @@ class StockRealizedPnlController(
     private val manualRealizedPnlService: ManualRealizedPnlService,
 ) {
 
-    @PostMapping("list")
+    @GetMapping
     fun list(
-        @RequestBody req: RealizedPnlListReq
+        @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -45,7 +45,7 @@ class StockRealizedPnlController(
         )
     }
 
-    @PostMapping("manual/create")
+    @PostMapping("manual")
     fun createManual(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -58,7 +58,7 @@ class StockRealizedPnlController(
         )
     }
 
-    @PutMapping("manual/{id}")
+    @PatchMapping("manual/{id}")
     fun updateManual(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq

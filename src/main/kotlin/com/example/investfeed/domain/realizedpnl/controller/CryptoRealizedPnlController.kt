@@ -19,9 +19,9 @@ class CryptoRealizedPnlController(
     private val cryptoRealizedPnlService: CryptoRealizedPnlService,
 ) {
 
-    @PostMapping("list")
+    @GetMapping
     fun list(
-        @RequestBody req: RealizedPnlListReq
+        @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -32,7 +32,7 @@ class CryptoRealizedPnlController(
         )
     }
 
-    @PostMapping("manual/create")
+    @PostMapping("manual")
     fun createManual(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -45,7 +45,7 @@ class CryptoRealizedPnlController(
         )
     }
 
-    @PutMapping("manual/{id}")
+    @PatchMapping("manual/{id}")
     fun updateManual(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq

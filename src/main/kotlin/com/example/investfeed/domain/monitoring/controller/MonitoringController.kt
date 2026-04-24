@@ -153,9 +153,9 @@ class MonitoringController(
         )
     }
 
-    @PostMapping("/redis/invalidate")
+    @DeleteMapping("/redis/cache")
     @PreAuthorize("hasRole('ADMIN')")
-    fun invalidate(@RequestBody req: RedisInvalidateReq): ResponseEntity<ApiResponse<RedisInvalidateRes>> {
+    fun invalidate(@ModelAttribute req: RedisInvalidateReq): ResponseEntity<ApiResponse<RedisInvalidateRes>> {
         val deleted = monitoringService.invalidatePrefix(req.prefix)
         return ResponseEntity(
             ApiResponse(

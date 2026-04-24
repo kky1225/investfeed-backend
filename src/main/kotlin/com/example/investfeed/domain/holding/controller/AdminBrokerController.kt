@@ -31,7 +31,7 @@ class AdminBrokerController(
         )
     }
 
-    @PostMapping("create")
+    @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     fun createBroker(
         @Valid @RequestBody req: BrokerCreateReq

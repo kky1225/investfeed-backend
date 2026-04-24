@@ -53,7 +53,7 @@ class NotificationController(
         )
     }
 
-    @PutMapping("{id}/read")
+    @PatchMapping("{id}/read")
     fun markAsRead(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable id: Long
@@ -68,7 +68,7 @@ class NotificationController(
         )
     }
 
-    @PutMapping("read-all")
+    @PatchMapping("read-all")
     fun markAllAsRead(
         @AuthenticationPrincipal user: CustomUserDetails
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -124,7 +124,7 @@ class NotificationController(
         )
     }
 
-    @PostMapping("settings")
+    @GetMapping("settings")
     fun getNotificationSetting(): ResponseEntity<ApiResponse<NotificationSettingRes>> {
         return ResponseEntity(
             ApiResponse(

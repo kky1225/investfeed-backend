@@ -46,7 +46,7 @@ class CryptoInterestController(
         )
     }
 
-    @PutMapping("groups/{groupId}")
+    @PatchMapping("groups/{groupId}")
     fun updateGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -77,7 +77,7 @@ class CryptoInterestController(
         )
     }
 
-    @PutMapping("groups/reorder")
+    @PatchMapping("groups/reorder")
     fun reorderGroups(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestBody req: ReorderCryptoGroupsReq
@@ -137,7 +137,7 @@ class CryptoInterestController(
         )
     }
 
-    @PutMapping("groups/{groupId}/items/reorder")
+    @PatchMapping("groups/{groupId}/items/reorder")
     fun reorderItems(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -153,7 +153,7 @@ class CryptoInterestController(
         )
     }
 
-    @PostMapping("groups/{groupId}/items/stream")
+    @GetMapping("groups/{groupId}/items/stream")
     fun streamItems(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long

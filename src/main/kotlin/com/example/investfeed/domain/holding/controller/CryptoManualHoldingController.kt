@@ -33,7 +33,7 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PostMapping("create")
+    @PostMapping
     fun createManualHolding(
         @Valid @RequestBody req: ManualHoldingCreateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
@@ -46,7 +46,7 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PutMapping("{holdingId}")
+    @PatchMapping("{holdingId}")
     fun updateManualHolding(
         @PathVariable holdingId: Long,
         @Valid @RequestBody req: ManualHoldingUpdateReq
@@ -75,7 +75,7 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PutMapping("balance/{memberBrokerId}")
+    @PatchMapping("balance/{memberBrokerId}")
     fun updateBalance(
         @PathVariable memberBrokerId: Long,
         @RequestBody req: MemberBrokerBalanceUpdateReq
@@ -89,7 +89,7 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PutMapping("reorder")
+    @PatchMapping("reorder")
     fun reorderHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

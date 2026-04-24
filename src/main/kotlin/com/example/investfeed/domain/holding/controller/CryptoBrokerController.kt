@@ -40,7 +40,7 @@ class CryptoBrokerController(
         )
     }
 
-    @PostMapping("my/add")
+    @PostMapping("my")
     fun addMyBroker(
         @RequestBody req: MyBrokerAddReq
     ): ResponseEntity<ApiResponse<MyBrokerItem>> {

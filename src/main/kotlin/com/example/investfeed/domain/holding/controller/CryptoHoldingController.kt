@@ -44,7 +44,7 @@ class CryptoHoldingController(
         )
     }
 
-    @PutMapping("reorder")
+    @PatchMapping("reorder")
     fun reorderHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

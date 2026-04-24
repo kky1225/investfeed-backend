@@ -18,7 +18,7 @@ class EconomicCalendarController(
     private val economicCalendarService: EconomicCalendarService,
 ) {
 
-    @PostMapping("indicators")
+    @GetMapping("indicators")
     fun indicators(): ResponseEntity<ApiResponse<EconomicIndicatorsRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -29,9 +29,9 @@ class EconomicCalendarController(
         )
     }
 
-    @PostMapping("history")
+    @GetMapping("history")
     fun history(
-        @Valid @RequestBody req: IndicatorHistoryReq
+        @Valid @ModelAttribute req: IndicatorHistoryReq
     ): ResponseEntity<ApiResponse<IndicatorHistoryRes?>> {
         return ResponseEntity(
             ApiResponse(
@@ -42,9 +42,9 @@ class EconomicCalendarController(
         )
     }
 
-    @PostMapping("events")
+    @GetMapping("events")
     fun events(
-        @RequestBody req: CalendarEventsReq
+        @ModelAttribute req: CalendarEventsReq
     ): ResponseEntity<ApiResponse<CalendarEventsRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -55,9 +55,9 @@ class EconomicCalendarController(
         )
     }
 
-    @PostMapping("events/list")
+    @GetMapping("events/manual")
     fun listManualEvents(
-        @RequestBody req: CalendarEventsReq
+        @ModelAttribute req: CalendarEventsReq
     ): ResponseEntity<ApiResponse<List<CalendarEvent>>> {
         return ResponseEntity(
             ApiResponse(
@@ -68,7 +68,7 @@ class EconomicCalendarController(
         )
     }
 
-    @PostMapping("events/create")
+    @PostMapping("events")
     fun createEvent(
         @Valid @RequestBody req: ManualCalendarEventReq
     ): ResponseEntity<ApiResponse<CalendarEvent>> {
@@ -109,7 +109,7 @@ class EconomicCalendarController(
         )
     }
 
-    @PostMapping("events/refresh")
+    @PatchMapping("events")
     fun refreshEvents(
         @RequestBody req: CalendarEventsReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

@@ -82,7 +82,7 @@ class MenuController(
         )
     }
 
-    @PutMapping("/admin/menus/structure")
+    @PatchMapping("/admin/menus/structure")
     @PreAuthorize("hasRole('ADMIN')")
     fun updateStructure(@RequestBody req: UpdateMenuStructureReq): ResponseEntity<ApiResponse<Nothing?>> {
         menuService.updateStructure(req)
@@ -96,7 +96,7 @@ class MenuController(
         )
     }
 
-    @PutMapping("/admin/menus/{id}/permissions")
+    @PatchMapping("/admin/menus/{id}/permissions")
     @PreAuthorize("hasRole('ADMIN')")
     fun updatePermissions(
         @PathVariable id: Long,
