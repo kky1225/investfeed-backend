@@ -4,6 +4,8 @@ import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.example.investfeed.domain.marketindex.exception.MarketIndexApiException
 import com.example.investfeed.domain.marketindex.exception.MarketIndexResponseException
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -11,6 +13,7 @@ import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 import reactor.core.publisher.Mono
@@ -25,6 +28,7 @@ class NaverMarketIndexCrawler(
     @param:Value("\${naver-stock.pc-url}")
     private val naverPcUrl: String,
     private val objectMapper: ObjectMapper,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -32,6 +36,10 @@ class NaverMarketIndexCrawler(
         .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
         .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
+        .filter(ExchangeFilterFunction.ofRequestProcessor { req ->
+            apiCallCounterService.increment(ApiProvider.NAVER_CRAWL)
+            Mono.just(req)
+        })
         .build()
 
     companion object {

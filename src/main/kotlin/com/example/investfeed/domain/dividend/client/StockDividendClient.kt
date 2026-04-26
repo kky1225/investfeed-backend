@@ -4,6 +4,8 @@ import com.example.investfeed.domain.dividend.client.dto.DividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.DividendApiResponse
 import com.example.investfeed.domain.dividend.exception.StockDividendApiException
 import com.example.investfeed.domain.dividend.exception.StockDividendResponseException
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -20,6 +22,7 @@ class StockDividendClient(
     @param:Value("\${data-go-kr.service-key}")
     private val serviceKey: String,
     private val objectMapper: ObjectMapper,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -27,6 +30,8 @@ class StockDividendClient(
 
     fun getDividendInfo(pageNo: Int, numOfRows: Int = 5000): Pair<List<DividendApiItem>, Int> {
         try {
+            apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_DIVIDEND)
+
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
             val urlStr = "$defaultUrl$DIVIDEND_PATH?serviceKey=$encodedKey&pageNo=$pageNo&numOfRows=$numOfRows&resultType=json"
             val connection = URI(urlStr).toURL().openConnection() as HttpURLConnection

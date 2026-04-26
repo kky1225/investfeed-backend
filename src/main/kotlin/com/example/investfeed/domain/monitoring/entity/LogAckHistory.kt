@@ -4,7 +4,7 @@ import jakarta.persistence.*
 import java.time.LocalDateTime
 
 enum class AckSourceType { SCHEDULER_LOG, ERROR_LOG }
-enum class AckAction { ACKNOWLEDGE, EDIT_NOTE, CANCEL }
+enum class AckAction { ACKNOWLEDGE, EDIT_NOTE, CANCEL, BULK_ACKNOWLEDGE }
 
 /**
  * 로그 acknowledge 이력.
@@ -13,6 +13,7 @@ enum class AckAction { ACKNOWLEDGE, EDIT_NOTE, CANCEL }
  * - ACKNOWLEDGE: 최초 확인 처리 시 기록
  * - EDIT_NOTE: 이미 확인된 상태에서 사유 수정
  * - CANCEL: 확인 취소
+ * - BULK_ACKNOWLEDGE: 미확인 전체 일괄 확인 처리 (사유 누락 시 "일괄 확인" 디폴트)
  */
 @Entity
 @Table(name = "log_ack_history")

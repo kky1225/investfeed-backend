@@ -3,8 +3,8 @@ package com.example.investfeed.domain.monitoring.scheduler
 import com.example.investfeed.domain.monitoring.repository.ErrorLogRepository
 import com.example.investfeed.domain.monitoring.repository.LogAckHistoryRepository
 import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -27,7 +27,7 @@ class SchedulerLogCleanupScheduler(
     @Scheduled(cron = "0 0 4 * * *", scheduler = "slowScheduler")
     @Transactional
     fun cleanup() {
-        schedulerLogService.execute("SchedulerLogCleanupScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.SchedulerLogCleanupScheduler) {
             val threshold = LocalDateTime.now().minusDays(90)
 
             val deletedSchedulerLogs = schedulerLogRepository.deleteByStartedAtBefore(threshold)

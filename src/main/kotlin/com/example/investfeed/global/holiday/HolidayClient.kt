@@ -1,5 +1,7 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.global.holiday.dto.HolidayApiResponse
 import com.example.investfeed.global.holiday.exception.HolidayApiException
 import com.example.investfeed.global.holiday.exception.HolidayInfoException
@@ -20,6 +22,7 @@ class HolidayClient(
     private val DEFAULT_URL: String,
     @param:Value("\${data-go-kr.service-key}")
     private val serviceKey: String,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -41,6 +44,8 @@ class HolidayClient(
         val solMonth = String.format("%02d", month)
 
         try {
+            apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_HOLIDAY)
+
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
             val urlStr = "$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&solMonth=$solMonth&numOfRows=30&_type=json"
             val connection = URI(urlStr).toURL().openConnection() as HttpURLConnection

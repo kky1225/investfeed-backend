@@ -1,8 +1,8 @@
 package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
@@ -29,7 +29,7 @@ class ApiKeyExpiryScheduler(
 
     @Scheduled(cron = "0 0 9 * * *", scheduler = "slowScheduler")
     fun checkApiKeyExpiry() {
-        schedulerLogService.execute("ApiKeyExpiryScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.ApiKeyExpiryScheduler) {
             val start = System.currentTimeMillis()
             val today = LocalDate.now()
             val allApiKeys = memberApiKeyRepository.findAll()

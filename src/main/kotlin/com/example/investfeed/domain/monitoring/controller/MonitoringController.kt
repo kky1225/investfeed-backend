@@ -4,6 +4,7 @@ import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.monitoring.dto.req.AcknowledgeLogReq
+import com.example.investfeed.domain.monitoring.dto.req.BulkAcknowledgeReq
 import com.example.investfeed.domain.monitoring.dto.req.ErrorLogsReq
 import com.example.investfeed.domain.monitoring.dto.req.RedisInvalidateReq
 import com.example.investfeed.domain.monitoring.dto.req.SchedulerConfigLogsReq
@@ -14,7 +15,6 @@ import com.example.investfeed.domain.monitoring.entity.AckSourceType
 import com.example.investfeed.domain.monitoring.service.ManualTriggerService
 import com.example.investfeed.domain.monitoring.service.MonitoringService
 import jakarta.validation.Valid
-import org.springframework.data.domain.Page
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -27,29 +27,80 @@ class MonitoringController(
     private val monitoringService: MonitoringService,
     private val manualTriggerService: ManualTriggerService,
 ) {
-
-    @GetMapping("/scheduler-status")
+    @GetMapping("/scheduler")
     @PreAuthorize("hasRole('ADMIN')")
-    fun schedulerStatus(): ResponseEntity<ApiResponse<List<SchedulerStatusRes>>> {
+    fun scheduler(
+        @ModelAttribute req: SchedulerLogsReq,
+    ): ResponseEntity<ApiResponse<SchedulerOverviewRes>> {
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.MONITORING_SCHEDULER_STATUS.code,
-                message = ResponseCode.MONITORING_SCHEDULER_STATUS.message,
-                result = monitoringService.getStatuses(),
+                code = ResponseCode.MONITORING_SCHEDULER_OVERVIEW.code,
+                message = ResponseCode.MONITORING_SCHEDULER_OVERVIEW.message,
+                result = monitoringService.getSchedulerOverview(req),
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("/scheduler-logs")
+    @GetMapping("/config-logs")
     @PreAuthorize("hasRole('ADMIN')")
-    fun schedulerLogs(
-        @RequestBody req: SchedulerLogsReq,
-    ): ResponseEntity<ApiResponse<Page<SchedulerLogRes>>> {
+    fun configLogs(
+        @ModelAttribute req: SchedulerConfigLogsReq,
+    ): ResponseEntity<ApiResponse<ConfigLogsOverviewRes>> {
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.MONITORING_SCHEDULER_LOGS.code,
-                message = ResponseCode.MONITORING_SCHEDULER_LOGS.message,
-                result = monitoringService.getLogs(req),
+                code = ResponseCode.MONITORING_CONFIG_LOGS_OVERVIEW.code,
+                message = ResponseCode.MONITORING_CONFIG_LOGS_OVERVIEW.message,
+                result = monitoringService.getConfigLogsOverview(req),
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/redis")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun redis(): ResponseEntity<ApiResponse<RedisOverviewRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_REDIS_OVERVIEW.code,
+                message = ResponseCode.MONITORING_REDIS_OVERVIEW.message,
+                result = monitoringService.getRedisOverview(),
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/errors")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun errors(
+        @ModelAttribute req: ErrorLogsReq,
+    ): ResponseEntity<ApiResponse<ErrorLogsOverviewRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_ERROR_LOGS_OVERVIEW.code,
+                message = ResponseCode.MONITORING_ERROR_LOGS_OVERVIEW.message,
+                result = monitoringService.getErrorLogsOverview(req),
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/api-calls")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun apiCalls(): ResponseEntity<ApiResponse<ApiCallsOverviewRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_API_CALLS_OVERVIEW.code,
+                message = ResponseCode.MONITORING_API_CALLS_OVERVIEW.message,
+                result = monitoringService.getApiCallsOverview(),
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/system")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun system(): ResponseEntity<ApiResponse<SystemOverviewRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_SYSTEM_OVERVIEW.code,
+                message = ResponseCode.MONITORING_SYSTEM_OVERVIEW.message,
+                result = monitoringService.getSystemOverview(),
             ), HttpStatus.OK
         )
     }
@@ -127,55 +178,18 @@ class MonitoringController(
         )
     }
 
-    @PostMapping("/scheduler-config-logs")
+    @PostMapping("/scheduler-logs/acknowledge-bulk")
     @PreAuthorize("hasRole('ADMIN')")
-    fun schedulerConfigLogs(
-        @RequestBody req: SchedulerConfigLogsReq,
-    ): ResponseEntity<ApiResponse<Page<SchedulerConfigLogRes>>> {
+    fun bulkAcknowledgeSchedulerLogs(
+        @Valid @RequestBody req: BulkAcknowledgeReq,
+    ): ResponseEntity<ApiResponse<BulkAcknowledgeRes>> {
+        val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
+        val changedBy = userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.MONITORING_SCHEDULER_CONFIG_LOGS.code,
-                message = ResponseCode.MONITORING_SCHEDULER_CONFIG_LOGS.message,
-                result = monitoringService.getConfigLogs(req),
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("/redis")
-    @PreAuthorize("hasRole('ADMIN')")
-    fun redis(): ResponseEntity<ApiResponse<RedisCacheRes>> {
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.MONITORING_REDIS.code,
-                message = ResponseCode.MONITORING_REDIS.message,
-                result = monitoringService.getRedisStats(),
-            ), HttpStatus.OK
-        )
-    }
-
-    @DeleteMapping("/redis/cache")
-    @PreAuthorize("hasRole('ADMIN')")
-    fun invalidate(@ModelAttribute req: RedisInvalidateReq): ResponseEntity<ApiResponse<RedisInvalidateRes>> {
-        val deleted = monitoringService.invalidatePrefix(req.prefix)
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.MONITORING_REDIS_INVALIDATE.code,
-                message = ResponseCode.MONITORING_REDIS_INVALIDATE.message,
-                result = RedisInvalidateRes(deleted = deleted),
-            ), HttpStatus.OK
-        )
-    }
-
-    @PostMapping("/error-logs")
-    @PreAuthorize("hasRole('ADMIN')")
-    fun errorLogs(
-        @RequestBody req: ErrorLogsReq,
-    ): ResponseEntity<ApiResponse<Page<ErrorLogRes>>> {
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.MONITORING_ERROR_LOGS.code,
-                message = ResponseCode.MONITORING_ERROR_LOGS.message,
-                result = monitoringService.getErrorLogs(req),
+                code = ResponseCode.MONITORING_BULK_ACKNOWLEDGE.code,
+                message = ResponseCode.MONITORING_BULK_ACKNOWLEDGE.message,
+                result = monitoringService.bulkAcknowledgeSchedulerLogs(req, changedBy),
             ), HttpStatus.OK
         )
     }
@@ -223,14 +237,31 @@ class MonitoringController(
         )
     }
 
-    @GetMapping("/system-status")
+    @PostMapping("/error-logs/acknowledge-bulk")
     @PreAuthorize("hasRole('ADMIN')")
-    fun systemStatus(): ResponseEntity<ApiResponse<SystemStatusRes>> {
+    fun bulkAcknowledgeErrorLogs(
+        @Valid @RequestBody req: BulkAcknowledgeReq,
+    ): ResponseEntity<ApiResponse<BulkAcknowledgeRes>> {
+        val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
+        val changedBy = userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.MONITORING_SYSTEM_STATUS.code,
-                message = ResponseCode.MONITORING_SYSTEM_STATUS.message,
-                result = monitoringService.getSystemStatus(),
+                code = ResponseCode.MONITORING_BULK_ACKNOWLEDGE.code,
+                message = ResponseCode.MONITORING_BULK_ACKNOWLEDGE.message,
+                result = monitoringService.bulkAcknowledgeErrorLogs(req, changedBy),
+            ), HttpStatus.OK
+        )
+    }
+
+    @DeleteMapping("/redis/cache")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun invalidate(@ModelAttribute req: RedisInvalidateReq): ResponseEntity<ApiResponse<RedisInvalidateRes>> {
+        val deleted = monitoringService.invalidatePrefix(req.prefix)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_REDIS_INVALIDATE.code,
+                message = ResponseCode.MONITORING_REDIS_INVALIDATE.message,
+                result = RedisInvalidateRes(deleted = deleted),
             ), HttpStatus.OK
         )
     }

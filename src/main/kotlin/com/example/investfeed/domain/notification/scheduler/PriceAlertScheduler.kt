@@ -9,8 +9,8 @@ import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -52,7 +52,7 @@ class PriceAlertScheduler(
 
     @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
     fun checkPriceAlerts() {
-        schedulerLogService.execute("PriceAlertScheduler", SchedulerType.FAST) {
+        schedulerLogService.execute(SchedulerName.PriceAlertScheduler) {
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()

@@ -8,8 +8,8 @@ import com.example.investfeed.domain.notification.repository.NotificationReposit
 import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.rebalancing.repository.RebalancingSettingRepository
 import com.example.investfeed.domain.rebalancing.service.RebalancingService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -40,7 +40,7 @@ class RebalancingAlertScheduler(
 
     @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkRebalancing() {
-        schedulerLogService.execute("RebalancingAlertScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.RebalancingAlertScheduler) {
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()

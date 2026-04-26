@@ -2,8 +2,8 @@ package com.example.investfeed.domain.investor.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.investor.service.InvestorService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
@@ -41,7 +41,7 @@ class InvestorCloseMarketScheduler(
 
     @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
     fun refresh() {
-        schedulerLogService.execute("InvestorCloseMarketScheduler", SchedulerType.FAST) {
+        schedulerLogService.execute(SchedulerName.InvestorCloseMarketScheduler) {
             if (holidayService.isHoliday()) return@execute
 
             val now = LocalTime.now()

@@ -1,8 +1,8 @@
 package com.example.investfeed.domain.dividend.scheduler
 
 import com.example.investfeed.domain.dividend.service.StockDividendService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -16,7 +16,7 @@ class StockDividendScheduler(
 
     @Scheduled(cron = "0 30 13 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
-        schedulerLogService.execute("StockDividendScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.StockDividendScheduler) {
             try {
                 stockDividendService.collectDailyDividends()
                 log.info { "배당 정보 일별 수집 스케줄러 완료" }

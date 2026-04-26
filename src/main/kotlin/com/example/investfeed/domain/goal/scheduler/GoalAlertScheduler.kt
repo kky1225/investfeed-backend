@@ -4,8 +4,8 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.goal.entity.GoalType
 import com.example.investfeed.domain.goal.repository.InvestmentGoalRepository
 import com.example.investfeed.domain.goal.service.InvestmentGoalService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -34,7 +34,7 @@ class GoalAlertScheduler(
 
     @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
     fun checkGoals() {
-        schedulerLogService.execute("GoalAlertScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.GoalAlertScheduler) {
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()

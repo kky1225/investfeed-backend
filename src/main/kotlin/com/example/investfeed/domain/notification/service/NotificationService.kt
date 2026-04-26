@@ -193,8 +193,13 @@ class NotificationService(
     ) {
         val assetCode = "API_KEY_$apiKeyId"
 
-        // 중복 방지: 같은 API Key + 같은 direction 에 대해 1회만 (alertDate 를 만료일 고정)
-        val alertDate = LocalDate.of(2000, 1, 1) // 고정값 — API Key 삭제/재등록 시 새 id 부여되므로 assetCode 로 구분
+        // 중복 방지 기준 날짜. 만료 계열은 API Key 생명주기 동안 1회 발송(고정값),
+        // 인증 실패는 매일 1회 발송(당일 날짜) — 사용자가 조치할 때까지 매일 인지시켜야 하므로.
+        val alertDate = if (direction == Direction.API_KEY_AUTH_FAILED) {
+            LocalDate.now()
+        } else {
+            LocalDate.of(2000, 1, 1) // 고정값 — API Key 삭제/재등록 시 새 id 부여되므로 assetCode 로 구분
+        }
         val alreadySent = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
             memberId, AssetType.TOTAL, assetCode, 0.0, direction, alertDate
         )
@@ -204,6 +209,7 @@ class NotificationService(
             Direction.API_KEY_EXPIRY_30D -> "${brokerName} API Key 유효기간이 30일 남았습니다"
             Direction.API_KEY_EXPIRY_7D -> "${brokerName} API Key 유효기간이 7일 남았습니다"
             Direction.API_KEY_EXPIRED -> "${brokerName} API Key 유효기간이 만료되었습니다"
+            Direction.API_KEY_AUTH_FAILED -> "${brokerName} API Key 인증에 실패했습니다. 키 재등록이 필요합니다"
             else -> "${brokerName} API Key 알림"
         }
 

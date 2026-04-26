@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.monitoring.service
 
 import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import mu.KotlinLogging
 import org.springframework.boot.ApplicationArguments
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 기동 실패 격리: 내부 try-catch 로 Seeder 실패가 앱 기동을 막지 않음.
  *
  * 새 스케줄러 추가 시:
- * 1. CATALOG 에 한 줄 추가
+ * 1. SchedulerName enum 에 항목 추가
  * 2. investfeed.sql seed 에도 한 줄 추가 (신규 DB 설치 대비)
  * 3. 앱 재시작 → 모든 환경 자동 동기화
  */
@@ -27,27 +28,6 @@ class SchedulerStatusSeeder(
     private val schedulerStatusRepository: SchedulerStatusRepository,
 ) : ApplicationRunner {
     private val log = KotlinLogging.logger {}
-
-    data class CatalogEntry(val name: String, val type: String, val defaultTimeoutSec: Int)
-
-    companion object {
-        val CATALOG: List<CatalogEntry> = listOf(
-            CatalogEntry("PriceAlertScheduler",          "FAST", 60),
-            CatalogEntry("MarketIndexScheduler",         "FAST", 60),
-            CatalogEntry("InvestorCloseMarketScheduler", "FAST", 60),
-            CatalogEntry("GoalAlertScheduler",           "SLOW", 60),
-            CatalogEntry("RebalancingAlertScheduler",    "SLOW", 60),
-            CatalogEntry("StockDividendScheduler",       "SLOW", 60),
-            CatalogEntry("ApiKeyExpiryScheduler",        "SLOW", 60),
-            CatalogEntry("SchedulerLogCleanupScheduler", "SLOW", 60),
-            CatalogEntry("RecommendScheduler",           "SLOW", 120),
-            CatalogEntry("IndexInvestorDailyScheduler",  "SLOW", 120),
-            CatalogEntry("HolidayRefreshScheduler",      "SLOW", 120),
-            CatalogEntry("CalendarSyncScheduler",        "SLOW", 300),
-            CatalogEntry("InterestSyncScheduler",        "SLOW", 600),
-            CatalogEntry("HoldingSyncScheduler",         "SLOW", 600),
-        )
-    }
 
     override fun run(args: ApplicationArguments) {
         try {
@@ -61,17 +41,17 @@ class SchedulerStatusSeeder(
     @Transactional
     internal fun seed() {
         var inserted = 0
-        CATALOG.forEach { entry ->
-            if (!schedulerStatusRepository.existsById(entry.name)) {
+        SchedulerName.entries.forEach { scheduler ->
+            if (!schedulerStatusRepository.existsById(scheduler.name)) {
                 schedulerStatusRepository.save(
                     SchedulerStatus(
-                        schedulerName = entry.name,
-                        schedulerType = entry.type,
-                        timeoutSec = entry.defaultTimeoutSec,
+                        schedulerName = scheduler.name,
+                        schedulerType = scheduler.type.name,
+                        timeoutSec = scheduler.defaultTimeoutSec,
                     )
                 )
                 inserted++
-                log.info { "[startup] scheduler_status 신규 등록: ${entry.name} (${entry.type}, timeout=${entry.defaultTimeoutSec}s)" }
+                log.info { "[startup] scheduler_status 신규 등록: ${scheduler.name} (${scheduler.type.name}, timeout=${scheduler.defaultTimeoutSec}s)" }
             }
         }
         if (inserted > 0) {

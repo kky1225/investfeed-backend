@@ -1,38 +1,31 @@
 package com.example.investfeed.domain.monitoring.service
 
 import com.example.investfeed.domain.auth.repository.MemberRepository
-import com.example.investfeed.domain.monitoring.dto.req.AcknowledgeLogReq
-import com.example.investfeed.domain.monitoring.dto.req.ErrorLogsReq
-import com.example.investfeed.domain.monitoring.dto.req.SchedulerConfigLogsReq
-import com.example.investfeed.domain.monitoring.dto.req.SchedulerLogsReq
-import com.example.investfeed.domain.monitoring.dto.req.UpdateSchedulerTimeoutReq
+import com.example.investfeed.domain.monitoring.dto.req.*
 import com.example.investfeed.domain.monitoring.dto.res.*
-import com.example.investfeed.domain.monitoring.entity.SchedulerConfigLog
-import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
-import com.example.investfeed.domain.monitoring.entity.AckAction
-import com.example.investfeed.domain.monitoring.entity.AckSourceType
-import com.example.investfeed.domain.monitoring.entity.LogAckHistory
-import com.example.investfeed.domain.monitoring.repository.ErrorLogRepository
-import com.example.investfeed.domain.monitoring.repository.LogAckHistoryRepository
-import com.example.investfeed.domain.monitoring.repository.SchedulerConfigLogRepository
-import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
-import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
+import com.example.investfeed.domain.monitoring.entity.*
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
+import com.example.investfeed.domain.monitoring.repository.*
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import jakarta.persistence.EntityManager
+import jakarta.persistence.criteria.Predicate
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.data.redis.core.ScanOptions
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.lang.management.ManagementFactory
-import javax.management.ObjectName
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
+import javax.management.ObjectName
 
 @Service
 class MonitoringService(
@@ -44,15 +37,76 @@ class MonitoringService(
     private val memberRepository: MemberRepository,
     private val redisTemplate: StringRedisTemplate,
     private val entityManager: EntityManager,
+    private val apiCallCounterService: ApiCallCounterService,
     @Qualifier("fastScheduler") private val fastScheduler: ThreadPoolTaskScheduler,
     @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
-    // ─────────── 스케줄러 ───────────
-
     fun getStatuses(): List<SchedulerStatusRes> =
         schedulerStatusRepository.findAllByOrderBySchedulerNameAsc().map { SchedulerStatusRes.from(it, computeState(it)) }
+
+    fun getCatalog(): List<SchedulerCatalogRes> =
+        SchedulerName.entries.map { SchedulerCatalogRes.from(it) }
+
+    fun getSchedulerOverview(req: SchedulerLogsReq): SchedulerOverviewRes =
+        SchedulerOverviewRes(
+            catalog = getCatalog(),
+            statuses = getStatuses(),
+            logs = getLogs(req),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    fun getConfigLogsOverview(req: SchedulerConfigLogsReq): ConfigLogsOverviewRes =
+        ConfigLogsOverviewRes(
+            logs = getConfigLogs(req),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    fun getRedisOverview(): RedisOverviewRes =
+        RedisOverviewRes(
+            redis = getRedisStats(),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    fun getErrorLogsOverview(req: ErrorLogsReq): ErrorLogsOverviewRes =
+        ErrorLogsOverviewRes(
+            logs = getErrorLogs(req),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    fun getApiCallsOverview(): ApiCallsOverviewRes =
+        ApiCallsOverviewRes(
+            stats = getApiCallStats(),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    fun getSystemOverview(): SystemOverviewRes =
+        SystemOverviewRes(
+            system = getSystemStatus(),
+            unackCount = getUnacknowledgedCount(),
+        )
+
+    // ─────────── 외부 API 호출 통계 ───────────
+
+    fun getApiCallStats(): ApiCallStatsRes {
+        val items = ApiProvider.entries.map { provider ->
+            val recent = apiCallCounterService.getRecent7Days(provider)
+            val today = recent.lastOrNull()?.second ?: 0L
+            val ratio = provider.dailyLimit?.let { limit ->
+                if (limit > 0) today.toDouble() / limit.toDouble() else null
+            }
+            ApiCallStatsItemRes(
+                provider = provider.name,
+                label = provider.label,
+                todayCount = today,
+                dailyLimit = provider.dailyLimit,
+                usageRatio = ratio,
+                recent7Days = recent.map { (date, count) -> DailyCallCount(date.toString(), count) },
+            )
+        }
+        return ApiCallStatsRes(items)
+    }
 
     /**
      * 스케줄러 상태 판정.
@@ -158,6 +212,40 @@ class MonitoringService(
         return SchedulerLogRes.from(logEntry, name)
     }
 
+    /**
+     * 미확인 스케줄러 로그 일괄 확인 처리.
+     * - SUCCESS 는 ack 대상이 아니므로 자동 제외
+     * - note 비었으면 "일괄 확인" 디폴트
+     * - LogAckHistory 에 BULK_ACKNOWLEDGE action 으로 기록
+     */
+    @Transactional
+    fun bulkAcknowledgeSchedulerLogs(req: BulkAcknowledgeReq, changedBy: Long): BulkAcknowledgeRes {
+        val appliedNote = req.note?.takeIf { it.isNotBlank() } ?: "일괄 확인"
+        val ids = req.ids?.takeIf { it.isNotEmpty() }
+        val targets = if (ids != null) {
+            schedulerLogRepository.findByIdInAndAcknowledgedFalseAndStatusNot(ids, "SUCCESS")
+        } else {
+            schedulerLogRepository.findByAcknowledgedFalseAndStatusNot("SUCCESS")
+        }
+        val now = LocalDateTime.now()
+        targets.forEach { entry ->
+            entry.acknowledged = true
+            entry.acknowledgedBy = changedBy
+            entry.acknowledgedAt = now
+            entry.acknowledgeNote = appliedNote
+            logAckHistoryRepository.save(LogAckHistory(
+                sourceType = AckSourceType.SCHEDULER_LOG,
+                sourceId = entry.id,
+                action = AckAction.BULK_ACKNOWLEDGE,
+                oldNote = null,
+                newNote = appliedNote,
+                actedBy = changedBy,
+                actedAt = now,
+            ))
+        }
+        return BulkAcknowledgeRes(processedCount = targets.size, appliedNote = appliedNote)
+    }
+
     /** 스케줄러 로그 확인 취소. 모든 ack 필드 리셋 + 이력에 CANCEL 기록. */
     @Transactional
     fun cancelAcknowledgeLog(logId: Long, changedBy: Long): SchedulerLogRes {
@@ -223,17 +311,32 @@ class MonitoringService(
     }
 
     fun getLogs(req: SchedulerLogsReq): Page<SchedulerLogRes> {
-        val pageable = PageRequest.of(req.page, req.size)
-        val result = when {
-            !req.schedulerName.isNullOrBlank() && !req.status.isNullOrBlank() ->
-                schedulerLogRepository.findBySchedulerNameAndStatusOrderByStartedAtDesc(req.schedulerName, req.status, pageable)
-            !req.schedulerName.isNullOrBlank() ->
-                schedulerLogRepository.findBySchedulerNameOrderByStartedAtDesc(req.schedulerName, pageable)
-            !req.status.isNullOrBlank() ->
-                schedulerLogRepository.findByStatusOrderByStartedAtDesc(req.status, pageable)
-            else ->
-                schedulerLogRepository.findAllByOrderByStartedAtDesc(pageable)
+        val pageable = PageRequest.of(req.page, req.size, Sort.Direction.DESC, "startedAt")
+        val spec = Specification<SchedulerLog> { root, _, cb ->
+            val predicates = mutableListOf<Predicate>()
+            req.schedulerName?.takeIf { it.isNotBlank() }?.let {
+                predicates.add(cb.equal(root.get<String>("schedulerName"), it))
+            }
+            req.status?.takeIf { it.isNotBlank() }?.let {
+                predicates.add(cb.equal(root.get<String>("status"), it))
+            }
+            req.acknowledged?.let {
+                predicates.add(cb.equal(root.get<Boolean>("acknowledged"), it))
+                if (!it) predicates.add(cb.notEqual(root.get<String>("status"), "SUCCESS"))
+            }
+            req.fromDate?.let {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("startedAt"), it.atStartOfDay()))
+            }
+            req.toDate?.let {
+                predicates.add(cb.lessThanOrEqualTo(root.get("startedAt"), it.atTime(23, 59, 59, 999_999_999)))
+            }
+            req.messageKeyword?.takeIf { it.isNotBlank() }?.let {
+                val pattern = "%${it.lowercase()}%"
+                predicates.add(cb.like(cb.lower(root.get("errorMessage")), pattern))
+            }
+            cb.and(*predicates.toTypedArray())
         }
+        val result = schedulerLogRepository.findAll(spec, pageable)
         val names = resolveNicknames(result.content.mapNotNull { it.acknowledgedBy }.toSet())
         return result.map { SchedulerLogRes.from(it, names[it.acknowledgedBy]) }
     }
@@ -279,8 +382,25 @@ class MonitoringService(
     // ─────────── 에러 로그 (DB 기반) ───────────
 
     fun getErrorLogs(req: ErrorLogsReq): Page<ErrorLogRes> {
-        val pageable = PageRequest.of(req.page, req.size)
-        val result = errorLogRepository.findAllByOrderByOccurredAtDesc(pageable)
+        val pageable = PageRequest.of(req.page, req.size, Sort.by(Sort.Direction.DESC, "occurredAt"))
+        val spec = Specification<ErrorLog> { root, _, cb ->
+            val predicates = mutableListOf<Predicate>()
+            req.acknowledged?.let {
+                predicates.add(cb.equal(root.get<Boolean>("acknowledged"), it))
+            }
+            req.fromDate?.let {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("occurredAt"), it.atStartOfDay()))
+            }
+            req.toDate?.let {
+                predicates.add(cb.lessThanOrEqualTo(root.get("occurredAt"), it.atTime(23, 59, 59, 999_999_999)))
+            }
+            req.messageKeyword?.takeIf { it.isNotBlank() }?.let {
+                val pattern = "%${it.lowercase()}%"
+                predicates.add(cb.like(cb.lower(root.get("message")), pattern))
+            }
+            cb.and(*predicates.toTypedArray())
+        }
+        val result = errorLogRepository.findAll(spec, pageable)
         val names = resolveNicknames(result.content.mapNotNull { it.acknowledgedBy }.toSet())
         return result.map { ErrorLogRes.from(it, names[it.acknowledgedBy]) }
     }
@@ -323,7 +443,40 @@ class MonitoringService(
         return ErrorLogRes.from(entry, name)
     }
 
-    /** 에러 로그 확인 취소. */
+    @Transactional
+    fun bulkAcknowledgeErrorLogs(req: BulkAcknowledgeReq, changedBy: Long): BulkAcknowledgeRes {
+        val appliedNote = req.note?.takeIf { it.isNotBlank() } ?: "일괄 확인"
+        val ids = req.ids?.takeIf { it.isNotEmpty() }
+        val targets = if (ids != null) {
+            errorLogRepository.findByIdInAndAcknowledgedFalse(ids)
+        } else {
+            errorLogRepository.findByAcknowledgedFalse()
+        }
+        val now = LocalDateTime.now()
+        targets.forEach { entry ->
+            entry.acknowledged = true
+            entry.acknowledgedBy = changedBy
+            entry.acknowledgedAt = now
+            entry.acknowledgeNote = appliedNote
+            logAckHistoryRepository.save(LogAckHistory(
+                sourceType = AckSourceType.ERROR_LOG,
+                sourceId = entry.id,
+                action = AckAction.BULK_ACKNOWLEDGE,
+                oldNote = null,
+                newNote = appliedNote,
+                actedBy = changedBy,
+                actedAt = now,
+            ))
+        }
+        return BulkAcknowledgeRes(processedCount = targets.size, appliedNote = appliedNote)
+    }
+
+    fun getUnacknowledgedCount(): UnacknowledgedCountRes {
+        val schedulerCount = schedulerLogRepository.countByAcknowledgedFalseAndStatusNot("SUCCESS")
+        val errorCount = errorLogRepository.countByAcknowledgedFalse()
+        return UnacknowledgedCountRes(schedulerLogs = schedulerCount, errorLogs = errorCount)
+    }
+
     @Transactional
     fun cancelAcknowledgeErrorLog(logId: Long, changedBy: Long): ErrorLogRes {
         val entry = errorLogRepository.findById(logId).orElseThrow {
@@ -348,8 +501,6 @@ class MonitoringService(
         ))
         return ErrorLogRes.from(entry)
     }
-
-    // ─────────── 시스템 상태 ───────────
 
     fun getSystemStatus(): SystemStatusRes {
         val runtime = Runtime.getRuntime()

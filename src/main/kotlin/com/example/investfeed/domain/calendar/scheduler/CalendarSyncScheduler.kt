@@ -1,8 +1,8 @@
 package com.example.investfeed.domain.calendar.scheduler
 
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -38,7 +38,7 @@ class CalendarSyncScheduler(
 
     @Scheduled(cron = "0 */30 * * * *", scheduler = "slowScheduler")
     fun syncCalendarData() {
-        schedulerLogService.execute("CalendarSyncScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.CalendarSyncScheduler) {
             val start = System.currentTimeMillis()
             try {
                 economicCalendarService.syncCurrentData()

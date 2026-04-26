@@ -4,6 +4,8 @@ import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiResponse
 import com.example.investfeed.domain.dividend.exception.EtfDividendApiException
 import com.example.investfeed.domain.dividend.exception.EtfDividendResponseException
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -13,6 +15,7 @@ import java.net.URI
 @Component
 class EtfDividendClient(
     private val objectMapper: ObjectMapper,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -20,6 +23,8 @@ class EtfDividendClient(
 
     fun getDividendInfo(stkCd: String): List<EtfDividendApiItem> {
         try {
+            apiCallCounterService.increment(ApiProvider.SEARCH_ETF)
+
             val connection = URI("$BASE_URL?stock_code=$stkCd").toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000

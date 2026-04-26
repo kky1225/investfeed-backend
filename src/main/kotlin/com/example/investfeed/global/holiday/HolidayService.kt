@@ -1,7 +1,7 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -24,7 +24,7 @@ class HolidayService(
 
     @Scheduled(cron = "0 5 0 1 * *", scheduler = "slowScheduler")
     fun refreshHolidays() {
-        schedulerLogService.execute("HolidayRefreshScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
             val now = LocalDate.now()
             loadHolidays(now.year, now.monthValue)
         }

@@ -2,6 +2,7 @@ package com.example.investfeed.domain.monitoring.service
 
 import com.example.investfeed.domain.monitoring.entity.SchedulerLog
 import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.logging.ApplicationShutdownState
 import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
@@ -37,10 +38,12 @@ class SchedulerLogService(
         const val MDC_SCHEDULER_NAME = "schedulerName"
     }
 
-    fun <T> execute(name: String, type: SchedulerType, block: () -> T): T {
+    fun <T> execute(scheduler: SchedulerName, block: () -> T): T {
+        val name = scheduler.name
+        val type = scheduler.type
         val startedAt = LocalDateTime.now()
         MDC.put(MDC_SCHEDULER_NAME, name)
-        runCatching { markStarted(name, type, startedAt) }
+        runCatching { markStarted(scheduler, startedAt) }
             .onFailure { log.error { "scheduler_status markStarted 실패 ($name): ${it.message}" } }
 
         return try {
@@ -53,7 +56,7 @@ class SchedulerLogService(
             }.getOrDefault(180)
             val timeoutExceeded = durationMs > timeoutSec * 1000L
 
-            runCatching { upsertSuccess(name, type, startedAt, finishedAt, durationMs) }
+            runCatching { upsertSuccess(scheduler, finishedAt, durationMs) }
                 .onFailure { log.error { "scheduler_status 성공 UPSERT 실패 ($name): ${it.message}" } }
 
             // SLOW 는 항상 기록 / FAST 는 timeout 초과한 경우만 기록
@@ -86,7 +89,7 @@ class SchedulerLogService(
             val durationMs = Duration.between(startedAt, finishedAt).toMillis()
             val message = e.message?.take(2000)
 
-            runCatching { upsertFailure(name, type, startedAt, finishedAt, message) }
+            runCatching { upsertFailure(scheduler, finishedAt, message) }
                 .onFailure { log.error { "scheduler_status 실패 UPSERT 실패 ($name): ${it.message}" } }
 
             runCatching {
@@ -109,22 +112,22 @@ class SchedulerLogService(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    internal fun markStarted(name: String, type: SchedulerType, at: LocalDateTime) {
-        val entity = schedulerStatusRepository.findById(name).orElse(
-            SchedulerStatus(schedulerName = name, schedulerType = type.name)
+    internal fun markStarted(scheduler: SchedulerName, at: LocalDateTime) {
+        val entity = schedulerStatusRepository.findById(scheduler.name).orElse(
+            SchedulerStatus(schedulerName = scheduler.name, schedulerType = scheduler.type.name)
         )
-        entity.schedulerType = type.name
+        entity.schedulerType = scheduler.type.name
         entity.lastStartedAt = at
         entity.updatedAt = LocalDateTime.now()
         schedulerStatusRepository.save(entity)
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    internal fun upsertSuccess(name: String, type: SchedulerType, startedAt: LocalDateTime, finishedAt: LocalDateTime, durationMs: Long) {
-        val entity = schedulerStatusRepository.findById(name).orElse(
-            SchedulerStatus(schedulerName = name, schedulerType = type.name)
+    internal fun upsertSuccess(scheduler: SchedulerName, finishedAt: LocalDateTime, durationMs: Long) {
+        val entity = schedulerStatusRepository.findById(scheduler.name).orElse(
+            SchedulerStatus(schedulerName = scheduler.name, schedulerType = scheduler.type.name)
         )
-        entity.schedulerType = type.name
+        entity.schedulerType = scheduler.type.name
         entity.lastFinishedAt = finishedAt
         entity.lastSuccessAt = finishedAt
         entity.lastSuccessDurationMs = durationMs
@@ -133,11 +136,11 @@ class SchedulerLogService(
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    internal fun upsertFailure(name: String, type: SchedulerType, startedAt: LocalDateTime, finishedAt: LocalDateTime, message: String?) {
-        val entity = schedulerStatusRepository.findById(name).orElse(
-            SchedulerStatus(schedulerName = name, schedulerType = type.name)
+    internal fun upsertFailure(scheduler: SchedulerName, finishedAt: LocalDateTime, message: String?) {
+        val entity = schedulerStatusRepository.findById(scheduler.name).orElse(
+            SchedulerStatus(schedulerName = scheduler.name, schedulerType = scheduler.type.name)
         )
-        entity.schedulerType = type.name
+        entity.schedulerType = scheduler.type.name
         entity.lastFinishedAt = finishedAt
         entity.lastFailureAt = finishedAt
         entity.lastFailureMessage = message

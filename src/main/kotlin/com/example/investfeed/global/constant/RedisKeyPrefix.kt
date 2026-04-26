@@ -27,4 +27,5 @@ enum class RedisKeyPrefix(
     REFRESH_TOKEN("RT:", "JWT refresh token"),
     BLACKLIST("BL:", "JWT access token 블랙리스트"),
     TOTP_SECRET("TOTP:", "TOTP 비밀키"),
+    API_CALL("api_call:", "외부 API 일별 호출 카운터"),
 }

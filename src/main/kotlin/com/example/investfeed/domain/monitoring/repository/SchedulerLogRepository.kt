@@ -1,19 +1,17 @@
 package com.example.investfeed.domain.monitoring.repository
 
 import com.example.investfeed.domain.monitoring.entity.SchedulerLog
-import org.springframework.data.domain.Page
-import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
-interface SchedulerLogRepository : JpaRepository<SchedulerLog, Long> {
-    fun findAllByOrderByStartedAtDesc(pageable: Pageable): Page<SchedulerLog>
-    fun findBySchedulerNameOrderByStartedAtDesc(schedulerName: String, pageable: Pageable): Page<SchedulerLog>
-    fun findByStatusOrderByStartedAtDesc(status: String, pageable: Pageable): Page<SchedulerLog>
-    fun findBySchedulerNameAndStatusOrderByStartedAtDesc(schedulerName: String, status: String, pageable: Pageable): Page<SchedulerLog>
+interface SchedulerLogRepository : JpaRepository<SchedulerLog, Long>, JpaSpecificationExecutor<SchedulerLog> {
+    fun countByAcknowledgedFalseAndStatusNot(status: String): Long
+    fun findByAcknowledgedFalseAndStatusNot(status: String): List<SchedulerLog>
+    fun findByIdInAndAcknowledgedFalseAndStatusNot(ids: Collection<Long>, status: String): List<SchedulerLog>
 
     @Modifying
     @Query("DELETE FROM SchedulerLog s WHERE s.startedAt < :threshold")

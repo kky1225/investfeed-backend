@@ -2,8 +2,8 @@ package com.example.investfeed.domain.index.scheduler
 
 import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.index.service.IndexService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -31,7 +31,7 @@ class IndexInvestorDailyScheduler(
 
     @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
-        schedulerLogService.execute("IndexInvestorDailyScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
             try {
                 val yesterday = LocalDate.now().minusDays(1).format(formatter)
                 indexService.collectIndexInvestorDaily(yesterday)

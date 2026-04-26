@@ -1,5 +1,7 @@
 package com.example.investfeed.naver.news.client
 
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.naver.news.dto.res.NaverNewsRes
 import com.example.investfeed.naver.news.exception.NaverNewsApiException
@@ -8,8 +10,10 @@ import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
+import reactor.core.publisher.Mono
 
 @Service
 class NaverNewsClient(
@@ -17,11 +21,16 @@ class NaverNewsClient(
     private val clientId: String,
     @param:Value("\${naver-news.client-secret}")
     private val clientSecret: String,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
     private val webClient = WebClient.builder()
         .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
         .baseUrl("https://openapi.naver.com")
+        .filter(ExchangeFilterFunction.ofRequestProcessor { req ->
+            apiCallCounterService.increment(ApiProvider.NAVER_NEWS)
+            Mono.just(req)
+        })
         .build()
 
     fun searchNews(query: String, display: Int = 20, start: Int = 1, sort: String = "date"): NaverNewsRes {

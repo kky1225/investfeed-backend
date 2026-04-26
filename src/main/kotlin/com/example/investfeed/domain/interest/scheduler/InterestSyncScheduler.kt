@@ -2,8 +2,8 @@ package com.example.investfeed.domain.interest.scheduler
 
 import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
 import com.example.investfeed.domain.interest.service.InterestSyncService
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import com.example.investfeed.domain.monitoring.service.SchedulerType
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -32,7 +32,7 @@ class InterestSyncScheduler(
 
     @Scheduled(cron = "0 15 5 * * *", scheduler = "slowScheduler")
     fun syncAllStkNm() {
-        schedulerLogService.execute("InterestSyncScheduler", SchedulerType.SLOW) {
+        schedulerLogService.execute(SchedulerName.InterestSyncScheduler) {
             log.info { "관심종목/수동 보유종목 stkNm 동기화 스케줄러 시작" }
             val start = System.currentTimeMillis()
 
