@@ -64,7 +64,12 @@ class FredClient(
                         uriBuilder.build()
                     }
                     .retrieve()
-                    .onStatus({ it.isError }, { throw FredApiException() })
+                    .onStatus({ it.isError }, { res ->
+                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
+                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
+                            FredApiException()
+                        }
+                    })
                     .bodyToMono<FredSeriesRes>()
                     .block()
 
@@ -118,7 +123,12 @@ class FredClient(
                         uriBuilder.build()
                     }
                     .retrieve()
-                    .onStatus({ it.isError }, { throw FredApiException() })
+                    .onStatus({ it.isError }, { res ->
+                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
+                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
+                            FredApiException()
+                        }
+                    })
                     .bodyToMono<FredReleaseDatesRes>()
                     .block()
 

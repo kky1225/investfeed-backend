@@ -1,13 +1,19 @@
 package com.example.investfeed.domain.menu.service
 
 import com.example.investfeed.domain.auth.entity.Role
+import com.example.investfeed.domain.holding.entity.Broker
+import com.example.investfeed.domain.holding.entity.BrokerType
+import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.menu.dto.req.*
 import com.example.investfeed.domain.menu.dto.res.MenuPermissionRes
 import com.example.investfeed.domain.menu.dto.res.MenuRes
 import com.example.investfeed.domain.menu.entity.Menu
+import com.example.investfeed.domain.menu.entity.MenuBrokerPermission
 import com.example.investfeed.domain.menu.entity.MenuRolePermission
+import com.example.investfeed.domain.menu.exception.InvalidBrokerForMenuException
 import com.example.investfeed.domain.menu.exception.MenuHasChildrenException
 import com.example.investfeed.domain.menu.exception.MenuNotFoundException
+import com.example.investfeed.domain.menu.repository.MenuBrokerPermissionRepository
 import com.example.investfeed.domain.menu.repository.MenuRepository
 import com.example.investfeed.domain.menu.repository.MenuRolePermissionRepository
 import mu.KotlinLogging
@@ -19,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class MenuService(
     private val menuRepository: MenuRepository,
-    private val menuRolePermissionRepository: MenuRolePermissionRepository
+    private val menuRolePermissionRepository: MenuRolePermissionRepository,
+    private val menuBrokerPermissionRepository: MenuBrokerPermissionRepository,
+    private val brokerRepository: BrokerRepository
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -39,6 +47,8 @@ class MenuService(
             menuRepository.findById(it).orElseThrow { MenuNotFoundException() }
         }
 
+        val brokers = resolveApiBrokers(req.requiredBrokerIds)
+
         val menu = Menu(
             name = req.name,
             url = req.url,
@@ -53,6 +63,12 @@ class MenuService(
         Role.entries.forEach { role ->
             menuRolePermissionRepository.save(
                 MenuRolePermission(menu = savedMenu, role = role, readable = role == Role.ADMIN)
+            )
+        }
+
+        brokers.forEach { broker ->
+            menuBrokerPermissionRepository.save(
+                MenuBrokerPermission(menu = savedMenu, broker = broker)
             )
         }
 
@@ -72,6 +88,13 @@ class MenuService(
         }
 
         return menu.toMenuRes()
+    }
+
+    @Transactional
+    fun updateBrokers(menuId: Long, req: UpdateMenuBrokersReq) {
+        val menu = menuRepository.findById(menuId).orElseThrow { MenuNotFoundException() }
+        val brokers = resolveApiBrokers(req.brokerIds)
+        syncBrokerPermissions(menu, brokers)
     }
 
     @Transactional
@@ -131,6 +154,45 @@ class MenuService(
         return permission?.readable ?: false
     }
 
+    private fun resolveApiBrokers(brokerIds: List<Long>): List<Broker> {
+        if (brokerIds.isEmpty()) return emptyList()
+
+        val distinctIds = brokerIds.distinct()
+        val brokers = brokerRepository.findAllById(distinctIds)
+
+        if (brokers.size != distinctIds.size) {
+            val foundIds = brokers.map { it.id }.toSet()
+            val missing = distinctIds.filterNot { foundIds.contains(it) }
+            throw InvalidBrokerForMenuException("존재하지 않는 broker 입니다: $missing")
+        }
+
+        val nonApi = brokers.filter { it.type != BrokerType.API }
+        if (nonApi.isNotEmpty()) {
+            val names = nonApi.joinToString(", ") { it.name }
+            throw InvalidBrokerForMenuException("API 타입 거래소만 권한을 지정할 수 있습니다: $names")
+        }
+
+        return brokers
+    }
+
+    /**
+     * 메뉴의 broker 의존성을 요청 상태와 동기화 (orphanRemoval=true 활용)
+     * - 제거 대상: 기존 - 신규
+     * - 추가 대상: 신규 - 기존
+     */
+    private fun syncBrokerPermissions(menu: Menu, brokers: List<Broker>) {
+        val targetBrokerIds = brokers.map { it.id }.toSet()
+        val currentBrokerIds = menu.brokerPermissions.map { it.broker.id }.toSet()
+
+        menu.brokerPermissions.removeAll { it.broker.id !in targetBrokerIds }
+
+        brokers
+            .filter { it.id !in currentBrokerIds }
+            .forEach { broker ->
+                menu.brokerPermissions.add(MenuBrokerPermission(menu = menu, broker = broker))
+            }
+    }
+
     private fun Menu.toMenuRes(): MenuRes = MenuRes(
         id = id,
         name = name,
@@ -140,6 +202,7 @@ class MenuService(
         orderIndex = orderIndex,
         visible = visible,
         permissions = permissions.map { MenuPermissionRes(role = it.role.name, readable = it.readable) },
+        requiredBrokerIds = brokerPermissions.map { it.broker.id }.sorted(),
         children = children.sortedBy { it.orderIndex }.map { it.toMenuRes() }
     )
 
@@ -162,6 +225,7 @@ class MenuService(
             permissions = permissions
                 .filter { it.role == role }
                 .map { MenuPermissionRes(role = it.role.name, readable = it.readable) },
+            requiredBrokerIds = brokerPermissions.map { it.broker.id }.sorted(),
             children = accessibleChildren
         )
     }

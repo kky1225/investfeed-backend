@@ -24,6 +24,8 @@ class RefreshTokenInvalidException : AuthenticationException("유효하지 않�
 // API Key
 class ApiKeyNotFoundException : InvestFeedException(code = "AUTH_4020", message = "API Key를 찾을 수 없습니다.")
 class DuplicateApiKeyException : InvestFeedException(code = "AUTH_4021", message = "이미 등록된 제공자의 API Key입니다.")
+class InvalidApiKeyException : InvestFeedException(code = "AUTH_4022", message = "유효하지 않은 API Key 입니다.")
+class ApiKeyRegistrationLockedException : InvestFeedException(code = "AUTH_4023", message = "API Key 등록이 잠겨 있습니다. 보안 정책상 5회 실패 시 모든 broker 등록이 차단됩니다. 관리자에게 문의해주세요.")
 
 // TOTP
 class TotpNotSetupException : InvestFeedException(code = "AUTH_4030", message = "TOTP가 설정되지 않았습니다. 먼저 TOTP 설정을 진행하세요.")

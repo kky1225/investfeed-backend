@@ -9,6 +9,7 @@ data class MenuRes(
     val orderIndex: Int,
     val visible: Boolean,
     val permissions: List<MenuPermissionRes>,
+    val requiredBrokerIds: List<Long>,
     val children: List<MenuRes>
 )
 

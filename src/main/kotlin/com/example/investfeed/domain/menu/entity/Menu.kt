@@ -35,5 +35,8 @@ class Menu(
     val children: MutableList<Menu> = mutableListOf(),
 
     @OneToMany(mappedBy = "menu", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val permissions: MutableList<MenuRolePermission> = mutableListOf()
+    val permissions: MutableList<MenuRolePermission> = mutableListOf(),
+
+    @OneToMany(mappedBy = "menu", cascade = [CascadeType.ALL], orphanRemoval = true)
+    val brokerPermissions: MutableList<MenuBrokerPermission> = mutableListOf()
 )

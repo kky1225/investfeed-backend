@@ -97,6 +97,7 @@ enum class ResponseCode(
     AUTH_API_KEY_LIST(message = "API Key 목록 조회에 성공하셨습니다."),
     AUTH_API_KEY_CREATE(message = "API Key 등록에 성공하셨습니다."),
     AUTH_API_KEY_DELETE(message = "API Key 삭제에 성공하셨습니다."),
+    AUTH_API_KEY_UNLOCK(message = "API Key 등록 잠금 해제에 성공하셨습니다."),
 
     INTEREST_GROUP_LIST(message = "관심종목 그룹 목록 조회에 성공하셨습니다."),
     INTEREST_GROUP_CREATE(message = "관심종목 그룹 생성에 성공하셨습니다."),
@@ -186,6 +187,7 @@ enum class ResponseCode(
     MENU_DELETE(message = "메뉴 삭제에 성공하셨습니다."),
     MENU_STRUCTURE_UPDATE(message = "메뉴 구조 변경에 성공하셨습니다."),
     MENU_PERMISSION_UPDATE(message = "메뉴 권한 변경에 성공하셨습니다."),
+    MENU_BROKER_UPDATE(message = "메뉴 API Key 의존성 변경에 성공하셨습니다."),
 
     MONITORING_SCHEDULER_OVERVIEW(message = "스케줄러 모니터링 조회에 성공하셨습니다."),
     MONITORING_CONFIG_LOGS_OVERVIEW(message = "스케줄러 설정 변경 이력 조회에 성공하셨습니다."),

@@ -6,12 +6,16 @@ import com.example.investfeed.domain.auth.dto.res.SecondaryPasswordLockStatusRes
 import com.example.investfeed.domain.auth.exception.AccountLockedByFailureException
 import com.example.investfeed.domain.auth.exception.AccountLockedException
 import com.example.investfeed.domain.auth.exception.AccountPermanentlyLockedException
+import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
+import com.example.investfeed.domain.auth.exception.ApiKeyRegistrationLockedException
+import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordLockedException
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -65,6 +69,36 @@ class ExceptionAdviceController {
 
         return ResponseEntity(
             ApiResponse(code = code, message = e.message ?: "접근 권한이 없습니다.", result), HttpStatus.FORBIDDEN
+        )
+    }
+
+    @ExceptionHandler(ApiKeyNotFoundException::class)
+    fun apiKeyNotFoundException(e: ApiKeyNotFoundException): ResponseEntity<ApiResponse<Nothing?>> {
+        val loginId = SecurityContextHolder.getContext().authentication?.name ?: "anonymous"
+        log.warn { "API Key 미등록 호출 (loginId=$loginId)" }
+
+        return ResponseEntity(
+            ApiResponse(code = e.code, message = e.message, null), HttpStatus.BAD_REQUEST
+        )
+    }
+
+    @ExceptionHandler(InvalidApiKeyException::class)
+    fun invalidApiKeyException(e: InvalidApiKeyException): ResponseEntity<ApiResponse<Nothing?>> {
+        val loginId = SecurityContextHolder.getContext().authentication?.name ?: "anonymous"
+        log.warn { "API Key 등록 검증 실패 (loginId=$loginId)" }
+
+        return ResponseEntity(
+            ApiResponse(code = e.code, message = e.message, null), HttpStatus.BAD_REQUEST
+        )
+    }
+
+    @ExceptionHandler(ApiKeyRegistrationLockedException::class)
+    fun apiKeyRegistrationLockedException(e: ApiKeyRegistrationLockedException): ResponseEntity<ApiResponse<Nothing?>> {
+        val loginId = SecurityContextHolder.getContext().authentication?.name ?: "anonymous"
+        log.warn { "API Key 등록 잠금 상태에서 시도 (loginId=$loginId)" }
+
+        return ResponseEntity(
+            ApiResponse(code = e.code, message = e.message, null), HttpStatus.FORBIDDEN
         )
     }
 

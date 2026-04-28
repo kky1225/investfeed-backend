@@ -4,6 +4,7 @@ import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.menu.dto.req.CreateMenuReq
+import com.example.investfeed.domain.menu.dto.req.UpdateMenuBrokersReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuPermissionReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuStructureReq
@@ -108,6 +109,23 @@ class MenuController(
             ApiResponse(
                 code = ResponseCode.MENU_PERMISSION_UPDATE.code,
                 message = ResponseCode.MENU_PERMISSION_UPDATE.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PatchMapping("/admin/menus/{id}/brokers")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun updateBrokers(
+        @PathVariable id: Long,
+        @RequestBody req: UpdateMenuBrokersReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        menuService.updateBrokers(id, req)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MENU_BROKER_UPDATE.code,
+                message = ResponseCode.MENU_BROKER_UPDATE.message,
                 result = null
             ), HttpStatus.OK
         )

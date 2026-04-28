@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.goal.scheduler
 
+import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.goal.entity.GoalType
 import com.example.investfeed.domain.goal.repository.InvestmentGoalRepository
@@ -23,6 +24,7 @@ class GoalAlertScheduler(
     private val investmentGoalRepository: InvestmentGoalRepository,
     private val investmentGoalService: InvestmentGoalService,
     private val memberRepository: MemberRepository,
+    private val memberApiKeyRepository: MemberApiKeyRepository,
     private val notificationService: NotificationService,
     private val notificationSettingService: NotificationSettingService,
     private val authClient: AuthClient,
@@ -52,8 +54,10 @@ class GoalAlertScheduler(
             val memberGoals = allGoals.groupBy { it.memberId }
 
             for ((memberId, goals) in memberGoals) {
-                // 해당 유저의 SecurityContext 설정
                 val member = memberRepository.findById(memberId).orElse(null) ?: continue
+
+                if (memberApiKeyRepository.findByMemberLoginId(member.loginId).isEmpty()) continue
+
                 val userDetails = CustomUserDetails(member)
                 SecurityContextHolder.getContext().authentication =
                     UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)

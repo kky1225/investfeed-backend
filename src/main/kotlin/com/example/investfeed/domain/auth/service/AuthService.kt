@@ -22,7 +22,9 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.domain.auth.exception.*
 import com.example.investfeed.global.constant.RedisKeyPrefix
+import com.example.investfeed.kiwoom.auth.service.AuthClient as KiwoomAuthClient
 import com.example.investfeed.totp.TotpService
+import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
 import org.springframework.security.access.AccessDeniedException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -44,6 +46,9 @@ class AuthService(
     private val memberApiKeyRepository: MemberApiKeyRepository,
     private val brokerRepository: BrokerRepository,
     private val loginAttemptService: LoginAttemptService,
+    private val apiKeyAttemptService: ApiKeyAttemptService,
+    private val kiwoomAuthClient: KiwoomAuthClient,
+    private val cryptoHoldingClient: CryptoHoldingClient,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
     private val totpService: TotpService,
@@ -245,6 +250,7 @@ class AuthService(
             permanentLock = lockedAt != null && lockExpiresAt == null,
             totpEnabled = totpSecret != null,
             secondaryPasswordEnabled = secondaryPassword != null,
+            apiKeyLocked = apiKeyLocked,
             createdAt = createdAt
         )
     }
@@ -456,11 +462,24 @@ class AuthService(
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
 
+        if (member.apiKeyLocked) throw ApiKeyRegistrationLockedException()
+
         val broker = brokerRepository.findById(req.brokerId)
             .orElseThrow { IllegalArgumentException("증권사를 찾을 수 없습니다.") }
 
         if (memberApiKeyRepository.existsByMemberLoginIdAndBrokerId(loginId, req.brokerId)) {
             throw DuplicateApiKeyException()
+        }
+
+        try {
+            when (broker.name) {
+                "키움증권" -> kiwoomAuthClient.validateApiKey(req.appKey, req.secretKey)
+                "업비트"   -> cryptoHoldingClient.validateApiKey(req.appKey, req.secretKey)
+                else -> { /* 기타 broker 는 검증 미적용 */ }
+            }
+        } catch (e: InvalidApiKeyException) {
+            apiKeyAttemptService.handleFailedRegistration(loginId)
+            throw e
         }
 
         memberApiKeyRepository.save(
@@ -472,6 +491,13 @@ class AuthService(
                 expiresAt = req.expiresAt.atStartOfDay()
             )
         )
+        apiKeyAttemptService.resetOnSuccess(loginId)
+    }
+
+    @Transactional
+    fun unlockApiKeyRegistration(loginId: String) {
+        if (!memberRepository.existsByLoginId(loginId)) throw MemberNotFoundException()
+        apiKeyAttemptService.unlock(loginId)
     }
 
     @Transactional

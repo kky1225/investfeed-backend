@@ -130,13 +130,15 @@ class AuthController(
 
     @PostMapping("/logout")
     fun logout(
-        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @AuthenticationPrincipal userDetails: CustomUserDetails?,
         @CookieValue(name = "accessToken", required = false) accessToken: String?,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "logout: ${userDetails.username}" }
+        userDetails?.username?.let { username ->
+            log.info { "logout: $username" }
+            authService.logout(username, accessToken)
+        }
 
-        authService.logout(userDetails.username, accessToken)
         response.addHeader(HttpHeaders.SET_COOKIE, expireAccessTokenCookie())
         response.addHeader(HttpHeaders.SET_COOKIE, expireRefreshTokenCookie())
         response.addHeader(HttpHeaders.SET_COOKIE, expireSecondaryAuthCookie())
@@ -375,6 +377,24 @@ class AuthController(
             ApiResponse(
                 code = ResponseCode.AUTH_LOCK.code,
                 message = ResponseCode.AUTH_LOCK.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PatchMapping("/admin/members/{loginId}/api-key-unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun unlockApiKeyRegistration(
+        @PathVariable loginId: String
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "unlock api key registration: $loginId" }
+
+        authService.unlockApiKeyRegistration(loginId)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_API_KEY_UNLOCK.code,
+                message = ResponseCode.AUTH_API_KEY_UNLOCK.message,
                 result = null
             ), HttpStatus.OK
         )

@@ -7,6 +7,7 @@ import com.example.investfeed.domain.notification.entity.Notification
 import com.example.investfeed.domain.notification.repository.NotificationRepository
 import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
+import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
@@ -27,6 +28,7 @@ class RebalancingAlertScheduler(
     private val rebalancingSettingRepository: RebalancingSettingRepository,
     private val rebalancingService: RebalancingService,
     private val memberRepository: MemberRepository,
+    private val memberApiKeyRepository: MemberApiKeyRepository,
     private val notificationRepository: NotificationRepository,
     private val notificationWebSocketHandler: NotificationWebSocketHandler,
     private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
@@ -57,8 +59,10 @@ class RebalancingAlertScheduler(
 
             for (setting in allSettings) {
                 try {
-                    // 해당 유저의 SecurityContext 설정 (AssetDashboardService가 getMemberId() 사용)
                     val member = memberRepository.findById(setting.memberId).orElse(null) ?: continue
+
+                    if (memberApiKeyRepository.findByMemberLoginId(member.loginId).isEmpty()) continue
+
                     val userDetails = CustomUserDetails(member)
                     SecurityContextHolder.getContext().authentication =
                         UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)

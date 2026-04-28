@@ -5,6 +5,7 @@ import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
 import com.example.investfeed.kiwoom.auth.dto.res.AccessTokenRes
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
+import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
@@ -88,10 +89,10 @@ class AuthClient(
             return
         }
 
-        try {
-            val (appKey, secretKey) = resolveApiKeys(loginId)
-            val redisKey = getRedisKey(loginId)
+        val (appKey, secretKey) = resolveApiKeys(loginId)
+        val redisKey = getRedisKey(loginId)
 
+        try {
             val accessTokenRes = kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/oauth2/token")
                 .bodyValue(
@@ -115,6 +116,19 @@ class AuthClient(
         } catch (e: Exception) {
             log.warn { "refreshToken 실패 (loginId=$loginId): ${e.message}" }
             throw RuntimeException(e.message)
+        }
+    }
+
+    fun validateApiKey(appKey: String, secretKey: String) {
+        val res = kiwoomWebClient.post()
+            .uri("$DEFAULT_URL/oauth2/token")
+            .bodyValue(AccessTokenReq(appkey = appKey, secretkey = secretKey))
+            .retrieve()
+            .bodyToMono<AccessTokenRes>()
+            .block()
+
+        if (res?.return_code != 0) {
+            throw InvalidApiKeyException()
         }
     }
 

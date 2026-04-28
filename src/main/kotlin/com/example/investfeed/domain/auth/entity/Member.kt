@@ -47,7 +47,13 @@ class Member(
 
     var totpSecret: String? = null,
 
-    var secondaryPassword: String? = null
+    var secondaryPassword: String? = null,
+
+    @Column(nullable = false)
+    var failedApiKeyAttempts: Int = 0,
+
+    @Column(nullable = false)
+    var apiKeyLocked: Boolean = false
 )
 
 enum class Role {
