@@ -29,14 +29,14 @@ class MarketIndexService(
         }
     }
 
-    fun getAll(): List<MarketIndexRes> {
+    fun listMarketIndexes(): List<MarketIndexRes> {
         return MarketIndexType.entries.mapNotNull { type ->
             redisTemplate.opsForValue().get("$KEY_PREFIX${type.name}")
                 ?.let { objectMapper.readValue(it, MarketIndexRes::class.java) }
         }
     }
 
-    fun getByType(type: MarketIndexType): MarketIndexRes? {
+    fun getMarketIndex(type: MarketIndexType): MarketIndexRes? {
         return redisTemplate.opsForValue().get("$KEY_PREFIX${type.name}")
             ?.let { objectMapper.readValue(it, MarketIndexRes::class.java) }
     }

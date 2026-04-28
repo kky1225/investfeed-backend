@@ -14,39 +14,39 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/crypto/realizedpnl")
+@RequestMapping("/api/crypto/realized-pnl")
 class CryptoRealizedPnlController(
     private val cryptoRealizedPnlService: CryptoRealizedPnlService,
 ) {
 
     @GetMapping
-    fun list(
+    fun listCryptoRealizedPnls(
         @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_LIST.code,
                 message = ResponseCode.REALIZED_PNL_LIST.message,
-                result = cryptoRealizedPnlService.list(req.year, req.month)
+                result = cryptoRealizedPnlService.listCryptoRealizedPnls(req.year, req.month)
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("manual")
-    fun createManual(
+    @PostMapping("/manual")
+    fun createManualCryptoPnl(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_CREATE.code,
                 message = ResponseCode.REALIZED_PNL_MANUAL_CREATE.message,
-                result = cryptoRealizedPnlService.create(req)
+                result = cryptoRealizedPnlService.createManualCryptoPnl(req)
             ), HttpStatus.OK
         )
     }
 
-    @PatchMapping("manual/{id}")
-    fun updateManual(
+    @PatchMapping("/manual/{id}")
+    fun updateManualCryptoPnl(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -54,16 +54,16 @@ class CryptoRealizedPnlController(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_UPDATE.code,
                 message = ResponseCode.REALIZED_PNL_MANUAL_UPDATE.message,
-                result = cryptoRealizedPnlService.update(id, req)
+                result = cryptoRealizedPnlService.updateManualCryptoPnl(id, req)
             ), HttpStatus.OK
         )
     }
 
-    @DeleteMapping("manual/{id}")
-    fun deleteManual(
+    @DeleteMapping("/manual/{id}")
+    fun deleteManualCryptoPnl(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        cryptoRealizedPnlService.delete(id)
+        cryptoRealizedPnlService.deleteManualCryptoPnl(id)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_DELETE.code,

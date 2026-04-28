@@ -25,12 +25,6 @@ enum class ResponseCode(
     INVESTOR_TRADE_ORGANIZE(message = "종목별 투자자 기관별 합계 요청 조회에 성공하셨습니다."),
     INVESTOR_TRADE_RANK_LIST(message = "기관/외국인 매수 상위 순위 조회에 성공하셨습니다."),
 
-    SECT_CHART_MINUTE_LIST(message = "업종 분봉 차트 조회에 성공하셨습니다."),
-
-    ETF_PRICE_LIST(message = "ETF 전체 시세 조회에 성공하셨습니다."),
-    ETF_INFO(message = "ETF 정목 정보 조회에 성공하셨습니다."),
-    ETF_TRADE_DAILY_LIST(message = "ETF 일자별 체결 조회에 성공하셨습니다."),
-
     HOLDING_LIST(message = "보유 주식 조회에 성공하셨습니다."),
     HOLDING_STREAM(message = "실시간 보유 주식 조회에 성공하셨습니다."),
 

@@ -10,14 +10,14 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/news")
+@RequestMapping("/api/news")
 class NewsController(
     private val newsService: NewsService
 ) {
 
-    @PostMapping("search")
-    fun search(
-        @RequestBody req: NewsSearchReq
+    @GetMapping
+    fun searchNews(
+        req: NewsSearchReq
     ): ResponseEntity<ApiResponse<NewsListRes>> {
         return ResponseEntity(
             ApiResponse(

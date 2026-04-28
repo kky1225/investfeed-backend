@@ -19,7 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/notifications")
+@RequestMapping("/api/notifications")
 class NotificationController(
     private val notificationService: NotificationService,
     private val priceTargetService: PriceTargetService,

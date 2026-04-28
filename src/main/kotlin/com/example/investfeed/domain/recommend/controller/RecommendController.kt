@@ -14,26 +14,26 @@ import org.springframework.web.bind.annotation.RestController
 
 
 @RestController
-@RequestMapping("/api/stock/recommend")
+@RequestMapping("/api/stock/recommendations")
 class RecommendController(
     private val recommendService: RecommendService
 ) {
-    @GetMapping("list")
-    fun recommendList(): ResponseEntity<ApiResponse<RecommendListRes>> {
+    @GetMapping
+    fun listRecommendations(): ResponseEntity<ApiResponse<RecommendListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.RECOMMEND_LIST.code,
                 message = ResponseCode.RECOMMEND_LIST.message,
-                result = recommendService.recommendList()
+                result = recommendService.listRecommendations()
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("list/stream")
-    fun recommendListStream(
+    @PostMapping("/stream")
+    fun streamRecommendations(
         req: RecommendListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        recommendService.recommendListStream(req = req)
+        recommendService.streamRecommendations(req = req)
 
         return ResponseEntity(
             ApiResponse(

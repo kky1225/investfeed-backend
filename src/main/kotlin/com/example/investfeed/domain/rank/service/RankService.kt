@@ -18,7 +18,7 @@ class RankService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun rankList(
+    fun listRanks(
         req: RankListReq
     ): RankListRes {
         when (req.type) {

@@ -21,7 +21,7 @@ class BrokerService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun brokerList(): BrokerListRes {
+    fun listBrokers(): BrokerListRes {
         val brokers = brokerRepository.findAllByOrderByIdAsc()
 
         return BrokerListRes(
@@ -36,7 +36,7 @@ class BrokerService(
         )
     }
 
-    fun myBrokerList(): MyBrokerListRes {
+    fun listMyBrokers(): MyBrokerListRes {
         val memberId = getMemberId()
         val memberBrokers = memberBrokerRepository.findByMemberIdOrderByOrderIndex(memberId)
 
@@ -54,7 +54,7 @@ class BrokerService(
         )
     }
 
-    fun brokerListByMarket(market: MarketType): BrokerListRes {
+    fun listBrokersByMarket(market: MarketType): BrokerListRes {
         val brokers = brokerRepository.findAllByMarketOrderByIdAsc(market)
 
         return BrokerListRes(
@@ -69,7 +69,7 @@ class BrokerService(
         )
     }
 
-    fun myBrokerListByMarket(market: MarketType): MyBrokerListRes {
+    fun listMyBrokersByMarket(market: MarketType): MyBrokerListRes {
         val memberId = getMemberId()
         val memberBrokers = memberBrokerRepository.findByMemberIdAndBrokerMarketOrderByOrderIndex(memberId, market)
 

@@ -12,38 +12,39 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/stock/sect")
+@RequestMapping("/api/stock/sects")
 class SectController(
     private val sectService: SectService,
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun sectList(
+    @GetMapping
+    fun listSects(
         req: SectListReq
     ): ResponseEntity<ApiResponse<SectListRes>> {
-        log.info { "sectList : $req" }
+        log.info { "listSects : $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.SECT_LIST.code,
                 message = ResponseCode.SECT_LIST.message,
-                result = sectService.sectList(req = req)
+                result = sectService.listSects(req = req)
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("list/stream")
-    fun sectListStream(
+    @GetMapping("/stream")
+    fun streamSects(
         req: SectListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "sectListStream : $req" }
+        log.info { "streamSects : $req" }
 
-        sectService.sectListStream(req = req)
+        sectService.streamSects(req = req)
 
         return ResponseEntity(
             ApiResponse(
@@ -54,17 +55,18 @@ class SectController(
         )
     }
 
-    @GetMapping("stock/list")
-    fun sectStockList(
+    @GetMapping("/{indsCd}/stocks")
+    fun listStocksBySect(
+        @PathVariable indsCd: String,
         req: SectStockListReq
     ): ResponseEntity<ApiResponse<SectStockListRes>> {
-        log.info { "sectStockList : $req" }
+        log.info { "listStocksBySect : indsCd=$indsCd, $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.SECT_STOCK_LIST.code,
                 message = ResponseCode.SECT_STOCK_LIST.message,
-                result = sectService.sectStockList(req = req)
+                result = sectService.listStocksBySect(indsCd = indsCd, req = req)
             ), HttpStatus.OK
         )
     }

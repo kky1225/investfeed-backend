@@ -13,14 +13,14 @@ import org.springframework.web.bind.annotation.*
 
 
 @RestController
-@RequestMapping("/api/stock/investor")
+@RequestMapping("/api/stock/investors")
 class InvestorController(
     private val investorService: InvestorService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("/list")
-    fun investorList(
+    @GetMapping
+    fun listInvestors(
         req: InvestorListReq
     ): ResponseEntity<ApiResponse<InvestorListRes?>> {
         log.info { "investorList $req" }
@@ -29,18 +29,18 @@ class InvestorController(
             ApiResponse(
                 code = ResponseCode.INVESTOR_LIST.code,
                 message = ResponseCode.INVESTOR_LIST.message,
-                result = investorService.investorList(req = req)
+                result = investorService.listInvestors(req = req)
             ), HttpStatus.OK
         )
     }
 
     @PostMapping("/stream")
-    fun stockStream(
+    fun streamInvestors(
         @RequestBody req: InvestorStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "stockStream $req" }
 
-        investorService.investorStream(req = req)
+        investorService.streamInvestors(req = req)
 
         return ResponseEntity(
             ApiResponse(

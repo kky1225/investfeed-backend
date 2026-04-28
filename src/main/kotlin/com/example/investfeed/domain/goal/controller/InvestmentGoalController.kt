@@ -13,26 +13,26 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/goal")
+@RequestMapping("/api/goals")
 class InvestmentGoalController(
     private val investmentGoalService: InvestmentGoalService
 ) {
 
     @PostMapping
-    fun create(
+    fun createGoal(
         @Valid @RequestBody req: InvestmentGoalCreateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.GOAL_CREATE.code,
                 message = ResponseCode.GOAL_CREATE.message,
-                result = investmentGoalService.create(req)
+                result = investmentGoalService.createGoal(req)
             ), HttpStatus.OK
         )
     }
 
-    @PatchMapping("{id}")
-    fun update(
+    @PatchMapping("/{id}")
+    fun updateGoal(
         @PathVariable id: Long,
         @Valid @RequestBody req: InvestmentGoalUpdateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
@@ -40,16 +40,16 @@ class InvestmentGoalController(
             ApiResponse(
                 code = ResponseCode.GOAL_UPDATE.code,
                 message = ResponseCode.GOAL_UPDATE.message,
-                result = investmentGoalService.update(id, req)
+                result = investmentGoalService.updateGoal(id, req)
             ), HttpStatus.OK
         )
     }
 
-    @DeleteMapping("{id}")
-    fun delete(
+    @DeleteMapping("/{id}")
+    fun deleteGoal(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        investmentGoalService.delete(id)
+        investmentGoalService.deleteGoal(id)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.GOAL_DELETE.code,
@@ -60,23 +60,23 @@ class InvestmentGoalController(
     }
 
     @GetMapping
-    fun list(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
+    fun listGoals(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.GOAL_LIST.code,
                 message = ResponseCode.GOAL_LIST.message,
-                result = investmentGoalService.getGoals()
+                result = investmentGoalService.listGoals()
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("dashboard")
-    fun dashboard(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
+    @GetMapping("/dashboard")
+    fun getGoalsDashboard(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.GOAL_LIST.code,
                 message = ResponseCode.GOAL_LIST.message,
-                result = investmentGoalService.getDashboardGoals()
+                result = investmentGoalService.getGoalsDashboard()
             ), HttpStatus.OK
         )
     }

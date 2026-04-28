@@ -29,7 +29,7 @@ class CommodityService(
     private val investorClient: InvestorClient,
     private val stockClient: StockClient,
 ) {
-    fun commodityList(): CommodityListRes {
+    fun listCommodities(): CommodityListRes {
         val commodityTypeList = CommodityType.entries
         val commodityList: MutableList<CommodityListItem> = mutableListOf()
 
@@ -82,22 +82,23 @@ class CommodityService(
         )
     }
 
-    fun commodityDetail(
+    fun getCommodity(
+        stkCd: String,
         req: CommodityDetailReq
     ): CommodityDetailRes {
         val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
             req = KiwoomDefaultStockInfoReq(
-                stk_cd = req.stkCd
+                stk_cd = stkCd
             )
         )
         val kiwoomStockInfoRes = stockClient.stockInfo(
             req = KiwoomStockInfoReq(
-                stk_cd = req.stkCd
+                stk_cd = stkCd
             )
         )
         val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
             req = KiwoomStockTradeInfoReq(
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
             )
         )
         val kiwoomGoldInvestorRes = investorClient.goldInvestor()
@@ -105,8 +106,8 @@ class CommodityService(
         var commodityInfo: CommodityInfo? = null
         if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0 && kiwoomGoldInvestorRes.return_code == 0) {
             commodityInfo = CommodityInfo(
-                stkCd = req.stkCd,
-                stkNm = CommodityType.entries.find { it.stkCd == req.stkCd }?.stkNm,
+                stkCd = stkCd,
+                stkNm = CommodityType.entries.find { it.stkCd == stkCd }?.stkNm,
                 curPrc = kiwoomStockDefaultInfoRes.cur_prc,
                 predPreSig = kiwoomStockDefaultInfoRes.pre_sig,
                 predPre = kiwoomStockDefaultInfoRes.pred_pre,
@@ -136,7 +137,7 @@ class CommodityService(
             CommodityChartType.DAY -> {
                 val kiwoomGoldChartDayRes = goldChartClient.goldChartDayList(
                     req = KiwoomGoldChartDayReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = baseDt,
                         upd_stkpc_tp = "1"
                     )
@@ -161,7 +162,7 @@ class CommodityService(
             CommodityChartType.WEEK -> {
                 val kiwoomGoldChartWeekRes = goldChartClient.goldChartWeekList(
                     req = KiwoomGoldChartWeekReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = baseDt,
                         upd_stkpc_tp = "1"
                     )
@@ -186,7 +187,7 @@ class CommodityService(
             CommodityChartType.MONTH -> {
                 val kiwoomGoldChartMonthRes = goldChartClient.goldChartMonthList(
                     req = KiwoomGoldChartMonthReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = baseDt,
                         upd_stkpc_tp = "1"
                     )
@@ -212,7 +213,7 @@ class CommodityService(
                 val kiwoomGoldChartMinuteRes = req.chartType.value?.let {
                     goldChartClient.goldChartMinuteList(
                         req = KiwoomGoldChartMinuteReq(
-                            stk_cd = req.stkCd,
+                            stk_cd = stkCd,
                             tic_scope = it,
                             upd_stkpc_tp = "1"
                         )

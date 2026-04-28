@@ -23,7 +23,7 @@ class CryptoManualHoldingService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val tickerClient: TickerClient,
 ) {
-    fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
+    fun listCryptoManualHoldings(brokerId: Long): ManualHoldingListRes {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, brokerId)
             ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
@@ -60,7 +60,7 @@ class CryptoManualHoldingService(
     }
 
     @Transactional
-    fun createManualHolding(req: ManualHoldingCreateReq): ManualHoldingItem {
+    fun createCryptoManualHolding(req: ManualHoldingCreateReq): ManualHoldingItem {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
             ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
@@ -102,7 +102,7 @@ class CryptoManualHoldingService(
     }
 
     @Transactional
-    fun updateManualHolding(holdingId: Long, req: ManualHoldingUpdateReq): ManualHoldingItem {
+    fun updateCryptoManualHolding(holdingId: Long, req: ManualHoldingUpdateReq): ManualHoldingItem {
         val memberId = getMemberId()
         val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
             ?: throw IllegalArgumentException("보유코인을 찾을 수 없습니다.")
@@ -129,7 +129,7 @@ class CryptoManualHoldingService(
     }
 
     @Transactional
-    fun deleteManualHolding(holdingId: Long) {
+    fun deleteCryptoManualHolding(holdingId: Long) {
         val memberId = getMemberId()
         val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)
             ?: throw IllegalArgumentException("보유코인을 찾을 수 없습니다.")
@@ -138,7 +138,7 @@ class CryptoManualHoldingService(
     }
 
     @Transactional
-    fun reorderHoldings(req: HoldingReorderReq) {
+    fun reorderCryptoManualHoldings(req: HoldingReorderReq) {
         val memberId = getMemberId()
         req.orderedIds.forEachIndexed { index, holdingId ->
             val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)

@@ -29,7 +29,7 @@ class IndexService(
     private val indexInvestorDailyRepository: IndexInvestorDailyRepository
 ) {
     private val log = KotlinLogging.logger {}
-    fun indexList(): IndexListRes? {
+    fun listIndexes(): IndexListRes? {
         val indexTypeList = IndexType.entries
         val indexList: MutableList<IndexListItem> = mutableListOf()
 
@@ -83,7 +83,8 @@ class IndexService(
         )
     }
 
-    fun indexDetail(
+    fun getIndex(
+        indsCd: String,
         req: IndexDetailReq
     ): IndexDetailRes {
         val chartList: MutableList<IndexChart> = mutableListOf()
@@ -92,7 +93,7 @@ class IndexService(
             IndexChartType.DAY -> {
                 val kiwoomSectChartDayRes = sectChartClient.sectChartDayList(
                     req = SectChartDayListReq(
-                        inds_cd = req.inds_cd,
+                        inds_cd = indsCd,
                         base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
@@ -116,7 +117,7 @@ class IndexService(
             IndexChartType.WEEK -> {
                 val kiwoomSectChartWeekRes = sectChartClient.sectChartWeekList(
                     req = SectChartWeekListReq(
-                        inds_cd = req.inds_cd,
+                        inds_cd = indsCd,
                         base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
@@ -140,7 +141,7 @@ class IndexService(
             IndexChartType.MONTH -> {
                 val kiwoomSectChartMonthRes = sectChartClient.sectChartMonthList(
                     req = SectChartMonthListReq(
-                        inds_cd = req.inds_cd,
+                        inds_cd = indsCd,
                         base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
@@ -164,7 +165,7 @@ class IndexService(
             IndexChartType.YEAR -> {
                 val kiwoomSectChartYearRes = sectChartClient.sectChartYearList(
                     req = SectChartYearListReq(
-                        inds_cd = req.inds_cd,
+                        inds_cd = indsCd,
                         base_dt = DateUtil.today("yyyyMMdd")
                     )
                 )
@@ -189,7 +190,7 @@ class IndexService(
                 req.chart_type.value?.let {
                     val kiwoomSectChartMinuteRes = sectChartClient.sectChartMinuteList(
                         req = SectChartMinuteListReq(
-                            inds_cd = req.inds_cd,
+                            inds_cd = indsCd,
                             tic_scope = it
                         )
                     )
@@ -216,13 +217,13 @@ class IndexService(
         val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
             req = KiwoomSectPriceNowReq(
                 mrkt_tp = "0",
-                inds_cd = req.inds_cd
+                inds_cd = indsCd
             )
         )
 
         val kiwoomSectInvestorRes = sectClient.sectInvestor(
             req = KiwoomSectInvestorReq(
-                mrkt_tp = if (req.inds_cd == "101" || req.inds_cd == "150") "1" else "0",
+                mrkt_tp = if (indsCd == "101" || indsCd == "150") "1" else "0",
                 amt_qty_tp = "0",
                 stex_tp = "3"
             )
@@ -232,7 +233,7 @@ class IndexService(
             req = KiwoomProgramTradeReq(
                 date = DateUtil.today("yyyyMMdd"),
                 amt_qty_tp = "1",
-                mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
+                mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
                 min_tic_tp = "1",
                 stex_tp = "3",
             )
@@ -250,7 +251,7 @@ class IndexService(
                 req = KiwoomIndexProgramTradeDayReq(
                     date = chartList[index].dt,
                     amt_qty_tp = "1",
-                    mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "0" else "1",
+                    mrkt_tp = if (indsCd == "001" || indsCd == "201") "0" else "1",
                     stex_tp = "3",
                 )
             )
@@ -273,7 +274,7 @@ class IndexService(
             req = KiwoomIndexProgramTradeMinuteReq(
                 date = DateUtil.today("yyyyMMdd"),
                 amt_qty_tp = "1",
-                mrkt_tp = if (req.inds_cd == "001" || req.inds_cd == "201") "P001_AL01" else "P101_AL02",
+                mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
                 min_tic_tp = "1",
                 stex_tp = "3",
             )
@@ -295,8 +296,8 @@ class IndexService(
 
         return IndexDetailRes(
             indexInfo = IndexInfo(
-                indsCd = req.inds_cd,
-                indsNm = IndexType.entries.find { it.indsCd == req.inds_cd }?.indsNm,
+                indsCd = indsCd,
+                indsNm = IndexType.entries.find { it.indsCd == indsCd }?.indsNm,
                 curPrc = kiwoomSectPriceNowRes.cur_prc,
                 predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
                 predPre = kiwoomSectPriceNowRes.pred_pre,
@@ -319,7 +320,7 @@ class IndexService(
             chartList = chartList,
             programChartList = programChartList.reversed(),
             programList = programList,
-            investorDailyList = getIndexInvestorDailyList(req.inds_cd),
+            investorDailyList = getIndexInvestorDailyList(indsCd),
         )
     }
 

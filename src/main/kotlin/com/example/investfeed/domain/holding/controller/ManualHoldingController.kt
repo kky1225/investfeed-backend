@@ -16,21 +16,21 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/stock/holding/manual")
+@RequestMapping("/api/stock/holdings/manual")
 class ManualHoldingController(
     private val manualHoldingService: ManualHoldingService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list/{brokerId}")
-    fun manualHoldingList(
+    @GetMapping("/{brokerId}")
+    fun listManualHoldings(
         @PathVariable brokerId: Long
     ): ResponseEntity<ApiResponse<ManualHoldingListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.MANUAL_HOLDING_LIST.code,
                 message = ResponseCode.MANUAL_HOLDING_LIST.message,
-                result = manualHoldingService.manualHoldingList(brokerId)
+                result = manualHoldingService.listManualHoldings(brokerId)
             ), HttpStatus.OK
         )
     }
@@ -48,7 +48,7 @@ class ManualHoldingController(
         )
     }
 
-    @PatchMapping("{holdingId}")
+    @PatchMapping("/{holdingId}")
     fun updateManualHolding(
         @PathVariable holdingId: Long,
         @Valid @RequestBody req: ManualHoldingUpdateReq
@@ -62,7 +62,7 @@ class ManualHoldingController(
         )
     }
 
-    @DeleteMapping("{holdingId}")
+    @DeleteMapping("/{holdingId}")
     fun deleteManualHolding(
         @PathVariable holdingId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -77,7 +77,7 @@ class ManualHoldingController(
         )
     }
 
-    @PatchMapping("balance/{memberBrokerId}")
+    @PatchMapping("/balance/{memberBrokerId}")
     fun updateBalance(
         @PathVariable memberBrokerId: Long,
         @RequestBody req: MemberBrokerBalanceUpdateReq
@@ -91,11 +91,11 @@ class ManualHoldingController(
         )
     }
 
-    @PatchMapping("reorder")
-    fun reorderHoldings(
+    @PatchMapping("/reorder")
+    fun reorderManualHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        manualHoldingService.reorderHoldings(req)
+        manualHoldingService.reorderManualHoldings(req)
 
         return ResponseEntity(
             ApiResponse(

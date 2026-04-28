@@ -13,53 +13,53 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/stock/realizedpnl")
+@RequestMapping("/api/stock/realized-pnl")
 class StockRealizedPnlController(
     private val stockRealizedPnlService: StockRealizedPnlService,
     private val manualRealizedPnlService: ManualRealizedPnlService,
 ) {
 
     @GetMapping
-    fun list(
+    fun listStockRealizedPnls(
         @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_LIST.code,
                 message = ResponseCode.REALIZED_PNL_LIST.message,
-                result = manualRealizedPnlService.list(req.year, req.month)
+                result = manualRealizedPnlService.listStockRealizedPnls(req.year, req.month)
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("sync")
-    fun sync(
+    @PostMapping("/sync")
+    fun syncStockRealizedPnls(
         @RequestBody req: RealizedPnlSyncReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_SYNC.code,
                 message = ResponseCode.REALIZED_PNL_SYNC.message,
-                result = stockRealizedPnlService.fetchApiPnl(req)
+                result = stockRealizedPnlService.syncStockRealizedPnls(req)
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("manual")
-    fun createManual(
+    @PostMapping("/manual")
+    fun createManualStockPnl(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_CREATE.code,
                 message = ResponseCode.REALIZED_PNL_MANUAL_CREATE.message,
-                result = manualRealizedPnlService.create(req)
+                result = manualRealizedPnlService.createManualStockPnl(req)
             ), HttpStatus.OK
         )
     }
 
-    @PatchMapping("manual/{id}")
-    fun updateManual(
+    @PatchMapping("/manual/{id}")
+    fun updateManualStockPnl(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -67,16 +67,16 @@ class StockRealizedPnlController(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_UPDATE.code,
                 message = ResponseCode.REALIZED_PNL_MANUAL_UPDATE.message,
-                result = manualRealizedPnlService.update(id, req)
+                result = manualRealizedPnlService.updateManualStockPnl(id, req)
             ), HttpStatus.OK
         )
     }
 
-    @DeleteMapping("manual/{id}")
-    fun deleteManual(
+    @DeleteMapping("/manual/{id}")
+    fun deleteManualStockPnl(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        manualRealizedPnlService.delete(id)
+        manualRealizedPnlService.deleteManualStockPnl(id)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REALIZED_PNL_MANUAL_DELETE.code,

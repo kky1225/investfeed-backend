@@ -17,7 +17,7 @@ class AssetDashboardService(
     private val cryptoManualHoldingService: CryptoManualHoldingService,
 ) {
 
-    fun dashboard(): AssetDashboardRes {
+    fun getAssetDashboard(): AssetDashboardRes {
         val memberId = getMemberId()
         val allBrokers = memberBrokerRepository.findByMemberIdOrderByOrderIndex(memberId)
 
@@ -38,7 +38,7 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                val res = holdingService.holdingList()
+                val res = holdingService.listHoldings()
                 bEvltAmt = res.totEvltAmt.toLongOrNull() ?: 0
                 bPurAmt = res.totPurAmt.toLongOrNull() ?: 0
                 bCash = res.balance.toLongOrNull() ?: 0
@@ -66,7 +66,7 @@ class AssetDashboardService(
                     )
                 })
             } else {
-                val res = manualHoldingService.manualHoldingList(broker.id)
+                val res = manualHoldingService.listManualHoldings(broker.id)
                 bCash = res.balance
                 stockCash += bCash
                 bHoldingCount = res.holdings.size
@@ -126,7 +126,7 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                val res = cryptoHoldingService.cryptoHoldingList()
+                val res = cryptoHoldingService.listCryptoHoldings()
                 bEvltAmt = res.totEvltAmt.toDoubleOrNull()?.toLong() ?: 0
                 bPurAmt = res.totPurAmt.toDoubleOrNull()?.toLong() ?: 0
                 bCash = res.balance.toDoubleOrNull()?.toLong() ?: 0
@@ -154,7 +154,7 @@ class AssetDashboardService(
                     )
                 })
             } else {
-                val res = cryptoManualHoldingService.manualHoldingList(broker.id)
+                val res = cryptoManualHoldingService.listCryptoManualHoldings(broker.id)
                 bCash = res.balance
                 cryptoCash += bCash
                 bHoldingCount = res.holdings.size

@@ -13,35 +13,35 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/crypto/broker")
+@RequestMapping("/api/crypto/brokers")
 class CryptoBrokerController(
     private val brokerService: BrokerService
 ) {
 
-    @GetMapping("list")
-    fun brokerList(): ResponseEntity<ApiResponse<BrokerListRes>> {
+    @GetMapping
+    fun listCryptoBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CRYPTO_BROKER_LIST.code,
                 message = ResponseCode.CRYPTO_BROKER_LIST.message,
-                result = brokerService.brokerListByMarket(MarketType.CRYPTO)
+                result = brokerService.listBrokersByMarket(MarketType.CRYPTO)
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("my/list")
-    fun myBrokerList(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
+    @GetMapping("/my")
+    fun listMyCryptoBrokers(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CRYPTO_MY_BROKER_LIST.code,
                 message = ResponseCode.CRYPTO_MY_BROKER_LIST.message,
-                result = brokerService.myBrokerListByMarket(MarketType.CRYPTO)
+                result = brokerService.listMyBrokersByMarket(MarketType.CRYPTO)
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("my")
-    fun addMyBroker(
+    @PostMapping("/my")
+    fun addMyCryptoBroker(
         @RequestBody req: MyBrokerAddReq
     ): ResponseEntity<ApiResponse<MyBrokerItem>> {
         return ResponseEntity(
@@ -53,8 +53,8 @@ class CryptoBrokerController(
         )
     }
 
-    @DeleteMapping("my/{memberBrokerId}")
-    fun removeMyBroker(
+    @DeleteMapping("/my/{memberBrokerId}")
+    fun removeMyCryptoBroker(
         @PathVariable memberBrokerId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
         brokerService.removeMyBroker(memberBrokerId)

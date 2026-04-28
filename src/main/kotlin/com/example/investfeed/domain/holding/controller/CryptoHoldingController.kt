@@ -12,28 +12,28 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/crypto/holding")
+@RequestMapping("/api/crypto/holdings")
 class CryptoHoldingController(
     private val cryptoHoldingService: CryptoHoldingService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun cryptoHoldingList(): ResponseEntity<ApiResponse<HoldingListRes>> {
+    @GetMapping
+    fun listCryptoHoldings(): ResponseEntity<ApiResponse<HoldingListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CRYPTO_HOLDING_LIST.code,
                 message = ResponseCode.CRYPTO_HOLDING_LIST.message,
-                result = cryptoHoldingService.cryptoHoldingList()
+                result = cryptoHoldingService.listCryptoHoldings()
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("stream")
-    fun cryptoHoldingStream(
+    @PostMapping("/stream")
+    fun streamCryptoHoldings(
         @RequestBody req: HoldingStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        cryptoHoldingService.cryptoHoldingStream(req)
+        cryptoHoldingService.streamCryptoHoldings(req)
 
         return ResponseEntity(
             ApiResponse(
@@ -44,11 +44,11 @@ class CryptoHoldingController(
         )
     }
 
-    @PatchMapping("reorder")
-    fun reorderHoldings(
+    @PatchMapping("/reorder")
+    fun reorderCryptoHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        cryptoHoldingService.reorderHoldings(req)
+        cryptoHoldingService.reorderCryptoHoldings(req)
 
         return ResponseEntity(
             ApiResponse(

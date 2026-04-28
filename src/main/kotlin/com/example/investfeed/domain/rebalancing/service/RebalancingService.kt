@@ -20,7 +20,7 @@ class RebalancingService(
     private val log = KotlinLogging.logger {}
 
     @Transactional
-    fun saveSetting(req: RebalancingSettingReq): RebalancingSettingRes {
+    fun saveRebalancing(req: RebalancingSettingReq): RebalancingSettingRes {
         val memberId = getMemberId()
 
         val existing = rebalancingSettingRepository.findByMemberId(memberId)
@@ -52,14 +52,14 @@ class RebalancingService(
         return toSettingRes(setting)
     }
 
-    fun getStatus(): RebalancingStatusRes? {
+    fun getRebalancing(): RebalancingStatusRes? {
         val memberId = getMemberId()
         val setting = rebalancingSettingRepository.findByMemberId(memberId) ?: return null
         return calculateStatus(setting)
     }
 
     fun calculateStatus(setting: RebalancingSetting): RebalancingStatusRes {
-        val dashboard = assetDashboardService.dashboard()
+        val dashboard = assetDashboardService.getAssetDashboard()
         val totalAsset = dashboard.totalAsset
 
         if (totalAsset <= 0) {
@@ -113,6 +113,8 @@ class RebalancingService(
             }
         }
 
+        overweightStocks.sortByDescending { it.currentRatio }
+
         return RebalancingStatusRes(
             setting = toSettingRes(setting),
             currentRatios = AssetRatioStatus(
@@ -148,7 +150,7 @@ class RebalancingService(
     }
 
     @Transactional
-    fun deleteSetting() {
+    fun deleteRebalancing() {
         val memberId = getMemberId()
         val setting = rebalancingSettingRepository.findByMemberId(memberId)
             ?: throw IllegalArgumentException("설정이 존재하지 않습니다.")

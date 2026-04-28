@@ -20,7 +20,7 @@ class AdminBrokerService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun brokerList(): BrokerListRes {
+    fun listBrokers(): BrokerListRes {
         val brokers = brokerRepository.findAllByOrderByIdAsc()
 
         return BrokerListRes(

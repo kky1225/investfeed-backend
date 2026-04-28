@@ -34,28 +34,29 @@ class StockService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun stockDetail(
+    fun getStock(
+        stkCd: String,
         req: StockDetailReq
     ): StockDetailRes {
         val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
             req = KiwoomDefaultStockInfoReq(
-                stk_cd = req.stkCd
+                stk_cd = stkCd
             )
         )
         val kiwoomStockInfoRes = stockClient.stockInfo(
             req = KiwoomStockInfoReq(
-                stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
+                stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
             )
         )
         val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
             req = KiwoomStockTradeInfoReq(
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
             )
         )
         val kiwoomStockInvestor = stockClient.stockInvestor(
             req = KiwoomStockInvestorReq(
                 dt = DateUtil.today("yyyyMMdd"),
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
                 amt_qty_tp = "2",
                 trde_tp = "0",
                 unit_tp = "1"
@@ -96,7 +97,7 @@ class StockService(
                     MarketTimeUtil.isOvtSinglePrice() && marketName == "ETF" -> {
                         val ovtRes = priceClient.stockSinglePriceList(
                             req = KiwoomStockSinglePriceReq(
-                                stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")
+                                stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")
                             )
                         )
                         ovtRes?.let {
@@ -147,7 +148,7 @@ class StockService(
             StockChartType.DAY -> {
                 val kiwoomStockChartDayRes = stockChartClient.chartDayList(
                     req = KiwoomStockChartDayReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -172,7 +173,7 @@ class StockService(
             StockChartType.WEEK -> {
                 val kiwoomStockChartWeekRes = stockChartClient.chartWeekList(
                     req = KiwoomStockChartWeekReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -197,7 +198,7 @@ class StockService(
             StockChartType.MONTH -> {
                 val kiwoomStockChartMonthRes = stockChartClient.chartMonthList(
                     req = KiwoomStockChartMonthReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -222,7 +223,7 @@ class StockService(
             StockChartType.YEAR -> {
                 val kiwoomStockChartYearRes = stockChartClient.chartYearList(
                     req = KiwoomStockChartYearReq(
-                        stk_cd = req.stkCd,
+                        stk_cd = stkCd,
                         base_dt = DateUtil.today("yyyyMMdd"),
                         upd_stkpc_tp = "1"
                     )
@@ -248,7 +249,7 @@ class StockService(
                 val kiwoomStockChartMinuteRes = req.chartType.value?.let {
                     stockChartClient.chartMinuteList(
                         req = KiwoomStockChartMinuteReq(
-                            stk_cd = req.stkCd,
+                            stk_cd = stkCd,
                             tic_scope = it,
                             upd_stkpc_tp = "1"
                         )
@@ -279,7 +280,7 @@ class StockService(
                 mrkt_tp = "000",
                 amt_qty_tp = "2",
                 trde_tp = "0",
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
             )
         )
 
@@ -300,7 +301,7 @@ class StockService(
         val kiwoomStockProgramTradeDayRes = priceClient.stockProgramTradeDay(
             req = KiwoomStockProgramTradeDayReq(
                 amt_qty_tp = "2",
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
                 date = DateUtil.today("yyyyMMdd")
             )
         )
@@ -322,7 +323,7 @@ class StockService(
 
         val kiwoomStockShortSellingRes = shortSellingClient.stockShortSelling(
             req = KiwoomStockShortSellingReq(
-                stk_cd = req.stkCd,
+                stk_cd = stkCd,
                 tm_tp = "1",
                 strt_dt = stockProgramList.lastOrNull()?.dt ?: DateUtil.today("yyyyMMdd"),
                 end_dt = stockProgramList.firstOrNull()?.dt ?: DateUtil.today("yyyyMMdd"),
@@ -345,7 +346,7 @@ class StockService(
             }
         }
 
-        val dividendList = stockDividendService.getDividendList(req.stkCd, kiwoomStockInfoRes.marketCode)
+        val dividendList = stockDividendService.getDividendList(stkCd, kiwoomStockInfoRes.marketCode)
 
         return StockDetailRes(
             stockInfo = stockInfo,
@@ -359,15 +360,15 @@ class StockService(
     }
 
 
-    fun stockChart(req: StockDetailReq): StockChartRes {
+    fun getStockChart(stkCd: String, req: StockDetailReq): StockChartRes {
         val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
-            req = KiwoomDefaultStockInfoReq(stk_cd = req.stkCd)
+            req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)
         )
         val kiwoomStockInfoRes = stockClient.stockInfo(
-            req = KiwoomStockInfoReq(stk_cd = req.stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""))
+            req = KiwoomStockInfoReq(stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""))
         )
         val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
-            req = KiwoomStockTradeInfoReq(stk_cd = req.stkCd)
+            req = KiwoomStockTradeInfoReq(stk_cd = stkCd)
         )
 
         var stockInfo: StockInfo? = null
@@ -405,24 +406,24 @@ class StockService(
         val chartListRes: MutableList<StockChart> = mutableListOf()
         when (req.chartType) {
             StockChartType.DAY -> {
-                val res = stockChartClient.chartDayList(KiwoomStockChartDayReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                val res = stockChartClient.chartDayList(KiwoomStockChartDayReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
                 if (res.return_code == 0) res.stk_dt_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
             }
             StockChartType.WEEK -> {
-                val res = stockChartClient.chartWeekList(KiwoomStockChartWeekReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                val res = stockChartClient.chartWeekList(KiwoomStockChartWeekReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
                 if (res.return_code == 0) res.stk_stk_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
             }
             StockChartType.MONTH -> {
-                val res = stockChartClient.chartMonthList(KiwoomStockChartMonthReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                val res = stockChartClient.chartMonthList(KiwoomStockChartMonthReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
                 if (res.return_code == 0) res.stk_mth_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
             }
             StockChartType.YEAR -> {
-                val res = stockChartClient.chartYearList(KiwoomStockChartYearReq(stk_cd = req.stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
+                val res = stockChartClient.chartYearList(KiwoomStockChartYearReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
                 if (res.return_code == 0) res.stk_yr_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
             }
             else -> {
                 req.chartType.value?.let { tic ->
-                    val res = stockChartClient.chartMinuteList(KiwoomStockChartMinuteReq(stk_cd = req.stkCd, tic_scope = tic, upd_stkpc_tp = "1"))
+                    val res = stockChartClient.chartMinuteList(KiwoomStockChartMinuteReq(stk_cd = stkCd, tic_scope = tic, upd_stkpc_tp = "1"))
                     if (res.return_code == 0) res.stk_min_pole_chart_qry?.filter { kiwoomStockTradeInfoRes.date?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
                         chartListRes.add(StockChart(dt = it.cntr_tm, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty))
                     }
@@ -433,7 +434,7 @@ class StockService(
         return StockChartRes(stockInfo = stockInfo, stockChartList = chartListRes)
     }
 
-    fun stockProgramChart(
+    fun getStockProgramChart(
         stkCd: String
     ): List<StockProgramChart> {
         val stockProgramChartList: MutableList<StockProgramChart> = mutableListOf()
@@ -465,7 +466,7 @@ class StockService(
         return stockProgramChartList.reversed()
     }
 
-    fun stockSearch(
+    fun searchStocks(
         keyword: String
     ): List<StockSearchItem> {
         val marketTypes = listOf("0", "10", "8", "60")
@@ -479,7 +480,7 @@ class StockService(
             .take(20)
     }
 
-    fun stockStream(
+    fun streamStocks(
         req: StockStreamReq
     ) {
         stockSocketClient.stockListStream(

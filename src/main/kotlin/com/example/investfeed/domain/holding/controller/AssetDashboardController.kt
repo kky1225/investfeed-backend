@@ -13,18 +13,18 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("api/asset")
+@RequestMapping("/api/asset")
 class AssetDashboardController(
     private val assetDashboardService: AssetDashboardService,
     private val realizedPnlSummaryService: RealizedPnlSummaryService,
     private val investmentGoalService: InvestmentGoalService,
 ) {
 
-    @GetMapping("dashboard")
-    fun dashboard(): ResponseEntity<ApiResponse<AssetDashboardRes>> {
-        val result = assetDashboardService.dashboard()
+    @GetMapping
+    fun getAssetDashboard(): ResponseEntity<ApiResponse<AssetDashboardRes>> {
+        val result = assetDashboardService.getAssetDashboard()
         result.realizedPnl = realizedPnlSummaryService.getDashboardSummary()
-        result.goals = investmentGoalService.getDashboardGoals().goals
+        result.goals = investmentGoalService.getGoalsDashboard().goals
 
         return ResponseEntity(
             ApiResponse(

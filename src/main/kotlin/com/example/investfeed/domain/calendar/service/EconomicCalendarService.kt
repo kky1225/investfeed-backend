@@ -137,7 +137,7 @@ class EconomicCalendarService(
     // 지표 카드 (최신 값 + 전기 대비 변동)
     // ==================================================================================
 
-    fun getIndicators(): EconomicIndicatorsRes {
+    fun listIndicators(): EconomicIndicatorsRes {
         val cacheKey = "${CACHE_PREFIX}indicators"
         redisTemplate.opsForValue().get(cacheKey)?.let {
             runCatching { return objectMapper.readValue(it, EconomicIndicatorsRes::class.java) }
@@ -507,7 +507,7 @@ class EconomicCalendarService(
     // 캘린더 이벤트
     // ==================================================================================
 
-    fun getManualEvents(year: Int): List<CalendarEvent> {
+    fun listManualEvents(year: Int): List<CalendarEvent> {
         val today = LocalDate.now(ZoneId.of("Asia/Seoul"))
         return calendarEventRepository.findByYearAndSource(year, "MANUAL")
             .map { CalendarEvent(
@@ -520,7 +520,7 @@ class EconomicCalendarService(
     }
 
     @Transactional
-    fun createManualEvent(req: ManualCalendarEventReq): CalendarEvent {
+    fun createEvent(req: ManualCalendarEventReq): CalendarEvent {
         val date = LocalDate.parse(req.date)
         val entity = calendarEventRepository.save(
             CalendarEventEntity(
@@ -538,7 +538,7 @@ class EconomicCalendarService(
     }
 
     @Transactional
-    fun updateManualEvent(id: Long, req: ManualCalendarEventReq): CalendarEvent {
+    fun updateEvent(id: Long, req: ManualCalendarEventReq): CalendarEvent {
         val entity = calendarEventRepository.findById(id)
             .orElseThrow { IllegalArgumentException("일정을 찾을 수 없습니다.") }
 
@@ -557,7 +557,7 @@ class EconomicCalendarService(
     }
 
     @Transactional
-    fun deleteManualEvent(id: Long) {
+    fun deleteEvent(id: Long) {
         val entity = calendarEventRepository.findById(id)
             .orElseThrow { IllegalArgumentException("일정을 찾을 수 없습니다.") }
 
@@ -568,7 +568,7 @@ class EconomicCalendarService(
         calendarEventRepository.delete(entity)
     }
 
-    fun getCalendarEvents(year: Int, month: Int): CalendarEventsRes {
+    fun listEvents(year: Int, month: Int): CalendarEventsRes {
         val target = YearMonth.of(year, month)
         val threshold = YearMonth.now().minusMonths(FREEZE_GRACE_MONTHS)
         val isPast = target.isBefore(threshold)
@@ -1025,7 +1025,7 @@ class EconomicCalendarService(
     }
 
     @Transactional
-    fun refreshMonth(year: Int, month: Int) {
+    fun refreshEvents(year: Int, month: Int) {
         freezeMonth(year, month)
         runCatching { redisTemplate.delete("${CACHE_PREFIX}events:$year:$month") }
     }

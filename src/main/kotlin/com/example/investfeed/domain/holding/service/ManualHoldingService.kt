@@ -25,7 +25,7 @@ class ManualHoldingService(
     private val stockClient: StockClient,
 ) {
 
-    fun manualHoldingList(brokerId: Long): ManualHoldingListRes {
+    fun listManualHoldings(brokerId: Long): ManualHoldingListRes {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, brokerId)
             ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
@@ -140,7 +140,7 @@ class ManualHoldingService(
     }
 
     @Transactional
-    fun reorderHoldings(req: HoldingReorderReq) {
+    fun reorderManualHoldings(req: HoldingReorderReq) {
         val memberId = getMemberId()
         req.orderedIds.forEachIndexed { index, holdingId ->
             val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)

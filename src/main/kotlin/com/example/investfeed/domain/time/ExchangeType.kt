@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.config
+package com.example.investfeed.domain.time
 
 enum class ExchangeType(
     val code: String,

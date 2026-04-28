@@ -23,7 +23,7 @@ class HoldingService(
     private val brokerRepository: BrokerRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
 ) {
-    fun holdingList(): HoldingListRes {
+    fun listHoldings(): HoldingListRes {
         val res = holdingClient.holdingList(
             req = KiwoomHoldingReq(
                 qry_tp = "1",
@@ -78,7 +78,7 @@ class HoldingService(
         )
     }
 
-    fun holdingStream(req: HoldingStreamReq) {
+    fun streamHoldings(req: HoldingStreamReq) {
         holdingSocketClient.holdingStream(
             req = KiwoomHoldingStreamReq(items = req.items)
         )

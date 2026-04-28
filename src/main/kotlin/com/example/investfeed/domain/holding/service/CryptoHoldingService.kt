@@ -30,7 +30,7 @@ class CryptoHoldingService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun cryptoHoldingList(): HoldingListRes {
+    fun listCryptoHoldings(): HoldingListRes {
         val loginId = getLoginId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
         val memberId = getMemberId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
 
@@ -145,12 +145,12 @@ class CryptoHoldingService(
         )
     }
 
-    fun cryptoHoldingStream(req: HoldingStreamReq) {
+    fun streamCryptoHoldings(req: HoldingStreamReq) {
         cryptoStreamClient.cryptoListStream(req.items)
     }
 
     @Transactional
-    fun reorderHoldings(req: HoldingReorderReq) {
+    fun reorderCryptoHoldings(req: HoldingReorderReq) {
         val memberId = getMemberId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
         req.orderedIds.forEachIndexed { index, holdingId ->
             val holding = memberHoldingRepository.findByMemberIdAndId(memberId, holdingId)

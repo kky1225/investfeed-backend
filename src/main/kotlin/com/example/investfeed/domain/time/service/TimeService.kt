@@ -1,11 +1,11 @@
-package com.example.investfeed.kiwoom.time.service
+package com.example.investfeed.domain.time.service
 
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.global.holiday.HolidayService
-import com.example.investfeed.kiwoom.config.ExchangeType
-import com.example.investfeed.kiwoom.config.MarketType
-import com.example.investfeed.kiwoom.time.dto.req.TimeNowReq
-import com.example.investfeed.kiwoom.time.dto.res.TimeNowRes
+import com.example.investfeed.domain.time.ExchangeType
+import com.example.investfeed.domain.time.MarketType
+import com.example.investfeed.domain.time.dto.req.TimeNowReq
+import com.example.investfeed.domain.time.dto.res.TimeNowRes
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDateTime
@@ -15,7 +15,7 @@ import java.time.ZoneId
 class TimeService(
     private val holidayService: HolidayService,
 ) {
-    fun timeNow(
+    fun getCurrentTime(
         req: TimeNowReq
     ): TimeNowRes {
         val now = System.currentTimeMillis()

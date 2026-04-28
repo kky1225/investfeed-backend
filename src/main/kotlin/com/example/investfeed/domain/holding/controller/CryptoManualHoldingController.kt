@@ -15,39 +15,39 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/crypto/holding/manual")
+@RequestMapping("/api/crypto/holdings/manual")
 class CryptoManualHoldingController(
     private val cryptoManualHoldingService: CryptoManualHoldingService
 ) {
 
-    @GetMapping("list/{brokerId}")
-    fun manualHoldingList(
+    @GetMapping("/{brokerId}")
+    fun listCryptoManualHoldings(
         @PathVariable brokerId: Long
     ): ResponseEntity<ApiResponse<ManualHoldingListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CRYPTO_MANUAL_HOLDING_LIST.code,
                 message = ResponseCode.CRYPTO_MANUAL_HOLDING_LIST.message,
-                result = cryptoManualHoldingService.manualHoldingList(brokerId)
+                result = cryptoManualHoldingService.listCryptoManualHoldings(brokerId)
             ), HttpStatus.OK
         )
     }
 
     @PostMapping
-    fun createManualHolding(
+    fun createCryptoManualHolding(
         @Valid @RequestBody req: ManualHoldingCreateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CRYPTO_MANUAL_HOLDING_CREATE.code,
                 message = ResponseCode.CRYPTO_MANUAL_HOLDING_CREATE.message,
-                result = cryptoManualHoldingService.createManualHolding(req)
+                result = cryptoManualHoldingService.createCryptoManualHolding(req)
             ), HttpStatus.OK
         )
     }
 
-    @PatchMapping("{holdingId}")
-    fun updateManualHolding(
+    @PatchMapping("/{holdingId}")
+    fun updateCryptoManualHolding(
         @PathVariable holdingId: Long,
         @Valid @RequestBody req: ManualHoldingUpdateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
@@ -55,16 +55,16 @@ class CryptoManualHoldingController(
             ApiResponse(
                 code = ResponseCode.CRYPTO_MANUAL_HOLDING_UPDATE.code,
                 message = ResponseCode.CRYPTO_MANUAL_HOLDING_UPDATE.message,
-                result = cryptoManualHoldingService.updateManualHolding(holdingId, req)
+                result = cryptoManualHoldingService.updateCryptoManualHolding(holdingId, req)
             ), HttpStatus.OK
         )
     }
 
-    @DeleteMapping("{holdingId}")
-    fun deleteManualHolding(
+    @DeleteMapping("/{holdingId}")
+    fun deleteCryptoManualHolding(
         @PathVariable holdingId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        cryptoManualHoldingService.deleteManualHolding(holdingId)
+        cryptoManualHoldingService.deleteCryptoManualHolding(holdingId)
 
         return ResponseEntity(
             ApiResponse(
@@ -75,7 +75,7 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PatchMapping("balance/{memberBrokerId}")
+    @PatchMapping("/balance/{memberBrokerId}")
     fun updateBalance(
         @PathVariable memberBrokerId: Long,
         @RequestBody req: MemberBrokerBalanceUpdateReq
@@ -89,11 +89,11 @@ class CryptoManualHoldingController(
         )
     }
 
-    @PatchMapping("reorder")
-    fun reorderHoldings(
+    @PatchMapping("/reorder")
+    fun reorderCryptoManualHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        cryptoManualHoldingService.reorderHoldings(req)
+        cryptoManualHoldingService.reorderCryptoManualHoldings(req)
 
         return ResponseEntity(
             ApiResponse(

@@ -144,7 +144,7 @@ class MonitoringService(
     }
 
     @Transactional
-    fun updateTimeout(schedulerName: String, req: UpdateSchedulerTimeoutReq, changedBy: Long): SchedulerStatusRes {
+    fun updateSchedulerTimeout(schedulerName: String, req: UpdateSchedulerTimeoutReq, changedBy: Long): SchedulerStatusRes {
         val status = schedulerStatusRepository.findById(schedulerName).orElseThrow {
             IllegalArgumentException("존재하지 않는 스케줄러: $schedulerName")
         }
@@ -174,7 +174,7 @@ class MonitoringService(
      * - 이미 확인됨: 사유만 교체, 이력에 EDIT_NOTE 기록
      */
     @Transactional
-    fun acknowledgeLog(logId: Long, req: AcknowledgeLogReq, changedBy: Long): SchedulerLogRes {
+    fun acknowledgeSchedulerLog(logId: Long, req: AcknowledgeLogReq, changedBy: Long): SchedulerLogRes {
         val logEntry = schedulerLogRepository.findById(logId).orElseThrow {
             IllegalArgumentException("존재하지 않는 로그: $logId")
         }
@@ -248,7 +248,7 @@ class MonitoringService(
 
     /** 스케줄러 로그 확인 취소. 모든 ack 필드 리셋 + 이력에 CANCEL 기록. */
     @Transactional
-    fun cancelAcknowledgeLog(logId: Long, changedBy: Long): SchedulerLogRes {
+    fun cancelAcknowledgeSchedulerLog(logId: Long, changedBy: Long): SchedulerLogRes {
         val logEntry = schedulerLogRepository.findById(logId).orElseThrow {
             IllegalArgumentException("존재하지 않는 로그: $logId")
         }
@@ -360,7 +360,7 @@ class MonitoringService(
         return RedisCacheRes(prefixes = result)
     }
 
-    fun invalidatePrefix(prefix: String): Long {
+    fun invalidateRedisCache(prefix: String): Long {
         val keys = scanKeys("$prefix*")
         if (keys.isEmpty()) return 0
         return redisTemplate.delete(keys)

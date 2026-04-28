@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/market-index")
+@RequestMapping("/api/market-indexes")
 class MarketIndexController(
     private val marketIndexService: MarketIndexService,
     private val cryptoService: CryptoService,
@@ -23,8 +23,8 @@ class MarketIndexController(
 ) {
 
     @GetMapping
-    fun getAll(): ResponseEntity<MarketIndexDashboardRes> {
-        val indices = marketIndexService.getAll()
+    fun listMarketIndexes(): ResponseEntity<MarketIndexDashboardRes> {
+        val indices = marketIndexService.listMarketIndexes()
         val fearGreed = cryptoService.fearGreedIndex()
 
         // BTC, ETH 를 한 번의 Upbit 호출로 동시 조회 (markets 파라미터 콤마 구분)
@@ -43,8 +43,8 @@ class MarketIndexController(
     }
 
     @GetMapping("/{type}")
-    fun getByType(@PathVariable type: MarketIndexType): ResponseEntity<MarketIndexRes> {
-        val result = marketIndexService.getByType(type)
+    fun getMarketIndex(@PathVariable type: MarketIndexType): ResponseEntity<MarketIndexRes> {
+        val result = marketIndexService.getMarketIndex(type)
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(result)
     }

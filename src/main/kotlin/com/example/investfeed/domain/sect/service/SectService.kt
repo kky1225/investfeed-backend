@@ -20,7 +20,7 @@ class SectService(
     private val sectClient: SectClient,
     private val realTimeClient: RealTimeClient
 ) {
-    fun sectList(
+    fun listSects(
         req: SectListReq
     ): SectListRes {
         val kiwoomSectIndexRes = sectClient.sectIndexList(
@@ -51,7 +51,7 @@ class SectService(
         )
     }
 
-    fun sectListStream(
+    fun streamSects(
         req: SectListStreamReq
     ) {
         realTimeClient.sectIndexListStream(
@@ -69,13 +69,14 @@ class SectService(
         )
     }
 
-    fun sectStockList(
+    fun listStocksBySect(
+        indsCd: String,
         req: SectStockListReq
     ): SectStockListRes {
         val kiwoomSectPriceRes = sectClient.sectPrice(
             req = KiwoomSectPriceReq(
                 mrkt_tp = req.mrktTp,
-                inds_cd = req.indsCd,
+                inds_cd = indsCd,
                 stex_tp = "3"
             )
         )

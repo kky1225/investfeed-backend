@@ -13,35 +13,35 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/stock/broker")
+@RequestMapping("/api/stock/brokers")
 class BrokerController(
     private val brokerService: BrokerService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun brokerList(): ResponseEntity<ApiResponse<BrokerListRes>> {
+    @GetMapping
+    fun listBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.BROKER_LIST.code,
                 message = ResponseCode.BROKER_LIST.message,
-                result = brokerService.brokerList()
+                result = brokerService.listBrokers()
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("my/list")
-    fun myBrokerList(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
+    @GetMapping("/my")
+    fun listMyBrokers(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.MY_BROKER_LIST.code,
                 message = ResponseCode.MY_BROKER_LIST.message,
-                result = brokerService.myBrokerList()
+                result = brokerService.listMyBrokers()
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("my")
+    @PostMapping("/my")
     fun addMyBroker(
         @RequestBody req: MyBrokerAddReq
     ): ResponseEntity<ApiResponse<MyBrokerItem>> {
@@ -54,7 +54,7 @@ class BrokerController(
         )
     }
 
-    @DeleteMapping("my/{memberBrokerId}")
+    @DeleteMapping("/my/{memberBrokerId}")
     fun removeMyBroker(
         @PathVariable memberBrokerId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

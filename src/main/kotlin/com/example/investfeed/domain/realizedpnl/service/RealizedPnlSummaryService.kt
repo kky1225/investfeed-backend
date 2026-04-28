@@ -40,7 +40,7 @@ class RealizedPnlSummaryService(
         }
 
         // API 데이터 (키움 API 직접 호출)
-        val apiPnlItems = stockRealizedPnlService.fetchApiPnl(RealizedPnlSyncReq(year = year)).items
+        val apiPnlItems = stockRealizedPnlService.syncStockRealizedPnls(RealizedPnlSyncReq(year = year)).items
 
         // 합산
         val allItems = manualPnlItems + apiPnlItems
@@ -77,7 +77,7 @@ class RealizedPnlSummaryService(
         val manualItems = memberRealizedPnlRepository.findByMemberId(memberId)
 
         // API 데이터 (키움 API 1번 호출로 전체 조회)
-        val apiAllItems = stockRealizedPnlService.fetchApiPnl(RealizedPnlSyncReq()).items
+        val apiAllItems = stockRealizedPnlService.syncStockRealizedPnls(RealizedPnlSyncReq()).items
 
         // 전체 합산
         val allItems = manualItems.map {

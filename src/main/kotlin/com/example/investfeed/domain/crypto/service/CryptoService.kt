@@ -22,16 +22,16 @@ class CryptoService(
     private val cryptoStreamClient: CryptoStreamClient,
     private val marketClient: MarketClient,
 ) {
-    fun cryptoListStream() {
+    fun streamCryptos() {
         val markets = CryptoType.entries.map { it.market }
         cryptoStreamClient.cryptoListStream(markets)
     }
 
-    fun cryptoDetailStream(market: String) {
+    fun streamCrypto(market: String) {
         cryptoStreamClient.cryptoListStream(listOf(market))
     }
 
-    fun cryptoList(): CryptoListRes {
+    fun listCryptos(): CryptoListRes {
         val cryptoTypes = CryptoType.entries
         val markets = cryptoTypes.joinToString(",") { it.market }
 
@@ -97,8 +97,8 @@ class CryptoService(
         return CryptoListRes(cryptoList = cryptoList, fearGreed = fearGreed)
     }
 
-    fun cryptoDetail(req: CryptoDetailReq): CryptoDetailRes {
-        val cryptoType = CryptoType.entries.find { it.market == req.market }
+    fun getCrypto(market: String, req: CryptoDetailReq): CryptoDetailRes {
+        val cryptoType = CryptoType.entries.find { it.market == market }
         val koreanName: String
         val englishName: String
 
@@ -106,13 +106,13 @@ class CryptoService(
             koreanName = cryptoType.koreanName
             englishName = cryptoType.englishName
         } else {
-            val marketInfo = marketClient.getKrwMarkets().find { it.market == req.market }
-                ?: throw IllegalArgumentException("Invalid market: ${req.market}")
+            val marketInfo = marketClient.getKrwMarkets().find { it.market == market }
+                ?: throw IllegalArgumentException("Invalid market: ${market}")
             koreanName = marketInfo.korean_name
             englishName = marketInfo.english_name
         }
 
-        val ticker = tickerClient.getTickers(req.market).firstOrNull()
+        val ticker = tickerClient.getTickers(market).firstOrNull()
 
         val chartList: List<CryptoChart> = when (req.chartType) {
             CryptoChartType.MINUTE_1,
@@ -129,14 +129,14 @@ class CryptoService(
                     CryptoChartType.MINUTE_30 -> 48   // 24시간
                     else -> 200
                 }
-                fetchMinuteCandles(unit, req.market, totalNeeded)
+                fetchMinuteCandles(unit, market, totalNeeded)
             }
 
             CryptoChartType.DAY -> {
                 val allCandles = mutableListOf<com.example.investfeed.upbit.candle.dto.res.UpbitCandleDayRes>()
                 var to: String? = null
                 repeat(5) {
-                    val batch = candleClient.getCandlesDays(market = req.market, count = 200, to = to)
+                    val batch = candleClient.getCandlesDays(market = market, count = 200, to = to)
                     if (batch.isEmpty()) return@repeat
                     allCandles.addAll(batch)
                     to = batch.last().candle_date_time_utc
@@ -158,7 +158,7 @@ class CryptoService(
                 val allCandles = mutableListOf<com.example.investfeed.upbit.candle.dto.res.UpbitCandleWeekMonthRes>()
                 var to: String? = null
                 repeat(3) {
-                    val batch = candleClient.getCandlesWeeks(market = req.market, count = 200, to = to)
+                    val batch = candleClient.getCandlesWeeks(market = market, count = 200, to = to)
                     if (batch.isEmpty()) return@repeat
                     allCandles.addAll(batch)
                     to = batch.last().candle_date_time_utc
@@ -177,9 +177,9 @@ class CryptoService(
             }
 
             CryptoChartType.MONTH -> {
-                val first = candleClient.getCandlesMonths(market = req.market, count = 200)
+                val first = candleClient.getCandlesMonths(market = market, count = 200)
                 val oldestTime = first.lastOrNull()?.candle_date_time_utc
-                val second = if (oldestTime != null) candleClient.getCandlesMonths(market = req.market, count = 200, to = oldestTime) else emptyList()
+                val second = if (oldestTime != null) candleClient.getCandlesMonths(market = market, count = 200, to = oldestTime) else emptyList()
                 (second + first).reversed().map {
                     CryptoChart(
                         dt = it.candle_date_time_kst,
@@ -194,7 +194,7 @@ class CryptoService(
             }
 
             CryptoChartType.YEAR -> {
-                candleClient.getCandlesYears(market = req.market, count = 200).reversed().map {
+                candleClient.getCandlesYears(market = market, count = 200).reversed().map {
                     CryptoChart(
                         dt = it.candle_date_time_kst,
                         tradePrice = it.trade_price,
@@ -209,7 +209,7 @@ class CryptoService(
         }
 
         val cryptoInfo = CryptoDetailInfo(
-            market = req.market,
+            market = market,
             koreanName = koreanName,
             englishName = englishName,
             tradePrice = ticker?.trade_price,
@@ -255,7 +255,7 @@ class CryptoService(
         )
     }
 
-    fun cryptoSearch(keyword: String): List<CryptoSearchItem> {
+    fun searchCryptos(keyword: String): List<CryptoSearchItem> {
         val lower = keyword.lowercase()
         return marketClient.getKrwMarkets()
             .filter {
@@ -308,7 +308,7 @@ class CryptoService(
         return allCandles.reversed()
     }
 
-    fun cryptoRankList(): List<CryptoRankItem> {
+    fun listCryptoRanks(): List<CryptoRankItem> {
         val krwMarkets = marketClient.getKrwMarkets()
         val marketCodes = krwMarkets.joinToString(",") { it.market }
 
@@ -335,7 +335,7 @@ class CryptoService(
         }.sortedByDescending { it.accTradePrice24h }
     }
 
-    fun cryptoRankStream() {
+    fun streamCryptoRanks() {
         val krwMarkets = marketClient.getKrwMarkets()
         val markets = krwMarkets.map { it.market }
         cryptoStreamClient.cryptoListStream(markets)

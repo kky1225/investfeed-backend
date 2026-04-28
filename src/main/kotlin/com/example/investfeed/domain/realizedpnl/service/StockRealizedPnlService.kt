@@ -23,7 +23,7 @@ class StockRealizedPnlService(
 ) {
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
-    fun fetchApiPnl(req: RealizedPnlSyncReq): RealizedPnlListRes {
+    fun syncStockRealizedPnls(req: RealizedPnlSyncReq): RealizedPnlListRes {
         val apiBrokers = memberBrokerRepository.findByMemberIdAndBrokerMarketOrderByOrderIndex(getMemberId(), MarketType.STOCK)
             .filter { it.broker.type == BrokerType.API }
 

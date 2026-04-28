@@ -12,38 +12,38 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/rebalancing")
+@RequestMapping("/api/rebalancing")
 class RebalancingController(
     private val rebalancingService: RebalancingService
 ) {
 
-    @PostMapping("setting")
-    fun saveSetting(
+    @PostMapping
+    fun saveRebalancing(
         @Valid @RequestBody req: RebalancingSettingReq
     ): ResponseEntity<ApiResponse<RebalancingSettingRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REBALANCING_SETTING_SAVE.code,
                 message = ResponseCode.REBALANCING_SETTING_SAVE.message,
-                result = rebalancingService.saveSetting(req)
+                result = rebalancingService.saveRebalancing(req)
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("status")
-    fun status(): ResponseEntity<ApiResponse<RebalancingStatusRes?>> {
+    @GetMapping
+    fun getRebalancing(): ResponseEntity<ApiResponse<RebalancingStatusRes?>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REBALANCING_STATUS.code,
                 message = ResponseCode.REBALANCING_STATUS.message,
-                result = rebalancingService.getStatus()
+                result = rebalancingService.getRebalancing()
             ), HttpStatus.OK
         )
     }
 
-    @DeleteMapping("setting")
-    fun deleteSetting(): ResponseEntity<ApiResponse<Nothing?>> {
-        rebalancingService.deleteSetting()
+    @DeleteMapping
+    fun deleteRebalancing(): ResponseEntity<ApiResponse<Nothing?>> {
+        rebalancingService.deleteRebalancing()
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.REBALANCING_SETTING_DELETE.code,

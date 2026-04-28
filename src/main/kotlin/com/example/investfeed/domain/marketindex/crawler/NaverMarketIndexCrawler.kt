@@ -55,9 +55,8 @@ class NaverMarketIndexCrawler(
             MarketIndexType.KOSDAQ to "/api/index/KOSDAQ/basic",
         )
 
-        private const val HOME_MAJORS_PATH = "/api/home/majors"
-        private val HOME_MAJORS_CODE_MAP = mapOf(
-            "FX_USDKRW" to MarketIndexType.USD_KRW,
+        private val EXCHANGE_PATHS = mapOf(
+            MarketIndexType.USD_KRW to "/marketindex/exchange/FX_USDKRW",
         )
 
         private val POLLING_PATHS = mapOf(
@@ -88,13 +87,13 @@ class NaverMarketIndexCrawler(
         result.addAll(jsonResults)
 
         try {
-            result.addAll(fetchFromHomeMajorsApi(now))
+            result.addAll(fetchFromExchangeDetail(now))
         } catch (e: MarketIndexApiException) {
-            log.error { "fetchFromHomeMajorsApi Error (API): ${e.message}" }
+            log.error { "fetchFromExchangeDetail Error (API): ${e.message}" }
         } catch (e: MarketIndexResponseException) {
-            log.error { "fetchFromHomeMajorsApi Error (Response): ${e.message}" }
+            log.error { "fetchFromExchangeDetail Error (Response): ${e.message}" }
         } catch (e: Exception) {
-            log.error { "fetchFromHomeMajorsApi Error: ${e.message}" }
+            log.error { "fetchFromExchangeDetail Error: ${e.message}" }
         }
 
         try {
@@ -123,66 +122,72 @@ class NaverMarketIndexCrawler(
             }
     }
 
-    private fun fetchFromHomeMajorsApi(now: LocalDateTime): List<MarketIndexRes> {
-        try {
-            val body = webClient.get()
-                .uri("$naverMobileUrl$HOME_MAJORS_PATH")
+    private fun fetchFromExchangeDetail(now: LocalDateTime): List<MarketIndexRes> {
+        val monos = EXCHANGE_PATHS.map { (type, path) ->
+            val url = "$naverApiUrl$path"
+            webClient.get()
+                .uri(url)
                 .retrieve()
                 .onStatus({ it.isError }, { Mono.error(MarketIndexApiException()) })
                 .bodyToMono<String>()
-                .block() ?: throw MarketIndexResponseException()
-
-            val root = objectMapper.readTree(body)
-            val items = root.get("marketIndexInfos") ?: throw MarketIndexResponseException()
-
-            return items.mapNotNull { item ->
-                val code = item.get("reutersCode")?.asText() ?: return@mapNotNull null
-                val type = HOME_MAJORS_CODE_MAP[code] ?: return@mapNotNull null
-
-                val price = item.textOrNull("closePrice") ?: ""
-                val changeAmount = item.textOrNull("compareToPreviousClosePrice") ?: ""
-                val fluctuationsRatio = item.textOrNull("fluctuationsRatio") ?: ""
-
-                val direction = item.path("compareToPreviousPrice").textOrNull("name") ?: ""
-                val sign = when (direction) {
-                    "RISING" -> "+"
-                    "FALLING" -> "-"
-                    else -> ""
+                .map { body -> parseExchangeDetail(type, body, now) }
+                .onErrorResume { e ->
+                    log.error { "[${type.displayName}] exchange detail fetch Error: ${e.message}" }
+                    Mono.empty()
                 }
-
-                val changeAmountWithSign = if (changeAmount.isNotBlank() && !changeAmount.startsWith("+") && !changeAmount.startsWith("-")) {
-                    "$sign$changeAmount"
-                } else {
-                    changeAmount
-                }
-
-                val changeRateWithSign = if (fluctuationsRatio.isNotBlank() && !fluctuationsRatio.startsWith("+") && !fluctuationsRatio.startsWith("-")) {
-                    "$sign${fluctuationsRatio}%"
-                } else if (fluctuationsRatio.isNotBlank()) {
-                    "${fluctuationsRatio}%"
-                } else {
-                    ""
-                }
-
-                MarketIndexRes(
-                    type = type.name,
-                    name = type.displayName,
-                    price = price,
-                    changeAmount = changeAmountWithSign,
-                    changeRate = changeRateWithSign,
-                    delayStatus = "실시간",
-                    updatedAt = now,
-                )
-            }
-        } catch (e: MarketIndexApiException) {
-            throw e
-        } catch (e: MarketIndexResponseException) {
-            throw e
-        } catch (e: Exception) {
-            log.error { "fetchFromHomeMajorsApi Error: ${e.message}" }
-
-            throw RuntimeException(e.message)
         }
+
+        return Mono.zip(monos) { results ->
+            results.filterIsInstance<MarketIndexRes>()
+        }.block() ?: emptyList()
+    }
+
+    private fun parseExchangeDetail(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
+        val root = objectMapper.readTree(body)
+        val data = root.get("exchangeInfo") ?: throw MarketIndexResponseException()
+
+        val price = data.textOrNull("closePrice") ?: ""
+        val changeAmount = data.textOrNull("fluctuations") ?: ""
+        val fluctuationsRatio = data.textOrNull("fluctuationsRatio") ?: ""
+
+        val direction = data.path("fluctuationsType").textOrNull("name") ?: ""
+        val sign = when (direction) {
+            "RISING" -> "+"
+            "FALLING" -> "-"
+            else -> ""
+        }
+
+        val changeAmountWithSign = if (changeAmount.isNotBlank() && !changeAmount.startsWith("+") && !changeAmount.startsWith("-")) {
+            "$sign$changeAmount"
+        } else {
+            changeAmount
+        }
+
+        val changeRateWithSign = if (fluctuationsRatio.isNotBlank() && !fluctuationsRatio.startsWith("+") && !fluctuationsRatio.startsWith("-")) {
+            "$sign${fluctuationsRatio}%"
+        } else if (fluctuationsRatio.isNotBlank()) {
+            "${fluctuationsRatio}%"
+        } else {
+            ""
+        }
+
+        val marketStatus = data.textOrNull("marketStatus") ?: ""
+        val delayTime = data.path("stockExchangeType").get("delayTime")?.asInt() ?: 0
+        val delayStatus = when {
+            marketStatus == "CLOSE" -> "장마감"
+            delayTime > 0 -> "${delayTime}분 지연"
+            else -> "실시간"
+        }
+
+        return MarketIndexRes(
+            type = type.name,
+            name = type.displayName,
+            price = price,
+            changeAmount = changeAmountWithSign,
+            changeRate = changeRateWithSign,
+            delayStatus = delayStatus,
+            updatedAt = now,
+        )
     }
 
     private fun fetchFromPollingApi(now: LocalDateTime): List<MarketIndexRes> {

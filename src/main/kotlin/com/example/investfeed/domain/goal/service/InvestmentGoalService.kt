@@ -32,7 +32,7 @@ class InvestmentGoalService(
 ) {
 
     @Transactional
-    fun create(req: InvestmentGoalCreateReq): InvestmentGoalRes {
+    fun createGoal(req: InvestmentGoalCreateReq): InvestmentGoalRes {
         val memberId = getMemberId()
 
         val existing = investmentGoalRepository.findByMemberIdAndType(memberId, req.type)
@@ -52,7 +52,7 @@ class InvestmentGoalService(
     }
 
     @Transactional
-    fun update(id: Long, req: InvestmentGoalUpdateReq): InvestmentGoalRes {
+    fun updateGoal(id: Long, req: InvestmentGoalUpdateReq): InvestmentGoalRes {
         val memberId = getMemberId()
         val goal = investmentGoalRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("목표를 찾을 수 없습니다.")
@@ -70,7 +70,7 @@ class InvestmentGoalService(
     }
 
     @Transactional
-    fun delete(id: Long) {
+    fun deleteGoal(id: Long) {
         val memberId = getMemberId()
         val goal = investmentGoalRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("목표를 찾을 수 없습니다.")
@@ -78,7 +78,7 @@ class InvestmentGoalService(
         investmentGoalRepository.delete(goal)
     }
 
-    fun getGoals(): GoalDashboardRes {
+    fun listGoals(): GoalDashboardRes {
         val memberId = getMemberId()
         val goals = investmentGoalRepository.findByMemberIdOrderByIdAsc(memberId)
 
@@ -89,19 +89,19 @@ class InvestmentGoalService(
         )
     }
 
-    fun getDashboardGoals(): GoalDashboardRes {
-        return getGoals()
+    fun getGoalsDashboard(): GoalDashboardRes {
+        return listGoals()
     }
 
     fun calculateCurrentAmount(memberId: Long, type: GoalType): Long {
         return when (type) {
             GoalType.TOTAL_ASSET -> {
-                val dashboard = assetDashboardService.dashboard()
+                val dashboard = assetDashboardService.getAssetDashboard()
                 dashboard.totalAsset
             }
             GoalType.MONTHLY_REALIZED_PNL -> {
                 val now = LocalDate.now()
-                val apiPnl = stockRealizedPnlService.fetchApiPnl(
+                val apiPnl = stockRealizedPnlService.syncStockRealizedPnls(
                     RealizedPnlSyncReq(year = now.year, month = now.monthValue)
                 ).totalRealizedPnl
                 val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)
@@ -111,7 +111,7 @@ class InvestmentGoalService(
             }
             GoalType.YEARLY_REALIZED_PNL -> {
                 val now = LocalDate.now()
-                val apiPnl = stockRealizedPnlService.fetchApiPnl(
+                val apiPnl = stockRealizedPnlService.syncStockRealizedPnls(
                     RealizedPnlSyncReq(year = now.year)
                 ).totalRealizedPnl
                 val manualPnl = memberRealizedPnlRepository.findByMemberId(memberId)

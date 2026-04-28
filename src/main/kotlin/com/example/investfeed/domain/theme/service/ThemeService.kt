@@ -20,7 +20,7 @@ class ThemeService(
     private val themeClient: ThemeClient,
     private val stockSocketClient: StockSocketClient
 ) {
-    fun themeList(
+    fun listThemes(
         req: ThemeListReq
     ): ThemeListRes {
         val KiwoomThemeGroupRes = themeClient.themeGroupList(
@@ -55,13 +55,14 @@ class ThemeService(
         )
     }
 
-    fun themeStockList(
+    fun listStocksByTheme(
+        themaGrpCd: String,
         req: ThemeStockListReq
     ): ThemeStockListRes {
         val KiwoomThemeGroupStockRes = themeClient.themeGroupStockList(
             req = KiwoomThemeGroupStockReq(
                 date_tp = req.dateTp,
-                thema_grp_cd = req.themaGrpCd,
+                thema_grp_cd = themaGrpCd,
                 stex_tp = "3"
             )
         )
@@ -89,7 +90,7 @@ class ThemeService(
         )
     }
 
-    fun themeStockStream(
+    fun streamThemeStocks(
         req: ThemeStockListStreamReq
     ) {
         stockSocketClient.stockListStream(

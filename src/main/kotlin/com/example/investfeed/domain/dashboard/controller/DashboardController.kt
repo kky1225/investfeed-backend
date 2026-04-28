@@ -18,15 +18,15 @@ class DashboardController(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("dashboard")
-    fun dashboard(): ResponseEntity<ApiResponse<DashboardRes?>> {
+    @GetMapping("/dashboard")
+    fun getStockDashboard(): ResponseEntity<ApiResponse<DashboardRes?>> {
         log.info { "dashboard" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.DASHBOARD.code,
                 message = ResponseCode.DASHBOARD.message,
-                dashboardService.dashboard()
+                dashboardService.getStockDashboard()
             ), HttpStatus.OK
         )
     }

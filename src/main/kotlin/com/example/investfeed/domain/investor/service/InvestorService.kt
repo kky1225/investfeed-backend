@@ -70,7 +70,7 @@ class InvestorService(
         return if (duration.isNegative || duration.isZero) Duration.ofMinutes(1) else duration
     }
 
-    fun investorList(
+    fun listInvestors(
         req: InvestorListReq
     ): InvestorListRes? {
         val now = LocalTime.now()
@@ -285,7 +285,7 @@ class InvestorService(
 
     // ─── 소켓 스트리밍 ────────────────────────────────────────────────────────
 
-    fun investorStream(
+    fun streamInvestors(
         req: InvestorStreamReq
     ) {
         stockSocketClient.stockListStream(

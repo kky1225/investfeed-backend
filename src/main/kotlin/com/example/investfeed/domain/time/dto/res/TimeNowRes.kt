@@ -1,4 +1,4 @@
-package com.example.investfeed.kiwoom.time.dto.res
+package com.example.investfeed.domain.time.dto.res
 
 data class TimeNowRes(
     var time: Long,

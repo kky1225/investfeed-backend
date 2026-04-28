@@ -186,7 +186,7 @@ class RecommendService(
         log.info { "매수 추천 종목 ${recommendResult.size}건, 매도 추천 종목 ${avoidResult.size}건 저장 완료" }
     }
 
-    fun recommendList(): RecommendListRes {
+    fun listRecommendations(): RecommendListRes {
         val allPicks = stockPickRepository.findAll()
 
         val recommendList = allPicks.filter { it.type == "RECOMMEND" }.map { entity ->
@@ -216,7 +216,7 @@ class RecommendService(
         return RecommendListRes(recommendList = recommendList, avoidList = avoidList)
     }
 
-    fun recommendListStream(
+    fun streamRecommendations(
         req: RecommendListStreamReq
     ) {
         stockSocketClient.stockListStream(

@@ -1,7 +1,6 @@
 package com.example.investfeed.domain.crypto.dto.req
 
 data class CryptoDetailReq(
-    val market: String,
     val chartType: CryptoChartType = CryptoChartType.DAY,
 )
 

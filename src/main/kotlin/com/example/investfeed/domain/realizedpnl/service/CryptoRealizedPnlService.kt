@@ -23,7 +23,7 @@ class CryptoRealizedPnlService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun list(year: Int?, month: Int?): RealizedPnlListRes {
+    fun listCryptoRealizedPnls(year: Int?, month: Int?): RealizedPnlListRes {
         val memberId = getMemberId()
 
         val items = when {
@@ -43,7 +43,7 @@ class CryptoRealizedPnlService(
     }
 
     @Transactional
-    fun create(req: ManualRealizedPnlCreateReq): RealizedPnlItem {
+    fun createManualCryptoPnl(req: ManualRealizedPnlCreateReq): RealizedPnlItem {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
             ?: throw IllegalArgumentException("거래소를 찾을 수 없습니다.")
@@ -75,7 +75,7 @@ class CryptoRealizedPnlService(
     }
 
     @Transactional
-    fun update(id: Long, req: ManualRealizedPnlUpdateReq): RealizedPnlItem {
+    fun updateManualCryptoPnl(id: Long, req: ManualRealizedPnlUpdateReq): RealizedPnlItem {
         val memberId = getMemberId()
         val pnl = memberRealizedPnlRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("실현손익 데이터를 찾을 수 없습니다.")
@@ -91,7 +91,7 @@ class CryptoRealizedPnlService(
     }
 
     @Transactional
-    fun delete(id: Long) {
+    fun deleteManualCryptoPnl(id: Long) {
         val memberId = getMemberId()
         val pnl = memberRealizedPnlRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("실현손익 데이터를 찾을 수 없습니다.")

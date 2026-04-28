@@ -11,32 +11,32 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/stock/holding")
+@RequestMapping("/api/stock/holdings")
 class HoldingController(
     private val holdingService: HoldingService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun holdingList(): ResponseEntity<ApiResponse<HoldingListRes>> {
-        log.info { "holdingList" }
+    @GetMapping
+    fun listHoldings(): ResponseEntity<ApiResponse<HoldingListRes>> {
+        log.info { "listHoldings" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.HOLDING_LIST.code,
                 message = ResponseCode.HOLDING_LIST.message,
-                result = holdingService.holdingList()
+                result = holdingService.listHoldings()
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("stream")
-    fun holdingStream(
+    @PostMapping("/stream")
+    fun streamHoldings(
         @RequestBody req: HoldingStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "holdingStream $req" }
+        log.info { "streamHoldings $req" }
 
-        holdingService.holdingStream(req)
+        holdingService.streamHoldings(req)
 
         return ResponseEntity(
             ApiResponse(

@@ -14,19 +14,19 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/admin/broker")
+@RequestMapping("/api/admin/brokers")
 class AdminBrokerController(
     private val adminBrokerService: AdminBrokerService
 ) {
 
-    @GetMapping("list")
+    @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    fun brokerList(): ResponseEntity<ApiResponse<BrokerListRes>> {
+    fun listBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.BROKER_LIST.code,
                 message = ResponseCode.BROKER_LIST.message,
-                result = adminBrokerService.brokerList()
+                result = adminBrokerService.listBrokers()
             ), HttpStatus.OK
         )
     }
@@ -45,7 +45,7 @@ class AdminBrokerController(
         )
     }
 
-    @PutMapping("{brokerId}")
+    @PutMapping("/{brokerId}")
     @PreAuthorize("hasRole('ADMIN')")
     fun updateBroker(
         @PathVariable brokerId: Long,
@@ -60,7 +60,7 @@ class AdminBrokerController(
         )
     }
 
-    @DeleteMapping("{brokerId}")
+    @DeleteMapping("/{brokerId}")
     @PreAuthorize("hasRole('ADMIN')")
     fun deleteBroker(
         @PathVariable brokerId: Long

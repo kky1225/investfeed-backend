@@ -12,54 +12,56 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/stock/theme")
+@RequestMapping("/api/stock/themes")
 class ThemeController(
     private val themeService: ThemeService,
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun themeList(
+    @GetMapping
+    fun listThemes(
         req: ThemeListReq
     ): ResponseEntity<ApiResponse<ThemeListRes?>> {
-        log.info { "themeList : $req" }
+        log.info { "listThemes : $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.THEME_LIST.code,
                 message = ResponseCode.THEME_LIST.message,
-                result = themeService.themeList(req = req)
+                result = themeService.listThemes(req = req)
             ), HttpStatus.OK
         )
     }
 
-    @GetMapping("stock/list")
-    fun themeStockList(
+    @GetMapping("/{themaGrpCd}/stocks")
+    fun listStocksByTheme(
+        @PathVariable themaGrpCd: String,
         req: ThemeStockListReq
     ): ResponseEntity<ApiResponse<ThemeStockListRes?>> {
-        log.info { "themeStockList : $req" }
+        log.info { "listStocksByTheme : themaGrpCd=$themaGrpCd, $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.THEME_STOCK_LIST.code,
                 message = ResponseCode.THEME_STOCK_LIST.message,
-                result = themeService.themeStockList(req = req)
+                result = themeService.listStocksByTheme(themaGrpCd = themaGrpCd, req = req)
             ), HttpStatus.OK
         )
     }
 
-    @PostMapping("stock/list/stream")
-    fun themeStockStream(
+    @PostMapping("/stocks/stream")
+    fun streamThemeStocks(
         req: ThemeStockListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "themeStockList : $req" }
+        log.info { "streamThemeStocks : $req" }
 
-        themeService.themeStockStream(req = req)
+        themeService.streamThemeStocks(req = req)
 
         return ResponseEntity(
             ApiResponse(

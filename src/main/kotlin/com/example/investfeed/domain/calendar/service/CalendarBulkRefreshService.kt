@@ -95,7 +95,7 @@ class CalendarBulkRefreshService(
                     }
 
                     try {
-                        economicCalendarService.refreshMonth(year, month)
+                        economicCalendarService.refreshEvents(year, month)
                         processed++
                     } catch (e: Exception) {
                         log.warn { "[bulk-refresh] $year-$month 재생성 실패: ${e.message}" }

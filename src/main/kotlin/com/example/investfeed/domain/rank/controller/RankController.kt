@@ -13,23 +13,23 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("api/stock/rank")
+@RequestMapping("/api/stock/ranks")
 class RankController(
     private val rankService: RankService
 ) {
     private val log = KotlinLogging.logger {}
 
-    @GetMapping("list")
-    fun rankList(
+    @GetMapping
+    fun listRanks(
         req: RankListReq
     ): ResponseEntity<ApiResponse<RankListRes>> {
-        log.info { "rankList : $req" }
+        log.info { "listRanks : $req" }
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.RANK_LIST.code,
                 message = ResponseCode.RANK_LIST.message,
-                result = rankService.rankList(req)
+                result = rankService.listRanks(req)
             ), HttpStatus.OK
         )
     }

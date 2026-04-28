@@ -27,7 +27,7 @@ class DashboardService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun dashboard(): DashboardRes? {
+    fun getStockDashboard(): DashboardRes? {
         log.debug { "dashboard" }
 
         val indexTypeList = DashboardIndexType.entries

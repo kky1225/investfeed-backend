@@ -24,7 +24,7 @@ class ManualRealizedPnlService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun list(year: Int?, month: Int?): RealizedPnlListRes {
+    fun listStockRealizedPnls(year: Int?, month: Int?): RealizedPnlListRes {
         val memberId = getMemberId()
 
         val items = when {
@@ -47,7 +47,7 @@ class ManualRealizedPnlService(
     }
 
     @Transactional
-    fun create(req: ManualRealizedPnlCreateReq): RealizedPnlItem {
+    fun createManualStockPnl(req: ManualRealizedPnlCreateReq): RealizedPnlItem {
         val memberId = getMemberId()
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
             ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
@@ -83,7 +83,7 @@ class ManualRealizedPnlService(
     }
 
     @Transactional
-    fun update(id: Long, req: ManualRealizedPnlUpdateReq): RealizedPnlItem {
+    fun updateManualStockPnl(id: Long, req: ManualRealizedPnlUpdateReq): RealizedPnlItem {
         val memberId = getMemberId()
         val pnl = memberRealizedPnlRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("실현손익 데이터를 찾을 수 없습니다.")
@@ -99,7 +99,7 @@ class ManualRealizedPnlService(
     }
 
     @Transactional
-    fun delete(id: Long) {
+    fun deleteManualStockPnl(id: Long) {
         val memberId = getMemberId()
         val pnl = memberRealizedPnlRepository.findByMemberIdAndId(memberId, id)
             ?: throw IllegalArgumentException("실현손익 데이터를 찾을 수 없습니다.")

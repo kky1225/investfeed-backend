@@ -13,24 +13,24 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("api/calendar")
+@RequestMapping("/api/calendar")
 class EconomicCalendarController(
     private val economicCalendarService: EconomicCalendarService,
 ) {
 
     @GetMapping("indicators")
-    fun indicators(): ResponseEntity<ApiResponse<EconomicIndicatorsRes>> {
+    fun listIndicators(): ResponseEntity<ApiResponse<EconomicIndicatorsRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.ECONOMIC_INDICATORS.code,
                 message = ResponseCode.ECONOMIC_INDICATORS.message,
-                result = economicCalendarService.getIndicators()
+                result = economicCalendarService.listIndicators()
             ), HttpStatus.OK
         )
     }
 
     @GetMapping("history")
-    fun history(
+    fun getIndicatorHistory(
         @Valid @ModelAttribute req: IndicatorHistoryReq
     ): ResponseEntity<ApiResponse<IndicatorHistoryRes?>> {
         return ResponseEntity(
@@ -43,14 +43,14 @@ class EconomicCalendarController(
     }
 
     @GetMapping("events")
-    fun events(
+    fun listEvents(
         @ModelAttribute req: CalendarEventsReq
     ): ResponseEntity<ApiResponse<CalendarEventsRes>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CALENDAR_EVENT_LIST.code,
                 message = ResponseCode.CALENDAR_EVENT_LIST.message,
-                result = economicCalendarService.getCalendarEvents(req.year, req.month)
+                result = economicCalendarService.listEvents(req.year, req.month)
             ), HttpStatus.OK
         )
     }
@@ -63,7 +63,7 @@ class EconomicCalendarController(
             ApiResponse(
                 code = ResponseCode.CALENDAR_EVENT_LIST.code,
                 message = ResponseCode.CALENDAR_EVENT_LIST.message,
-                result = economicCalendarService.getManualEvents(req.year)
+                result = economicCalendarService.listManualEvents(req.year)
             ), HttpStatus.OK
         )
     }
@@ -76,7 +76,7 @@ class EconomicCalendarController(
             ApiResponse(
                 code = ResponseCode.CALENDAR_EVENT_CREATE.code,
                 message = ResponseCode.CALENDAR_EVENT_CREATE.message,
-                result = economicCalendarService.createManualEvent(req)
+                result = economicCalendarService.createEvent(req)
             ), HttpStatus.OK
         )
     }
@@ -90,7 +90,7 @@ class EconomicCalendarController(
             ApiResponse(
                 code = ResponseCode.CALENDAR_EVENT_UPDATE.code,
                 message = ResponseCode.CALENDAR_EVENT_UPDATE.message,
-                result = economicCalendarService.updateManualEvent(id, req)
+                result = economicCalendarService.updateEvent(id, req)
             ), HttpStatus.OK
         )
     }
@@ -99,7 +99,7 @@ class EconomicCalendarController(
     fun deleteEvent(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        economicCalendarService.deleteManualEvent(id)
+        economicCalendarService.deleteEvent(id)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CALENDAR_EVENT_DELETE.code,
@@ -113,7 +113,7 @@ class EconomicCalendarController(
     fun refreshEvents(
         @RequestBody req: CalendarEventsReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        economicCalendarService.refreshMonth(req.year, req.month)
+        economicCalendarService.refreshEvents(req.year, req.month)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.CALENDAR_REFRESH.code,
