@@ -2,6 +2,9 @@ package com.example.investfeed.domain.time.controller
 
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.time.dto.req.TimeNowReq
 import com.example.investfeed.domain.time.dto.res.TimeNowRes
 import com.example.investfeed.domain.time.service.TimeService
@@ -12,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
+@RequiresAction(permission = Permissions.TIME, action = Actions.READ)
 @RestController
 @RequestMapping("/api/time")
 class TimeController(

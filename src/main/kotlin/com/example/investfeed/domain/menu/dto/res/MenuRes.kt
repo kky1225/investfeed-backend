@@ -6,14 +6,11 @@ data class MenuRes(
     val url: String?,
     val icon: String?,
     val parentId: Long?,
+    val requiredPermissionId: Long?,
+    val requiredPermissionCode: String?,
+    val requiredPermissionName: String?,
     val orderIndex: Int,
     val visible: Boolean,
-    val permissions: List<MenuPermissionRes>,
     val requiredBrokerIds: List<Long>,
     val children: List<MenuRes>
-)
-
-data class MenuPermissionRes(
-    val role: String,
-    val readable: Boolean
 )

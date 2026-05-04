@@ -13,7 +13,11 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.CRYPTO_HOLDINGS)
 @RestController
 @RequestMapping("/api/crypto/holdings/manual")
 class CryptoManualHoldingController(
@@ -21,6 +25,7 @@ class CryptoManualHoldingController(
 ) {
 
     @GetMapping("/{brokerId}")
+    @RequiresAction(action = Actions.READ)
     fun listCryptoManualHoldings(
         @PathVariable brokerId: Long
     ): ResponseEntity<ApiResponse<ManualHoldingListRes>> {
@@ -34,6 +39,7 @@ class CryptoManualHoldingController(
     }
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun createCryptoManualHolding(
         @Valid @RequestBody req: ManualHoldingCreateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
@@ -47,6 +53,7 @@ class CryptoManualHoldingController(
     }
 
     @PatchMapping("/{holdingId}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateCryptoManualHolding(
         @PathVariable holdingId: Long,
         @Valid @RequestBody req: ManualHoldingUpdateReq
@@ -61,6 +68,7 @@ class CryptoManualHoldingController(
     }
 
     @DeleteMapping("/{holdingId}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteCryptoManualHolding(
         @PathVariable holdingId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -76,6 +84,7 @@ class CryptoManualHoldingController(
     }
 
     @PatchMapping("/balance/{memberBrokerId}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateBalance(
         @PathVariable memberBrokerId: Long,
         @RequestBody req: MemberBrokerBalanceUpdateReq
@@ -90,6 +99,7 @@ class CryptoManualHoldingController(
     }
 
     @PatchMapping("/reorder")
+    @RequiresAction(action = Actions.UPDATE)
     fun reorderCryptoManualHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

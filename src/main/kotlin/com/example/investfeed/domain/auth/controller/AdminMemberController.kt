@@ -10,18 +10,21 @@ import jakarta.validation.Valid
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.ADMIN_MEMBER)
 @RestController
 @RequestMapping("/api/admin/members")
-@PreAuthorize("hasRole('ADMIN')")
 class AdminMemberController(
     private val authService: AuthService
 ) {
     private val log = KotlinLogging.logger {}
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun createMember(@Valid @RequestBody req: CreateMemberReq): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "create member: ${req.loginId}" }
 
@@ -37,6 +40,7 @@ class AdminMemberController(
     }
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun getMembers(): ResponseEntity<ApiResponse<List<MemberRes>>> {
         val members = authService.getMembers()
 
@@ -50,6 +54,7 @@ class AdminMemberController(
     }
 
     @PatchMapping("/{loginId}/role")
+    @RequiresAction(action = Actions.UPDATE)
     fun changeRole(
         @PathVariable loginId: String,
         @RequestBody req: ChangeRoleReq
@@ -68,6 +73,7 @@ class AdminMemberController(
     }
 
     @PatchMapping("/{loginId}/totp-reset")
+    @RequiresAction(action = Actions.UPDATE)
     fun resetTotp(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -85,6 +91,7 @@ class AdminMemberController(
     }
 
     @PatchMapping("/{loginId}/lock")
+    @RequiresAction(action = Actions.UPDATE)
     fun lockAccount(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -102,6 +109,7 @@ class AdminMemberController(
     }
 
     @PatchMapping("/{loginId}/api-key-unlock")
+    @RequiresAction(action = Actions.UPDATE)
     fun unlockApiKeyRegistration(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -119,6 +127,7 @@ class AdminMemberController(
     }
 
     @PatchMapping("/{loginId}/unlock")
+    @RequiresAction(action = Actions.UPDATE)
     fun unlockAccount(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {

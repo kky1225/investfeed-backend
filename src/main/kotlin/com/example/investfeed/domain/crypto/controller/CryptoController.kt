@@ -3,6 +3,7 @@ package com.example.investfeed.domain.crypto.controller
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.crypto.dto.req.CryptoDetailReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoSearchReq
+import com.example.investfeed.domain.crypto.dto.req.CryptoStreamReq
 import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoListRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoRankItem
@@ -13,7 +14,11 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.CRYPTO_PUBLIC)
 @RestController
 @RequestMapping("/api/cryptos")
 class CryptoController(
@@ -22,6 +27,7 @@ class CryptoController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listCryptos(): ResponseEntity<ApiResponse<CryptoListRes>> {
         log.info { "listCryptos" }
 
@@ -34,11 +40,14 @@ class CryptoController(
         )
     }
 
-    @GetMapping("/stream")
-    fun streamCryptos(): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamCryptos" }
+    @PostMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
+    fun streamCryptos(
+        @RequestBody req: CryptoStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "streamCryptos: $req" }
 
-        cryptoService.streamCryptos()
+        cryptoService.streamCryptos(req.items)
 
         return ResponseEntity(
             ApiResponse(
@@ -50,6 +59,7 @@ class CryptoController(
     }
 
     @GetMapping("/ranks")
+    @RequiresAction(action = Actions.READ)
     fun listCryptoRanks(): ResponseEntity<ApiResponse<List<CryptoRankItem>>> {
         log.info { "listCryptoRanks" }
 
@@ -63,6 +73,7 @@ class CryptoController(
     }
 
     @GetMapping("/ranks/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamCryptoRanks(): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "streamCryptoRanks" }
 
@@ -78,6 +89,7 @@ class CryptoController(
     }
 
     @GetMapping("/search")
+    @RequiresAction(action = Actions.READ)
     fun searchCryptos(
         req: CryptoSearchReq
     ): ResponseEntity<ApiResponse<List<CryptoSearchItem>>> {
@@ -93,6 +105,7 @@ class CryptoController(
     }
 
     @GetMapping("/{market}")
+    @RequiresAction(action = Actions.READ)
     fun getCrypto(
         @PathVariable market: String,
         req: CryptoDetailReq
@@ -107,22 +120,4 @@ class CryptoController(
             ), HttpStatus.OK
         )
     }
-
-    @GetMapping("/{market}/stream")
-    fun streamCrypto(
-        @PathVariable market: String
-    ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamCrypto: market=$market" }
-
-        cryptoService.streamCrypto(market)
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.CRYPTO_DETAIL.code,
-                message = ResponseCode.CRYPTO_DETAIL.message,
-                result = null
-            ), HttpStatus.OK
-        )
-    }
-
 }

@@ -2,6 +2,7 @@ package com.example.investfeed.domain.security
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.SecurityPaths
 import com.example.investfeed.domain.ResponseCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -28,7 +29,6 @@ class SecurityConfig(
     @param:Value("\${cors.allowed-origins}")
     private val allowedOrigins: String,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
-    private val menuPermissionFilter: MenuPermissionFilter,
     private val secondaryAuthFilter: SecondaryAuthFilter,
     private val objectMapper: ObjectMapper
 ) {
@@ -46,11 +46,9 @@ class SecurityConfig(
             .httpBasic { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/password", "/api/auth/profile", "/api/auth/api-keys/**", "/api/auth/secondary-password/**", "/api/auth/admin/**").authenticated()
-                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                    .requestMatchers("/api/menus/me").authenticated()
-                    .requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/ws/**").permitAll()
+                    .requestMatchers(*SecurityPaths.AUTH_AUTHENTICATED_PATTERNS).authenticated()
+                    .requestMatchers(SecurityPaths.AUTH_PATTERN).permitAll()
+                    .requestMatchers(SecurityPaths.WS_PATTERN).permitAll()
                     .anyRequest().authenticated()
             }
             .exceptionHandling { ex ->
@@ -74,8 +72,7 @@ class SecurityConfig(
                 }
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
-            .addFilterAfter(menuPermissionFilter, JwtAuthenticationFilter::class.java)
-            .addFilterAfter(secondaryAuthFilter, MenuPermissionFilter::class.java)
+            .addFilterAfter(secondaryAuthFilter, JwtAuthenticationFilter::class.java)
 
         return http.build()
     }

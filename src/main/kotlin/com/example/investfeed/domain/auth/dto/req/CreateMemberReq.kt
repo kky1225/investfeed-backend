@@ -1,9 +1,7 @@
 package com.example.investfeed.domain.auth.dto.req
 
-import com.example.investfeed.domain.auth.entity.Role
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 
 data class CreateMemberReq(
@@ -20,6 +18,6 @@ data class CreateMemberReq(
     @field:NotBlank(message = "전화번호를 입력해주세요.")
     @field:Pattern(regexp = "^[0-9-]{9,13}$", message = "올바른 전화번호 형식이 아닙니다.")
     val phone: String,
-    @field:NotNull(message = "역할을 선택해주세요.")
-    val role: Role = Role.GUEST
+    @field:NotBlank(message = "역할을 선택해주세요.")
+    val role: String = "GUEST"
 )

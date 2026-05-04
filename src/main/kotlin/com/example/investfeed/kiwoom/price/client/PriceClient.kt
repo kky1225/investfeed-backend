@@ -119,7 +119,7 @@ class PriceClient(
         } catch (e: GoldPriceNowException) {
             throw e;
         } catch (e: Exception) {
-            log.warn { "goldPriceNow Error" }
+            log.warn { "goldPriceNow Error: ${e.message}" }
 
             throw RuntimeException(e.message)
         }

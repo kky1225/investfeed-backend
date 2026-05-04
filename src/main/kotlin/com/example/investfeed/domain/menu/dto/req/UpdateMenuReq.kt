@@ -8,5 +8,6 @@ data class UpdateMenuReq(
     val url: String? = null,
     val icon: String? = null,
     val parentId: Long? = null,
+    val requiredPermissionId: Long? = null,
     val visible: Boolean = true
 )

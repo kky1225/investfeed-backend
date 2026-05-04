@@ -16,7 +16,11 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_INTEREST)
 @RestController
 @RequestMapping("/api/stock/interest")
 class InterestController(
@@ -24,6 +28,7 @@ class InterestController(
 ) {
 
     @GetMapping("groups")
+    @RequiresAction(action = Actions.READ)
     fun getGroups(
         @AuthenticationPrincipal user: CustomUserDetails
     ): ResponseEntity<ApiResponse<List<InterestGroupRes>>> {
@@ -37,6 +42,7 @@ class InterestController(
     }
 
     @PostMapping("groups")
+    @RequiresAction(action = Actions.CREATE)
     fun createGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @Valid @RequestBody req: CreateGroupReq
@@ -51,6 +57,7 @@ class InterestController(
     }
 
     @PatchMapping("groups/{groupId}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -67,6 +74,7 @@ class InterestController(
     }
 
     @DeleteMapping("groups/{groupId}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteGroup(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long
@@ -82,6 +90,7 @@ class InterestController(
     }
 
     @PatchMapping("groups/reorder")
+    @RequiresAction(action = Actions.UPDATE)
     fun reorderGroups(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestBody req: ReorderGroupsReq
@@ -97,6 +106,7 @@ class InterestController(
     }
 
     @GetMapping("groups/{groupId}/items")
+    @RequiresAction(action = Actions.READ)
     fun getItems(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long
@@ -111,6 +121,7 @@ class InterestController(
     }
 
     @PostMapping("groups/{groupId}/items")
+    @RequiresAction(action = Actions.CREATE)
     fun addItem(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -126,6 +137,7 @@ class InterestController(
     }
 
     @DeleteMapping("groups/{groupId}/items/{itemId}")
+    @RequiresAction(action = Actions.DELETE)
     fun removeItem(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -142,6 +154,7 @@ class InterestController(
     }
 
     @PatchMapping("groups/{groupId}/items/reorder")
+    @RequiresAction(action = Actions.UPDATE)
     fun reorderItems(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long,
@@ -158,6 +171,7 @@ class InterestController(
     }
 
     @GetMapping("groups/{groupId}/items/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamItems(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable groupId: Long

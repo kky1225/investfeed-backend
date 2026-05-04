@@ -17,10 +17,13 @@ import com.example.investfeed.domain.monitoring.service.MonitoringService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.ADMIN_MONITORING)
 @RestController
 @RequestMapping("/api/admin/monitoring")
 class MonitoringController(
@@ -28,7 +31,7 @@ class MonitoringController(
     private val manualTriggerService: ManualTriggerService,
 ) {
     @GetMapping("/scheduler")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getSchedulerOverview(
         @ModelAttribute req: SchedulerLogsReq,
     ): ResponseEntity<ApiResponse<SchedulerOverviewRes>> {
@@ -42,7 +45,7 @@ class MonitoringController(
     }
 
     @GetMapping("/config-logs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getConfigLogsOverview(
         @ModelAttribute req: SchedulerConfigLogsReq,
     ): ResponseEntity<ApiResponse<ConfigLogsOverviewRes>> {
@@ -56,7 +59,7 @@ class MonitoringController(
     }
 
     @GetMapping("/redis")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getRedisOverview(): ResponseEntity<ApiResponse<RedisOverviewRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -68,7 +71,7 @@ class MonitoringController(
     }
 
     @GetMapping("/errors")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getErrorLogsOverview(
         @ModelAttribute req: ErrorLogsReq,
     ): ResponseEntity<ApiResponse<ErrorLogsOverviewRes>> {
@@ -82,7 +85,7 @@ class MonitoringController(
     }
 
     @GetMapping("/api-calls")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getApiCallsOverview(): ResponseEntity<ApiResponse<ApiCallsOverviewRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -94,7 +97,7 @@ class MonitoringController(
     }
 
     @GetMapping("/system")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getSystemOverview(): ResponseEntity<ApiResponse<SystemOverviewRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -106,7 +109,7 @@ class MonitoringController(
     }
 
     @PatchMapping("/scheduler-status/{name}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateSchedulerTimeout(
         @PathVariable name: String,
         @Valid @RequestBody req: UpdateSchedulerTimeoutReq,
@@ -123,7 +126,7 @@ class MonitoringController(
     }
 
     @PostMapping("/scheduler-status/{name}/trigger")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.CREATE)
     fun triggerScheduler(@PathVariable name: String): ResponseEntity<ApiResponse<TriggerSchedulerRes>> {
         manualTriggerService.trigger(name)
         return ResponseEntity(
@@ -136,7 +139,7 @@ class MonitoringController(
     }
 
     @PatchMapping("/scheduler-logs/{id}/acknowledge")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.UPDATE)
     fun acknowledgeSchedulerLog(
         @PathVariable id: Long,
         @Valid @RequestBody req: AcknowledgeLogReq,
@@ -153,7 +156,7 @@ class MonitoringController(
     }
 
     @DeleteMapping("/scheduler-logs/{id}/acknowledge")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.DELETE)
     fun cancelAcknowledgeSchedulerLog(@PathVariable id: Long): ResponseEntity<ApiResponse<SchedulerLogRes>> {
         val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
         val changedBy = userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
@@ -167,7 +170,7 @@ class MonitoringController(
     }
 
     @GetMapping("/scheduler-logs/{id}/ack-history")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getSchedulerLogAckHistory(@PathVariable id: Long): ResponseEntity<ApiResponse<List<LogAckHistoryRes>>> {
         return ResponseEntity(
             ApiResponse(
@@ -179,7 +182,7 @@ class MonitoringController(
     }
 
     @PostMapping("/scheduler-logs/acknowledge-bulk")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.CREATE)
     fun bulkAcknowledgeSchedulerLogs(
         @Valid @RequestBody req: BulkAcknowledgeReq,
     ): ResponseEntity<ApiResponse<BulkAcknowledgeRes>> {
@@ -195,7 +198,7 @@ class MonitoringController(
     }
 
     @PatchMapping("/error-logs/{id}/acknowledge")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.UPDATE)
     fun acknowledgeErrorLog(
         @PathVariable id: Long,
         @Valid @RequestBody req: AcknowledgeLogReq,
@@ -212,7 +215,7 @@ class MonitoringController(
     }
 
     @DeleteMapping("/error-logs/{id}/acknowledge")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.DELETE)
     fun cancelAcknowledgeErrorLog(@PathVariable id: Long): ResponseEntity<ApiResponse<ErrorLogRes>> {
         val userDetails = SecurityContextHolder.getContext().authentication?.principal as? CustomUserDetails
         val changedBy = userDetails?.member?.id ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
@@ -226,7 +229,7 @@ class MonitoringController(
     }
 
     @GetMapping("/error-logs/{id}/ack-history")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun getErrorLogAckHistory(@PathVariable id: Long): ResponseEntity<ApiResponse<List<LogAckHistoryRes>>> {
         return ResponseEntity(
             ApiResponse(
@@ -238,7 +241,7 @@ class MonitoringController(
     }
 
     @PostMapping("/error-logs/acknowledge-bulk")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.CREATE)
     fun bulkAcknowledgeErrorLogs(
         @Valid @RequestBody req: BulkAcknowledgeReq,
     ): ResponseEntity<ApiResponse<BulkAcknowledgeRes>> {
@@ -254,7 +257,7 @@ class MonitoringController(
     }
 
     @DeleteMapping("/redis/cache")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.DELETE)
     fun invalidateRedisCache(@ModelAttribute req: RedisInvalidateReq): ResponseEntity<ApiResponse<RedisInvalidateRes>> {
         val deleted = monitoringService.invalidateRedisCache(req.prefix)
         return ResponseEntity(

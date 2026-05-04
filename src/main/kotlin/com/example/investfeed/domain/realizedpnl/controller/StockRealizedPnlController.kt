@@ -11,7 +11,11 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_REALIZED_PNL)
 @RestController
 @RequestMapping("/api/stock/realized-pnl")
 class StockRealizedPnlController(
@@ -20,6 +24,7 @@ class StockRealizedPnlController(
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listStockRealizedPnls(
         @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
@@ -33,6 +38,7 @@ class StockRealizedPnlController(
     }
 
     @PostMapping("/sync")
+    @RequiresAction(action = Actions.CREATE)
     fun syncStockRealizedPnls(
         @RequestBody req: RealizedPnlSyncReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
@@ -46,6 +52,7 @@ class StockRealizedPnlController(
     }
 
     @PostMapping("/manual")
+    @RequiresAction(action = Actions.CREATE)
     fun createManualStockPnl(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -59,6 +66,7 @@ class StockRealizedPnlController(
     }
 
     @PatchMapping("/manual/{id}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateManualStockPnl(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq
@@ -73,6 +81,7 @@ class StockRealizedPnlController(
     }
 
     @DeleteMapping("/manual/{id}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteManualStockPnl(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

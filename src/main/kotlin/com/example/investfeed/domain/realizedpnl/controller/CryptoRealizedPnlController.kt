@@ -12,7 +12,11 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.CRYPTO_REALIZED_PNL)
 @RestController
 @RequestMapping("/api/crypto/realized-pnl")
 class CryptoRealizedPnlController(
@@ -20,6 +24,7 @@ class CryptoRealizedPnlController(
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listCryptoRealizedPnls(
         @ModelAttribute req: RealizedPnlListReq
     ): ResponseEntity<ApiResponse<RealizedPnlListRes>> {
@@ -33,6 +38,7 @@ class CryptoRealizedPnlController(
     }
 
     @PostMapping("/manual")
+    @RequiresAction(action = Actions.CREATE)
     fun createManualCryptoPnl(
         @Valid @RequestBody req: ManualRealizedPnlCreateReq
     ): ResponseEntity<ApiResponse<RealizedPnlItem>> {
@@ -46,6 +52,7 @@ class CryptoRealizedPnlController(
     }
 
     @PatchMapping("/manual/{id}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateManualCryptoPnl(
         @PathVariable id: Long,
         @RequestBody req: ManualRealizedPnlUpdateReq
@@ -60,6 +67,7 @@ class CryptoRealizedPnlController(
     }
 
     @DeleteMapping("/manual/{id}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteManualCryptoPnl(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

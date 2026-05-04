@@ -17,5 +17,6 @@ data class MemberRes(
     val totpEnabled: Boolean = false,
     val secondaryPasswordEnabled: Boolean = false,
     val apiKeyLocked: Boolean = false,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val permissions: List<UserPermissionRes> = emptyList()
 )

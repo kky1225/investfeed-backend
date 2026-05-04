@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import mu.KotlinLogging
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.security.core.context.SecurityContextHolder
@@ -20,7 +21,18 @@ class SecondaryAuthFilter(
     private val objectMapper: ObjectMapper
 ) : OncePerRequestFilter() {
 
-    private val protectedPaths = listOf("/api/auth/admin/", "/api/admin/", "/api/stock/holding/", "/api/crypto/holding/", "/api/asset/", "/api/stock/realizedpnl/", "/api/crypto/realizedpnl/", "/api/realizedpnl/", "/api/goal/", "/api/rebalancing/", "/api/calendar/events/")
+    private val log = KotlinLogging.logger {}
+
+    private val protectedPaths = listOf(
+        "/api/admin/",                  // 관리자 도메인 전체
+        "/api/stock/holdings/",         // 주식 계좌 (HoldingController + ManualHoldingController)
+        "/api/crypto/holdings/",        // 코인 계좌
+        "/api/asset/",                  // 통합 자산
+        "/api/stock/realized-pnl/",     // 주식 실현손익
+        "/api/crypto/realized-pnl/",    // 코인 실현손익
+        "/api/goals/",                  // 투자 목표
+        "/api/rebalancing/"             // 리밸런싱
+    )
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -56,9 +68,11 @@ class SecondaryAuthFilter(
         if (token == null || storedToken == null || storedToken != token) {
             val lockTtl = redisTemplate.getExpire("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId", TimeUnit.SECONDS)
             if (lockTtl > 0) {
+                log.warn { "2차 인증 잠금: uri=$requestUri, loginId=$loginId" }
                 writeLockedResponse(response)
                 return
             }
+            log.info { "2차 인증 요구: uri=$requestUri, loginId=$loginId, cookieToken=${if (token == null) "NULL" else "present"}, redisToken=${if (storedToken == null) "NULL" else "present"}, match=${storedToken == token}" }
             writeResponse(response, ResponseCode.AUTH_SECONDARY_REQUIRED)
             return
         }
@@ -67,7 +81,10 @@ class SecondaryAuthFilter(
     }
 
     private fun requiresSecondaryAuth(uri: String): Boolean {
-        return protectedPaths.any { uri.startsWith(it) }
+        return protectedPaths.any { prefix ->
+            val base = prefix.trimEnd('/')
+            uri == base || uri.startsWith("$base/")
+        }
     }
 
     private fun writeResponse(response: HttpServletResponse, code: ResponseCode) {

@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 class CustomUserDetails(val member: Member) : UserDetails {
 
     override fun getAuthorities(): Collection<GrantedAuthority> =
-        listOf(SimpleGrantedAuthority("ROLE_${member.role.name}"))
+        listOf(SimpleGrantedAuthority("ROLE_${member.role.code}"))
 
     override fun getPassword(): String = member.password
 

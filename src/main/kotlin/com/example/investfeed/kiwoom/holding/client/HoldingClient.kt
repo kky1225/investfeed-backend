@@ -54,7 +54,7 @@ class HoldingClient(
         }catch (e: HoldingListException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "holdingList Error" }
+            log.warn { "holdingList Error: ${e.message}" }
 
             throw RuntimeException(e.message)
         }

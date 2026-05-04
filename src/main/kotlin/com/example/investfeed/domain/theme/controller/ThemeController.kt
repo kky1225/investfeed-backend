@@ -8,6 +8,9 @@ import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
 import com.example.investfeed.domain.theme.service.ThemeService
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
+@RequiresAction(permission = Permissions.STOCK_THEME)
 @RestController
 @RequestMapping("/api/stock/themes")
 class ThemeController(
@@ -25,6 +29,7 @@ class ThemeController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listThemes(
         req: ThemeListReq
     ): ResponseEntity<ApiResponse<ThemeListRes?>> {
@@ -40,6 +45,7 @@ class ThemeController(
     }
 
     @GetMapping("/{themaGrpCd}/stocks")
+    @RequiresAction(action = Actions.READ)
     fun listStocksByTheme(
         @PathVariable themaGrpCd: String,
         req: ThemeStockListReq
@@ -56,6 +62,7 @@ class ThemeController(
     }
 
     @PostMapping("/stocks/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamThemeStocks(
         req: ThemeStockListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

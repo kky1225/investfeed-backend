@@ -11,5 +11,4 @@ enum class CommodityChartType(
     DAY,
     WEEK,
     MONTH,
-    YEAR
 }

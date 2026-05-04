@@ -17,7 +17,11 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.NOTIFICATION)
 @RestController
 @RequestMapping("/api/notifications")
 class NotificationController(
@@ -27,6 +31,7 @@ class NotificationController(
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun getNotifications(
         @AuthenticationPrincipal user: CustomUserDetails,
         req: NotificationListReq
@@ -41,6 +46,7 @@ class NotificationController(
     }
 
     @GetMapping("unread-count")
+    @RequiresAction(action = Actions.READ)
     fun getUnreadCount(
         @AuthenticationPrincipal user: CustomUserDetails
     ): ResponseEntity<ApiResponse<Int>> {
@@ -54,6 +60,7 @@ class NotificationController(
     }
 
     @PatchMapping("{id}/read")
+    @RequiresAction(action = Actions.UPDATE)
     fun markAsRead(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable id: Long
@@ -69,6 +76,7 @@ class NotificationController(
     }
 
     @PatchMapping("read-all")
+    @RequiresAction(action = Actions.UPDATE)
     fun markAllAsRead(
         @AuthenticationPrincipal user: CustomUserDetails
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -83,6 +91,7 @@ class NotificationController(
     }
 
     @PostMapping("price-targets")
+    @RequiresAction(action = Actions.CREATE)
     fun createPriceTarget(
         @AuthenticationPrincipal user: CustomUserDetails,
         @Valid @RequestBody req: PriceTargetCreateReq
@@ -97,6 +106,7 @@ class NotificationController(
     }
 
     @GetMapping("price-targets")
+    @RequiresAction(action = Actions.READ)
     fun getPriceTargets(
         @AuthenticationPrincipal user: CustomUserDetails
     ): ResponseEntity<ApiResponse<List<PriceTargetRes>>> {
@@ -110,6 +120,7 @@ class NotificationController(
     }
 
     @DeleteMapping("price-targets/{id}")
+    @RequiresAction(action = Actions.DELETE)
     fun deletePriceTarget(
         @AuthenticationPrincipal user: CustomUserDetails,
         @PathVariable id: Long
@@ -125,6 +136,7 @@ class NotificationController(
     }
 
     @GetMapping("settings")
+    @RequiresAction(action = Actions.READ)
     fun getNotificationSetting(): ResponseEntity<ApiResponse<NotificationSettingRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -136,6 +148,7 @@ class NotificationController(
     }
 
     @PutMapping("settings")
+    @RequiresAction(action = Actions.UPDATE)
     fun saveNotificationSetting(
         @RequestBody req: NotificationSettingReq
     ): ResponseEntity<ApiResponse<NotificationSettingRes>> {

@@ -11,7 +11,11 @@ import com.example.investfeed.domain.holding.service.BrokerService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.CRYPTO_BROKER)
 @RestController
 @RequestMapping("/api/crypto/brokers")
 class CryptoBrokerController(
@@ -19,6 +23,7 @@ class CryptoBrokerController(
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listCryptoBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -30,6 +35,7 @@ class CryptoBrokerController(
     }
 
     @GetMapping("/my")
+    @RequiresAction(action = Actions.READ)
     fun listMyCryptoBrokers(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -41,6 +47,7 @@ class CryptoBrokerController(
     }
 
     @PostMapping("/my")
+    @RequiresAction(action = Actions.CREATE)
     fun addMyCryptoBroker(
         @RequestBody req: MyBrokerAddReq
     ): ResponseEntity<ApiResponse<MyBrokerItem>> {
@@ -54,6 +61,7 @@ class CryptoBrokerController(
     }
 
     @DeleteMapping("/my/{memberBrokerId}")
+    @RequiresAction(action = Actions.DELETE)
     fun removeMyCryptoBroker(
         @PathVariable memberBrokerId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

@@ -11,7 +11,11 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.GOAL)
 @RestController
 @RequestMapping("/api/goals")
 class InvestmentGoalController(
@@ -19,6 +23,7 @@ class InvestmentGoalController(
 ) {
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun createGoal(
         @Valid @RequestBody req: InvestmentGoalCreateReq
     ): ResponseEntity<ApiResponse<InvestmentGoalRes>> {
@@ -32,6 +37,7 @@ class InvestmentGoalController(
     }
 
     @PatchMapping("/{id}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateGoal(
         @PathVariable id: Long,
         @Valid @RequestBody req: InvestmentGoalUpdateReq
@@ -46,6 +52,7 @@ class InvestmentGoalController(
     }
 
     @DeleteMapping("/{id}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteGoal(
         @PathVariable id: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -60,6 +67,7 @@ class InvestmentGoalController(
     }
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listGoals(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -71,6 +79,7 @@ class InvestmentGoalController(
     }
 
     @GetMapping("/dashboard")
+    @RequiresAction(action = Actions.READ)
     fun getGoalsDashboard(): ResponseEntity<ApiResponse<GoalDashboardRes>> {
         return ResponseEntity(
             ApiResponse(

@@ -21,54 +21,6 @@ class RealizedPnlSummaryService(
     private val stockRealizedPnlService: StockRealizedPnlService,
 ) {
 
-    fun getSummary(year: Int?): RealizedPnlSummaryRes {
-        // 수동 데이터 (DB)
-        val memberId = getMemberId()
-        val manualItems = if (year != null) {
-            memberRealizedPnlRepository.findByMemberIdAndYear(memberId, year)
-        } else {
-            memberRealizedPnlRepository.findByMemberId(memberId)
-        }
-        val manualPnlItems = manualItems.map {
-            RealizedPnlItem(
-                id = it.id, brokerName = it.broker.name, brokerId = it.broker.id,
-                market = it.broker.market.name, year = it.year, month = it.month,
-                realizedPnl = it.realizedPnl, totalBuyAmt = it.totalBuyAmt,
-                totalSellAmt = it.totalSellAmt, tradeFee = it.tradeFee,
-                tradeTax = it.tradeTax, source = it.source.name
-            )
-        }
-
-        // API 데이터 (키움 API 직접 호출)
-        val apiPnlItems = stockRealizedPnlService.syncStockRealizedPnls(RealizedPnlSyncReq(year = year)).items
-
-        // 합산
-        val allItems = manualPnlItems + apiPnlItems
-
-        val monthlyMap = allItems.groupBy { Pair(it.year, it.month) }
-        val monthly = monthlyMap.map { (key, items) ->
-            val stockPnl = items.filter { it.market == MarketType.STOCK.name }.sumOf { it.realizedPnl }
-            val cryptoPnl = items.filter { it.market == MarketType.CRYPTO.name }.sumOf { it.realizedPnl }
-            MonthlyPnlItem(
-                year = key.first, month = key.second,
-                stockPnl = stockPnl, cryptoPnl = cryptoPnl,
-                totalPnl = stockPnl + cryptoPnl
-            )
-        }.sortedWith(compareBy({ it.year }, { it.month }))
-
-        val totalPnl = allItems.sumOf { it.realizedPnl }
-        val stockTotal = allItems.filter { it.market == MarketType.STOCK.name }.sumOf { it.realizedPnl }
-        val cryptoTotal = allItems.filter { it.market == MarketType.CRYPTO.name }.sumOf { it.realizedPnl }
-
-        return RealizedPnlSummaryRes(
-            monthly = monthly,
-            yearlyTotal = totalPnl,
-            allTimeTotal = totalPnl,
-            stockTotal = stockTotal,
-            cryptoTotal = cryptoTotal
-        )
-    }
-
     fun getDashboardSummary(): RealizedPnlDashboardItem {
         val memberId = getMemberId()
         val now = LocalDate.now()

@@ -2,7 +2,6 @@ package com.example.investfeed.domain.menu.controller
 
 import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
-import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.menu.dto.res.MenuRes
 import com.example.investfeed.domain.menu.service.MenuService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -12,7 +11,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.USER_MENU)
 @RestController
 @RequestMapping("/api/menus")
 class MenuController(
@@ -20,11 +23,11 @@ class MenuController(
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun getMyMenuTree(
         @AuthenticationPrincipal userDetails: CustomUserDetails
     ): ResponseEntity<ApiResponse<List<MenuRes>>> {
-        val role = Role.valueOf(userDetails.member.role.name)
-        val menus = menuService.getMyMenuTree(role)
+        val menus = menuService.getMyMenuTree(userDetails.member.role)
 
         return ResponseEntity(
             ApiResponse(

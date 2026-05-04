@@ -33,6 +33,14 @@ class CryptoHoldingClient(
                 .block()
 
             return res ?: emptyList()
+        } catch (e: WebClientResponseException) {
+            if (e.statusCode == HttpStatus.UNAUTHORIZED) {
+                log.warn { "upbit getAccounts 401 Unauthorized (사용자 API 키 인증 실패)" }
+                throw InvalidApiKeyException()
+            }
+
+            log.error { "upbit getAccounts Error: ${e.message}" }
+            throw RuntimeException(e.message)
         } catch (e: Exception) {
             log.error { "upbit getAccounts Error: ${e.message}" }
             throw RuntimeException(e.message)

@@ -1,6 +1,9 @@
 package com.example.investfeed.domain.stock.controller
 
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockSearchReq
@@ -15,14 +18,16 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+@RequiresAction(permission = Permissions.STOCK_DETAIL)
 @RestController
-@RequestMapping("/api/stock")
+@RequestMapping("/api/stocks")
 class StockController(
     private val stockService: StockService
 ) {
     private val log = KotlinLogging.logger {}
 
     @GetMapping("/{stkCd}")
+    @RequiresAction(action = Actions.READ)
     fun getStock(
         @PathVariable stkCd: String,
         req: StockDetailReq
@@ -39,6 +44,7 @@ class StockController(
     }
 
     @GetMapping("/{stkCd}/chart")
+    @RequiresAction(action = Actions.READ)
     fun getStockChart(
         @PathVariable stkCd: String,
         req: StockDetailReq
@@ -53,6 +59,7 @@ class StockController(
     }
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun searchStocks(
         req: StockSearchReq
     ): ResponseEntity<ApiResponse<List<StockSearchItem>>> {
@@ -68,6 +75,7 @@ class StockController(
     }
 
     @GetMapping("/{stkCd}/program-chart")
+    @RequiresAction(action = Actions.READ)
     fun getStockProgramChart(
         @PathVariable stkCd: String
     ): ResponseEntity<ApiResponse<List<StockProgramChart>>> {
@@ -81,6 +89,7 @@ class StockController(
     }
 
     @PostMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamStocks(
         @RequestBody req: StockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

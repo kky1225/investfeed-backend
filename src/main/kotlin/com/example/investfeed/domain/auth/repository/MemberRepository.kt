@@ -12,4 +12,5 @@ interface MemberRepository : JpaRepository<Member, Long> {
     fun existsByPhone(phone: String): Boolean
     fun existsByEmailAndLoginIdNot(email: String, loginId: String): Boolean
     fun existsByPhoneAndLoginIdNot(phone: String, loginId: String): Boolean
+    fun existsByRoleId(roleId: Long): Boolean
 }

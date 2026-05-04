@@ -6,10 +6,8 @@ import org.springframework.data.jpa.repository.Query
 
 interface MenuRepository : JpaRepository<Menu, Long> {
 
-    @Query("SELECT m FROM Menu m LEFT JOIN FETCH m.permissions WHERE m.parent IS NULL ORDER BY m.orderIndex")
+    @Query("SELECT m FROM Menu m LEFT JOIN FETCH m.requiredPermission WHERE m.parent IS NULL ORDER BY m.orderIndex")
     fun findAllRootMenus(): List<Menu>
-
-    fun findByUrl(url: String): Menu?
 
     fun existsByParentId(parentId: Long): Boolean
 }

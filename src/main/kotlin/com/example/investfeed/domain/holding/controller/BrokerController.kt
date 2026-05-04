@@ -11,7 +11,11 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_BROKER)
 @RestController
 @RequestMapping("/api/stock/brokers")
 class BrokerController(
@@ -20,6 +24,7 @@ class BrokerController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -31,6 +36,7 @@ class BrokerController(
     }
 
     @GetMapping("/my")
+    @RequiresAction(action = Actions.READ)
     fun listMyBrokers(): ResponseEntity<ApiResponse<MyBrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -42,6 +48,7 @@ class BrokerController(
     }
 
     @PostMapping("/my")
+    @RequiresAction(action = Actions.CREATE)
     fun addMyBroker(
         @RequestBody req: MyBrokerAddReq
     ): ResponseEntity<ApiResponse<MyBrokerItem>> {
@@ -55,6 +62,7 @@ class BrokerController(
     }
 
     @DeleteMapping("/my/{memberBrokerId}")
+    @RequiresAction(action = Actions.DELETE)
     fun removeMyBroker(
         @PathVariable memberBrokerId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

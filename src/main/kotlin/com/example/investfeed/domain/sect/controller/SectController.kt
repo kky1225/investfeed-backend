@@ -15,7 +15,11 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_SECT)
 @RestController
 @RequestMapping("/api/stock/sects")
 class SectController(
@@ -24,6 +28,7 @@ class SectController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listSects(
         req: SectListReq
     ): ResponseEntity<ApiResponse<SectListRes>> {
@@ -39,6 +44,7 @@ class SectController(
     }
 
     @GetMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamSects(
         req: SectListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -56,6 +62,7 @@ class SectController(
     }
 
     @GetMapping("/{indsCd}/stocks")
+    @RequiresAction(action = Actions.READ)
     fun listStocksBySect(
         @PathVariable indsCd: String,
         req: SectStockListReq

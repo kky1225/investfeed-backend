@@ -5,7 +5,13 @@ enum class ResponseCode(
     val message: String
 ) {
     DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
+    DASHBOARD_STREAM(message = "실시간 대시보드 조회에 성공하셨습니다."),
     ASSET_DASHBOARD(message = "통합 자산 대시보드 조회에 성공하셨습니다."),
+    ASSET_STOCK_STREAM(message = "실시간 통합자산 주식 조회에 성공하셨습니다."),
+    ASSET_CRYPTO_STREAM(message = "실시간 통합자산 코인 조회에 성공하셨습니다."),
+    MULTI_VIEW_STOCK_STREAM(message = "실시간 멀티뷰 주식 조회에 성공하셨습니다."),
+    MULTI_VIEW_CRYPTO_STREAM(message = "실시간 멀티뷰 코인 조회에 성공하셨습니다."),
+    RANK_STREAM(message = "실시간 주식 순위 조회에 성공하셨습니다."),
 
     TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
 
@@ -20,10 +26,6 @@ enum class ResponseCode(
     STOCK_PROGRAM_CHART(message = "종목 시간별 프로그램 매매 조회에 성공하셨습니다."),
 
     INVESTOR_LIST(message = "투자자별 목록 조회에 성공하셨습니다."),
-
-    INVESTOR_TRADE_DAILY(message = "투자자별 일별 매매 조회에 성공하셨습니다."),
-    INVESTOR_TRADE_ORGANIZE(message = "종목별 투자자 기관별 합계 요청 조회에 성공하셨습니다."),
-    INVESTOR_TRADE_RANK_LIST(message = "기관/외국인 매수 상위 순위 조회에 성공하셨습니다."),
 
     HOLDING_LIST(message = "보유 주식 조회에 성공하셨습니다."),
     HOLDING_STREAM(message = "실시간 보유 주식 조회에 성공하셨습니다."),
@@ -45,14 +47,12 @@ enum class ResponseCode(
     MEMBER_BROKER_BALANCE_UPDATE(message = "계좌 잔액 수정에 성공하셨습니다."),
 
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
-    INDEX_WS_LIST(message = "지수 목록 소켓 조회에 성공하셨습니다."),
+    INDEX_STREAM(message = "실시간 지수 조회에 성공하셨습니다."),
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다."),
-    INDEX_WS_DETAIL(message = "지수 상세 소켓 조회에 성공하셨습니다."),
 
     COMMODITY_LIST(message = "원자재 목록 조회에 성공하셨습니다."),
-    COMMODITY_LIST_REALTIME(message = "원자재 목록 실시간 조회에 성공하셨습니다."),
+    COMMODITY_STREAM(message = "실시간 원자재 조회에 성공하셨습니다."),
     COMMODITY_DETAIL(message = "원자재 상세 조회에 성공하셨습니다."),
-    COMMODITY_DETAIL_REALTIME(message = "원자재 상세 실시간 조회에 성공하셨습니다."),
 
     THEME_LIST(message = "테마 그룹별 조회에 성공하셨습니다."),
     THEME_STOCK_LIST(message = "테마 구성 종목 조회에 성공하셨습니다."),
@@ -73,6 +73,21 @@ enum class ResponseCode(
     AUTH_CHANGE_ROLE(message = "계정 권한 변경에 성공하셨습니다."),
     AUTH_CREATE_MEMBER(message = "회원 생성에 성공하셨습니다."),
     AUTH_MEMBER_LIST(message = "회원 목록 조회에 성공하셨습니다."),
+    AUTH_ROLE_LIST(message = "역할 목록 조회에 성공하셨습니다."),
+    AUTH_ROLE_CREATE(message = "역할 생성에 성공하셨습니다."),
+    AUTH_ROLE_UPDATE(message = "역할 수정에 성공하셨습니다."),
+    AUTH_ROLE_DELETE(message = "역할 삭제에 성공하셨습니다."),
+    AUTH_ROLE_ORDER_UPDATE(message = "역할 순서 변경에 성공하셨습니다."),
+
+    PERMISSION_LIST(message = "권한 목록 조회에 성공하셨습니다."),
+    PERMISSION_CREATE(message = "권한 생성에 성공하셨습니다."),
+    PERMISSION_UPDATE(message = "권한 수정에 성공하셨습니다."),
+    PERMISSION_DELETE(message = "권한 삭제에 성공하셨습니다."),
+    PERMISSION_PATTERN_ADD(message = "API 패턴 추가에 성공하셨습니다."),
+    PERMISSION_PATTERN_DELETE(message = "API 패턴 삭제에 성공하셨습니다."),
+    PERMISSION_ACTION_ADD(message = "지원 action 추가에 성공하셨습니다."),
+    PERMISSION_ACTION_DELETE(message = "지원 action 삭제에 성공하셨습니다."),
+    PERMISSION_ROLE_UPDATE(message = "역할별 권한 변경에 성공하셨습니다."),
     AUTH_PROFILE(message = "프로필 조회에 성공하셨습니다."),
     AUTH_PROFILE_UPDATE(message = "프로필 수정에 성공하셨습니다."),
 
@@ -180,7 +195,6 @@ enum class ResponseCode(
     MENU_UPDATE(message = "메뉴 수정에 성공하셨습니다."),
     MENU_DELETE(message = "메뉴 삭제에 성공하셨습니다."),
     MENU_STRUCTURE_UPDATE(message = "메뉴 구조 변경에 성공하셨습니다."),
-    MENU_PERMISSION_UPDATE(message = "메뉴 권한 변경에 성공하셨습니다."),
     MENU_BROKER_UPDATE(message = "메뉴 API Key 의존성 변경에 성공하셨습니다."),
 
     MONITORING_SCHEDULER_OVERVIEW(message = "스케줄러 모니터링 조회에 성공하셨습니다."),

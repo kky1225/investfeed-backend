@@ -14,7 +14,11 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_HOLDINGS)
 @RestController
 @RequestMapping("/api/stock/holdings/manual")
 class ManualHoldingController(
@@ -23,6 +27,7 @@ class ManualHoldingController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping("/{brokerId}")
+    @RequiresAction(action = Actions.READ)
     fun listManualHoldings(
         @PathVariable brokerId: Long
     ): ResponseEntity<ApiResponse<ManualHoldingListRes>> {
@@ -36,6 +41,7 @@ class ManualHoldingController(
     }
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun createManualHolding(
         @Valid @RequestBody req: ManualHoldingCreateReq
     ): ResponseEntity<ApiResponse<ManualHoldingItem>> {
@@ -49,6 +55,7 @@ class ManualHoldingController(
     }
 
     @PatchMapping("/{holdingId}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateManualHolding(
         @PathVariable holdingId: Long,
         @Valid @RequestBody req: ManualHoldingUpdateReq
@@ -63,6 +70,7 @@ class ManualHoldingController(
     }
 
     @DeleteMapping("/{holdingId}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteManualHolding(
         @PathVariable holdingId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {
@@ -78,6 +86,7 @@ class ManualHoldingController(
     }
 
     @PatchMapping("/balance/{memberBrokerId}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateBalance(
         @PathVariable memberBrokerId: Long,
         @RequestBody req: MemberBrokerBalanceUpdateReq
@@ -92,6 +101,7 @@ class ManualHoldingController(
     }
 
     @PatchMapping("/reorder")
+    @RequiresAction(action = Actions.UPDATE)
     fun reorderManualHoldings(
         @RequestBody req: HoldingReorderReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

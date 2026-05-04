@@ -56,7 +56,11 @@ class IndexInvestorDailyScheduler(
             val lastDtKospi = lastKospi?.dt
             val lastDtKosdaq = lastKosdaq?.dt
 
-            if (lastDtKospi == null && lastDtKosdaq == null) return
+            // 빈 테이블 — 어제 기준으로 과거 100 평일치 초기 시드
+            if (lastDtKospi == null && lastDtKosdaq == null) {
+                backfillInitial(100)
+                return
+            }
 
             val lastDt = listOfNotNull(lastDtKospi, lastDtKosdaq).min()
             val lastDate = LocalDate.parse(lastDt, formatter)
@@ -92,5 +96,31 @@ class IndexInvestorDailyScheduler(
         } finally {
             SecurityContextHolder.clearContext()
         }
+    }
+
+    /** 빈 테이블 초기 시드 — 어제부터 과거로 거슬러 올라가며 평일 N일치 수집. */
+    private fun backfillInitial(weekdays: Int) {
+        var current = LocalDate.now().minusDays(1)
+        var collected = 0
+        var failed = 0
+        // safety: 최대 검사 calendar 일수 제한 (평일 N일이면 최대 N*2 calendar)
+        val maxScanDays = weekdays * 2
+
+        repeat(maxScanDays) {
+            if (collected >= weekdays) return@repeat
+            if (current.dayOfWeek != DayOfWeek.SATURDAY && current.dayOfWeek != DayOfWeek.SUNDAY) {
+                val dt = current.format(formatter)
+                try {
+                    indexService.collectIndexInvestorDaily(dt)
+                    collected++
+                } catch (e: Exception) {
+                    failed++
+                    log.warn { "지수 투자자 일별 초기 시드 실패 ($dt): ${e.message}" }
+                }
+            }
+            current = current.minusDays(1)
+        }
+
+        log.info { "지수 투자자 일별 초기 시드 완료: ${collected}일치 수집 (실패 ${failed}건)" }
     }
 }

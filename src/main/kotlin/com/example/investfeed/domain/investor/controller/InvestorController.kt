@@ -6,12 +6,16 @@ import com.example.investfeed.domain.investor.dto.res.InvestorListRes
 import com.example.investfeed.domain.investor.service.InvestorService
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 
+@RequiresAction(permission = Permissions.STOCK_INVESTOR)
 @RestController
 @RequestMapping("/api/stock/investors")
 class InvestorController(
@@ -20,6 +24,7 @@ class InvestorController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listInvestors(
         req: InvestorListReq
     ): ResponseEntity<ApiResponse<InvestorListRes?>> {
@@ -35,6 +40,7 @@ class InvestorController(
     }
 
     @PostMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamInvestors(
         @RequestBody req: InvestorStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

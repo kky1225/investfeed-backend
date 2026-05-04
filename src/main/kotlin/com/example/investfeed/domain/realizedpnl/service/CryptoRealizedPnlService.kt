@@ -28,11 +28,11 @@ class CryptoRealizedPnlService(
 
         val items = when {
             year != null && month != null ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonth(memberId, MarketType.CRYPTO, year, month)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(memberId, MarketType.CRYPTO, year, month)
             year != null ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYear(memberId, MarketType.CRYPTO, year)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(memberId, MarketType.CRYPTO, year)
             else ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarket(memberId, MarketType.CRYPTO)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketOrderByYearDescMonthDesc(memberId, MarketType.CRYPTO)
         }
 
         val pnlItems = items.map { toItem(it) }

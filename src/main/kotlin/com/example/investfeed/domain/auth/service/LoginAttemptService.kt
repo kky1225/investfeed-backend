@@ -51,7 +51,7 @@ class LoginAttemptService(
     }
 
     private fun getLockDurationMinutes(attempts: Int, role: Role): Long? {
-        if (role == Role.ADMIN) {
+        if (role.code == "ADMIN") {
             return when {
                 attempts >= LOCK_STAGE_3_ATTEMPTS -> LOCK_STAGE_3_MINUTES
                 attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES

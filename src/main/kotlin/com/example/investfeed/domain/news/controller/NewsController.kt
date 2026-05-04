@@ -8,7 +8,11 @@ import com.example.investfeed.domain.news.service.NewsService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.NEWS, action = Actions.READ)
 @RestController
 @RequestMapping("/api/news")
 class NewsController(

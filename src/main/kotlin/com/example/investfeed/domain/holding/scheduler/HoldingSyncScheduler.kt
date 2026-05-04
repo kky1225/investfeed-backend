@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.holding.scheduler
 
-import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.entity.Broker
 import com.example.investfeed.domain.holding.repository.BrokerRepository
@@ -43,7 +42,7 @@ class HoldingSyncScheduler(
 
             val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return@execute
             val kiwoomApiKeys = memberApiKeyRepository.findAllByBrokerId(kiwoomBroker.id)
-                .filter { it.member.role != Role.ADMIN }
+                .filter { it.member.role.code != "ADMIN" }
 
             var successCount = 0
             var authFailCount = 0

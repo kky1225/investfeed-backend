@@ -5,5 +5,7 @@ data class TokenRes(
     val role: String? = null,
     val nickname: String? = null,
     val email: String? = null,
-    val secondaryPasswordEnabled: Boolean = false
+    val secondaryPasswordEnabled: Boolean = false,
+    val defaultPath: String? = null,
+    val permissions: List<UserPermissionRes> = emptyList()
 )

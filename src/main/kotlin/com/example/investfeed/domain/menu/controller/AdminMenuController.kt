@@ -4,7 +4,6 @@ import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.menu.dto.req.CreateMenuReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuBrokersReq
-import com.example.investfeed.domain.menu.dto.req.UpdateMenuPermissionReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuReq
 import com.example.investfeed.domain.menu.dto.req.UpdateMenuStructureReq
 import com.example.investfeed.domain.menu.dto.res.MenuRes
@@ -12,17 +11,20 @@ import com.example.investfeed.domain.menu.service.MenuService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.ADMIN_MENU)
 @RestController
 @RequestMapping("/api/admin/menus")
-@PreAuthorize("hasRole('ADMIN')")
 class AdminMenuController(
     private val menuService: MenuService
 ) {
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun getAllMenuTree(): ResponseEntity<ApiResponse<List<MenuRes>>> {
         val menus = menuService.getAllMenuTree()
 
@@ -36,6 +38,7 @@ class AdminMenuController(
     }
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun createMenu(@Valid @RequestBody req: CreateMenuReq): ResponseEntity<ApiResponse<MenuRes>> {
         val menu = menuService.createMenu(req)
 
@@ -49,6 +52,7 @@ class AdminMenuController(
     }
 
     @PutMapping("/{id}")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateMenu(
         @PathVariable id: Long,
         @Valid @RequestBody req: UpdateMenuReq
@@ -65,6 +69,7 @@ class AdminMenuController(
     }
 
     @DeleteMapping("/{id}")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteMenu(@PathVariable id: Long): ResponseEntity<ApiResponse<Nothing?>> {
         menuService.deleteMenu(id)
 
@@ -78,6 +83,7 @@ class AdminMenuController(
     }
 
     @PatchMapping("/structure")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateStructure(@RequestBody req: UpdateMenuStructureReq): ResponseEntity<ApiResponse<Nothing?>> {
         menuService.updateStructure(req)
 
@@ -90,23 +96,8 @@ class AdminMenuController(
         )
     }
 
-    @PatchMapping("/{id}/permissions")
-    fun updatePermissions(
-        @PathVariable id: Long,
-        @RequestBody req: UpdateMenuPermissionReq
-    ): ResponseEntity<ApiResponse<Nothing?>> {
-        menuService.updatePermissions(id, req)
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.MENU_PERMISSION_UPDATE.code,
-                message = ResponseCode.MENU_PERMISSION_UPDATE.message,
-                result = null
-            ), HttpStatus.OK
-        )
-    }
-
     @PatchMapping("/{id}/brokers")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateBrokers(
         @PathVariable id: Long,
         @RequestBody req: UpdateMenuBrokersReq

@@ -1,40 +1,32 @@
 package com.example.investfeed.domain.auth.service
 
-import com.example.investfeed.domain.auth.dto.req.ApiKeyReq
-import com.example.investfeed.domain.auth.dto.req.ChangePasswordReq
-import com.example.investfeed.domain.auth.dto.req.CreateMemberReq
-import com.example.investfeed.domain.auth.dto.req.LoginReq
-import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordChangeReq
-import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordSetupReq
-import com.example.investfeed.domain.auth.dto.req.SecondaryPasswordVerifyReq
-import com.example.investfeed.domain.auth.dto.req.UpdateProfileReq
-import com.example.investfeed.domain.auth.dto.res.ApiKeyRes
-import com.example.investfeed.domain.auth.dto.res.MemberRes
-import com.example.investfeed.domain.auth.dto.res.PreAuthRes
-import com.example.investfeed.domain.auth.dto.res.TokenRes
-import com.example.investfeed.domain.auth.dto.res.TotpSetupRes
-import com.example.investfeed.domain.auth.entity.MemberApiKey
-import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
-import com.example.investfeed.domain.holding.repository.BrokerRepository
+import com.example.investfeed.domain.auth.dto.req.*
+import com.example.investfeed.domain.auth.dto.res.*
 import com.example.investfeed.domain.auth.entity.Member
-import com.example.investfeed.domain.auth.entity.Role
-import com.example.investfeed.domain.auth.repository.MemberRepository
-import com.example.investfeed.domain.security.JwtProvider
+import com.example.investfeed.domain.auth.entity.MemberApiKey
 import com.example.investfeed.domain.auth.exception.*
+import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.auth.repository.RoleRepository
+import com.example.investfeed.domain.holding.repository.BrokerRepository
+import com.example.investfeed.domain.permission.repository.RolePermissionRepository
+import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.global.constant.RedisKeyPrefix
-import com.example.investfeed.kiwoom.auth.service.AuthClient as KiwoomAuthClient
 import com.example.investfeed.totp.TotpService
 import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
-import org.springframework.security.access.AccessDeniedException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.TimeUnit
+import com.example.investfeed.kiwoom.auth.service.AuthClient as KiwoomAuthClient
 
 @Service("memberAuthService")
 class AuthService(
@@ -44,6 +36,8 @@ class AuthService(
     private val defaultPassword: String,
     private val memberRepository: MemberRepository,
     private val memberApiKeyRepository: MemberApiKeyRepository,
+    private val roleRepository: RoleRepository,
+    private val rolePermissionRepository: RolePermissionRepository,
     private val brokerRepository: BrokerRepository,
     private val loginAttemptService: LoginAttemptService,
     private val apiKeyAttemptService: ApiKeyAttemptService,
@@ -160,14 +154,28 @@ class AuthService(
         return LoginResult(
             tokenRes = TokenRes(
                 passwordChangeRequired = passwordChangeRequired,
-                role = member.role.name,
+                role = member.role.code,
                 nickname = member.nickname,
                 email = maskEmail(member.email),
-                secondaryPasswordEnabled = member.secondaryPassword != null
+                secondaryPasswordEnabled = member.secondaryPassword != null,
+                defaultPath = member.role.defaultLandingPath,
+                permissions = loadUserPermissions(member.role.id)
             ),
             accessToken = jwtProvider.generateAccessToken(member.loginId),
             refreshToken = jwtProvider.generateRefreshToken(member.loginId)
         )
+    }
+
+    private fun loadUserPermissions(roleId: Long): List<UserPermissionRes> {
+        return rolePermissionRepository.findAllByRoleId(roleId)
+            .groupBy { it.permission.code }
+            .map { (code, grants) ->
+                UserPermissionRes(
+                    code = code,
+                    actions = grants.map { it.action }.distinct().sorted()
+                )
+            }
+            .sortedBy { it.code }
     }
 
     private fun validatePreAuthToken(preAuthToken: String): String {
@@ -209,6 +217,9 @@ class AuthService(
             throw DuplicatePhoneException()
         }
 
+        val role = roleRepository.findByCode(req.role)
+            ?: throw IllegalArgumentException("존재하지 않는 권한입니다: ${req.role}")
+
         val member = Member(
             loginId = req.loginId,
             password = passwordEncoder.encode(defaultPassword),
@@ -216,7 +227,7 @@ class AuthService(
             nickname = req.nickname,
             name = req.name,
             phone = req.phone,
-            role = req.role,
+            role = role,
             passwordChangedAt = LocalDateTime.of(2000, 1, 1, 0, 0)
         )
 
@@ -225,7 +236,8 @@ class AuthService(
 
     @Transactional(readOnly = true)
     fun getMembers(): List<MemberRes> {
-        return memberRepository.findAll().map { it.toMemberRes() }
+        return memberRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "createdAt"))
+            .map { it.toMemberRes() }
     }
 
     @Transactional(readOnly = true)
@@ -243,7 +255,7 @@ class AuthService(
             nickname = nickname,
             name = name,
             phone = phone,
-            role = role.name,
+            role = role.code,
             failedLoginAttempts = failedLoginAttempts,
             lockedAt = lockedAt,
             lockExpiresAt = lockExpiresAt,
@@ -251,7 +263,8 @@ class AuthService(
             totpEnabled = totpSecret != null,
             secondaryPasswordEnabled = secondaryPassword != null,
             apiKeyLocked = apiKeyLocked,
-            createdAt = createdAt
+            createdAt = createdAt,
+            permissions = loadUserPermissions(role.id)
         )
     }
 
@@ -280,6 +293,7 @@ class AuthService(
     fun lockAccount(loginId: String) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
 
         member.lockedAt = LocalDateTime.now()
         member.lockExpiresAt = null
@@ -289,6 +303,7 @@ class AuthService(
     fun unlockAccount(loginId: String) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
 
         member.failedLoginAttempts = 0
         member.lockedAt = null
@@ -299,6 +314,7 @@ class AuthService(
     fun resetTotp(loginId: String) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
 
         member.totpSecret = null
     }
@@ -380,17 +396,24 @@ class AuthService(
         redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId")
     }
 
-    fun isSecondaryAuthValid(loginId: String, token: String): Boolean {
-        val stored = redisTemplate.opsForValue().get("${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId") ?: return false
-        return stored == token
-    }
-
     @Transactional
     fun changeRole(loginId: String, role: String) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
 
-        member.role = Role.valueOf(role)
+        val newRole = roleRepository.findByCode(role)
+            ?: throw IllegalArgumentException("존재하지 않는 권한입니다: $role")
+
+        // 새 role 도 본인보다 낮은 priority 여야 함 (자기보다 상위 role 부여 차단)
+        val currentPriority = currentUserRolePriority()
+        if (newRole.priority <= currentPriority) {
+            throw AccessDeniedException(
+                "본인 (priority=$currentPriority) 과 동등 또는 상위 역할 '${newRole.code}' 로 변경할 수 없습니다."
+            )
+        }
+
+        member.role = newRole
     }
 
     data class ReissueResult(
@@ -413,10 +436,12 @@ class AuthService(
 
         return ReissueResult(
             tokenRes = TokenRes(
-                role = member.role.name,
+                role = member.role.code,
                 nickname = member.nickname,
                 email = maskEmail(member.email),
-                secondaryPasswordEnabled = member.secondaryPassword != null
+                secondaryPasswordEnabled = member.secondaryPassword != null,
+                defaultPath = member.role.defaultLandingPath,
+                permissions = loadUserPermissions(member.role.id)
             ),
             accessToken = jwtProvider.generateAccessToken(loginId)
         )
@@ -496,7 +521,9 @@ class AuthService(
 
     @Transactional
     fun unlockApiKeyRegistration(loginId: String) {
-        if (!memberRepository.existsByLoginId(loginId)) throw MemberNotFoundException()
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
         apiKeyAttemptService.unlock(loginId)
     }
 
@@ -535,5 +562,26 @@ class AuthService(
         val domain = parts[1]
         val visible = if (local.length <= 2) 1 else 2
         return local.take(visible) + "*".repeat(local.length - visible) + "@" + domain
+    }
+
+    /**
+     * 회원 hierarchy 검사 — 자기보다 같거나 상위 priority 의 회원은 변경/잠금 불가.
+     * 예: ADMIN(priority=1) 이 SUPER_ADMIN(priority=0) 회원을 정지/권한변경/TOTP리셋 시도 → 거부.
+     */
+    private fun assertHierarchyAllowed(target: Member) {
+        val currentPriority = currentUserRolePriority()
+        if (target.role.priority <= currentPriority) {
+            throw AccessDeniedException(
+                "본인 (priority=$currentPriority) 과 동등 또는 상위 역할의 회원 '${target.loginId}' (role=${target.role.code}) 은 변경할 수 없습니다."
+            )
+        }
+    }
+
+    private fun currentUserRolePriority(): Int {
+        val auth = SecurityContextHolder.getContext().authentication
+            ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
+        val userDetails = auth.principal as? CustomUserDetails
+            ?: throw IllegalStateException("인증 정보가 올바르지 않습니다.")
+        return userDetails.member.role.priority
     }
 }

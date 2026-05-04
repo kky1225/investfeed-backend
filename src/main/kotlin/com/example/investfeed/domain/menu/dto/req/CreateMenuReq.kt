@@ -8,6 +8,7 @@ data class CreateMenuReq(
     val url: String? = null,
     val icon: String? = null,
     val parentId: Long? = null,
+    val requiredPermissionId: Long? = null,
     val orderIndex: Int = 0,
     val visible: Boolean = true,
     val requiredBrokerIds: List<Long> = emptyList()

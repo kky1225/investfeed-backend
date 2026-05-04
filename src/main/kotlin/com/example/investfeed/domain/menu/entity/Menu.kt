@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.menu.entity
 
+import com.example.investfeed.domain.permission.entity.Permission
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -21,6 +22,10 @@ class Menu(
     @JoinColumn(name = "parent_id")
     var parent: Menu? = null,
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "required_permission_id")
+    var requiredPermission: Permission? = null,
+
     @Column(name = "order_index", nullable = false)
     var orderIndex: Int = 0,
 
@@ -33,9 +38,6 @@ class Menu(
     @OneToMany(mappedBy = "parent")
     @OrderBy("orderIndex ASC")
     val children: MutableList<Menu> = mutableListOf(),
-
-    @OneToMany(mappedBy = "menu", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val permissions: MutableList<MenuRolePermission> = mutableListOf(),
 
     @OneToMany(mappedBy = "menu", cascade = [CascadeType.ALL], orphanRemoval = true)
     val brokerPermissions: MutableList<MenuBrokerPermission> = mutableListOf()

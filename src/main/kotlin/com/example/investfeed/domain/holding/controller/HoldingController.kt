@@ -1,6 +1,9 @@
 package com.example.investfeed.domain.holding.controller
 
 import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingListRes
@@ -10,6 +13,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+@RequiresAction(permission = Permissions.STOCK_HOLDINGS)
 @RestController
 @RequestMapping("/api/stock/holdings")
 class HoldingController(
@@ -18,6 +22,7 @@ class HoldingController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listHoldings(): ResponseEntity<ApiResponse<HoldingListRes>> {
         log.info { "listHoldings" }
 
@@ -31,6 +36,7 @@ class HoldingController(
     }
 
     @PostMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamHoldings(
         @RequestBody req: HoldingStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {

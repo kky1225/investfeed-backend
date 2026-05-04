@@ -10,9 +10,12 @@ import com.example.investfeed.domain.holding.service.AdminBrokerService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.ADMIN_BROKER)
 @RestController
 @RequestMapping("/api/admin/brokers")
 class AdminBrokerController(
@@ -20,7 +23,7 @@ class AdminBrokerController(
 ) {
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.READ)
     fun listBrokers(): ResponseEntity<ApiResponse<BrokerListRes>> {
         return ResponseEntity(
             ApiResponse(
@@ -32,7 +35,7 @@ class AdminBrokerController(
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.CREATE)
     fun createBroker(
         @Valid @RequestBody req: BrokerCreateReq
     ): ResponseEntity<ApiResponse<BrokerItem>> {
@@ -46,7 +49,7 @@ class AdminBrokerController(
     }
 
     @PutMapping("/{brokerId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.UPDATE)
     fun updateBroker(
         @PathVariable brokerId: Long,
         @Valid @RequestBody req: BrokerUpdateReq
@@ -61,7 +64,7 @@ class AdminBrokerController(
     }
 
     @DeleteMapping("/{brokerId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @RequiresAction(action = Actions.DELETE)
     fun deleteBroker(
         @PathVariable brokerId: Long
     ): ResponseEntity<ApiResponse<Nothing?>> {

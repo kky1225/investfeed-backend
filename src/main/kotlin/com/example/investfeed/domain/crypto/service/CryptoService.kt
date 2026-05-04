@@ -22,13 +22,8 @@ class CryptoService(
     private val cryptoStreamClient: CryptoStreamClient,
     private val marketClient: MarketClient,
 ) {
-    fun streamCryptos() {
-        val markets = CryptoType.entries.map { it.market }
+    fun streamCryptos(markets: List<String>) {
         cryptoStreamClient.cryptoListStream(markets)
-    }
-
-    fun streamCrypto(market: String) {
-        cryptoStreamClient.cryptoListStream(listOf(market))
     }
 
     fun listCryptos(): CryptoListRes {

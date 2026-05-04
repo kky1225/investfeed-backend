@@ -29,13 +29,13 @@ class ManualRealizedPnlService(
 
         val items = when {
             year != null && month != null ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonth(memberId, MarketType.STOCK, year, month)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(memberId, MarketType.STOCK, year, month)
                     .filter { it.source == PnlSource.MANUAL }
             year != null ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYear(memberId, MarketType.STOCK, year)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(memberId, MarketType.STOCK, year)
                     .filter { it.source == PnlSource.MANUAL }
             else ->
-                memberRealizedPnlRepository.findByMemberIdAndBrokerMarket(memberId, MarketType.STOCK)
+                memberRealizedPnlRepository.findByMemberIdAndBrokerMarketOrderByYearDescMonthDesc(memberId, MarketType.STOCK)
                     .filter { it.source == PnlSource.MANUAL }
         }
 

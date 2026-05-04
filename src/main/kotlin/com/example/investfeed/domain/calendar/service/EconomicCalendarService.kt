@@ -944,20 +944,25 @@ class EconomicCalendarService(
     }
 
     private fun enrichFromEcos(event: CalendarEvent, tableCode: String, itemCode: String, name: String?, unit: String, persistToDb: Boolean): CalendarEvent {
-        val value = runCatching {
-            val dateStr = event.date.replace("-", "")
-            // 우선 일별 조회
+        val dateStr = event.date.replace("-", "")
+        // 일별 조회 시도 — daily 시계열이 아닌 지표(GDP 등)는 ECOS 가 예외를 던지므로 격리
+        val dailyValue = runCatching {
             ecosClient.getStatistics(tableCode, "D", dateStr, dateStr, itemCode).statisticSearch?.row?.firstOrNull()?.DATA_VALUE
-                ?: run {
-                    // 분기 데이터 fallback (GDP 등)
-                    val eDate = LocalDate.parse(event.date)
-                    val quarter = "${eDate.year}Q${(eDate.monthValue - 1) / 3 + 1}"
-                    val prevQuarter = if (eDate.monthValue <= 3) "${eDate.year - 1}Q4"
-                        else "${eDate.year}Q${(eDate.monthValue - 1) / 3}"
-                    listOf(prevQuarter, quarter).firstNotNullOfOrNull { q ->
-                        ecosClient.getStatistics(tableCode, "Q", q, q, itemCode).statisticSearch?.row?.firstOrNull()?.DATA_VALUE
-                    }
-                }
+        }.getOrNull()
+
+        // 분기 데이터 fallback (GDP 등)
+        val value = dailyValue ?: runCatching {
+            val eDate = LocalDate.parse(event.date)
+            val quarter = "${eDate.year}Q${(eDate.monthValue - 1) / 3 + 1}"
+            val prevQuarter = if (eDate.monthValue <= 3) "${eDate.year - 1}Q4"
+                else "${eDate.year}Q${(eDate.monthValue - 1) / 3}"
+
+            // 발표일 기준 더 최신 분기부터 시도 (속보치는 직전 분기 데이터)
+            listOf(prevQuarter, quarter).firstNotNullOfOrNull { q ->
+                runCatching {
+                    ecosClient.getStatistics(tableCode, "Q", q, q, itemCode).statisticSearch?.row?.firstOrNull()?.DATA_VALUE
+                }.getOrNull()
+            }
         }.getOrNull() ?: return event
 
         val displayValue = formatEventValue(value, unit) ?: "$value$unit"

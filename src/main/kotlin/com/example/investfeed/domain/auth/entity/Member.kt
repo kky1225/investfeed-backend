@@ -28,9 +28,9 @@ class Member(
     @Column(nullable = false)
     var phone: String,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    var role: Role = Role.USER,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "role_id", nullable = false)
+    var role: Role,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
@@ -55,7 +55,3 @@ class Member(
     @Column(nullable = false)
     var apiKeyLocked: Boolean = false
 )
-
-enum class Role {
-    USER, ADMIN, GUEST
-}

@@ -1,23 +1,22 @@
 package com.example.investfeed.domain.menu.service
 
+import com.example.investfeed.common.security.Actions
 import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.holding.entity.Broker
 import com.example.investfeed.domain.holding.entity.BrokerType
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.menu.dto.req.*
-import com.example.investfeed.domain.menu.dto.res.MenuPermissionRes
 import com.example.investfeed.domain.menu.dto.res.MenuRes
 import com.example.investfeed.domain.menu.entity.Menu
 import com.example.investfeed.domain.menu.entity.MenuBrokerPermission
-import com.example.investfeed.domain.menu.entity.MenuRolePermission
 import com.example.investfeed.domain.menu.exception.InvalidBrokerForMenuException
 import com.example.investfeed.domain.menu.exception.MenuHasChildrenException
 import com.example.investfeed.domain.menu.exception.MenuNotFoundException
 import com.example.investfeed.domain.menu.repository.MenuBrokerPermissionRepository
 import com.example.investfeed.domain.menu.repository.MenuRepository
-import com.example.investfeed.domain.menu.repository.MenuRolePermissionRepository
+import com.example.investfeed.domain.permission.repository.PermissionRepository
+import com.example.investfeed.domain.permission.repository.RolePermissionRepository
 import mu.KotlinLogging
-import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -25,9 +24,10 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class MenuService(
     private val menuRepository: MenuRepository,
-    private val menuRolePermissionRepository: MenuRolePermissionRepository,
     private val menuBrokerPermissionRepository: MenuBrokerPermissionRepository,
-    private val brokerRepository: BrokerRepository
+    private val brokerRepository: BrokerRepository,
+    private val permissionRepository: PermissionRepository,
+    private val rolePermissionRepository: RolePermissionRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -37,14 +37,23 @@ class MenuService(
     }
 
     fun getMyMenuTree(role: Role): List<MenuRes> {
+        val grantedPermissionIds = rolePermissionRepository.findAllByRoleId(role.id)
+            .filter { it.action == Actions.READ }
+            .map { it.permission.id }
+            .toSet()
+
         val rootMenus = menuRepository.findAllRootMenus()
-        return rootMenus.mapNotNull { it.toAccessibleMenuRes(role) }
+        return rootMenus.mapNotNull { it.toAccessibleMenuRes(grantedPermissionIds) }
     }
 
     @Transactional
     fun createMenu(req: CreateMenuReq): MenuRes {
         val parent = req.parentId?.let {
             menuRepository.findById(it).orElseThrow { MenuNotFoundException() }
+        }
+
+        val requiredPermission = req.requiredPermissionId?.let {
+            permissionRepository.findById(it).orElseThrow { IllegalArgumentException("권한을 찾을 수 없습니다: $it") }
         }
 
         val brokers = resolveApiBrokers(req.requiredBrokerIds)
@@ -54,17 +63,12 @@ class MenuService(
             url = req.url,
             icon = req.icon,
             parent = parent,
+            requiredPermission = requiredPermission,
             orderIndex = req.orderIndex,
             visible = req.visible
         )
 
         val savedMenu = menuRepository.save(menu)
-
-        Role.entries.forEach { role ->
-            menuRolePermissionRepository.save(
-                MenuRolePermission(menu = savedMenu, role = role, readable = role == Role.ADMIN)
-            )
-        }
 
         brokers.forEach { broker ->
             menuBrokerPermissionRepository.save(
@@ -84,6 +88,9 @@ class MenuService(
             url = req.url
             icon = req.icon
             parent = req.parentId?.let { menuRepository.findById(it).orElseThrow { MenuNotFoundException() } }
+            requiredPermission = req.requiredPermissionId?.let {
+                permissionRepository.findById(it).orElseThrow { IllegalArgumentException("권한을 찾을 수 없습니다: $it") }
+            }
             visible = req.visible
         }
 
@@ -118,42 +125,6 @@ class MenuService(
         }
     }
 
-    @Transactional
-    fun updatePermissions(menuId: Long, req: UpdateMenuPermissionReq) {
-        if (!menuRepository.existsById(menuId)) throw MenuNotFoundException()
-
-        req.permissions.forEach { item ->
-            val role = Role.valueOf(item.role)
-            val permission = menuRolePermissionRepository.findByMenuIdAndRole(menuId, role)
-
-            if (permission != null) {
-                permission.readable = item.readable
-            } else {
-                val menu = menuRepository.findById(menuId).orElseThrow { MenuNotFoundException() }
-                menuRolePermissionRepository.save(
-                    MenuRolePermission(menu = menu, role = role, readable = item.readable)
-                )
-            }
-        }
-    }
-
-    fun checkMenuAccess(url: String, role: Role) {
-        val menu = menuRepository.findByUrl(url) ?: return
-
-        if (!isMenuAccessible(menu, role)) {
-            throw AccessDeniedException("해당 메뉴에 대한 접근 권한이 없습니다.")
-        }
-    }
-
-    private fun isMenuAccessible(menu: Menu, role: Role): Boolean {
-        menu.parent?.let {
-            if (!isMenuAccessible(it, role)) return false
-        }
-
-        val permission = menu.permissions.find { it.role == role }
-        return permission?.readable ?: false
-    }
-
     private fun resolveApiBrokers(brokerIds: List<Long>): List<Broker> {
         if (brokerIds.isEmpty()) return emptyList()
 
@@ -177,8 +148,6 @@ class MenuService(
 
     /**
      * 메뉴의 broker 의존성을 요청 상태와 동기화 (orphanRemoval=true 활용)
-     * - 제거 대상: 기존 - 신규
-     * - 추가 대상: 신규 - 기존
      */
     private fun syncBrokerPermissions(menu: Menu, brokers: List<Broker>) {
         val targetBrokerIds = brokers.map { it.id }.toSet()
@@ -199,20 +168,39 @@ class MenuService(
         url = url,
         icon = icon,
         parentId = parent?.id,
+        requiredPermissionId = requiredPermission?.id,
+        requiredPermissionCode = requiredPermission?.code,
+        requiredPermissionName = requiredPermission?.name,
         orderIndex = orderIndex,
         visible = visible,
-        permissions = permissions.map { MenuPermissionRes(role = it.role.name, readable = it.readable) },
         requiredBrokerIds = brokerPermissions.map { it.broker.id }.sorted(),
         children = children.sortedBy { it.orderIndex }.map { it.toMenuRes() }
     )
 
-    private fun Menu.toAccessibleMenuRes(role: Role): MenuRes? {
-        if (!isMenuAccessible(this, role)) return null
+    /**
+     * 사이드바 트리에 노출할 메뉴인지 판정 + 자식 재귀.
+     *
+     * selfAllowed 규칙:
+     * - requiredPermission 있음 → 사용자가 해당 권한 canRead=true 일 때만 본인 노출
+     * - requiredPermission 없음 + 자식 있음 (네비 그룹) → 본인은 단독으로 노출 X. 자식이 보일 때만 따라 노출
+     * - requiredPermission 없음 + 자식 없음 (단독 메뉴) → 항상 노출
+     *
+     * 최종 노출: selfAllowed 또는 자식 중 하나라도 노출 가능한 경우.
+     */
+    private fun Menu.toAccessibleMenuRes(grantedPermissionIds: Set<Long>): MenuRes? {
         if (!visible) return null
 
         val accessibleChildren = children
             .sortedBy { it.orderIndex }
-            .mapNotNull { it.toAccessibleMenuRes(role) }
+            .mapNotNull { it.toAccessibleMenuRes(grantedPermissionIds) }
+
+        val selfAllowed = if (requiredPermission != null) {
+            requiredPermission!!.id in grantedPermissionIds
+        } else {
+            !children.isNotEmpty()
+        }
+
+        if (!selfAllowed && accessibleChildren.isEmpty()) return null
 
         return MenuRes(
             id = id,
@@ -220,11 +208,11 @@ class MenuService(
             url = url,
             icon = icon,
             parentId = parent?.id,
+            requiredPermissionId = requiredPermission?.id,
+            requiredPermissionCode = requiredPermission?.code,
+            requiredPermissionName = requiredPermission?.name,
             orderIndex = orderIndex,
             visible = visible,
-            permissions = permissions
-                .filter { it.role == role }
-                .map { MenuPermissionRes(role = it.role.name, readable = it.readable) },
             requiredBrokerIds = brokerPermissions.map { it.broker.id }.sorted(),
             children = accessibleChildren
         )

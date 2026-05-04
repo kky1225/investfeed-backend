@@ -10,11 +10,11 @@ interface MemberRealizedPnlRepository : JpaRepository<MemberRealizedPnl, Long> {
 
     fun findByMemberIdAndBrokerIdAndYearAndMonth(memberId: Long, brokerId: Long, year: Int, month: Int): MemberRealizedPnl?
 
-    fun findByMemberIdAndBrokerMarketAndYearAndMonth(memberId: Long, market: MarketType, year: Int, month: Int): List<MemberRealizedPnl>
+    fun findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(memberId: Long, market: MarketType, year: Int, month: Int): List<MemberRealizedPnl>
 
-    fun findByMemberIdAndBrokerMarketAndYear(memberId: Long, market: MarketType, year: Int): List<MemberRealizedPnl>
+    fun findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(memberId: Long, market: MarketType, year: Int): List<MemberRealizedPnl>
 
-    fun findByMemberIdAndBrokerMarket(memberId: Long, market: MarketType): List<MemberRealizedPnl>
+    fun findByMemberIdAndBrokerMarketOrderByYearDescMonthDesc(memberId: Long, market: MarketType): List<MemberRealizedPnl>
 
     fun findByMemberIdAndYear(memberId: Long, year: Int): List<MemberRealizedPnl>
 

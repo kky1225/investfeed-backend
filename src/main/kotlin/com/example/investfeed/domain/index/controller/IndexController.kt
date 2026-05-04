@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.index.controller
 
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
+import com.example.investfeed.domain.index.dto.req.IndexStreamReq
 import com.example.investfeed.domain.index.dto.res.IndexDetailRes
 import com.example.investfeed.domain.index.dto.res.IndexListRes
 import com.example.investfeed.domain.index.service.IndexService
@@ -13,7 +14,11 @@ import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.STOCK_INDEX)
 @RestController
 @RequestMapping("/api/stock/indexes")
 class IndexController(
@@ -23,6 +28,7 @@ class IndexController(
     private val log = KotlinLogging.logger {}
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun listIndexes(): ResponseEntity<ApiResponse<IndexListRes?>> {
         log.info { "listIndexes" }
 
@@ -35,9 +41,12 @@ class IndexController(
         )
     }
 
-    @GetMapping("/stream")
-    fun streamIndexes(): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamIndexes" }
+    @PostMapping("/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
+    fun streamIndexes(
+        @RequestBody req: IndexStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        log.info { "streamIndexes: $req" }
 
         realTimeClient.sectIndexListStream(
             req = SectIndexListStreamReq(
@@ -46,7 +55,7 @@ class IndexController(
                 refresh = "0",
                 data = listOf(
                     SectIndexListStream(
-                        item = listOf("001", "101", "201", "150"),
+                        item = req.items,
                         type = listOf("0J")
                     )
                 )
@@ -55,14 +64,15 @@ class IndexController(
 
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.INDEX_WS_LIST.code,
-                message = ResponseCode.INDEX_WS_LIST.message,
+                code = ResponseCode.INDEX_STREAM.code,
+                message = ResponseCode.INDEX_STREAM.message,
                 result = null
             ), HttpStatus.OK
         )
     }
 
     @GetMapping("/{indsCd}")
+    @RequiresAction(action = Actions.READ)
     fun getIndex(
         @PathVariable indsCd: String,
         req: IndexDetailReq
@@ -74,35 +84,6 @@ class IndexController(
                 code = ResponseCode.INDEX_DETAIL.code,
                 message = ResponseCode.INDEX_DETAIL.message,
                 result = indexService.getIndex(indsCd = indsCd, req = req)
-            ), HttpStatus.OK
-        )
-    }
-
-    @GetMapping("/{indsCd}/stream")
-    fun streamIndex(
-        @PathVariable indsCd: String
-    ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamIndex: indsCd=$indsCd" }
-
-        realTimeClient.sectIndexListStream(
-            req = SectIndexListStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    SectIndexListStream(
-                        item = listOf(indsCd),
-                        type = listOf("0J")
-                    )
-                )
-            )
-        )
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.INDEX_WS_DETAIL.code,
-                message = ResponseCode.INDEX_WS_DETAIL.message,
-                result = null
             ), HttpStatus.OK
         )
     }

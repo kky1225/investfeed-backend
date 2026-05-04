@@ -10,7 +10,11 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.investfeed.common.security.Actions
+import com.example.investfeed.common.security.Permissions
+import com.example.investfeed.common.security.RequiresAction
 
+@RequiresAction(permission = Permissions.REBALANCING)
 @RestController
 @RequestMapping("/api/rebalancing")
 class RebalancingController(
@@ -18,6 +22,7 @@ class RebalancingController(
 ) {
 
     @PostMapping
+    @RequiresAction(action = Actions.CREATE)
     fun saveRebalancing(
         @Valid @RequestBody req: RebalancingSettingReq
     ): ResponseEntity<ApiResponse<RebalancingSettingRes>> {
@@ -31,6 +36,7 @@ class RebalancingController(
     }
 
     @GetMapping
+    @RequiresAction(action = Actions.READ)
     fun getRebalancing(): ResponseEntity<ApiResponse<RebalancingStatusRes?>> {
         return ResponseEntity(
             ApiResponse(
@@ -42,6 +48,7 @@ class RebalancingController(
     }
 
     @DeleteMapping
+    @RequiresAction(action = Actions.DELETE)
     fun deleteRebalancing(): ResponseEntity<ApiResponse<Nothing?>> {
         rebalancingService.deleteRebalancing()
         return ResponseEntity(
