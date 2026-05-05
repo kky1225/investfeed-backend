@@ -1,5 +1,7 @@
 package com.example.investfeed.domain.marketindex.controller
 
+import com.example.investfeed.common.exception.ApiResponse
+import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.BitcoinSummary
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexDashboardRes
@@ -8,6 +10,7 @@ import com.example.investfeed.domain.marketindex.service.MarketIndexService
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -27,7 +30,7 @@ class MarketIndexController(
 ) {
 
     @GetMapping
-    fun listMarketIndexes(): ResponseEntity<MarketIndexDashboardRes> {
+    fun listMarketIndexes(): ResponseEntity<ApiResponse<MarketIndexDashboardRes>> {
         val indices = marketIndexService.listMarketIndexes()
         val fearGreed = cryptoService.fearGreedIndex()
 
@@ -36,21 +39,30 @@ class MarketIndexController(
         val bitcoin = tickers["KRW-BTC"]?.toSummary()
         val ethereum = tickers["KRW-ETH"]?.toSummary()
 
-        return ResponseEntity.ok(
-            MarketIndexDashboardRes(
-                indices = indices,
-                fearGreed = fearGreed,
-                bitcoin = bitcoin,
-                ethereum = ethereum,
-            )
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_INDEX.code,
+                message = ResponseCode.MARKET_INDEX.message,
+                result = MarketIndexDashboardRes(
+                    indices = indices,
+                    fearGreed = fearGreed,
+                    bitcoin = bitcoin,
+                    ethereum = ethereum,
+                )
+            ), HttpStatus.OK
         )
     }
 
     @GetMapping("/{type}")
-    fun getMarketIndex(@PathVariable type: MarketIndexType): ResponseEntity<MarketIndexRes> {
+    fun getMarketIndex(@PathVariable type: MarketIndexType): ResponseEntity<ApiResponse<MarketIndexRes?>> {
         val result = marketIndexService.getMarketIndex(type)
-            ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(result)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_INDEX.code,
+                message = ResponseCode.MARKET_INDEX.message,
+                result = result
+            ), HttpStatus.OK
+        )
     }
 
     private fun UpbitTickerRes.toSummary(): BitcoinSummary {

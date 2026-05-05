@@ -139,6 +139,8 @@ enum class ResponseCode(
     CRYPTO_RANK_LIST(message = "암호화폐 거래대금 순위 조회에 성공하셨습니다."),
     CRYPTO_RANK_STREAM(message = "실시간 암호화폐 거래대금 순위 조회에 성공하셨습니다."),
 
+    MARKET_INDEX(message = "주요 지수 조회에 성공하셨습니다."),
+
     CRYPTO_INTEREST_GROUP_LIST(message = "암호화폐 관심종목 그룹 목록 조회에 성공하셨습니다."),
     CRYPTO_INTEREST_GROUP_CREATE(message = "암호화폐 관심종목 그룹 생성에 성공하셨습니다."),
     CRYPTO_INTEREST_GROUP_UPDATE(message = "암호화폐 관심종목 그룹 수정에 성공하셨습니다."),
