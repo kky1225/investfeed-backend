@@ -6,5 +6,5 @@ data class UpdateRoleOrderReq(
 
 data class RoleOrderItem(
     val id: Long,
-    val orderIndex: Int,
+    val priority: Int,
 )

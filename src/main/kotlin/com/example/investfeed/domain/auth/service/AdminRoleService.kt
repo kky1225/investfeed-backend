@@ -20,7 +20,7 @@ class AdminRoleService(
     private val memberRepository: MemberRepository,
 ) {
     fun listRoles(): List<RoleRes> {
-        return roleRepository.findAllByOrderByOrderIndexAsc().map { it.toRes() }
+        return roleRepository.findAllByOrderByPriorityAsc().map { it.toRes() }
     }
 
     @Transactional
@@ -29,10 +29,24 @@ class AdminRoleService(
             throw IllegalArgumentException("이미 존재하는 권한 코드입니다: ${req.code}")
         }
 
-        val nextOrderIndex = (roleRepository.findAll().maxOfOrNull { it.orderIndex } ?: -1) + 1
-        // 새 role 의 priority: 본인보다 1 낮은 우선순위 (자기보다 하위 role 만 생성 가능)
         val currentPriority = currentUserRolePriority()
-        val nextPriority = (roleRepository.findAll().maxOfOrNull { it.priority } ?: currentPriority) + 1
+        val allRoles = roleRepository.findAll()
+
+        val newPriority = if (req.afterRoleId != null) {
+            val afterRole = allRoles.find { it.id == req.afterRoleId }
+                ?: throw IllegalArgumentException("기준 역할을 찾을 수 없습니다.")
+            if (afterRole.priority < currentPriority) {
+                throw AccessDeniedException("본인보다 상위 역할 아래에는 삽입할 수 없습니다.")
+            }
+            afterRole.priority + 1
+        } else {
+            currentPriority + 1
+        }
+
+        allRoles.filter { it.priority >= newPriority }
+            .forEach { it.priority += 1 }
+
+        val nextOrderIndex = (allRoles.maxOfOrNull { it.orderIndex } ?: -1) + 1
 
         val saved = roleRepository.save(
             Role(
@@ -40,7 +54,7 @@ class AdminRoleService(
                 name = req.name,
                 defaultLandingPath = req.defaultLandingPath,
                 isSystem = false,
-                priority = nextPriority,
+                priority = newPriority,
                 orderIndex = nextOrderIndex,
             )
         )
@@ -74,7 +88,15 @@ class AdminRoleService(
             throw IllegalArgumentException("해당 권한을 사용 중인 회원이 있어 삭제할 수 없습니다.")
         }
 
+        val deletedPriority = role.priority
         roleRepository.delete(role)
+
+        roleRepository.findAll()
+            .filter { it.priority > deletedPriority }
+            .forEach {
+                it.priority -= 1
+                it.orderIndex = it.priority
+            }
     }
 
     /** Hierarchy 검사 — 본인과 동등 또는 상위 priority 의 role 은 변경/삭제 불가. */
@@ -82,7 +104,7 @@ class AdminRoleService(
         val currentPriority = currentUserRolePriority()
         if (target.priority <= currentPriority) {
             throw AccessDeniedException(
-                "본인 (priority=$currentPriority) 과 동등 또는 상위 역할 '${target.code}' (priority=${target.priority}) 은 변경할 수 없습니다."
+                "'${target.name}' 역할은 본인과 동등하거나 상위 권한이므로 변경할 수 없습니다."
             )
         }
     }
@@ -97,11 +119,16 @@ class AdminRoleService(
 
     @Transactional
     fun updateOrder(req: UpdateRoleOrderReq) {
+        val currentPriority = currentUserRolePriority()
         val roleMap = roleRepository.findAllById(req.orders.map { it.id }).associateBy { it.id }
         req.orders.forEach { item ->
             val role = roleMap[item.id]
                 ?: throw IllegalArgumentException("권한을 찾을 수 없습니다: ${item.id}")
-            role.orderIndex = item.orderIndex
+            if (item.priority <= currentPriority) {
+                throw AccessDeniedException("'${role.name}' 역할은 본인과 동등하거나 상위 권한이므로 변경할 수 없습니다.")
+            }
+            role.priority = item.priority
+            role.orderIndex = item.priority
         }
     }
 

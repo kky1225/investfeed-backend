@@ -564,15 +564,11 @@ class AuthService(
         return local.take(visible) + "*".repeat(local.length - visible) + "@" + domain
     }
 
-    /**
-     * 회원 hierarchy 검사 — 자기보다 같거나 상위 priority 의 회원은 변경/잠금 불가.
-     * 예: ADMIN(priority=1) 이 SUPER_ADMIN(priority=0) 회원을 정지/권한변경/TOTP리셋 시도 → 거부.
-     */
     private fun assertHierarchyAllowed(target: Member) {
         val currentPriority = currentUserRolePriority()
         if (target.role.priority <= currentPriority) {
             throw AccessDeniedException(
-                "본인 (priority=$currentPriority) 과 동등 또는 상위 역할의 회원 '${target.loginId}' (role=${target.role.code}) 은 변경할 수 없습니다."
+                "'${target.loginId}' 계정은 본인과 동등하거나 상위 권한이므로 변경할 수 없습니다."
             )
         }
     }

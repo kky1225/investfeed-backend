@@ -10,6 +10,7 @@ import com.example.investfeed.domain.holding.entity.MemberHolding
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest
@@ -23,6 +24,7 @@ class ManualHoldingService(
     private val memberHoldingRepository: MemberHoldingRepository,
     private val memberBrokerRepository: MemberBrokerRepository,
     private val stockClient: StockClient,
+    private val holidayService: HolidayService,
 ) {
 
     fun listManualHoldings(brokerId: Long): ManualHoldingListRes {
@@ -41,11 +43,13 @@ class ManualHoldingService(
         }
 
         val priceMap = fetchCurrentPrices(holdings.map { it.stkCd })
+        val isHoliday = holidayService.isHoliday()
 
         return ManualHoldingListRes(
             balance = memberBroker.balance,
             holdings = holdings.map { holding ->
                 val price = priceMap[holding.stkCd]
+                val curPrc = price?.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0"
                 ManualHoldingItem(
                     id = holding.id,
                     stkCd = holding.stkCd,
@@ -53,9 +57,9 @@ class ManualHoldingService(
                     purPrice = holding.purPrice ?: 0,
                     quantity = holding.quantity ?: 0,
                     purAmt = holding.purAmt ?: 0,
-                    curPrc = price?.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0",
+                    curPrc = curPrc,
                     fluRt = price?.flu_rt ?: "0",
-                    basePric = price?.base_pric ?: "0"
+                    basePric = if (isHoliday) curPrc else price?.base_pric ?: "0"
                 )
             }
         )

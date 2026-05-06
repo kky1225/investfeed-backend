@@ -10,4 +10,5 @@ data class CreateRoleReq(
     @field:NotBlank(message = "권한 이름을 입력해주세요.")
     val name: String,
     val defaultLandingPath: String? = null,
+    val afterRoleId: Long? = null,
 )

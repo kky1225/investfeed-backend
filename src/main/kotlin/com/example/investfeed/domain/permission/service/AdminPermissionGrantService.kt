@@ -85,7 +85,7 @@ class AdminPermissionGrantService(
     }
 
     private fun Permission.toRes(): PermissionRes {
-        val allRoles = roleRepository.findAllByOrderByOrderIndexAsc()
+        val allRoles = roleRepository.findAllByOrderByPriorityAsc()
         val grantsByRoleId = rolePermissions.groupBy { it.role.id }
         return PermissionRes(
             id = id,

@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface RoleRepository : JpaRepository<Role, Long> {
     fun findByCode(code: String): Role?
-    fun findAllByOrderByOrderIndexAsc(): List<Role>
+    fun findAllByOrderByPriorityAsc(): List<Role>
 }
