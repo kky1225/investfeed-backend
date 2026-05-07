@@ -8,6 +8,7 @@ import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
 import com.example.investfeed.domain.recommend.entity.StockPick
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
@@ -17,17 +18,13 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
-import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import kotlin.String
+import org.springframework.scheduling.annotation.Scheduled
 
 @Service
 class RecommendService(
@@ -227,7 +224,7 @@ class RecommendService(
                 data = listOf(
                     KiwoomStockStream(
                         item = req.items,
-                        type = listOf("0J")
+                        type = listOf("0B")
                     )
                 )
             )
