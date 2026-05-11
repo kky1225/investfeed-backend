@@ -22,4 +22,10 @@ interface SchedulerLogRepository : JpaRepository<SchedulerLog, Long>, JpaSpecifi
         statuses: Collection<String>,
         startedAt: LocalDateTime,
     ): Boolean
+
+    fun findBySchedulerNameAndStatusInAndStartedAtAfter(
+        schedulerName: String,
+        statuses: Collection<String>,
+        startedAt: LocalDateTime,
+    ): List<SchedulerLog>
 }

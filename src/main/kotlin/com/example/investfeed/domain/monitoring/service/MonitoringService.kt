@@ -8,6 +8,7 @@ import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.*
 import com.example.investfeed.global.constant.RedisKeyPrefix
+import com.example.investfeed.global.holiday.HolidayService
 import jakarta.persistence.EntityManager
 import jakarta.persistence.criteria.Predicate
 import mu.KotlinLogging
@@ -38,6 +39,7 @@ class MonitoringService(
     private val redisTemplate: StringRedisTemplate,
     private val entityManager: EntityManager,
     private val apiCallCounterService: ApiCallCounterService,
+    private val holidayService: HolidayService,
     @Qualifier("fastScheduler") private val fastScheduler: ThreadPoolTaskScheduler,
     @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
@@ -55,6 +57,7 @@ class MonitoringService(
             statuses = getStatuses(),
             logs = getLogs(req),
             unackCount = getUnacknowledgedCount(),
+            isHoliday = holidayService.isHoliday(),
         )
 
     fun getConfigLogsOverview(req: SchedulerConfigLogsReq): ConfigLogsOverviewRes =

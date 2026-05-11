@@ -7,6 +7,7 @@ data class SchedulerCatalogRes(
     val schedulerType: String,
     val defaultTimeoutSec: Int,
     val label: String,
+    val blockedOnHoliday: Boolean,
 ) {
     companion object {
         fun from(e: SchedulerName) = SchedulerCatalogRes(
@@ -14,6 +15,7 @@ data class SchedulerCatalogRes(
             schedulerType = e.type.name,
             defaultTimeoutSec = e.defaultTimeoutSec,
             label = e.label,
+            blockedOnHoliday = e.blockedOnHoliday,
         )
     }
 }

@@ -14,6 +14,7 @@ data class SchedulerOverviewRes(
     val statuses: List<SchedulerStatusRes>,
     val logs: Page<SchedulerLogRes>,
     val unackCount: UnacknowledgedCountRes,
+    val isHoliday: Boolean,
 )
 
 data class ConfigLogsOverviewRes(

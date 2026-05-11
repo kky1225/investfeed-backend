@@ -54,6 +54,16 @@ class HolidayService(
         return candidate
     }
 
+    fun lastTradingDay(from: LocalDate = LocalDate.now()): LocalDate {
+        var candidate = from
+        repeat(60) {
+            if (!isHoliday(candidate)) return candidate
+            candidate = candidate.minusDays(1)
+        }
+        log.warn { "lastTradingDay: 60일 내 거래일을 찾지 못함 (from=$from) — 마지막 후보 반환: $candidate" }
+        return candidate
+    }
+
     /** 해당 월의 공휴일 Set 를 반환. 미로드 시 client 호출 후 캐시. */
     private fun holidaysOf(year: Int, month: Int): Set<String> {
         val key = monthKey(year, month)

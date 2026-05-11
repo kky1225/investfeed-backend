@@ -6,6 +6,7 @@ import com.example.investfeed.domain.goal.scheduler.GoalAlertScheduler
 import com.example.investfeed.domain.holding.scheduler.HoldingSyncScheduler
 import com.example.investfeed.domain.index.scheduler.IndexInvestorDailyScheduler
 import com.example.investfeed.domain.interest.scheduler.InterestSyncScheduler
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
@@ -46,13 +47,13 @@ class ManualTriggerService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    /** 수동 실행 가능한 SLOW 스케줄러 이름 → 실행 함수 매핑 */
     private val runnableMap: Map<String, () -> Unit> by lazy {
         mapOf(
             "GoalAlertScheduler"           to { goalAlertScheduler.checkGoals() },
             "RebalancingAlertScheduler"    to { rebalancingAlertScheduler.checkRebalancing() },
             "CalendarSyncScheduler"        to { calendarSyncScheduler.syncCalendarData() },
-            "RecommendScheduler"           to { recommendService.recommendStock() },
+            "RecommendScheduler"           to { recommendService.runRecommendStock() },
+            "RecommendTodayDirectionScheduler" to { recommendService.runRefreshTodayDirection() },
             "HolidayRefreshScheduler"      to { holidayService.refreshHolidays() },
             "HoldingSyncScheduler"         to { holdingSyncScheduler.syncAllHoldings() },
             "StockDividendScheduler"       to { stockDividendScheduler.collectDaily() },
@@ -63,28 +64,41 @@ class ManualTriggerService(
         )
     }
 
-    fun trigger(schedulerName: String) {
+    fun trigger(schedulerName: String, force: Boolean = false) {
         val runnable = runnableMap[schedulerName]
             ?: throw IllegalArgumentException("수동 실행을 지원하지 않는 스케줄러: $schedulerName")
 
-        // 현재 실행 중인지 확인 — 중복 실행 방지
-        val status = schedulerStatusRepository.findById(schedulerName).orElse(null)
-        if (status != null) {
-            val started = status.lastStartedAt
-            val finished = status.lastFinishedAt
-            if (started != null && (finished == null || finished.isBefore(started))) {
-                val elapsed = Duration.between(started, LocalDateTime.now()).seconds
-                if (elapsed <= status.timeoutSec) {
-                    throw IllegalStateException(
-                        "스케줄러가 이미 실행 중입니다: $schedulerName (경과 ${elapsed}s, timeout ${status.timeoutSec}s)"
-                    )
-                }
-            }
+        val schedulerEnum = runCatching { SchedulerName.valueOf(schedulerName) }.getOrNull()
+        if (schedulerEnum?.blockedOnHoliday == true && holidayService.isHoliday() && !force) {
+            throw IllegalStateException(
+                "휴일에는 실행할 수 없는 스케줄러입니다: $schedulerName (force=true 로 우회 가능)"
+            )
+        }
+        if (force && schedulerEnum?.blockedOnHoliday == true && holidayService.isHoliday()) {
+            log.info { "[manual-trigger] $schedulerName 휴일 강제 실행 (force=true) — 직전 거래일 기준 갱신" }
+        }
+
+        runningStatus(schedulerName)?.let { (elapsed, timeoutSec) ->
+            throw IllegalStateException(
+                "스케줄러가 이미 실행 중입니다: $schedulerName (경과 ${elapsed}s, timeout ${timeoutSec}s)"
+            )
+        }
+
+        if (schedulerName == SchedulerName.RecommendTodayDirectionScheduler.name
+            && runningStatus(SchedulerName.RecommendScheduler.name) != null) {
+            throw IllegalStateException("RecommendScheduler 실행이 끝난 후 시도하세요. (현재 실행 중)")
         }
 
         log.info { "[manual-trigger] $schedulerName 수동 실행 요청 — 백그라운드 예약" }
-        // slowScheduler 풀에 즉시 예약. 실행 자체는 해당 메서드가 schedulerLogService.execute() 로 감싸져 있어
-        // 기존 스케줄 실행과 동일하게 status/log 가 기록된다.
         taskScheduler.schedule(runnable, Instant.now())
+    }
+
+    private fun runningStatus(schedulerName: String): Pair<Long, Int>? {
+        val status = schedulerStatusRepository.findById(schedulerName).orElse(null) ?: return null
+        val started = status.lastStartedAt ?: return null
+        val finished = status.lastFinishedAt
+        if (finished != null && !finished.isBefore(started)) return null
+        val elapsed = Duration.between(started, LocalDateTime.now()).seconds
+        return if (elapsed <= status.timeoutSec) elapsed to status.timeoutSec else null
     }
 }

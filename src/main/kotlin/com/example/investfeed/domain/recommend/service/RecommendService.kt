@@ -1,19 +1,28 @@
 package com.example.investfeed.domain.recommend.service
 
 import com.example.investfeed.common.util.DateUtil
+import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.holding.repository.BrokerRepository
+import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
+import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
 import com.example.investfeed.domain.recommend.entity.StockPick
+import com.example.investfeed.domain.recommend.entity.StockPickHistory
+import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestor
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
@@ -25,6 +34,9 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.scheduling.annotation.Scheduled
+import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlin.math.abs
 
 @Service
 class RecommendService(
@@ -32,6 +44,12 @@ class RecommendService(
     private val stockClient: StockClient,
     private val stockSocketClient: StockSocketClient,
     private val stockPickRepository: StockPickRepository,
+    private val stockPickHistoryRepository: StockPickHistoryRepository,
+    private val memberRepository: MemberRepository,
+    private val memberHoldingRepository: MemberHoldingRepository,
+    private val brokerRepository: BrokerRepository,
+    private val schedulerLogRepository: SchedulerLogRepository,
+    private val holidayService: HolidayService,
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
@@ -39,9 +57,14 @@ class RecommendService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 30 * * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = "0 0 22 * * *", scheduler = "slowScheduler")
+    fun scheduledRecommendStock() {
+        if (holidayService.isHoliday()) return
+        runRecommendStock()
+    }
+
     @Transactional
-    fun recommendStock() {
+    fun runRecommendStock() {
         schedulerLogService.execute(SchedulerName.RecommendScheduler) {
             setSchedulerSecurityContext()
             try {
@@ -53,7 +76,103 @@ class RecommendService(
         }
     }
 
+    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
+    fun scheduledRefreshTodayDirection() {
+        if (holidayService.isHoliday()) return
+        runRefreshTodayDirection()
+    }
+
+    @Transactional
+    fun runRefreshTodayDirection() {
+        schedulerLogService.execute(SchedulerName.RecommendTodayDirectionScheduler) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+                doRefreshTodayDirection()
+            } finally {
+                SecurityContextHolder.clearContext()
+            }
+        }
+    }
+
+    private fun doRefreshTodayDirection() {
+        val today = DateUtil.today("yyyyMMdd")
+        val picks = stockPickRepository.findAll()
+        if (picks.isEmpty()) return
+
+        var matchCount = 0
+        var mismatchCount = 0
+        var nullCount = 0
+
+        picks.forEach { pick ->
+            try {
+                Thread.sleep(API_PACING_MS)
+                val res = stockClient.stockInvestor(
+                    req = KiwoomStockInvestorReq(
+                        dt = today,
+                        stk_cd = pick.stkCd,
+                        amt_qty_tp = "2",
+                        trde_tp = "0",
+                        unit_tp = "1"
+                    )
+                )
+                if (res.return_code != 0) {
+                    pick.todayDirection = null
+                    nullCount++
+                    return@forEach
+                }
+                val firstItem = res.stk_invsr_orgn?.firstOrNull()
+                // 날짜 명시 비교: 오늘 데이터 없으면 null (휴일/자정/휴장일)
+                if (firstItem?.dt != today) {
+                    pick.todayDirection = null
+                    nullCount++
+                    return@forEach
+                }
+                val frgnr = firstItem.frgnr_invsr?.toLongOrNull() ?: 0L
+                val penfnd = firstItem.penfnd_etc?.toLongOrNull() ?: 0L
+                val direction = computeTodayDirection(frgnr, penfnd, pick.originSide)
+                pick.todayDirection = direction
+                when (direction) {
+                    "MATCH" -> matchCount++
+                    "MISMATCH" -> mismatchCount++
+                    else -> nullCount++
+                }
+            } catch (e: Exception) {
+                log.error(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
+                pick.todayDirection = null
+                nullCount++
+            }
+        }
+        stockPickRepository.saveAll(picks)
+        log.info { "당일 매매 동향 갱신: MATCH=$matchCount, MISMATCH=$mismatchCount, NULL=$nullCount" }
+    }
+
+    private fun computeTodayDirection(frgnr: Long, penfnd: Long, originSide: String?): String? {
+        return when (originSide) {
+            "BUY" -> when {
+                frgnr > 0 && penfnd > 0 -> "MATCH"
+                frgnr < 0 || penfnd < 0 -> "MISMATCH"
+                else -> null
+            }
+            "SELL" -> when {
+                frgnr < 0 && penfnd < 0 -> "MATCH"
+                frgnr > 0 || penfnd > 0 -> "MISMATCH"
+                else -> null
+            }
+            else -> null
+        }
+    }
+
     private fun doRecommendStock() {
+        val isHoliday = holidayService.isHoliday()
+        val todayOffset = if (isHoliday) 0 else TODAY_OFFSET
+
+        val now = if (isHoliday) {
+            holidayService.lastTradingDay().atTime(22, 0)
+        } else {
+            LocalDateTime.now()
+        }
+
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
@@ -63,143 +182,468 @@ class RecommendService(
             )
         )
 
-        var frgnrList: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
-        var penfndList: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
-        var result: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
-        var recommendResult: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
-        var avoidResult: MutableList<KiwoomInvestorTradeCloseMarketItemList> = mutableListOf()
+        val processed: List<ProcessedPick> = if (kiwoomInvestorTradeCloseMarketRes.return_code == 0) {
+            val items = kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde ?: emptyList()
+            val buyCandidates = extractIntersection(items, sortDesc = true)
+            val sellCandidates = extractIntersection(items, sortDesc = false)
 
-        if (kiwoomInvestorTradeCloseMarketRes.return_code == 0) {
-            // 외국인 순매수금액 top 100
-            kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedByDescending { it.frgnr_invsr?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { frgnrList = it.toList() }
-            // 연기금 순매수금액 top 100
-            kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde?.sortedByDescending { it.penfnd_etc?.toLongOrNull() ?: 0L }?.stream()?.limit(100)?.let { penfndList = it.toList() }
+            log.info {
+                "BUY 후보(${buyCandidates.size}): " +
+                    buyCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
+            }
+            log.info {
+                "SELL 후보(${sellCandidates.size}): " +
+                    sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
+            }
 
-            // 외국인/연기금 순매수금액 top 100에 동시에 들어간 주식 추출
-            val stkCdSet = frgnrList.map { it.stk_cd }.toSet()
-            result = penfndList.filter { it.stk_cd in stkCdSet }.sortedByDescending { (it.frgnr_invsr?.toLongOrNull() ?: 0L) + (it.penfnd_etc?.toLongOrNull() ?: 0L) }.toList().toMutableList()
-
-            // 외국인/연기금 순매수금액 동시 top 100에 들어간 주식의 종목별투자자기관별 조회
-            recommendResult = result.filter {
-                Thread.sleep(100)
-
-                val kiwoomStockInvestor = stockClient.stockInvestor(
-                    req = KiwoomStockInvestorReq(
-                        dt = DateUtil.today("yyyyMMdd"),
-                        stk_cd = it.stk_cd,
-                        amt_qty_tp = "2",
-                        trde_tp = "0",
-                        unit_tp = "1"
-                    )
-                )
-
-                if (kiwoomStockInvestor.return_code == 0) {
-                    var recommendCnt = 0
-                    var isRecommend = false
-                    var frgnrCnt = 0
-                    var orgnCnt = 0
-                    var penfndCnt = 0
-
-                    // 최근 5일간 외국인/기관/연기금 순매수 일수 조회
-                    kiwoomStockInvestor.stk_invsr_orgn?.take(5)?.forEach { invsr ->
-                        val frgnr = invsr.frgnr_invsr?.toLongOrNull() ?: 0
-                        val orgn = invsr.orgn?.toLongOrNull() ?: 0
-                        val penfnd = invsr.penfnd_etc?.toLongOrNull() ?: 0
-
-                        log.info { it.stk_cd + ", " + frgnr + ", " + orgn + ", " + penfnd }
-
-                        if (frgnr > 0) frgnrCnt++
-                        if (orgn > 0) orgnCnt++
-                        if (penfnd > 0) penfndCnt++
-
-                        recommendCnt++
-
-                        if (recommendCnt == 1 && frgnr > 0 && penfnd > 0) isRecommend = true
-                    }
-
-                    (frgnrCnt >= 3 && orgnCnt >= 3 && penfndCnt >= 4) && isRecommend
-                } else {
-                    false
-                }
-            }.toList().toMutableList()
-
-            // 외국인/연기금 순매수금액 동시 top 100에 들어간 주식의 종목별투자자기관별 조회
-            avoidResult = result.filter {
-                Thread.sleep(100)
-
-                val kiwoomStockInvestor = stockClient.stockInvestor(
-                    req = KiwoomStockInvestorReq(
-                        dt = DateUtil.today("yyyyMMdd"),
-                        stk_cd = it.stk_cd,
-                        amt_qty_tp = "2",
-                        trde_tp = "0",
-                        unit_tp = "1"
-                    )
-                )
-
-                if (kiwoomStockInvestor.return_code == 0) {
-                    var avoidCnt = 0
-                    var isAvoid = false
-                    var frgnrCnt = 0
-                    var orgnCnt = 0
-                    var penfndCnt = 0
-
-                    // 최근 5일간 외국인/기관/연기금 순매수 일수 조회
-                    kiwoomStockInvestor.stk_invsr_orgn?.take(5)?.forEach { invsr ->
-                        val frgnr = invsr.frgnr_invsr?.toLongOrNull() ?: 0
-                        val orgn = invsr.orgn?.toLongOrNull() ?: 0
-                        val penfnd = invsr.penfnd_etc?.toLongOrNull() ?: 0
-
-                        if (frgnr > 0) frgnrCnt++
-                        if (orgn > 0) orgnCnt++
-                        if (penfnd > 0) penfndCnt++
-
-                        avoidCnt++
-                        if (avoidCnt == 1 && frgnr < 0 && penfnd < 0) isAvoid = true
-                    }
-
-                    (frgnrCnt < 3 && orgnCnt < 3 && penfndCnt < 4) && isAvoid
-                } else {
-                    false
-                }
-            }.toList().toMutableList()
+            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset) } +
+                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset) }
+        } else {
+            emptyList()
         }
 
-        // 기존 데이터 삭제 후 새로 저장
+        // 현재용 테이블 갱신
         stockPickRepository.deleteAll()
+        stockPickRepository.saveAll(processed.map { it.toCurrentEntity() })
 
-        stockPickRepository.saveAll(
-            recommendResult.filter { item ->
-                item.stk_cd != null && item.stk_nm != null
-            }.map { item ->
-                StockPick(type = "RECOMMEND", stkCd = item.stk_cd!!, stkNm = item.stk_nm!!)
-            } + avoidResult.filter { item ->
-                item.stk_cd != null && item.stk_nm != null
-            }.map { item ->
-                StockPick(type = "AVOID", stkCd = item.stk_cd!!, stkNm = item.stk_nm!!)
+        // 이력용 테이블 누적
+        stockPickHistoryRepository.saveAll(processed.map { it.toHistoryEntity(now) })
+
+        val counts = processed.groupingBy { it.type }.eachCount()
+        log.info {
+            "추천 분류 저장 완료 - " +
+                "STRONG_BUY: ${counts["STRONG_BUY"] ?: 0}, " +
+                "BUY: ${counts["BUY"] ?: 0}, " +
+                "HOLD: ${counts["HOLD"] ?: 0}, " +
+                "SELL: ${counts["SELL"] ?: 0}, " +
+                "STRONG_SELL: ${counts["STRONG_SELL"] ?: 0}"
+        }
+    }
+
+    private fun processCandidate(
+        item: KiwoomInvestorTradeCloseMarketItemList,
+        position: Position,
+        todayOffset: Int = TODAY_OFFSET,
+    ): ProcessedPick? {
+        val stkCd = item.stk_cd ?: return null
+        val stkNm = item.stk_nm ?: return null
+
+        Thread.sleep(API_PACING_MS)
+
+        val investorRes = try {
+            stockClient.stockInvestor(
+                req = KiwoomStockInvestorReq(
+                    dt = DateUtil.today("yyyyMMdd"),
+                    stk_cd = stkCd,
+                    amt_qty_tp = "2",
+                    trde_tp = "0",
+                    unit_tp = "1"
+                )
+            )
+        } catch (e: Exception) {
+            log.error(e) { "stockInvestor 호출 실패 stkCd=$stkCd position=$position" }
+            return null
+        }
+
+        if (investorRes.return_code != 0) {
+            log.info { "[$stkNm($stkCd) $position] return_code=${investorRes.return_code} 컷" }
+            return null
+        }
+        val items = investorRes.stk_invsr_orgn ?: run {
+            log.info { "[$stkNm($stkCd) $position] stk_invsr_orgn null 컷" }
+            return null
+        }
+
+        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val penfndValues = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
+        val frgnrValues = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
+
+        // 연기금 시그널 통과 못 하면 추천 풀에서 제외.
+        if (!evaluateSignal(items, position, todayOffset)) {
+            log.info {
+                "[$stkNm($stkCd) $position] 시그널 미달 컷 — 연기금 시계열=$penfndValues"
             }
+            return null
+        }
+
+        val penfndK = computeK(penfndValues, position, todayOffset)
+        val frgnrBlocked = isForeignerBlocked(items, position, todayOffset)
+        log.info {
+            "[$stkNm($stkCd) $position] 시그널 통과 — penfndK=${"%.2f".format(penfndK)}, frgnrBlocked=$frgnrBlocked, " +
+                "연기금=$penfndValues, 외국인=$frgnrValues"
+        }
+        val pickPrice = abs(items[0].cur_prc?.toLongOrNull() ?: 0L)
+
+        val marketCap = try {
+            stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd)).mac?.toLongOrNull()
+        } catch (e: Exception) {
+            log.error(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
+            null
+        }
+
+        if (marketCap == null || marketCap == 0L) {
+            log.error {
+                "시총 데이터 누락으로 추천 후보 제외 stkCd=$stkCd, stkNm=$stkNm, position=$position, marketCap=$marketCap"
+            }
+            return null
+        }
+
+        val frgnrSignedRatio = computeForeignerSignedMcapRatio(window, marketCap, todayOffset)
+        val effectiveRatio = effectiveForeignerRatio(frgnrSignedRatio, position)
+        val prior = penfndValues.subList(todayOffset + RECENT_WINDOW, penfndValues.size)
+        val priorTrendRatio = computeDominantStrengthRatio(prior)
+        val foreignerAligned = isForeignerDirectionallyAligned(items, position, todayOffset)
+        val type = classify(penfndK, frgnrBlocked, effectiveRatio, position, prior, foreignerAligned)
+        log.info {
+            "[$stkNm($stkCd) $position] 분류=$type — penfndK=${"%.2f".format(penfndK)} " +
+                "(STRONG≥$K_STRONG_OVERRIDE), frgnrSignedRatio=${"%.4f%%".format(frgnrSignedRatio * 100)}, " +
+                "effectiveRatio=${"%.4f%%".format(effectiveRatio * 100)} " +
+                "(BUY≥${MCAP_RATIO_BUY * 100}%, STRONG≥${MCAP_RATIO_STRONG * 100}%), " +
+                "priorTrendRatio=${"%.2f".format(priorTrendRatio)} (STRONG격상≥$TREND_CLARITY_THRESHOLD), " +
+                "foreignerAligned=$foreignerAligned, marketCap=${marketCap}억"
+        }
+
+        return ProcessedPick(
+            type = type,
+            stkCd = stkCd,
+            stkNm = stkNm,
+            penfndK = penfndK,
+            frgnrBlocked = frgnrBlocked,
+            frgnrMcapRatio = frgnrSignedRatio,
+            pickPrice = pickPrice,
+            marketCap = marketCap,
+            originSide = position.name,
+        )
+    }
+
+    /**
+     * prior 10일 매수/매도 강도 비율 — 한 방향이 전체 강도의 몇 %를 차지하는지.
+     *
+     * 횡보 판정 (`< TREND_CLARITY_THRESHOLD`)에 사용. 일수가 아닌 **강도** 기반이라
+     * 5일×+5000 + 5일×-500 같은 "일수 비등하지만 강도 한쪽 압도적" 케이스를
+     * 추세 명확으로 인정 (false positive 방지).
+     */
+    internal fun computeDominantStrengthRatio(values: List<Long>): Double {
+        val buyTotal = values.filter { it > 0 }.sumOf { it.toDouble() }
+        val sellTotal = abs(values.filter { it < 0 }.sumOf { it.toDouble() })
+        val total = buyTotal + sellTotal
+        if (total == 0.0) return 0.5  // 데이터 없음 = 중립
+        return maxOf(buyTotal, sellTotal) / total
+    }
+
+    /**
+     * 외국인 방향성 동조 검사 — "외국인이 12일 동안 추천 방향과 같은 방향으로 일관 매매했는가"
+     *
+     * 시총 비중 임계 미달 종목(예: 두산 같은 시총 큰 지주사)을 구제하기 위한 보조 룰.
+     * 외국인 거래량은 작아도 prior 10일 추세가 명확(≥ 70%)하고 recent 2일도 그 방향 유지면
+     * "조용한 매도/매수 추세" 시그널로 인정.
+     *
+     * 3가지 조건 모두 충족 시 true:
+     *   ① 외국인 prior 10일 magnitude ratio ≥ 70% (한 방향 일관)
+     *   ② 외국인 prior 10일 sum 방향 = 추천 방향
+     *   ③ 외국인 recent 2일 sum 방향 = 추천 방향
+     */
+    internal fun isForeignerDirectionallyAligned(
+        items: List<KiwoomStockInvestor>,
+        position: Position,
+        todayOffset: Int = TODAY_OFFSET,
+    ): Boolean {
+        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        if (window.size <= todayOffset + RECENT_WINDOW) return false
+        val frgnr = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
+        val recent = frgnr.subList(todayOffset, todayOffset + RECENT_WINDOW)
+        val prior = frgnr.subList(todayOffset + RECENT_WINDOW, frgnr.size)
+        if (prior.isEmpty()) return false
+
+        // 조건 ①: prior 10일 추세 명확 (B' 와 동일 임계 재사용)
+        val priorRatio = computeDominantStrengthRatio(prior)
+        if (priorRatio < TREND_CLARITY_THRESHOLD) return false
+
+        // 조건 ②③: prior + recent 둘 다 추천 방향 일치
+        val priorSum = prior.sum()
+        val recentSum = recent.sum()
+        return when (position) {
+            Position.SELL -> priorSum < 0 && recentSum < 0
+            Position.BUY -> priorSum > 0 && recentSum > 0
+        }
+    }
+
+    /**
+     * 분류 규칙 우선순위:
+     * 1. 외국인 BLOCK → HOLD (외국인이 추천 반대 방향으로 강한 시그널)
+     * 2. STRONG 격상 (연기금 K ≥ 3.0 또는 외국인 시총 비중 ≥ 0.1%) + prior 추세 명확(B' ≥ 70%) → STRONG
+     * 3. 외국인 시총 비중 ≥ MCAP_RATIO_BUY (0.05%) → BUY/SELL
+     * 4. **(옵션 B)** 외국인 방향성 동조 (12일 추세 일관) → BUY/SELL ← 신규: 시총 비중 미달 구제
+     * 5. 그 외 → HOLD
+     *
+     * @param foreignerAligned [isForeignerDirectionallyAligned] 결과. 호출부에서 미리 계산해서 전달.
+     */
+    internal fun classify(
+        penfndK: Double,
+        frgnrBlocked: Boolean,
+        foreignerEffectiveRatio: Double,
+        position: Position,
+        prior: List<Long>,
+        foreignerAligned: Boolean = false,
+    ): String {
+        if (frgnrBlocked) return "HOLD"
+        val sideName = position.name
+
+        val priorTrendUnclear = computeDominantStrengthRatio(prior) < TREND_CLARITY_THRESHOLD
+
+        // STRONG 격상은 prior 추세 명확할 때만 (모호하면 1단계 격하)
+        if (penfndK >= K_STRONG_OVERRIDE && !priorTrendUnclear) return "STRONG_$sideName"
+        return when {
+            foreignerEffectiveRatio >= MCAP_RATIO_STRONG && !priorTrendUnclear -> "STRONG_$sideName"
+            foreignerEffectiveRatio >= MCAP_RATIO_BUY -> sideName  // BUY/SELL은 격하 영향 없음
+            foreignerAligned -> sideName  // 옵션 B: 시총 비중 미달이지만 외국인 12일 일관 추세
+            else -> "HOLD"
+        }
+    }
+
+    /**
+     * 연기금 K값 계산 (평균/평균 비교).
+     * BUY: recent 일평균 매수 / prior 일평균 매도
+     * SELL: recent 일평균 매도 / prior 일평균 매수
+     * 의미: K = "매수 강도가 매도 강도의 K배" (또는 그 반대).
+     *
+     * @param todayOffset 평일 정규 실행 시 1 (idx 0 제외), 휴일 force 트리거 시 0 (idx 0 = 마지막 거래일 포함).
+     */
+    internal fun computeK(values: List<Long>, position: Position, todayOffset: Int = TODAY_OFFSET): Double {
+        if (values.size <= todayOffset + RECENT_WINDOW) return 0.0
+        val recent = values.subList(todayOffset, todayOffset + RECENT_WINDOW)
+        val prior = values.subList(todayOffset + RECENT_WINDOW, values.size)
+        if (prior.isEmpty()) return 0.0
+        val priorAvg = prior.sum().toDouble() / prior.size
+        val recentAvg = recent.sum().toDouble() / recent.size
+        return when (position) {
+            Position.BUY -> if (priorAvg < 0) recentAvg / -priorAvg else 0.0
+            Position.SELL -> if (priorAvg > 0) -recentAvg / priorAvg else 0.0
+        }
+    }
+
+    /**
+     * recent 2일 외국인 순매수 금액(원) ÷ 시가총액(원).
+     *
+     * 키움 ka10001의 mac 필드는 **억원 단위**라 원으로 환산해서 분모로 사용.
+     * 결과 부호: 양수=매수 방향, 음수=매도 방향.
+     *
+     * @param todayOffset 평일=1 (idx 0 제외), 휴일 force=0 (idx 0 포함).
+     */
+    private fun computeForeignerSignedMcapRatio(
+        window: List<KiwoomStockInvestor>,
+        marketCap: Long,
+        todayOffset: Int = TODAY_OFFSET,
+    ): Double {
+        if (marketCap <= 0L) return 0.0
+        val recent = if (window.size > todayOffset) {
+            window.subList(todayOffset, minOf(todayOffset + RECENT_WINDOW, window.size))
+        } else emptyList()
+        val signedAmount = recent.sumOf {
+            val qty = it.frgnr_invsr?.toLongOrNull() ?: 0L
+            val price = abs(it.cur_prc?.toLongOrNull() ?: 0L)
+            qty * price
+        }
+        val marketCapWon = marketCap * MARKET_CAP_UNIT_WON
+        return signedAmount.toDouble() / marketCapWon
+    }
+
+    /** 분류용 effective ratio: 추천 방향과 같은 부호일 때 절대값, 반대 부호면 0. */
+    private fun effectiveForeignerRatio(signedRatio: Double, position: Position): Double = when (position) {
+        Position.BUY -> if (signedRatio > 0) signedRatio else 0.0
+        Position.SELL -> if (signedRatio < 0) -signedRatio else 0.0
+    }
+
+    private data class ProcessedPick(
+        val type: String,
+        val stkCd: String,
+        val stkNm: String,
+        val penfndK: Double,
+        val frgnrBlocked: Boolean,
+        val frgnrMcapRatio: Double?,
+        val pickPrice: Long,
+        val marketCap: Long?,
+        val originSide: String,
+    ) {
+        fun toCurrentEntity(): StockPick = StockPick(
+            type = type,
+            stkCd = stkCd,
+            stkNm = stkNm,
+            penfndK = penfndK,
+            frgnrBlocked = frgnrBlocked,
+            frgnrMcapRatio = frgnrMcapRatio,
+            originSide = originSide,
         )
 
-        log.info { "매수 추천 종목 ${recommendResult.size}건, 매도 추천 종목 ${avoidResult.size}건 저장 완료" }
+        fun toHistoryEntity(pickDate: LocalDateTime): StockPickHistory = StockPickHistory(
+            type = type,
+            stkCd = stkCd,
+            stkNm = stkNm,
+            penfndK = penfndK,
+            frgnrBlocked = frgnrBlocked,
+            frgnrMcapRatio = frgnrMcapRatio,
+            pickPrice = pickPrice,
+            marketCap = marketCap,
+            originSide = originSide,
+            pickDate = pickDate,
+        )
+    }
+
+    private fun extractIntersection(
+        items: List<KiwoomInvestorTradeCloseMarketItemList>,
+        sortDesc: Boolean
+    ): List<KiwoomInvestorTradeCloseMarketItemList> {
+        val frgnrSorted = if (sortDesc) {
+            items.sortedByDescending { it.frgnr_invsr?.toLongOrNull() ?: 0L }
+        } else {
+            items.sortedBy { it.frgnr_invsr?.toLongOrNull() ?: 0L }
+        }
+        val penfndSorted = if (sortDesc) {
+            items.sortedByDescending { it.penfnd_etc?.toLongOrNull() ?: 0L }
+        } else {
+            items.sortedBy { it.penfnd_etc?.toLongOrNull() ?: 0L }
+        }
+
+        val frgnrTopCodes = frgnrSorted.take(TOP_N).mapNotNull { it.stk_cd }.toSet()
+        return penfndSorted.take(TOP_N).filter { it.stk_cd in frgnrTopCodes }
+    }
+
+    /**
+     * 연기금 [position] 시그널(K_SIGNAL + 부호 일관성) 만족 여부.
+     * 외국인 BLOCK 검사는 별도 단계에서 수행 (분류 시 BLOCK이면 HOLD로 분류).
+     *
+     * @param todayOffset 평일=1 (idx 0 in-progress 제외), 휴일 force=0 (idx 0 = 마지막 거래일 포함).
+     */
+    internal fun evaluateSignal(
+        items: List<KiwoomStockInvestor>,
+        position: Position,
+        todayOffset: Int = TODAY_OFFSET,
+    ): Boolean {
+        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val penfnd = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
+        return evaluateColumn(penfnd, position, K_SIGNAL, requireSignConsistency = true, todayOffset = todayOffset)
+    }
+
+    /**
+     * 외국인이 추천 방향과 반대로 강한 시그널(K_BLOCK + 부호 일관성)이면 차단.
+     *
+     * @param todayOffset 평일=1, 휴일 force=0.
+     */
+    internal fun isForeignerBlocked(
+        items: List<KiwoomStockInvestor>,
+        position: Position,
+        todayOffset: Int = TODAY_OFFSET,
+    ): Boolean {
+        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val frgnr = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
+        val opposite = if (position == Position.BUY) Position.SELL else Position.BUY
+        return evaluateColumn(frgnr, opposite, K_BLOCK, requireSignConsistency = true, todayOffset = todayOffset)
+    }
+
+    /**
+     * 평균/평균 비교 식. K = "매수 강도가 매도 강도의 K배" (또는 매도 강도가 매수의 K배).
+     *
+     * 인덱스 구조 (todayOffset=1 평일 기본):
+     * - idx 0 (당일, 평가 제외)
+     * - idx 1 ~ idx 2 = recent (어제 + 엊그제)
+     * - idx 3 ~ end = prior 10일
+     *
+     * 휴일 force 트리거(todayOffset=0):
+     * - idx 0 ~ idx 1 = recent (마지막 거래일 + 그 직전 거래일, 모두 완전 집계됨)
+     * - idx 2 ~ end = prior 10일
+     *
+     * BUY: 이전 N일 누적 순매도 + 최근 2일 누적 순매수가 일평균 매도분의 [k]배 이상
+     * SELL: 이전 N일 누적 순매수 + 최근 2일 누적 순매도가 일평균 매수분의 [k]배 이상
+     * [requireSignConsistency]가 true면 recent 2일 부호가 모두 같은 방향이어야 함 (단발 노이즈 컷).
+     */
+    internal fun evaluateColumn(
+        values: List<Long>,
+        position: Position,
+        k: Double,
+        requireSignConsistency: Boolean,
+        todayOffset: Int = TODAY_OFFSET,
+    ): Boolean {
+        if (values.size <= todayOffset + RECENT_WINDOW) return false
+
+        val recent = values.subList(todayOffset, todayOffset + RECENT_WINDOW)
+        val prior = values.subList(todayOffset + RECENT_WINDOW, values.size)
+        if (prior.isEmpty()) return false
+
+        // signed sum: 양수면 매수 우세, 음수면 매도 우세
+        val priorNetBuy = prior.sum()
+        val recentNetBuy = recent.sum()
+
+        return when (position) {
+            Position.BUY -> {
+                if (priorNetBuy >= 0 || recentNetBuy <= 0) return false
+                if (requireSignConsistency && recent.any { it < 0 }) return false
+                val priorAvgSell = -priorNetBuy.toDouble() / prior.size  // prior 일평균 매도 (양수)
+                val recentAvgBuy = recentNetBuy.toDouble() / recent.size // recent 일평균 매수 (양수)
+                recentAvgBuy >= priorAvgSell * k
+            }
+            Position.SELL -> {
+                if (priorNetBuy <= 0 || recentNetBuy >= 0) return false
+                if (requireSignConsistency && recent.any { it > 0 }) return false
+                val priorAvgBuy = priorNetBuy.toDouble() / prior.size      // prior 일평균 매수 (양수)
+                val recentAvgSell = -recentNetBuy.toDouble() / recent.size // recent 일평균 매도 (양수)
+                recentAvgSell >= priorAvgBuy * k
+            }
+        }
+    }
+
+    internal enum class Position { BUY, SELL }
+
+    companion object {
+        private const val TOP_N = 100
+        private const val TODAY_OFFSET = 1   // idx 0 = 당일 (평가 제외, 보조 지표용)
+        private const val RECENT_WINDOW = 2  // idx 1+2 = 어제+엊그제
+        private const val PRIOR_WINDOW = 10  // idx 3~12
+        private const val K_SIGNAL = 1.5          // 연기금 시그널 통과 임계 (평균/평균)
+        private const val K_BLOCK = 1.5           // 외국인 차단 임계 (평균/평균)
+        private const val K_STRONG_OVERRIDE = 3.0 // 연기금 STRONG 격상 임계 (평균/평균)
+        private const val TREND_CLARITY_THRESHOLD = 0.7 // prior 강도 비율 임계 (미만이면 STRONG 격하)
+        private const val MCAP_RATIO_BUY = 0.0005    // 0.05%
+        private const val MCAP_RATIO_STRONG = 0.001  // 0.1%
+        private const val MARKET_CAP_UNIT_WON = 100_000_000L  // 키움 ka10001 mac 필드: 억원 단위
+        private const val API_PACING_MS = 500L
+        private const val KIWOOM_BROKER_NAME = "키움증권"
+        private const val STREAK_LOOKBACK_DAYS = 45L      // history / 운영 사이클 조회 기간
     }
 
     fun listRecommendations(): RecommendListRes {
         val allPicks = stockPickRepository.findAll()
 
-        val recommendList = allPicks.filter { it.type == "RECOMMEND" }.map { entity ->
-            RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
-        }.toMutableList()
+        val holdingCodes = loadHoldingStkCds()
+        val historyByStkCd = loadRecentHistoryByStkCd(allPicks.map { it.stkCd })
+        val operatingDates = loadOperatingDates()
 
-        val avoidList = allPicks.filter { it.type == "AVOID" }.map { entity ->
-            RecommendListItem(stkCd = entity.stkCd, stkNm = entity.stkNm)
-        }.toMutableList()
+        fun toItem(entity: StockPick): RecommendListItem = RecommendListItem(
+            type = entity.type,
+            stkCd = entity.stkCd,
+            stkNm = entity.stkNm,
+            todayDirection = entity.todayDirection,
+            isHolding = entity.stkCd in holdingCodes,
+            streakDays = computeStreakDays(
+                histories = historyByStkCd[entity.stkCd] ?: emptyList(),
+                currentType = entity.type,
+                operatingDates = operatingDates,
+            ),
+        )
 
-        val allCodes = (recommendList + avoidList).mapNotNull { it.stkCd }.joinToString("|")
+        val recommendList = allPicks.filter { it.type == "STRONG_BUY" || it.type == "BUY" }
+            .map(::toItem).toMutableList()
+        val avoidList = allPicks.filter { it.type == "STRONG_SELL" || it.type == "SELL" }
+            .map(::toItem).toMutableList()
+        val holdList = allPicks.filter { it.type == "HOLD" }
+            .map(::toItem).toMutableList()
+
+        val allItems = recommendList + avoidList + holdList
+        val allCodes = allItems.mapNotNull { it.stkCd }.joinToString("|")
         if (allCodes.isNotBlank()) {
             val kiwoomStockInterestRes = stockClient.stockInterest(req = KiwoomStockInterestReq(stk_cd = allCodes))
             if (kiwoomStockInterestRes.return_code == 0) {
                 val infoMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd } ?: emptyMap()
-                (recommendList + avoidList).forEach { item ->
+                allItems.forEach { item ->
                     infoMap[item.stkCd]?.let { info ->
                         item.curPrc = info.cur_prc
                         item.fluRt = info.flu_rt
@@ -210,7 +654,92 @@ class RecommendService(
             }
         }
 
-        return RecommendListRes(recommendList = recommendList, avoidList = avoidList)
+        return RecommendListRes(recommendList = recommendList, avoidList = avoidList, holdList = holdList)
+    }
+
+    private fun loadHoldingStkCds(): Set<String> {
+        val loginId = currentLoginIdOrNull() ?: return emptySet()
+        val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return emptySet()
+        val broker = brokerRepository.findByName(KIWOOM_BROKER_NAME) ?: return emptySet()
+        return memberHoldingRepository
+            .findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(member.id, broker.id)
+            .map { it.stkCd }
+            .toSet()
+    }
+
+    /** stkCd 별 최근 STREAK_LOOKBACK_DAYS 일 history (pickDate desc). 빈 입력이면 emptyMap. */
+    private fun loadRecentHistoryByStkCd(stkCds: List<String>): Map<String, List<StockPickHistory>> {
+        if (stkCds.isEmpty()) return emptyMap()
+        val after = LocalDateTime.now().minusDays(STREAK_LOOKBACK_DAYS)
+        return stockPickHistoryRepository
+            .findByStkCdInAndPickDateAfterOrderByStkCdAscPickDateDesc(stkCds, after)
+            .groupBy { it.stkCd }
+    }
+
+    /**
+     * 추천 스케줄러가 정상 운영된 날짜 집합 (desc).
+     *
+     * scheduler_log 의 RecommendScheduler 실행 이력 중 SUCCESS / INTERRUPTED (timeout 났으나 결국 성공)
+     * 만 운영일로 친다. FAILED 는 history row 가 부분만 저장됐을 수 있어 제외.
+     *
+     * 휴장·시스템 다운 → 로그 자체가 없음 → 자동으로 streak 계산에서 skip 되어 부풀림이나 단절 모두 막는다.
+     */
+    private fun loadOperatingDates(): List<LocalDate> {
+        val after = LocalDateTime.now().minusDays(STREAK_LOOKBACK_DAYS)
+        return schedulerLogRepository
+            .findBySchedulerNameAndStatusInAndStartedAtAfter(
+                SchedulerName.RecommendScheduler.name,
+                listOf("SUCCESS", "INTERRUPTED"),
+                after,
+            )
+            .map { it.startedAt.toLocalDate() }
+            .distinct()
+            .sortedDescending()
+    }
+
+    private fun currentLoginIdOrNull(): String? {
+        val auth = SecurityContextHolder.getContext().authentication ?: return null
+        if (!auth.isAuthenticated) return null
+        if (auth.name == "anonymousUser") return null
+        return auth.name
+    }
+
+    /**
+     * 같은 진영(매수: STRONG_BUY+BUY / 매도: STRONG_SELL+SELL)으로 연속 추천된 일수 계산.
+     *
+     * 알고리즘: 최근 운영일부터 거꾸로 훑으며
+     * - 그 운영일에 이 종목 row 가 없거나(추천 풀에서 빠진 날) → 단절
+     * - row 가 있어도 진영이 다르면(HOLD 또는 반대) → 단절
+     * - 같은 진영이면 streak++
+     *
+     * 규칙:
+     * - currentType 이 HOLD/알 수 없는 값 → 0
+     * - 같은 날짜 row 여러 개면 가장 늦은 시각 row 채택 (manual trigger 중복 방지)
+     * - operatingDates 에 없는 날(휴장/시스템 다운)은 자연스럽게 skip → 휴장 전후 streak 유지
+     */
+    internal fun computeStreakDays(
+        histories: List<StockPickHistory>,
+        currentType: String,
+        operatingDates: List<LocalDate>,
+    ): Int {
+        val camp = when (currentType) {
+            "STRONG_BUY", "BUY" -> setOf("STRONG_BUY", "BUY")
+            "STRONG_SELL", "SELL" -> setOf("STRONG_SELL", "SELL")
+            else -> return 0
+        }
+
+        // 같은 날짜의 가장 늦은 시각 row 만 사용. 입력 정렬 순서에 의존하지 않도록 명시적으로 maxBy.
+        val typeByDate: Map<LocalDate, String> = histories
+            .groupBy { it.pickDate.toLocalDate() }
+            .mapValues { (_, rows) -> rows.maxBy { it.pickDate }.type }
+
+        var streak = 0
+        for (opDate in operatingDates) {
+            val type = typeByDate[opDate] ?: break
+            if (type !in camp) break
+            streak++
+        }
+        return streak
     }
 
     fun streamRecommendations(

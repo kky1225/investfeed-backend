@@ -6,6 +6,7 @@ enum class SchedulerName(
     val type: SchedulerType,
     val defaultTimeoutSec: Int,
     val label: String,
+    val blockedOnHoliday: Boolean = false,
 ) {
     PriceAlertScheduler(SchedulerType.FAST, 60, "매분"),
     MarketIndexScheduler(SchedulerType.FAST, 60, "매분"),
@@ -15,7 +16,8 @@ enum class SchedulerName(
     StockDividendScheduler(SchedulerType.SLOW, 60, "매일 13:30"),
     ApiKeyExpiryScheduler(SchedulerType.SLOW, 60, "매일 09:00"),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00"),
-    RecommendScheduler(SchedulerType.SLOW, 120, "매시 30분"),
+    RecommendScheduler(SchedulerType.SLOW, 300, "매일 22:00", blockedOnHoliday = true),
+    RecommendTodayDirectionScheduler(SchedulerType.SLOW, 120, "매시 정각", blockedOnHoliday = true),
     IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00"),
     HolidayRefreshScheduler(SchedulerType.SLOW, 120, "매월 1일 00:05"),
     CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분"),

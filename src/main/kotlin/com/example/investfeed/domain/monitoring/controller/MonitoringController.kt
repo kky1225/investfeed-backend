@@ -127,8 +127,11 @@ class MonitoringController(
 
     @PostMapping("/scheduler-status/{name}/trigger")
     @RequiresAction(action = Actions.CREATE)
-    fun triggerScheduler(@PathVariable name: String): ResponseEntity<ApiResponse<TriggerSchedulerRes>> {
-        manualTriggerService.trigger(name)
+    fun triggerScheduler(
+        @PathVariable name: String,
+        @RequestParam(defaultValue = "false") force: Boolean,
+    ): ResponseEntity<ApiResponse<TriggerSchedulerRes>> {
+        manualTriggerService.trigger(name, force)
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.MONITORING_SCHEDULER_TRIGGER.code,
