@@ -60,6 +60,8 @@ enum class ResponseCode(
 
     RECOMMEND_LIST(message = "주식 추천 목록 조회에 성공하셨습니다."),
     RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다."),
+    RECOMMEND_SETTING(message = "추천 설정 조회에 성공하셨습니다."),
+    RECOMMEND_SETTING_SAVE(message = "추천 설정 저장에 성공하셨습니다."),
 
     AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
     AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),

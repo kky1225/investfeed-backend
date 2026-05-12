@@ -23,7 +23,9 @@ data class StockInfo(
     var tm: String? = null, // 시간
     var trdePrica: String? = null, // 누적거래대금
     var nxtEnable: String? = null, // NXT가능여부
-    var orderWarning: String? = null, // 투자유의종목여부
+    var orderWarning: String? = null, // 투자유의종목여부 (0:해당없음, 1:ETF투자주의, 2:정리매매, 3:단기과열, 4:투자위험, 5:투자경고)
+    var auditInfo: String? = null, // 감리구분 (정상 / 투자주의환기종목 / 거래정지)
+    var state: String? = null, // 종목상태 (예: "관리종목", "증거금20%|담보대출|신용가능")
     var marketCode: String? = null, // 시장구분코드
     var marketName: String? = null, // 시장명
     var upName: String? = null, // 업종명

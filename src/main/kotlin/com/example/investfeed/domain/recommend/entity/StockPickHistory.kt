@@ -40,6 +40,27 @@ class StockPickHistory(
     @Column(name = "today_direction")
     val todayDirection: String? = null,
 
+    @Column(name = "is_managed")
+    val isManaged: Boolean? = null,
+
+    @Column(name = "is_delisting")
+    val isDelisting: Boolean? = null,
+
+    @Column(name = "is_overheated")
+    val isOverheated: Boolean? = null,
+
+    @Column(name = "is_investment_risk")
+    val isInvestmentRisk: Boolean? = null,
+
+    @Column(name = "is_investment_warning")
+    val isInvestmentWarning: Boolean? = null,
+
+    @Column(name = "is_investor_alert")
+    val isInvestorAlert: Boolean? = null,
+
+    @Column(name = "is_trading_halted")
+    val isTradingHalted: Boolean? = null,
+
     @Column(name = "pick_date", nullable = false)
     val pickDate: LocalDateTime,
 )

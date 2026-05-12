@@ -82,13 +82,13 @@ class FredClient(
             } catch (e: FredApiException) {
                 lastError = e
                 log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+                if (attempt < 2) Thread.sleep(1_000L * (attempt + 1))
             } catch (e: FredSeriesObservationsException) {
                 throw e
             } catch (e: Exception) {
                 lastError = e
                 log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+                if (attempt < 2) Thread.sleep(1_000L * (attempt + 1))
             }
         }
 
@@ -141,13 +141,13 @@ class FredClient(
             } catch (e: FredApiException) {
                 lastError = e
                 log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+                if (attempt < 2) Thread.sleep(1_000L * (attempt + 1))
             } catch (e: FredReleaseDatesException) {
                 throw e
             } catch (e: Exception) {
                 lastError = e
                 log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+                if (attempt < 2) Thread.sleep(1_000L * (attempt + 1))
             }
         }
 

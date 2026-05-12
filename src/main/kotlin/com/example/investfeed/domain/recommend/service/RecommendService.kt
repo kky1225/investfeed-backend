@@ -5,16 +5,18 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
-import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
+import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.entity.StockPick
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
+import com.example.investfeed.domain.stock.dto.res.StockInfoList
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
@@ -48,10 +50,10 @@ class RecommendService(
     private val memberRepository: MemberRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val brokerRepository: BrokerRepository,
-    private val schedulerLogRepository: SchedulerLogRepository,
     private val holidayService: HolidayService,
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
+    private val recommendSettingService: RecommendSettingService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -148,15 +150,18 @@ class RecommendService(
     }
 
     private fun computeTodayDirection(frgnr: Long, penfnd: Long, originSide: String?): String? {
+        // MATCH: 외인+연기금 둘 다 추천 방향
+        // MISMATCH: 외인+연기금 둘 다 추천 반대 방향 (강한 추세 전환 신호)
+        // null: 한쪽만 반대거나 데이터 부족 (단기 노이즈 가능성 — 표시 안 함)
         return when (originSide) {
             "BUY" -> when {
                 frgnr > 0 && penfnd > 0 -> "MATCH"
-                frgnr < 0 || penfnd < 0 -> "MISMATCH"
+                frgnr < 0 && penfnd < 0 -> "MISMATCH"
                 else -> null
             }
             "SELL" -> when {
                 frgnr < 0 && penfnd < 0 -> "MATCH"
-                frgnr > 0 || penfnd > 0 -> "MISMATCH"
+                frgnr > 0 && penfnd > 0 -> "MISMATCH"
                 else -> null
             }
             else -> null
@@ -172,6 +177,8 @@ class RecommendService(
         } else {
             LocalDateTime.now()
         }
+
+        val riskMap = buildRiskCategoryMap()
 
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
@@ -196,8 +203,8 @@ class RecommendService(
                     sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
             }
 
-            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset) } +
-                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset) }
+            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset, riskMap) } +
+                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset, riskMap) }
         } else {
             emptyList()
         }
@@ -224,6 +231,7 @@ class RecommendService(
         item: KiwoomInvestorTradeCloseMarketItemList,
         position: Position,
         todayOffset: Int = TODAY_OFFSET,
+        riskMap: Map<String, RiskFlags> = emptyMap(),
     ): ProcessedPick? {
         val stkCd = item.stk_cd ?: return null
         val stkNm = item.stk_nm ?: return null
@@ -303,6 +311,8 @@ class RecommendService(
                 "foreignerAligned=$foreignerAligned, marketCap=${marketCap}억"
         }
 
+        val riskFlags = riskMap[stkCd] ?: RiskFlags.UNKNOWN
+
         return ProcessedPick(
             type = type,
             stkCd = stkCd,
@@ -313,7 +323,54 @@ class RecommendService(
             pickPrice = pickPrice,
             marketCap = marketCap,
             originSide = position.name,
+            riskFlags = riskFlags,
         )
+    }
+
+    private fun buildRiskCategoryMap(): Map<String, RiskFlags> {
+        return try {
+            val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList()
+            Thread.sleep(API_PACING_MS)
+            val kosdaq = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList()
+            val combined = kospi + kosdaq
+            val map = combined
+                .filter { !it.code.isNullOrBlank() }
+                .associate { it.code!! to RiskFlags.from(it) }
+            log.info { "위험 카테고리 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, distinct=${map.size}" }
+            map
+        } catch (e: Exception) {
+            log.error(e) { "위험 카테고리 맵 구축 실패 - 빈 맵 반환" }
+            emptyMap()
+        }
+    }
+
+    internal data class RiskFlags(
+        val isManaged: Boolean?,
+        val isDelisting: Boolean?,
+        val isOverheated: Boolean?,
+        val isInvestmentRisk: Boolean?,
+        val isInvestmentWarning: Boolean?,
+        val isInvestorAlert: Boolean?,
+        val isTradingHalted: Boolean?,
+    ) {
+        companion object {
+            /** 위험 카테고리 정보 미확보 — 모든 플래그 null. */
+            val UNKNOWN = RiskFlags(null, null, null, null, null, null, null)
+
+            fun from(item: StockInfoList): RiskFlags {
+                val stateValues = (item.state ?: "").split("|").map { it.trim() }
+                val ow = item.orderWarning
+                return RiskFlags(
+                    isManaged = stateValues.contains("관리종목"),
+                    isDelisting = ow == "2",
+                    isOverheated = ow == "3",
+                    isInvestmentRisk = ow == "4",
+                    isInvestmentWarning = ow == "5",
+                    isInvestorAlert = item.auditInfo == "투자주의환기종목",
+                    isTradingHalted = item.auditInfo == "거래정지",
+                )
+            }
+        }
     }
 
     /**
@@ -464,6 +521,7 @@ class RecommendService(
         val pickPrice: Long,
         val marketCap: Long?,
         val originSide: String,
+        val riskFlags: RiskFlags,
     ) {
         fun toCurrentEntity(): StockPick = StockPick(
             type = type,
@@ -473,6 +531,13 @@ class RecommendService(
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrMcapRatio,
             originSide = originSide,
+            isManaged = riskFlags.isManaged,
+            isDelisting = riskFlags.isDelisting,
+            isOverheated = riskFlags.isOverheated,
+            isInvestmentRisk = riskFlags.isInvestmentRisk,
+            isInvestmentWarning = riskFlags.isInvestmentWarning,
+            isInvestorAlert = riskFlags.isInvestorAlert,
+            isTradingHalted = riskFlags.isTradingHalted,
         )
 
         fun toHistoryEntity(pickDate: LocalDateTime): StockPickHistory = StockPickHistory(
@@ -485,6 +550,13 @@ class RecommendService(
             pickPrice = pickPrice,
             marketCap = marketCap,
             originSide = originSide,
+            isManaged = riskFlags.isManaged,
+            isDelisting = riskFlags.isDelisting,
+            isOverheated = riskFlags.isOverheated,
+            isInvestmentRisk = riskFlags.isInvestmentRisk,
+            isInvestmentWarning = riskFlags.isInvestmentWarning,
+            isInvestorAlert = riskFlags.isInvestorAlert,
+            isTradingHalted = riskFlags.isTradingHalted,
             pickDate = pickDate,
         )
     }
@@ -612,9 +684,10 @@ class RecommendService(
 
     fun listRecommendations(): RecommendListRes {
         val allPicks = stockPickRepository.findAll()
+        val filteredPicks = applyRiskFilter(allPicks)
 
         val holdingCodes = loadHoldingStkCds()
-        val historyByStkCd = loadRecentHistoryByStkCd(allPicks.map { it.stkCd })
+        val historyByStkCd = loadRecentHistoryByStkCd(filteredPicks.map { it.stkCd })
         val operatingDates = loadOperatingDates()
 
         fun toItem(entity: StockPick): RecommendListItem = RecommendListItem(
@@ -630,11 +703,11 @@ class RecommendService(
             ),
         )
 
-        val recommendList = allPicks.filter { it.type == "STRONG_BUY" || it.type == "BUY" }
+        val recommendList = filteredPicks.filter { it.type == "STRONG_BUY" || it.type == "BUY" }
             .map(::toItem).toMutableList()
-        val avoidList = allPicks.filter { it.type == "STRONG_SELL" || it.type == "SELL" }
+        val avoidList = filteredPicks.filter { it.type == "STRONG_SELL" || it.type == "SELL" }
             .map(::toItem).toMutableList()
-        val holdList = allPicks.filter { it.type == "HOLD" }
+        val holdList = filteredPicks.filter { it.type == "HOLD" }
             .map(::toItem).toMutableList()
 
         val allItems = recommendList + avoidList + holdList
@@ -657,6 +730,27 @@ class RecommendService(
         return RecommendListRes(recommendList = recommendList, avoidList = avoidList, holdList = holdList)
     }
 
+    /**
+     * 로그인 사용자의 RiskPreset 에 따라 위험 카테고리 종목을 제외한다.
+     * - 거래정지 종목은 preset 무관 항상 제외 (매매 자체 불가능)
+     * - preset 별 추가 제외 카테고리는 [RiskPreset.blockedCategories] 참조
+     * - 비로그인/preference 미설정 사용자는 NORMAL 적용
+     */
+    private fun applyRiskFilter(picks: List<StockPick>): List<StockPick> {
+        val preset = resolveCurrentRiskPreset()
+        val blocked = preset.blockedCategories()
+        return picks.filterNot { pick ->
+            pick.isTradingHalted == true ||
+                blocked.any { category -> category.matches(pick) }
+        }
+    }
+
+    private fun resolveCurrentRiskPreset(): RiskPreset {
+        val loginId = currentLoginIdOrNull() ?: return RiskPreset.NORMAL
+        val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return RiskPreset.NORMAL
+        return recommendSettingService.getPresetByMemberId(member.id)
+    }
+
     private fun loadHoldingStkCds(): Set<String> {
         val loginId = currentLoginIdOrNull() ?: return emptySet()
         val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return emptySet()
@@ -677,22 +771,17 @@ class RecommendService(
     }
 
     /**
-     * 추천 스케줄러가 정상 운영된 날짜 집합 (desc).
+     * 추천 결과가 실제로 저장된 운영일 집합 (desc).
      *
-     * scheduler_log 의 RecommendScheduler 실행 이력 중 SUCCESS / INTERRUPTED (timeout 났으나 결국 성공)
-     * 만 운영일로 친다. FAILED 는 history row 가 부분만 저장됐을 수 있어 제외.
-     *
-     * 휴장·시스템 다운 → 로그 자체가 없음 → 자동으로 streak 계산에서 skip 되어 부풀림이나 단절 모두 막는다.
+     * stock_pick_history 의 distinct pickDate (date 단위) 를 사용한다.
+     * - 수동 트리거든 정상 cron 이든 history 에 row 가 만들어진 날만 운영일로 인정 → streak 계산 일관
+     * - 휴장 수동 force 트리거가 빈 결과로 끝난 날은 history row 가 없어 자연 제외 → false positive 방지
+     * - 휴일 force 모드에서 pickDate 가 직전 거래일 22:00 으로 들어가도 동일 기준으로 처리됨
      */
     private fun loadOperatingDates(): List<LocalDate> {
         val after = LocalDateTime.now().minusDays(STREAK_LOOKBACK_DAYS)
-        return schedulerLogRepository
-            .findBySchedulerNameAndStatusInAndStartedAtAfter(
-                SchedulerName.RecommendScheduler.name,
-                listOf("SUCCESS", "INTERRUPTED"),
-                after,
-            )
-            .map { it.startedAt.toLocalDate() }
+        return stockPickHistoryRepository
+            .findDistinctPickDatesAfter(after)
             .distinct()
             .sortedDescending()
     }
