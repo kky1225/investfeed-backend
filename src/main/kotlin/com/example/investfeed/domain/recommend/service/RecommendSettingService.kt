@@ -26,6 +26,15 @@ class RecommendSettingService(
         return recommendSettingRepository.findByMemberId(memberId)?.riskPreset ?: RiskPreset.NORMAL
     }
 
+    /**
+     * 사용자 설정 전체 반환. row 없으면 default(NORMAL + 모든 모듈 OFF).
+     * RecommendService.listRecommendations 에서 사용.
+     */
+    fun getSettingByMemberIdOrDefault(memberId: Long): RecommendSetting {
+        return recommendSettingRepository.findByMemberId(memberId)
+            ?: RecommendSetting(memberId = memberId)
+    }
+
     @Transactional
     fun saveSetting(req: RecommendSettingReq): RecommendSettingRes {
         val memberId = getMemberId()
@@ -33,6 +42,8 @@ class RecommendSettingService(
 
         val setting = if (existing != null) {
             existing.riskPreset = req.riskPreset
+            existing.priceVolatilityEnabled = req.priceVolatilityEnabled
+            existing.movingAverageEnabled = req.movingAverageEnabled
             existing.updatedAt = LocalDateTime.now()
             existing
         } else {
@@ -40,6 +51,8 @@ class RecommendSettingService(
                 RecommendSetting(
                     memberId = memberId,
                     riskPreset = req.riskPreset,
+                    priceVolatilityEnabled = req.priceVolatilityEnabled,
+                    movingAverageEnabled = req.movingAverageEnabled,
                 )
             )
         }
@@ -48,11 +61,19 @@ class RecommendSettingService(
     }
 
     private fun toRes(setting: RecommendSetting): RecommendSettingRes {
-        return RecommendSettingRes(riskPreset = setting.riskPreset)
+        return RecommendSettingRes(
+            riskPreset = setting.riskPreset,
+            priceVolatilityEnabled = setting.priceVolatilityEnabled,
+            movingAverageEnabled = setting.movingAverageEnabled,
+        )
     }
 
     private fun defaultSetting(): RecommendSettingRes {
-        return RecommendSettingRes(riskPreset = RiskPreset.NORMAL)
+        return RecommendSettingRes(
+            riskPreset = RiskPreset.NORMAL,
+            priceVolatilityEnabled = false,
+            movingAverageEnabled = false,
+        )
     }
 
     private fun getMemberId(): Long {

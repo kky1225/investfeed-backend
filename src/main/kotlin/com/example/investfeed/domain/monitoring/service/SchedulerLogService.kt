@@ -111,6 +111,21 @@ class SchedulerLogService(
         }
     }
 
+    /**
+     * 해당 스케줄러가 현재 실행 중인지 판정.
+     * - lastStartedAt 이 lastFinishedAt 보다 이후이고 timeout 내라면 실행 중으로 본다.
+     * - row 자체가 없으면 false.
+     * cron 핸들러 간 상호배제 가드 및 ManualTriggerService 에서 사용.
+     */
+    fun isRunning(scheduler: SchedulerName): Boolean {
+        val status = schedulerStatusRepository.findById(scheduler.name).orElse(null) ?: return false
+        val started = status.lastStartedAt ?: return false
+        val finished = status.lastFinishedAt
+        if (finished != null && !finished.isBefore(started)) return false
+        val elapsed = Duration.between(started, LocalDateTime.now()).seconds
+        return elapsed <= status.timeoutSec
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     internal fun markStarted(scheduler: SchedulerName, at: LocalDateTime) {
         val entity = schedulerStatusRepository.findById(scheduler.name).orElse(

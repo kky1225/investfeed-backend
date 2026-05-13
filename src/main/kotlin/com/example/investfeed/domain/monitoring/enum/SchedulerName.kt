@@ -17,7 +17,7 @@ enum class SchedulerName(
     ApiKeyExpiryScheduler(SchedulerType.SLOW, 60, "매일 09:00"),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00"),
     RecommendScheduler(SchedulerType.SLOW, 300, "매일 22:00", blockedOnHoliday = true),
-    RecommendTodayDirectionScheduler(SchedulerType.SLOW, 120, "매시 정각", blockedOnHoliday = true),
+    RecommendTodayDirectionScheduler(SchedulerType.SLOW, 120, "매 30분(HH:05, HH:35)", blockedOnHoliday = true),
     IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00"),
     HolidayRefreshScheduler(SchedulerType.SLOW, 120, "매월 1일 00:05"),
     CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분"),

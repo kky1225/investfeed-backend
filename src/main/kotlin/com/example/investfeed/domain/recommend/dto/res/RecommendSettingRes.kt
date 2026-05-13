@@ -4,4 +4,6 @@ import com.example.investfeed.domain.recommend.entity.RiskPreset
 
 data class RecommendSettingRes(
     val riskPreset: RiskPreset,
+    val priceVolatilityEnabled: Boolean,
+    val movingAverageEnabled: Boolean,
 )

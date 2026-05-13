@@ -61,6 +61,15 @@ class StockPickHistory(
     @Column(name = "is_trading_halted")
     val isTradingHalted: Boolean? = null,
 
+    @Column(name = "flu5_pct")
+    val flu5Pct: Double? = null,
+
+    @Column(name = "ma5")
+    val ma5: Double? = null,
+
+    @Column(name = "ma20")
+    val ma20: Double? = null,
+
     @Column(name = "pick_date", nullable = false)
     val pickDate: LocalDateTime,
 )

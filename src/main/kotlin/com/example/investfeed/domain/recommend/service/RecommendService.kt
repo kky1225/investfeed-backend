@@ -10,6 +10,7 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
+import com.example.investfeed.domain.recommend.entity.RecommendSetting
 import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.entity.StockPick
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
@@ -18,6 +19,8 @@ import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.dto.res.StockInfoList
 import com.example.investfeed.kiwoom.auth.service.AuthClient
+import com.example.investfeed.kiwoom.chart.client.StockChartClient
+import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartDayReq
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarketReq
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
@@ -44,6 +47,7 @@ import kotlin.math.abs
 class RecommendService(
     private val priceClient: PriceClient,
     private val stockClient: StockClient,
+    private val stockChartClient: StockChartClient,
     private val stockSocketClient: StockSocketClient,
     private val stockPickRepository: StockPickRepository,
     private val stockPickHistoryRepository: StockPickHistoryRepository,
@@ -61,7 +65,15 @@ class RecommendService(
 
     @Scheduled(cron = "0 0 22 * * *", scheduler = "slowScheduler")
     fun scheduledRecommendStock() {
-        if (holidayService.isHoliday()) return
+        log.info { "RecommendScheduler cron fired" }
+        if (holidayService.isHoliday()) {
+            log.info { "RecommendScheduler skipped: today is holiday" }
+            return
+        }
+        if (schedulerLogService.isRunning(SchedulerName.RecommendTodayDirectionScheduler)) {
+            log.warn { "RecommendScheduler skipped: RecommendTodayDirectionScheduler 실행 중 (stock_pick 충돌 방지)" }
+            return
+        }
         runRecommendStock()
     }
 
@@ -78,9 +90,17 @@ class RecommendService(
         }
     }
 
-    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = "0 5,35 * * * *", scheduler = "slowScheduler")
     fun scheduledRefreshTodayDirection() {
-        if (holidayService.isHoliday()) return
+        log.info { "RecommendTodayDirectionScheduler cron fired" }
+        if (holidayService.isHoliday()) {
+            log.info { "RecommendTodayDirectionScheduler skipped: today is holiday" }
+            return
+        }
+        if (schedulerLogService.isRunning(SchedulerName.RecommendScheduler)) {
+            log.warn { "RecommendTodayDirectionScheduler skipped: RecommendScheduler 실행 중 (stock_pick 충돌 방지)" }
+            return
+        }
         runRefreshTodayDirection()
     }
 
@@ -312,6 +332,7 @@ class RecommendService(
         }
 
         val riskFlags = riskMap[stkCd] ?: RiskFlags.UNKNOWN
+        val priceMetrics = computePriceMetrics(stkCd)
 
         return ProcessedPick(
             type = type,
@@ -324,7 +345,51 @@ class RecommendService(
             marketCap = marketCap,
             originSide = position.name,
             riskFlags = riskFlags,
+            priceMetrics = priceMetrics,
         )
+    }
+
+    private fun computePriceMetrics(stkCd: String): PriceMetrics {
+        return try {
+            Thread.sleep(API_PACING_MS)
+            val res = stockChartClient.chartDayList(
+                req = KiwoomStockChartDayReq(
+                    stk_cd = stkCd,
+                    base_dt = DateUtil.today("yyyyMMdd"),
+                    upd_stkpc_tp = "1",
+                )
+            )
+            if (res.return_code != 0) return PriceMetrics.UNKNOWN
+            val rows = res.stk_dt_pole_chart_qry ?: return PriceMetrics.UNKNOWN
+            val closes = rows.mapNotNull { it.cur_prc?.toLongOrNull() }.map { abs(it) }
+            if (closes.isEmpty()) return PriceMetrics.UNKNOWN
+
+            val flu5Pct = if (closes.size >= 5) {
+                (closes[0] - closes[4]).toDouble() / closes[4] * 100
+            } else null
+
+            val ma5 = if (closes.size >= 5) closes.take(5).map { it.toDouble() }.average() else null
+            val ma20 = if (closes.size >= 20) closes.take(20).map { it.toDouble() }.average() else null
+
+            PriceMetrics(
+                flu5Pct = flu5Pct,
+                ma5 = ma5,
+                ma20 = ma20,
+            )
+        } catch (e: Exception) {
+            log.error(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
+            PriceMetrics.UNKNOWN
+        }
+    }
+
+    internal data class PriceMetrics(
+        val flu5Pct: Double?,
+        val ma5: Double?,
+        val ma20: Double?,
+    ) {
+        companion object {
+            val UNKNOWN = PriceMetrics(null, null, null)
+        }
     }
 
     private fun buildRiskCategoryMap(): Map<String, RiskFlags> {
@@ -522,6 +587,7 @@ class RecommendService(
         val marketCap: Long?,
         val originSide: String,
         val riskFlags: RiskFlags,
+        val priceMetrics: PriceMetrics,
     ) {
         fun toCurrentEntity(): StockPick = StockPick(
             type = type,
@@ -538,6 +604,9 @@ class RecommendService(
             isInvestmentWarning = riskFlags.isInvestmentWarning,
             isInvestorAlert = riskFlags.isInvestorAlert,
             isTradingHalted = riskFlags.isTradingHalted,
+            flu5Pct = priceMetrics.flu5Pct,
+            ma5 = priceMetrics.ma5,
+            ma20 = priceMetrics.ma20,
         )
 
         fun toHistoryEntity(pickDate: LocalDateTime): StockPickHistory = StockPickHistory(
@@ -557,6 +626,9 @@ class RecommendService(
             isInvestmentWarning = riskFlags.isInvestmentWarning,
             isInvestorAlert = riskFlags.isInvestorAlert,
             isTradingHalted = riskFlags.isTradingHalted,
+            flu5Pct = priceMetrics.flu5Pct,
+            ma5 = priceMetrics.ma5,
+            ma20 = priceMetrics.ma20,
             pickDate = pickDate,
         )
     }
@@ -685,29 +757,36 @@ class RecommendService(
     fun listRecommendations(): RecommendListRes {
         val allPicks = stockPickRepository.findAll()
         val filteredPicks = applyRiskFilter(allPicks)
+        val setting = resolveCurrentSetting()
+        val effectiveTypes = computeEffectiveTypes(filteredPicks, setting)
+
+        fun typeOf(pick: StockPick): String = effectiveTypes[pick.stkCd] ?: pick.type
 
         val holdingCodes = loadHoldingStkCds()
         val historyByStkCd = loadRecentHistoryByStkCd(filteredPicks.map { it.stkCd })
         val operatingDates = loadOperatingDates()
 
-        fun toItem(entity: StockPick): RecommendListItem = RecommendListItem(
-            type = entity.type,
-            stkCd = entity.stkCd,
-            stkNm = entity.stkNm,
-            todayDirection = entity.todayDirection,
-            isHolding = entity.stkCd in holdingCodes,
-            streakDays = computeStreakDays(
-                histories = historyByStkCd[entity.stkCd] ?: emptyList(),
-                currentType = entity.type,
-                operatingDates = operatingDates,
-            ),
-        )
+        fun toItem(entity: StockPick): RecommendListItem {
+            val effectiveType = typeOf(entity)
+            return RecommendListItem(
+                type = effectiveType,
+                stkCd = entity.stkCd,
+                stkNm = entity.stkNm,
+                todayDirection = entity.todayDirection,
+                isHolding = entity.stkCd in holdingCodes,
+                streakDays = computeStreakDays(
+                    histories = historyByStkCd[entity.stkCd] ?: emptyList(),
+                    currentType = effectiveType,
+                    operatingDates = operatingDates,
+                ),
+            )
+        }
 
-        val recommendList = filteredPicks.filter { it.type == "STRONG_BUY" || it.type == "BUY" }
+        val recommendList = filteredPicks.filter { typeOf(it) == "STRONG_BUY" || typeOf(it) == "BUY" }
             .map(::toItem).toMutableList()
-        val avoidList = filteredPicks.filter { it.type == "STRONG_SELL" || it.type == "SELL" }
+        val avoidList = filteredPicks.filter { typeOf(it) == "STRONG_SELL" || typeOf(it) == "SELL" }
             .map(::toItem).toMutableList()
-        val holdList = filteredPicks.filter { it.type == "HOLD" }
+        val holdList = filteredPicks.filter { typeOf(it) == "HOLD" }
             .map(::toItem).toMutableList()
 
         val allItems = recommendList + avoidList + holdList
@@ -737,7 +816,7 @@ class RecommendService(
      * - 비로그인/preference 미설정 사용자는 NORMAL 적용
      */
     private fun applyRiskFilter(picks: List<StockPick>): List<StockPick> {
-        val preset = resolveCurrentRiskPreset()
+        val preset = resolveCurrentSetting().riskPreset
         val blocked = preset.blockedCategories()
         return picks.filterNot { pick ->
             pick.isTradingHalted == true ||
@@ -745,10 +824,125 @@ class RecommendService(
         }
     }
 
-    private fun resolveCurrentRiskPreset(): RiskPreset {
-        val loginId = currentLoginIdOrNull() ?: return RiskPreset.NORMAL
-        val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return RiskPreset.NORMAL
-        return recommendSettingService.getPresetByMemberId(member.id)
+    /**
+     * 사용자 옵션 ON 인 보정 모듈들을 다수결 점수제로 평가해 effectiveType 결정.
+     *
+     * 점수 = (격상 트리거 개수) - (격하 트리거 개수)
+     *   score ≥ 1   → 한 단계 격상 (BUY → STRONG_BUY, SELL → STRONG_SELL)
+     *   score 0 + 격하 1+ → 한 단계 격하 (동률 시 격하 우선)
+     *   score -1 ~ -2 → 한 단계 격하 (STRONG → 일반)
+     *   score ≤ -3  → 두 단계 격하 (HOLD까지, 강한 모순 시그널)
+     *
+     * 룰:
+     *   1. 수급 분류는 백본 — 분류 방향 (BUY ↔ SELL) 절대 못 뒤집음
+     *   2. 격상은 최대 한 단계 (수익 추구는 신중)
+     *   3. 격하는 보정 강도 따라 1~2단계 (손실 보호는 강하게)
+     */
+    private fun computeEffectiveTypes(
+        picks: List<StockPick>,
+        setting: RecommendSetting,
+    ): Map<String, String> {
+        return picks.associate { pick ->
+            pick.stkCd to applyAdjustments(pick, setting)
+        }
+    }
+
+    private fun applyAdjustments(pick: StockPick, setting: RecommendSetting): String {
+        val side = when (pick.type) {
+            "STRONG_BUY", "BUY" -> Position.BUY
+            "STRONG_SELL", "SELL" -> Position.SELL
+            else -> return pick.type  // HOLD는 보정 대상 X
+        }
+
+        val modules = activeModules(setting)
+        if (modules.isEmpty()) return pick.type
+
+        val promotionCount = modules.count { it.shouldPromote(pick, side) }
+        val demotionCount  = modules.count { it.shouldDemote(pick, side) }
+        val score = promotionCount - demotionCount
+
+        return when {
+            score >= 1 -> promoteOnce(pick.type)
+            score <= -3 -> demoteTwoLevels(pick.type)
+            score <= -1 -> demoteOnce(pick.type)
+            else -> pick.type  // score == 0 → 그대로
+        }
+    }
+
+    private fun activeModules(setting: RecommendSetting): List<AdjustmentModule> {
+        val list = mutableListOf<AdjustmentModule>()
+        if (setting.priceVolatilityEnabled) list += PriceVolatilityModule
+        if (setting.movingAverageEnabled) list += MovingAverageModule
+        // 추후 모듈 추가 시 여기에
+        return list
+    }
+
+    private fun promoteOnce(type: String): String = when (type) {
+        "BUY" -> "STRONG_BUY"
+        "SELL" -> "STRONG_SELL"
+        else -> type  // STRONG_BUY/STRONG_SELL은 이미 STRONG — 격상 안 함
+    }
+
+    private fun demoteOnce(type: String): String = when (type) {
+        "STRONG_BUY" -> "BUY"
+        "BUY" -> "HOLD"            // 한 단계 격하 = 등급 한 칸 다운
+        "STRONG_SELL" -> "SELL"
+        "SELL" -> "HOLD"
+        else -> type
+    }
+
+    private fun demoteTwoLevels(type: String): String = when (type) {
+        "STRONG_BUY", "BUY" -> "HOLD"
+        "STRONG_SELL", "SELL" -> "HOLD"
+        else -> type
+    }
+
+    /**
+     * 보정 모듈 인터페이스 — 각 모듈은 격상/격하 트리거 조건을 자체 정의.
+     */
+    internal interface AdjustmentModule {
+        fun shouldPromote(pick: StockPick, side: Position): Boolean
+        fun shouldDemote(pick: StockPick, side: Position): Boolean
+    }
+
+    /**
+     * 가격 변동성 모듈 (격하 전용).
+     * 반대 추세 단기 변동성 (5일 누적 ±10%)이 클 때 격하 권유.
+     */
+    internal object PriceVolatilityModule : AdjustmentModule {
+        override fun shouldPromote(pick: StockPick, side: Position): Boolean = false
+        override fun shouldDemote(pick: StockPick, side: Position): Boolean {
+            val flu5 = pick.flu5Pct ?: return false
+            return when (side) {
+                Position.BUY -> flu5 <= -10.0
+                Position.SELL -> flu5 >= 10.0
+            }
+        }
+    }
+
+    /**
+     * 이동평균선 모듈 (격상 전용).
+     * 매수 + 골든크로스 (MA5 > MA20) → 격상.
+     * 매도 + 데드크로스 (MA5 < MA20) → 격상.
+     * 격하 X — 추세 전환 초기는 자연 데드크로스 상태라 격하 부당.
+     */
+    internal object MovingAverageModule : AdjustmentModule {
+        override fun shouldPromote(pick: StockPick, side: Position): Boolean {
+            val ma5 = pick.ma5 ?: return false
+            val ma20 = pick.ma20 ?: return false
+            return when (side) {
+                Position.BUY -> ma5 > ma20   // 골든크로스
+                Position.SELL -> ma5 < ma20  // 데드크로스
+            }
+        }
+        override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
+    }
+
+    private fun resolveCurrentSetting(): RecommendSetting {
+        val default = RecommendSetting(memberId = 0L)
+        val loginId = currentLoginIdOrNull() ?: return default
+        val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return default
+        return recommendSettingService.getSettingByMemberIdOrDefault(member.id)
     }
 
     private fun loadHoldingStkCds(): Set<String> {
