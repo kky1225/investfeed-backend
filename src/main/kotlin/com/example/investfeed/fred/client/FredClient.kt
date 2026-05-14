@@ -22,12 +22,7 @@ class FredClient(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        /**
-         * FRED rate limit(120/min = 500ms per call) 완화를 위한 호출 간 최소 간격.
-         * 500ms 로 분당 120 요청 한계에 맞춤 → rate limit 안전권.
-         * 실측 50 콜 × 500ms = 약 25초 순수 대기 + API 응답 시간.
-         */
-        private const val THROTTLE_MS = 500L
+        private const val THROTTLE_MS = 5_000L
     }
 
     /**

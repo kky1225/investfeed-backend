@@ -18,6 +18,9 @@ class StockPick(
     @Column(nullable = false)
     val stkNm: String,
 
+    @Column(name = "market_type")
+    val marketType: String? = null,
+
     @Column(name = "penfnd_k")
     val penfndK: Double? = null,
 

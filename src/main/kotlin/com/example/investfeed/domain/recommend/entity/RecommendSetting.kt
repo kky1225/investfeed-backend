@@ -25,6 +25,10 @@ class RecommendSetting(
     @Column(name = "moving_average_enabled", nullable = false)
     var movingAverageEnabled: Boolean = false,
 
+    // 코스피/코스닥 매크로 보정 옵션 — 시장 등락률 + 기관/외국인 매매 부호로 6가지 케이스 격상/격하
+    @Column(name = "market_index_enabled", nullable = false)
+    var marketIndexEnabled: Boolean = false,
+
     @Column(name = "created_at")
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
