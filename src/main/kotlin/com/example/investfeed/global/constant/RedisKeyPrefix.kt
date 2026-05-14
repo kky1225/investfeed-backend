@@ -15,6 +15,7 @@ enum class RedisKeyPrefix(
 ) {
     ECONOMIC_CALENDAR("ECON:", "경제 캘린더 캐시"),
     MARKET_INDEX("market-index:", "주요 시장 지수 캐시"),
+    MARKET_MACRO("market-macro:", "코스피/코스닥 매크로 보정용 실시간 시그널 캐시"),
     NEWS("NEWS:", "네이버 뉴스 캐시"),
     INVESTOR_CLOSE_MARKET("investor:closeMarket:", "투자자별 장마감 데이터 캐시"),
     KIWOOM_ACCESS_TOKEN("kiwoom:access_token:", "키움 OAuth access token"),

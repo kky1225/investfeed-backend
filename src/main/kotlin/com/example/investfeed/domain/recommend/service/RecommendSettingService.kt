@@ -44,6 +44,7 @@ class RecommendSettingService(
             existing.riskPreset = req.riskPreset
             existing.priceVolatilityEnabled = req.priceVolatilityEnabled
             existing.movingAverageEnabled = req.movingAverageEnabled
+            existing.marketIndexEnabled = req.marketIndexEnabled
             existing.updatedAt = LocalDateTime.now()
             existing
         } else {
@@ -53,6 +54,7 @@ class RecommendSettingService(
                     riskPreset = req.riskPreset,
                     priceVolatilityEnabled = req.priceVolatilityEnabled,
                     movingAverageEnabled = req.movingAverageEnabled,
+                    marketIndexEnabled = req.marketIndexEnabled,
                 )
             )
         }
@@ -65,6 +67,7 @@ class RecommendSettingService(
             riskPreset = setting.riskPreset,
             priceVolatilityEnabled = setting.priceVolatilityEnabled,
             movingAverageEnabled = setting.movingAverageEnabled,
+            marketIndexEnabled = setting.marketIndexEnabled,
         )
     }
 
@@ -73,6 +76,7 @@ class RecommendSettingService(
             riskPreset = RiskPreset.NORMAL,
             priceVolatilityEnabled = false,
             movingAverageEnabled = false,
+            marketIndexEnabled = false,
         )
     }
 

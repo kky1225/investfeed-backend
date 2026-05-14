@@ -6,4 +6,5 @@ data class RecommendSettingRes(
     val riskPreset: RiskPreset,
     val priceVolatilityEnabled: Boolean,
     val movingAverageEnabled: Boolean,
+    val marketIndexEnabled: Boolean,
 )

@@ -14,6 +14,9 @@ import com.example.investfeed.domain.recommend.entity.RecommendSetting
 import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.entity.StockPick
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
+import com.example.investfeed.domain.recommend.Position
+import com.example.investfeed.domain.recommend.adjustment.AdjustmentModule
+import com.example.investfeed.domain.recommend.marketmacro.MarketIndexAdjustmentModule
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
@@ -58,6 +61,12 @@ class RecommendService(
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
     private val recommendSettingService: RecommendSettingService,
+    private val marketIndexAdjustmentModule: MarketIndexAdjustmentModule,
+    /**
+     * 점수제 보정 모듈 목록. Spring 이 자동으로 모든 [AdjustmentModule] `@Component`
+     * 구현체를 모아서 주입한다. 새 모듈 추가 시 본 클래스 수정 없이 모듈 클래스만 만들면 자동 합류.
+     */
+    private val adjustmentModules: List<AdjustmentModule>,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -90,7 +99,7 @@ class RecommendService(
         }
     }
 
-    @Scheduled(cron = "0 5,35 * * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = "0 */5 9-21 * * *", scheduler = "slowScheduler")
     fun scheduledRefreshTodayDirection() {
         log.info { "RecommendTodayDirectionScheduler cron fired" }
         if (holidayService.isHoliday()) {
@@ -198,7 +207,7 @@ class RecommendService(
             LocalDateTime.now()
         }
 
-        val riskMap = buildRiskCategoryMap()
+        val (riskMap, marketTypeMap) = buildStockMetadataMaps()
 
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
@@ -223,8 +232,8 @@ class RecommendService(
                     sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
             }
 
-            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset, riskMap) } +
-                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset, riskMap) }
+            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset, riskMap, marketTypeMap) } +
+                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset, riskMap, marketTypeMap) }
         } else {
             emptyList()
         }
@@ -252,6 +261,7 @@ class RecommendService(
         position: Position,
         todayOffset: Int = TODAY_OFFSET,
         riskMap: Map<String, RiskFlags> = emptyMap(),
+        marketTypeMap: Map<String, String> = emptyMap(),
     ): ProcessedPick? {
         val stkCd = item.stk_cd ?: return null
         val stkNm = item.stk_nm ?: return null
@@ -331,13 +341,16 @@ class RecommendService(
                 "foreignerAligned=$foreignerAligned, marketCap=${marketCap}억"
         }
 
-        val riskFlags = riskMap[stkCd] ?: RiskFlags.UNKNOWN
+        val baseStkCd = stkCd.substringBefore("_")
+        val riskFlags = riskMap[baseStkCd] ?: RiskFlags.UNKNOWN
         val priceMetrics = computePriceMetrics(stkCd)
+        val marketType = marketTypeMap[baseStkCd]
 
         return ProcessedPick(
             type = type,
             stkCd = stkCd,
             stkNm = stkNm,
+            marketType = marketType,
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrSignedRatio,
@@ -406,6 +419,29 @@ class RecommendService(
         } catch (e: Exception) {
             log.error(e) { "위험 카테고리 맵 구축 실패 - 빈 맵 반환" }
             emptyMap()
+        }
+    }
+
+    private fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
+        return try {
+            val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList()
+            Thread.sleep(API_PACING_MS)
+            val kosdaq = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList()
+            val combined = kospi + kosdaq
+            val riskMap = combined
+                .filter { !it.code.isNullOrBlank() }
+                .associate { it.code!! to RiskFlags.from(it) }
+            val marketTypeMap =
+                kospi.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSPI" } +
+                    kosdaq.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSDAQ" }
+            log.info {
+                "종목 메타데이터 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, " +
+                    "riskDistinct=${riskMap.size}, marketTypeDistinct=${marketTypeMap.size}"
+            }
+            riskMap to marketTypeMap
+        } catch (e: Exception) {
+            log.error(e) { "종목 메타데이터 맵 구축 실패 - 빈 맵 반환" }
+            emptyMap<String, RiskFlags>() to emptyMap()
         }
     }
 
@@ -580,6 +616,7 @@ class RecommendService(
         val type: String,
         val stkCd: String,
         val stkNm: String,
+        val marketType: String?,
         val penfndK: Double,
         val frgnrBlocked: Boolean,
         val frgnrMcapRatio: Double?,
@@ -593,6 +630,7 @@ class RecommendService(
             type = type,
             stkCd = stkCd,
             stkNm = stkNm,
+            marketType = marketType,
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrMcapRatio,
@@ -613,6 +651,7 @@ class RecommendService(
             type = type,
             stkCd = stkCd,
             stkNm = stkNm,
+            marketType = marketType,
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrMcapRatio,
@@ -735,8 +774,6 @@ class RecommendService(
         }
     }
 
-    internal enum class Position { BUY, SELL }
-
     companion object {
         private const val TOP_N = 100
         private const val TODAY_OFFSET = 1   // idx 0 = 당일 (평가 제외, 보조 지표용)
@@ -854,27 +891,37 @@ class RecommendService(
             else -> return pick.type  // HOLD는 보정 대상 X
         }
 
+        // 1단계: 점수제 보정 (PriceVolatility, MovingAverage 등 기존 모듈)
         val modules = activeModules(setting)
-        if (modules.isEmpty()) return pick.type
+        val afterScoring = if (modules.isEmpty()) {
+            pick.type
+        } else {
+            val promotionCount = modules.count { it.shouldPromote(pick, side) }
+            val demotionCount = modules.count { it.shouldDemote(pick, side) }
+            val score = promotionCount - demotionCount
+            when {
+                score >= 1 -> promoteOnce(pick.type)
+                score <= -3 -> demoteTwoLevels(pick.type)
+                score <= -1 -> demoteOnce(pick.type)
+                else -> pick.type
+            }
+        }
 
-        val promotionCount = modules.count { it.shouldPromote(pick, side) }
-        val demotionCount  = modules.count { it.shouldDemote(pick, side) }
-        val score = promotionCount - demotionCount
-
-        return when {
-            score >= 1 -> promoteOnce(pick.type)
-            score <= -3 -> demoteTwoLevels(pick.type)
-            score <= -1 -> demoteOnce(pick.type)
-            else -> pick.type  // score == 0 → 그대로
+        // 2단계: 매크로 보정 (시장 등락률 + 기관/외국인 매매 부호 기반 6가지 케이스)
+        // 점수제와 별개로 한 번 더 한 단계 격상/격하 적용. Redis 캐시 미스 시 무보정.
+        return if (setting.marketIndexEnabled) {
+            marketIndexAdjustmentModule.adjust(afterScoring, pick)
+        } else {
+            afterScoring
         }
     }
 
+    /**
+     * 사용자 옵션 ON 상태인 보정 모듈만 필터링. 새 모듈은 `@Component` 로 만들면
+     * [adjustmentModules] 에 자동 합류하므로 본 메서드 수정 불필요.
+     */
     private fun activeModules(setting: RecommendSetting): List<AdjustmentModule> {
-        val list = mutableListOf<AdjustmentModule>()
-        if (setting.priceVolatilityEnabled) list += PriceVolatilityModule
-        if (setting.movingAverageEnabled) list += MovingAverageModule
-        // 추후 모듈 추가 시 여기에
-        return list
+        return adjustmentModules.filter { it.isEnabled(setting) }
     }
 
     private fun promoteOnce(type: String): String = when (type) {
@@ -895,47 +942,6 @@ class RecommendService(
         "STRONG_BUY", "BUY" -> "HOLD"
         "STRONG_SELL", "SELL" -> "HOLD"
         else -> type
-    }
-
-    /**
-     * 보정 모듈 인터페이스 — 각 모듈은 격상/격하 트리거 조건을 자체 정의.
-     */
-    internal interface AdjustmentModule {
-        fun shouldPromote(pick: StockPick, side: Position): Boolean
-        fun shouldDemote(pick: StockPick, side: Position): Boolean
-    }
-
-    /**
-     * 가격 변동성 모듈 (격하 전용).
-     * 반대 추세 단기 변동성 (5일 누적 ±10%)이 클 때 격하 권유.
-     */
-    internal object PriceVolatilityModule : AdjustmentModule {
-        override fun shouldPromote(pick: StockPick, side: Position): Boolean = false
-        override fun shouldDemote(pick: StockPick, side: Position): Boolean {
-            val flu5 = pick.flu5Pct ?: return false
-            return when (side) {
-                Position.BUY -> flu5 <= -10.0
-                Position.SELL -> flu5 >= 10.0
-            }
-        }
-    }
-
-    /**
-     * 이동평균선 모듈 (격상 전용).
-     * 매수 + 골든크로스 (MA5 > MA20) → 격상.
-     * 매도 + 데드크로스 (MA5 < MA20) → 격상.
-     * 격하 X — 추세 전환 초기는 자연 데드크로스 상태라 격하 부당.
-     */
-    internal object MovingAverageModule : AdjustmentModule {
-        override fun shouldPromote(pick: StockPick, side: Position): Boolean {
-            val ma5 = pick.ma5 ?: return false
-            val ma20 = pick.ma20 ?: return false
-            return when (side) {
-                Position.BUY -> ma5 > ma20   // 골든크로스
-                Position.SELL -> ma5 < ma20  // 데드크로스
-            }
-        }
-        override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
     }
 
     private fun resolveCurrentSetting(): RecommendSetting {
