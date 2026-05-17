@@ -29,4 +29,7 @@ class PriceVolatilityModule : AdjustmentModule {
             Position.SELL -> flu5 >= 10.0
         }
     }
+
+    /** 격하 전용 모듈 — 격상 능력 없음. 만장일치 격상 판정에서 제외. */
+    override fun canPromote(side: Position): Boolean = false
 }

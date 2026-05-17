@@ -62,6 +62,10 @@ enum class ResponseCode(
     RECOMMEND_LIST_STREAM(message = "실시간 주식 추천 목록 조회에 성공하셨습니다."),
     RECOMMEND_SETTING(message = "추천 설정 조회에 성공하셨습니다."),
     RECOMMEND_SETTING_SAVE(message = "추천 설정 저장에 성공하셨습니다."),
+    ADMIN_RECOMMEND_PICKS(message = "추천 모니터링 - 신호 조회에 성공하셨습니다."),
+    ADMIN_RECOMMEND_SNAPSHOTS(message = "추천 모니터링 - 매크로 스냅샷 조회에 성공하셨습니다."),
+    ADMIN_RECOMMEND_BACKFILL_STATUS(message = "추천 모니터링 - 백필 진행도 조회에 성공하셨습니다."),
+    ADMIN_RECOMMEND_METRICS(message = "추천 모니터링 - 백테스트 집계 조회에 성공하셨습니다."),
 
     AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
     AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),

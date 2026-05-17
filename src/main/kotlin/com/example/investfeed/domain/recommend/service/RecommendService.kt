@@ -10,6 +10,7 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
+import com.example.investfeed.domain.recommend.entity.MarketIndexSnapshot
 import com.example.investfeed.domain.recommend.entity.RecommendSetting
 import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.entity.StockPick
@@ -17,6 +18,9 @@ import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.Position
 import com.example.investfeed.domain.recommend.adjustment.AdjustmentModule
 import com.example.investfeed.domain.recommend.marketmacro.MarketIndexAdjustmentModule
+import com.example.investfeed.domain.recommend.marketmacro.MarketMacroCacheService
+import com.example.investfeed.domain.recommend.marketmacro.MarketMacroSnapshot
+import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
@@ -62,6 +66,8 @@ class RecommendService(
     private val schedulerLogService: SchedulerLogService,
     private val recommendSettingService: RecommendSettingService,
     private val marketIndexAdjustmentModule: MarketIndexAdjustmentModule,
+    private val marketMacroCacheService: MarketMacroCacheService,
+    private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
     /**
      * 점수제 보정 모듈 목록. Spring 이 자동으로 모든 [AdjustmentModule] `@Component`
      * 구현체를 모아서 주입한다. 새 모듈 추가 시 본 클래스 수정 없이 모듈 클래스만 만들면 자동 합류.
@@ -245,6 +251,9 @@ class RecommendService(
         // 이력용 테이블 누적
         stockPickHistoryRepository.saveAll(processed.map { it.toHistoryEntity(now) })
 
+        // 백테스트용 매크로 일일 스냅샷 저장 (당일 1행, 이미 있으면 skip).
+        saveMarketIndexSnapshot(now)
+
         val counts = processed.groupingBy { it.type }.eachCount()
         log.info {
             "추천 분류 저장 완료 - " +
@@ -253,6 +262,78 @@ class RecommendService(
                 "HOLD: ${counts["HOLD"] ?: 0}, " +
                 "SELL: ${counts["SELL"] ?: 0}, " +
                 "STRONG_SELL: ${counts["STRONG_SELL"] ?: 0}"
+        }
+    }
+
+    /**
+     * 22시 스케줄러 시점에 Redis 매크로 캐시 (16:00 polling 결과) 를 DB 에 1행 영속.
+     * 백테스트/디버깅용 — 매크로 시나리오별 N일 후 수익률 분석 등 사후 추적 가능하게 함.
+     *
+     * 중복 호출 방지: captured_date UNIQUE — 같은 날 이미 있으면 skip.
+     * 캐시 미스 (KOSPI/KOSDAQ 둘 다 없음) 시 저장 스킵.
+     */
+    private fun saveMarketIndexSnapshot(now: LocalDateTime) {
+        val date = now.toLocalDate()
+        marketIndexSnapshotRepository.findByCapturedDate(date)?.let {
+            log.info { "MarketIndexSnapshot 이미 존재 ($date), 저장 스킵" }
+            return
+        }
+
+        val kospi = marketMacroCacheService.getSnapshot("KOSPI")
+        val kosdaq = marketMacroCacheService.getSnapshot("KOSDAQ")
+
+        if (kospi == null && kosdaq == null) {
+            log.warn { "매크로 캐시 미스 (KOSPI/KOSDAQ 둘 다 없음) — MarketIndexSnapshot 저장 스킵 ($date)" }
+            return
+        }
+
+        marketIndexSnapshotRepository.save(
+            MarketIndexSnapshot(
+                capturedDate = date,
+                kospiChangeRate = kospi?.priceChangeRate?.toDouble(),
+                kospiForeignerSign = signOf(kospi?.foreignNetBuy),
+                kospiInstitutionSign = signOf(kospi?.institutionalNetBuy),
+                kospiScenario = scenarioOf(kospi),
+                kosdaqChangeRate = kosdaq?.priceChangeRate?.toDouble(),
+                kosdaqForeignerSign = signOf(kosdaq?.foreignNetBuy),
+                kosdaqInstitutionSign = signOf(kosdaq?.institutionalNetBuy),
+                kosdaqScenario = scenarioOf(kosdaq),
+                capturedAt = now,
+            )
+        )
+        log.info {
+            "MarketIndexSnapshot 저장 완료 ($date) - " +
+                "KOSPI=${scenarioOf(kospi) ?: "MISS"}, KOSDAQ=${scenarioOf(kosdaq) ?: "MISS"}"
+        }
+    }
+
+    private fun signOf(value: Long?): String? = when {
+        value == null -> null
+        value > 0 -> "BUY"
+        value < 0 -> "SELL"
+        else -> "NEUTRAL"
+    }
+
+    /**
+     * 매크로 6가지 케이스 + 중립 분류 (MarketIndexAdjustmentModule 의 조건문과 동일 의미).
+     * 백테스트 SQL 에서 GROUP BY 키로 사용.
+     */
+    private fun scenarioOf(snap: MarketMacroSnapshot?): String? {
+        if (snap == null) return null
+        val isUp = snap.priceChangeRate.signum() > 0
+        val isDown = snap.priceChangeRate.signum() < 0
+        val instBuy = snap.institutionalNetBuy > 0
+        val instSell = snap.institutionalNetBuy < 0
+        val frgnBuy = snap.foreignNetBuy > 0
+        val frgnSell = snap.foreignNetBuy < 0
+        return when {
+            isUp && instBuy && frgnBuy -> "UP_BUY_BUY"           // 케이스 1: BUY 격상
+            isUp && instBuy && frgnSell -> "UP_BUY_SELL"          // 케이스 2: 다이버전스 유지
+            isUp && instSell && frgnSell -> "UP_SELL_SELL"        // 케이스 3: BUY 격하
+            isDown && instSell && frgnSell -> "DOWN_SELL_SELL"    // 케이스 4: SELL 격상
+            isDown && instBuy && frgnSell -> "DOWN_BUY_SELL"      // 케이스 5: 다이버전스 유지
+            isDown && instBuy && frgnBuy -> "DOWN_BUY_BUY"        // 케이스 6: SELL 격하
+            else -> "NEUTRAL"
         }
     }
 
@@ -346,6 +427,27 @@ class RecommendService(
         val priceMetrics = computePriceMetrics(stkCd)
         val marketType = marketTypeMap[baseStkCd]
 
+        // 백테스트/디버깅용 — 모든 모듈 ON 가정의 trigger 결과 + 매크로 반영 최종 등급.
+        // 사용자 응답 로직과 독립적 (사용자 옵션 따라 applyAdjustments 가 별도 재계산).
+        val tempPick = StockPick(
+            type = type, stkCd = stkCd, stkNm = stkNm,
+            marketType = marketType,
+            flu5Pct = priceMetrics.flu5Pct,
+            ma5 = priceMetrics.ma5,
+            ma20 = priceMetrics.ma20,
+            avg20dVolume = priceMetrics.avg20dVolume,
+            todayChangeRate = priceMetrics.todayChangeRate,
+            todayVolume = priceMetrics.todayVolume,
+            rsi14 = priceMetrics.rsi14,
+            rsi14Breakdown70 = priceMetrics.rsi14Breakdown70,
+            high52w = priceMetrics.high52w,
+            low52w = priceMetrics.low52w,
+            distFromHigh52w = priceMetrics.distFromHigh52w,
+            distFromLow52w = priceMetrics.distFromLow52w,
+            closeAboveMa20 = priceMetrics.closeAboveMa20,
+        )
+        val backtestMeta = evaluateBacktestMeta(tempPick)
+
         return ProcessedPick(
             type = type,
             stkCd = stkCd,
@@ -359,6 +461,7 @@ class RecommendService(
             originSide = position.name,
             riskFlags = riskFlags,
             priceMetrics = priceMetrics,
+            backtestMeta = backtestMeta,
         )
     }
 
@@ -384,10 +487,58 @@ class RecommendService(
             val ma5 = if (closes.size >= 5) closes.take(5).map { it.toDouble() }.average() else null
             val ma20 = if (closes.size >= 20) closes.take(20).map { it.toDouble() }.average() else null
 
+            // VolumePriceModule 평가용 — 종목 당일 등락률 + 당일 거래량 + 20일 평균 거래량
+            val todayChangeRate = if (closes.size >= 2 && closes[1] > 0) {
+                (closes[0] - closes[1]).toDouble() / closes[1] * 100
+            } else null
+
+            val volumes = rows.mapNotNull { it.trde_qty?.toLongOrNull() }.map { abs(it) }
+            val todayVolume = volumes.firstOrNull()
+            // 20일 평균: 당일(idx 0) 제외하고 직전 20영업일 (idx 1~20)
+            val avg20dVolume = if (volumes.size >= 21) {
+                volumes.subList(1, 21).average().toLong()
+            } else if (volumes.size >= 2) {
+                // 데이터 부족 시 가능한 만큼 평균 (당일 제외)
+                volumes.subList(1, volumes.size).average().toLong()
+            } else null
+
+            // RsiModule 평가용 — 최근 4일치 RSI 14 (오늘 + 어제 + 그제 + 3일 전).
+            // Wilder smoothing 정확도 확보를 위해 RSI 한 점당 30일 가격 윈도 사용
+            // (14일 초기 평균 + 15회 smoothing 누적으로 안정화).
+            val rsiSeries = (0..3).mapNotNull { i ->
+                val window = closes.drop(i).take(30)
+                if (window.size >= 15) calculateRsi14(window) else null
+            }
+            val rsi14 = rsiSeries.firstOrNull()
+            // 3일 전 RSI ≥ 70 + 최근 3일 모두 < 70 = "70 도달 후 3일 회복 못 함"
+            val rsi14Breakdown70 = if (rsiSeries.size >= 4) {
+                rsiSeries[3] >= 70.0 && rsiSeries.take(3).all { it < 70.0 }
+            } else null
+
+            // HighLow52wModule 평가용 — 240영업일 최고/최저 + 거리 % + MA20 위/아래.
+            // closes.take(240) = 오늘 포함 직전 240영업일 윈도. 데이터 부족 시 null.
+            val window52w = closes.take(240)
+            val high52w = if (window52w.size >= 240) window52w.max() else null
+            val low52w = if (window52w.size >= 240) window52w.min() else null
+            val today = closes[0]
+            val distFromHigh52w = high52w?.let { (today - it).toDouble() / it * 100 }
+            val distFromLow52w = low52w?.let { (today - it).toDouble() / it * 100 }
+            val closeAboveMa20 = ma20?.let { today.toDouble() > it }
+
             PriceMetrics(
                 flu5Pct = flu5Pct,
                 ma5 = ma5,
                 ma20 = ma20,
+                todayChangeRate = todayChangeRate,
+                todayVolume = todayVolume,
+                avg20dVolume = avg20dVolume,
+                rsi14 = rsi14,
+                rsi14Breakdown70 = rsi14Breakdown70,
+                high52w = high52w,
+                low52w = low52w,
+                distFromHigh52w = distFromHigh52w,
+                distFromLow52w = distFromLow52w,
+                closeAboveMa20 = closeAboveMa20,
             )
         } catch (e: Exception) {
             log.error(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
@@ -395,13 +546,53 @@ class RecommendService(
         }
     }
 
+    /**
+     * Wilder smoothing 기반 14일 RSI 계산 (표준).
+     *
+     * @param closes 종가 리스트. Kiwoom 응답 기준 [당일, 어제, 그제, ...] 순서.
+     *               최소 15개 이상 필요 (14일 변화량 = 15개 가격).
+     */
+    private fun calculateRsi14(closes: List<Long>): Double? {
+        if (closes.size < 15) return null
+        // [오래된 → 최근] 순으로 정렬해서 시간 순 계산
+        val sorted = closes.map { it.toDouble() }.reversed()
+        val changes = (1 until sorted.size).map { sorted[it] - sorted[it - 1] }
+        val gains = changes.map { if (it > 0) it else 0.0 }
+        val losses = changes.map { if (it < 0) -it else 0.0 }
+
+        // 초기 14일 단순 평균
+        var avgGain = gains.take(14).average()
+        var avgLoss = losses.take(14).average()
+        // 15일 이후 Wilder smoothing
+        for (i in 14 until changes.size) {
+            avgGain = (avgGain * 13 + gains[i]) / 14
+            avgLoss = (avgLoss * 13 + losses[i]) / 14
+        }
+
+        if (avgLoss == 0.0) return 100.0
+        val rs = avgGain / avgLoss
+        return 100.0 - (100.0 / (1.0 + rs))
+    }
+
     internal data class PriceMetrics(
         val flu5Pct: Double?,
         val ma5: Double?,
         val ma20: Double?,
+        val todayChangeRate: Double? = null,
+        val todayVolume: Long? = null,
+        val avg20dVolume: Long? = null,
+        val rsi14: Double? = null,
+        val rsi14Breakdown70: Boolean? = null,
+        val high52w: Long? = null,
+        val low52w: Long? = null,
+        val distFromHigh52w: Double? = null,
+        val distFromLow52w: Double? = null,
+        val closeAboveMa20: Boolean? = null,
     ) {
         companion object {
-            val UNKNOWN = PriceMetrics(null, null, null)
+            val UNKNOWN = PriceMetrics(
+                flu5Pct = null, ma5 = null, ma20 = null,
+            )
         }
     }
 
@@ -625,6 +816,7 @@ class RecommendService(
         val originSide: String,
         val riskFlags: RiskFlags,
         val priceMetrics: PriceMetrics,
+        val backtestMeta: BacktestMeta,
     ) {
         fun toCurrentEntity(): StockPick = StockPick(
             type = type,
@@ -645,6 +837,20 @@ class RecommendService(
             flu5Pct = priceMetrics.flu5Pct,
             ma5 = priceMetrics.ma5,
             ma20 = priceMetrics.ma20,
+            avg20dVolume = priceMetrics.avg20dVolume,
+            todayChangeRate = priceMetrics.todayChangeRate,
+            todayVolume = priceMetrics.todayVolume,
+            rsi14 = priceMetrics.rsi14,
+            rsi14Breakdown70 = priceMetrics.rsi14Breakdown70,
+            high52w = priceMetrics.high52w,
+            low52w = priceMetrics.low52w,
+            distFromHigh52w = priceMetrics.distFromHigh52w,
+            distFromLow52w = priceMetrics.distFromLow52w,
+            closeAboveMa20 = priceMetrics.closeAboveMa20,
+            pvTrigger = backtestMeta.pvTrigger,
+            maTrigger = backtestMeta.maTrigger,
+            vpTrigger = backtestMeta.vpTrigger,
+            rsiTrigger = backtestMeta.rsiTrigger,
         )
 
         fun toHistoryEntity(pickDate: LocalDateTime): StockPickHistory = StockPickHistory(
@@ -668,8 +874,46 @@ class RecommendService(
             flu5Pct = priceMetrics.flu5Pct,
             ma5 = priceMetrics.ma5,
             ma20 = priceMetrics.ma20,
+            avg20dVolume = priceMetrics.avg20dVolume,
+            todayChangeRate = priceMetrics.todayChangeRate,
+            todayVolume = priceMetrics.todayVolume,
+            rsi14 = priceMetrics.rsi14,
+            rsi14Breakdown70 = priceMetrics.rsi14Breakdown70,
+            high52w = priceMetrics.high52w,
+            low52w = priceMetrics.low52w,
+            distFromHigh52w = priceMetrics.distFromHigh52w,
+            distFromLow52w = priceMetrics.distFromLow52w,
+            closeAboveMa20 = priceMetrics.closeAboveMa20,
+            pvTrigger = backtestMeta.pvTrigger,
+            maTrigger = backtestMeta.maTrigger,
+            vpTrigger = backtestMeta.vpTrigger,
+            rsiTrigger = backtestMeta.rsiTrigger,
             pickDate = pickDate,
         )
+    }
+
+    /**
+     * 백테스트/디버깅용 메타데이터 — 후행지표 모듈의 trigger 결과만.
+     *
+     * 22:00 스케줄러가 모든 **후행** 모듈 ON 가정으로 1회 계산해 영속.
+     * 사용자 응답 로직 [applyAdjustments] 와 독립.
+     *
+     * **매크로(동행지표)는 의도적으로 제외**:
+     *  - 매크로 = 사용 시점의 시장 상황 반영이 본질
+     *  - 22시 시점에 적용해 저장하면 시간 lag (T일 마감 매크로 → T+1일 매수)
+     *  - 동행지표가 후행지표로 변질 → 백테스트 가정 부정확
+     *  - 운영 시 [applyAdjustments] 가 실시간 매크로 적용 (DB 저장 X)
+     *  - 매크로 환경 영향은 market_index_snapshot 분해로 측정
+     */
+    private data class BacktestMeta(
+        val pvTrigger: String?,
+        val maTrigger: String?,
+        val vpTrigger: String?,
+        val rsiTrigger: String?,
+    ) {
+        companion object {
+            val EMPTY = BacktestMeta("NONE", "NONE", "NONE", "NONE")
+        }
     }
 
     private fun extractIntersection(
@@ -809,7 +1053,8 @@ class RecommendService(
                 type = effectiveType,
                 stkCd = entity.stkCd,
                 stkNm = entity.stkNm,
-                todayDirection = entity.todayDirection,
+                // HOLD 는 매매 추천 X 라 당일 매매 동향 정보는 사용자에게 노이즈 → 마스킹
+                todayDirection = if (effectiveType == "HOLD") null else entity.todayDirection,
                 isHolding = entity.stkCd in holdingCodes,
                 streakDays = computeStreakDays(
                     histories = historyByStkCd[entity.stkCd] ?: emptyList(),
@@ -884,6 +1129,20 @@ class RecommendService(
         }
     }
 
+    /**
+     * 후행지표 보정 모듈은 **만장일치 룰** 로 평가 (사용자 철학 "잃지 않는 게 우선" 반영).
+     *
+     * 룰:
+     * - 격상: 활성 격상 능력 모듈 모두 격상 트리거 + 격하 시그널 0 → 한 단계 격상
+     * - 격하: 활성 격하 능력 모듈 모두 격하 트리거 + 격상 시그널 0 → 한 단계 격하
+     * - 그 외 (혼합/단일 무보정/균형) → 유지
+     * - 두 단계 격하는 폐기 (공격적 격하 회피)
+     *
+     * 단일 옵션 활성화 시 → 활성 능력 모듈 1개 → 1/1 = 만장일치 → 단독 발동 OK.
+     *
+     * 매크로(동행지표)는 점수제 밖에서 별도 한 단계 보정 추가 — 모듈 6가지 케이스 자체가
+     * 내부 만장일치(지수 등락률 + 기관 + 외국인 합의) 메커니즘이라 단독 발동 정당.
+     */
     private fun applyAdjustments(pick: StockPick, setting: RecommendSetting): String {
         val side = when (pick.type) {
             "STRONG_BUY", "BUY" -> Position.BUY
@@ -891,24 +1150,32 @@ class RecommendService(
             else -> return pick.type  // HOLD는 보정 대상 X
         }
 
-        // 1단계: 점수제 보정 (PriceVolatility, MovingAverage 등 기존 모듈)
-        val modules = activeModules(setting)
-        val afterScoring = if (modules.isEmpty()) {
+        val activeModules = activeModules(setting)
+        val afterScoring = if (activeModules.isEmpty()) {
             pick.type
         } else {
-            val promotionCount = modules.count { it.shouldPromote(pick, side) }
-            val demotionCount = modules.count { it.shouldDemote(pick, side) }
-            val score = promotionCount - demotionCount
+            val promotableModules = activeModules.filter { it.canPromote(side) }
+            val demotableModules = activeModules.filter { it.canDemote(side) }
+
+            val promotionCount = activeModules.count { it.shouldPromote(pick, side) }
+            val demotionCount = activeModules.count { it.shouldDemote(pick, side) }
+
+            val isUnanimousPromote = promotableModules.isNotEmpty() &&
+                promotableModules.all { it.shouldPromote(pick, side) } &&
+                demotionCount == 0
+
+            val isUnanimousDemote = demotableModules.isNotEmpty() &&
+                demotableModules.all { it.shouldDemote(pick, side) } &&
+                promotionCount == 0
+
             when {
-                score >= 1 -> promoteOnce(pick.type)
-                score <= -3 -> demoteTwoLevels(pick.type)
-                score <= -1 -> demoteOnce(pick.type)
+                isUnanimousPromote -> promoteOnce(pick.type)
+                isUnanimousDemote -> demoteOnce(pick.type)
                 else -> pick.type
             }
         }
 
-        // 2단계: 매크로 보정 (시장 등락률 + 기관/외국인 매매 부호 기반 6가지 케이스)
-        // 점수제와 별개로 한 번 더 한 단계 격상/격하 적용. Redis 캐시 미스 시 무보정.
+        // 2단계: 매크로 보정 (동행지표, 별도 처리). 캐시 미스 시 무보정.
         return if (setting.marketIndexEnabled) {
             marketIndexAdjustmentModule.adjust(afterScoring, pick)
         } else {
@@ -924,6 +1191,39 @@ class RecommendService(
         return adjustmentModules.filter { it.isEnabled(setting) }
     }
 
+    /**
+     * 백테스트/디버깅용 — 22:00 스케줄러 시점에 **모든 후행 모듈 ON** 가정으로
+     * 각 모듈의 raw trigger 결과만 저장 (만장일치 룰 적용 전).
+     *
+     * 매크로(동행지표)는 의도적으로 제외 — 시간 lag 시 의미 변질.
+     * 매크로 보정은 [applyAdjustments] 가 사용자 응답 시점에 실시간 적용 (DB 저장 X).
+     *
+     * HOLD 종목 = 보정 대상 X → 모든 trigger NONE.
+     */
+    private fun evaluateBacktestMeta(pick: StockPick): BacktestMeta {
+        val side = when (pick.type) {
+            "STRONG_BUY", "BUY" -> Position.BUY
+            "STRONG_SELL", "SELL" -> Position.SELL
+            else -> return BacktestMeta.EMPTY
+        }
+
+        val triggers = adjustmentModules.associate { module ->
+            val result = when {
+                module.shouldPromote(pick, side) -> "PROMOTE"
+                module.shouldDemote(pick, side) -> "DEMOTE"
+                else -> "NONE"
+            }
+            module.name to result
+        }
+
+        return BacktestMeta(
+            pvTrigger = triggers["PriceVolatility"] ?: "NONE",
+            maTrigger = triggers["MovingAverage"] ?: "NONE",
+            vpTrigger = triggers["VolumePrice"] ?: "NONE",
+            rsiTrigger = triggers["Rsi"] ?: "NONE",
+        )
+    }
+
     private fun promoteOnce(type: String): String = when (type) {
         "BUY" -> "STRONG_BUY"
         "SELL" -> "STRONG_SELL"
@@ -935,12 +1235,6 @@ class RecommendService(
         "BUY" -> "HOLD"            // 한 단계 격하 = 등급 한 칸 다운
         "STRONG_SELL" -> "SELL"
         "SELL" -> "HOLD"
-        else -> type
-    }
-
-    private fun demoteTwoLevels(type: String): String = when (type) {
-        "STRONG_BUY", "BUY" -> "HOLD"
-        "STRONG_SELL", "SELL" -> "HOLD"
         else -> type
     }
 

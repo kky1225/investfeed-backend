@@ -45,6 +45,9 @@ class RecommendSettingService(
             existing.priceVolatilityEnabled = req.priceVolatilityEnabled
             existing.movingAverageEnabled = req.movingAverageEnabled
             existing.marketIndexEnabled = req.marketIndexEnabled
+            existing.volumePriceEnabled = req.volumePriceEnabled
+            existing.rsiEnabled = req.rsiEnabled
+            existing.highLow52wEnabled = req.highLow52wEnabled
             existing.updatedAt = LocalDateTime.now()
             existing
         } else {
@@ -55,6 +58,9 @@ class RecommendSettingService(
                     priceVolatilityEnabled = req.priceVolatilityEnabled,
                     movingAverageEnabled = req.movingAverageEnabled,
                     marketIndexEnabled = req.marketIndexEnabled,
+                    volumePriceEnabled = req.volumePriceEnabled,
+                    rsiEnabled = req.rsiEnabled,
+                    highLow52wEnabled = req.highLow52wEnabled,
                 )
             )
         }
@@ -68,15 +74,22 @@ class RecommendSettingService(
             priceVolatilityEnabled = setting.priceVolatilityEnabled,
             movingAverageEnabled = setting.movingAverageEnabled,
             marketIndexEnabled = setting.marketIndexEnabled,
+            volumePriceEnabled = setting.volumePriceEnabled,
+            rsiEnabled = setting.rsiEnabled,
+            highLow52wEnabled = setting.highLow52wEnabled,
         )
     }
 
     private fun defaultSetting(): RecommendSettingRes {
+        // 보정 옵션 기본값 = 모두 ON (잃지 않기 철학 — 신규 사용자도 다층 안전망 디폴트 활성).
         return RecommendSettingRes(
             riskPreset = RiskPreset.NORMAL,
-            priceVolatilityEnabled = false,
-            movingAverageEnabled = false,
-            marketIndexEnabled = false,
+            priceVolatilityEnabled = true,
+            movingAverageEnabled = true,
+            marketIndexEnabled = true,
+            volumePriceEnabled = true,
+            rsiEnabled = true,
+            highLow52wEnabled = true,
         )
     }
 

@@ -11,6 +11,7 @@ import com.example.investfeed.domain.monitoring.repository.SchedulerStatusReposi
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
 import com.example.investfeed.domain.rebalancing.scheduler.RebalancingAlertScheduler
+import com.example.investfeed.domain.recommend.service.BacktestBackfillService
 import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
 import mu.KotlinLogging
@@ -37,6 +38,7 @@ class ManualTriggerService(
     private val rebalancingAlertScheduler: RebalancingAlertScheduler,
     private val calendarSyncScheduler: CalendarSyncScheduler,
     private val recommendService: RecommendService,
+    private val backtestBackfillService: BacktestBackfillService,
     private val holidayService: HolidayService,
     private val holdingSyncScheduler: HoldingSyncScheduler,
     private val stockDividendScheduler: StockDividendScheduler,
@@ -54,6 +56,7 @@ class ManualTriggerService(
             "CalendarSyncScheduler"        to { calendarSyncScheduler.syncCalendarData() },
             "RecommendScheduler"           to { recommendService.runRecommendStock() },
             "RecommendTodayDirectionScheduler" to { recommendService.runRefreshTodayDirection() },
+            "BacktestBackfillScheduler"    to { backtestBackfillService.runBackfill() },
             "HolidayRefreshScheduler"      to { holidayService.refreshHolidays() },
             "HoldingSyncScheduler"         to { holdingSyncScheduler.syncAllHoldings() },
             "StockDividendScheduler"       to { stockDividendScheduler.collectDaily() },

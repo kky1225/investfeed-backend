@@ -7,4 +7,7 @@ data class RecommendSettingRes(
     val priceVolatilityEnabled: Boolean,
     val movingAverageEnabled: Boolean,
     val marketIndexEnabled: Boolean,
+    val volumePriceEnabled: Boolean,
+    val rsiEnabled: Boolean,
+    val highLow52wEnabled: Boolean,
 )

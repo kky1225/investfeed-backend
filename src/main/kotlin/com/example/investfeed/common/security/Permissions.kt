@@ -24,6 +24,9 @@ object Permissions {
     /** 역할별 권한 action 부여 매트릭스 (운영자용) */
     const val ADMIN_PERMISSION_GRANT = "ADMIN_PERMISSION_GRANT"
 
+    /** 추천 시스템 일일 운영 모니터링 (trigger 메타, 매크로 스냅샷, 백필 진행도) */
+    const val ADMIN_RECOMMEND_MONITORING = "ADMIN_RECOMMEND_MONITORING"
+
     /** 역할 CRUD 및 순서 */
     const val ADMIN_ROLE = "ADMIN_ROLE"
 

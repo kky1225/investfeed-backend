@@ -30,4 +30,7 @@ class MovingAverageModule : AdjustmentModule {
     }
 
     override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
+
+    /** 격상 전용 모듈 — 격하 능력 없음. 만장일치 격하 판정에서 제외. */
+    override fun canDemote(side: Position): Boolean = false
 }

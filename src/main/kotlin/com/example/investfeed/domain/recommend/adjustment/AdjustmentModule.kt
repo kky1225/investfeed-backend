@@ -33,4 +33,20 @@ interface AdjustmentModule {
 
     /** 한 단계 격하 트리거 조건 충족 여부. */
     fun shouldDemote(pick: StockPick, side: Position): Boolean
+
+    /**
+     * 격상 능력 여부 — 격하 전용 모듈은 false 오버라이드. 기본 true.
+     *
+     * 만장일치 격상 룰 판정 시 "격상 능력 있는 활성 모듈" 집합을 계산하는 데 사용.
+     * 격상 능력이 본질적으로 없는 모듈은 만장일치 판정에서 제외되어,
+     * 격상 불가 모듈로 인해 만장일치가 영원히 깨지는 문제를 방지.
+     */
+    fun canPromote(side: Position): Boolean = true
+
+    /**
+     * 격하 능력 여부 — 격상 전용 모듈은 false 오버라이드. 기본 true.
+     *
+     * 만장일치 격하 룰 판정 시 동일 목적으로 사용.
+     */
+    fun canDemote(side: Position): Boolean = true
 }
