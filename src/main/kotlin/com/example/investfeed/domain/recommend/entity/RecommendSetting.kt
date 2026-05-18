@@ -44,6 +44,10 @@ class RecommendSetting(
     @Column(name = "high_low_52w_enabled", nullable = false)
     var highLow52wEnabled: Boolean = true,
 
+    // 신고저 돌파 보정 옵션 — 가용 범위 신고가 95% / 신저가 5% + 거래량 동반
+    @Column(name = "breakout_enabled", nullable = false)
+    var breakoutEnabled: Boolean = true,
+
     @Column(name = "created_at")
     val createdAt: LocalDateTime = LocalDateTime.now(),
 

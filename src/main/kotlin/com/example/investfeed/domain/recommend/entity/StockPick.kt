@@ -113,4 +113,10 @@ class StockPick(
 
     @Column(name = "rsi_trigger")
     val rsiTrigger: String? = null,
+
+    @Column(name = "hl52w_trigger")
+    val hl52wTrigger: String? = null,           // HighLow52w 트리거 (누락 보강)
+
+    @Column(name = "breakout_trigger")
+    val breakoutTrigger: String? = null,        // Breakout 트리거 (신규)
 )

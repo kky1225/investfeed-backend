@@ -58,10 +58,6 @@ class VolumePriceModule : AdjustmentModule {
         val today = pick.todayVolume ?: return false
         val avg = pick.avg20dVolume ?: return false
         if (avg <= 0L) return false
-        return today.toDouble() / avg >= RVOL_THRESHOLD
-    }
-
-    companion object {
-        private const val RVOL_THRESHOLD = 2.0
+        return today.toDouble() / avg >= RvolThreshold.VALUE
     }
 }

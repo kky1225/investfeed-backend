@@ -515,14 +515,20 @@ class RecommendService(
                 rsiSeries[3] >= 70.0 && rsiSeries.take(3).all { it < 70.0 }
             } else null
 
-            // HighLow52wModule 평가용 — 240영업일 최고/최저 + 거리 % + MA20 위/아래.
-            // closes.take(240) = 오늘 포함 직전 240영업일 윈도. 데이터 부족 시 null.
-            val window52w = closes.take(240)
-            val high52w = if (window52w.size >= 240) window52w.max() else null
-            val low52w = if (window52w.size >= 240) window52w.min() else null
             val today = closes[0]
-            val distFromHigh52w = high52w?.let { (today - it).toDouble() / it * 100 }
-            val distFromLow52w = low52w?.let { (today - it).toDouble() / it * 100 }
+
+            val defaultInfo = try {
+                Thread.sleep(API_PACING_MS)
+                stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd))
+                    .takeIf { it.return_code == 0 }
+            } catch (e: Exception) {
+                log.warn(e) { "ka10001 조회 실패 stkCd=$stkCd" }
+                null
+            }
+            val high52w = defaultInfo?._250hgst?.toLongOrNull()?.let { abs(it) }
+            val low52w = defaultInfo?._250lwst?.toLongOrNull()?.let { abs(it) }
+            val distFromHigh52w = defaultInfo?._250hgst_pric_pre_rt?.toDoubleOrNull()
+            val distFromLow52w = defaultInfo?._250lwst_pric_pre_rtm?.toDoubleOrNull()
             val closeAboveMa20 = ma20?.let { today.toDouble() > it }
 
             PriceMetrics(
@@ -851,6 +857,8 @@ class RecommendService(
             maTrigger = backtestMeta.maTrigger,
             vpTrigger = backtestMeta.vpTrigger,
             rsiTrigger = backtestMeta.rsiTrigger,
+            hl52wTrigger = backtestMeta.hl52wTrigger,
+            breakoutTrigger = backtestMeta.breakoutTrigger,
         )
 
         fun toHistoryEntity(pickDate: LocalDateTime): StockPickHistory = StockPickHistory(
@@ -888,6 +896,8 @@ class RecommendService(
             maTrigger = backtestMeta.maTrigger,
             vpTrigger = backtestMeta.vpTrigger,
             rsiTrigger = backtestMeta.rsiTrigger,
+            hl52wTrigger = backtestMeta.hl52wTrigger,
+            breakoutTrigger = backtestMeta.breakoutTrigger,
             pickDate = pickDate,
         )
     }
@@ -910,9 +920,11 @@ class RecommendService(
         val maTrigger: String?,
         val vpTrigger: String?,
         val rsiTrigger: String?,
+        val hl52wTrigger: String?,
+        val breakoutTrigger: String?,
     ) {
         companion object {
-            val EMPTY = BacktestMeta("NONE", "NONE", "NONE", "NONE")
+            val EMPTY = BacktestMeta("NONE", "NONE", "NONE", "NONE", "NONE", "NONE")
         }
     }
 
@@ -1221,6 +1233,8 @@ class RecommendService(
             maTrigger = triggers["MovingAverage"] ?: "NONE",
             vpTrigger = triggers["VolumePrice"] ?: "NONE",
             rsiTrigger = triggers["Rsi"] ?: "NONE",
+            hl52wTrigger = triggers["HighLow52w"] ?: "NONE",   // 누락 보강
+            breakoutTrigger = triggers["Breakout"] ?: "NONE",  // 신규
         )
     }
 

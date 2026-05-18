@@ -48,6 +48,7 @@ class RecommendSettingService(
             existing.volumePriceEnabled = req.volumePriceEnabled
             existing.rsiEnabled = req.rsiEnabled
             existing.highLow52wEnabled = req.highLow52wEnabled
+            existing.breakoutEnabled = req.breakoutEnabled
             existing.updatedAt = LocalDateTime.now()
             existing
         } else {
@@ -61,6 +62,7 @@ class RecommendSettingService(
                     volumePriceEnabled = req.volumePriceEnabled,
                     rsiEnabled = req.rsiEnabled,
                     highLow52wEnabled = req.highLow52wEnabled,
+                    breakoutEnabled = req.breakoutEnabled,
                 )
             )
         }
@@ -77,6 +79,7 @@ class RecommendSettingService(
             volumePriceEnabled = setting.volumePriceEnabled,
             rsiEnabled = setting.rsiEnabled,
             highLow52wEnabled = setting.highLow52wEnabled,
+            breakoutEnabled = setting.breakoutEnabled,
         )
     }
 
@@ -90,6 +93,7 @@ class RecommendSettingService(
             volumePriceEnabled = true,
             rsiEnabled = true,
             highLow52wEnabled = true,
+            breakoutEnabled = true,
         )
     }
 

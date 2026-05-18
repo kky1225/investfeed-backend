@@ -231,6 +231,8 @@ class AdminRecommendMonitoringService(
             tagged("MA", h.maTrigger),
             tagged("VP", h.vpTrigger),
             tagged("RSI", h.rsiTrigger),
+            tagged("HL", h.hl52wTrigger),
+            tagged("BO", h.breakoutTrigger),
         )
         return if (parts.isEmpty()) "ALL_NONE" else parts.joinToString(",")
     }
@@ -259,6 +261,7 @@ class AdminRecommendMonitoringService(
         stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
         type = type,
         pvTrigger = pvTrigger, maTrigger = maTrigger, vpTrigger = vpTrigger, rsiTrigger = rsiTrigger,
+        hl52wTrigger = hl52wTrigger, breakoutTrigger = breakoutTrigger,
         rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
         ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
         todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
@@ -282,6 +285,7 @@ class AdminRecommendMonitoringService(
             stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
             type = type,
             pvTrigger = pvTrigger, maTrigger = maTrigger, vpTrigger = vpTrigger, rsiTrigger = rsiTrigger,
+            hl52wTrigger = hl52wTrigger, breakoutTrigger = breakoutTrigger,
             rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
             ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
             todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,

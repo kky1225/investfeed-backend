@@ -10,4 +10,5 @@ data class RecommendSettingReq(
     val volumePriceEnabled: Boolean = false,
     val rsiEnabled: Boolean = false,
     val highLow52wEnabled: Boolean = false,
+    val breakoutEnabled: Boolean = false,
 )

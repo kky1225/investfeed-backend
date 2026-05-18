@@ -120,6 +120,12 @@ class StockPickHistory(
     @Column(name = "rsi_trigger")
     val rsiTrigger: String? = null,
 
+    @Column(name = "hl52w_trigger")
+    val hl52wTrigger: String? = null,
+
+    @Column(name = "breakout_trigger")
+    val breakoutTrigger: String? = null,
+
     // N영업일 후 가격 (BacktestBackfillService 가 백필).
     // T+1일 시가 매수 / T+N일 종가 평가 백테스트 모델 기준.
     @Column(name = "price_open_1d")

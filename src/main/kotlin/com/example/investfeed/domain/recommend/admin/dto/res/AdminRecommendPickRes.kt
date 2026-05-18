@@ -28,6 +28,8 @@ data class AdminRecommendPickRes(
     val maTrigger: String?,
     val vpTrigger: String?,
     val rsiTrigger: String?,
+    val hl52wTrigger: String?,         // HighLow52w (누락 보강)
+    val breakoutTrigger: String?,      // Breakout (신규)
 
     // ─── 후행 지표 raw ────────────────────────────────────────────────────
     val rsi14: Double?,
