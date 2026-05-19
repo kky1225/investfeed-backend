@@ -18,6 +18,10 @@ import org.springframework.stereotype.Component
  * | `RSI < 50` | **격상** (저점 매수 메리트) | **격하** (가격 약세 → 매도 위험) |
  * | `RSI ≥ 70 → 3일 < 70 유지` (Breakdown70) | **격하** (모멘텀 약화 확정) | **격상** (매도 기회 강화) |
  *
+ * 단, **Breakdown70이면 `RSI < 50` 해석을 배제**(상호배타). RSI가 70→붕괴(예: 72→45)할 때
+ * 한 모듈이 격상·격하를 동시 투표해 다수결 비토로 양방향이 다 막히는 자기모순을 막는다 —
+ * 떨어지는 칼날을 "저점 매수"(BUY 격상)·"약세 격하"(SELL 격하)로 오인하지 않는다.
+ *
  * **Breakdown70 정의**:
  * - 3일 전 RSI ≥ 70 (3일 전엔 과매수)
  * - AND 최근 3일 RSI 모두 < 70 (회복 못 함)
@@ -31,8 +35,8 @@ class RsiModule : AdjustmentModule {
 
     override fun shouldPromote(pick: StockPick, side: Position): Boolean {
         return when (side) {
-            // BUY 격상: RSI < 50 (저점 매수 메리트)
-            Position.BUY -> (pick.rsi14 ?: return false) < 50.0
+            // BUY 격상: RSI < 50 (저점 매수 메리트). 단 Breakdown70이면 배제 (떨어지는 칼날 X)
+            Position.BUY -> pick.rsi14Breakdown70 != true && (pick.rsi14 ?: return false) < 50.0
             // SELL 격상: 70 이탈 3일 (모멘텀 약화 = 매도 기회 강화)
             Position.SELL -> pick.rsi14Breakdown70 == true
         }
@@ -42,8 +46,8 @@ class RsiModule : AdjustmentModule {
         return when (side) {
             // BUY 격하: 70 이탈 3일 (모멘텀 약화)
             Position.BUY -> pick.rsi14Breakdown70 == true
-            // SELL 격하: RSI < 50 (가격 약세 → 매도 위험)
-            Position.SELL -> (pick.rsi14 ?: return false) < 50.0
+            // SELL 격하: RSI < 50 (가격 약세 → 매도 위험). 단 Breakdown70이면 배제 (격상 우선)
+            Position.SELL -> pick.rsi14Breakdown70 != true && (pick.rsi14 ?: return false) < 50.0
         }
     }
 }

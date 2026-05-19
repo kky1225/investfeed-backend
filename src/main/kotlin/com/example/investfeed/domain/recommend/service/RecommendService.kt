@@ -1045,6 +1045,55 @@ class RecommendService(
         private const val API_PACING_MS = 500L
         private const val KIWOOM_BROKER_NAME = "키움증권"
         private const val STREAK_LOOKBACK_DAYS = 45L      // history / 운영 사이클 조회 기간
+
+        /**
+         * Stage 1 — 활성 보정 모듈 다수결로 한 단계 격상/격하 결정 (순수 함수, 테스트 대상).
+         *
+         * 풀(pool) = 사용자가 켠 모듈 중 격상/격하 **능력** 보유 집합. 투표는 트리거 발동 수.
+         * - 격상: 격상풀 과반 + 격하표 0 → 1칸 (STRONG 종착이라 자연 캡)
+         * - 격하 만장일치: 격하풀 전원 + 격상표 0 → 2칸 (HOLD 바닥에서 자연 정지)
+         * - 격하 다수결: 격하풀 과반 + 격상표 0 → 1칸
+         * - 반대표 1개라도 있으면 해당 방향 무효 (대칭 하드 비토)
+         * - 만장일치 ⊂ 다수결 이므로 만장일치 분기를 다수결 분기보다 먼저 둔다.
+         *
+         * activeModules 빈 리스트면 원본 유지. HOLD 는 호출 전([applyAdjustments])에서 차단됨.
+         */
+        internal fun resolveStage1(
+            pick: StockPick,
+            activeModules: List<AdjustmentModule>,
+            side: Position,
+        ): String {
+            if (activeModules.isEmpty()) return pick.type
+
+            val promotable = activeModules.filter { it.canPromote(side) }
+            val demotable = activeModules.filter { it.canDemote(side) }
+            val promoteVotes = promotable.count { it.shouldPromote(pick, side) }
+            val demoteVotes = demotable.count { it.shouldDemote(pick, side) }
+
+            return when {
+                promotable.isNotEmpty() && promoteVotes * 2 > promotable.size && demoteVotes == 0 ->
+                    promoteOnce(pick.type)
+                demotable.isNotEmpty() && demoteVotes == demotable.size && promoteVotes == 0 ->
+                    demoteOnce(demoteOnce(pick.type))
+                demotable.isNotEmpty() && demoteVotes * 2 > demotable.size && promoteVotes == 0 ->
+                    demoteOnce(pick.type)
+                else -> pick.type
+            }
+        }
+
+        private fun promoteOnce(type: String): String = when (type) {
+            "BUY" -> "STRONG_BUY"
+            "SELL" -> "STRONG_SELL"
+            else -> type  // STRONG_BUY/STRONG_SELL은 이미 STRONG — 격상 안 함
+        }
+
+        private fun demoteOnce(type: String): String = when (type) {
+            "STRONG_BUY" -> "BUY"
+            "BUY" -> "HOLD"            // 한 단계 격하 = 등급 한 칸 다운
+            "STRONG_SELL" -> "SELL"
+            "SELL" -> "HOLD"
+            else -> type
+        }
     }
 
     fun listRecommendations(): RecommendListRes {
@@ -1084,13 +1133,14 @@ class RecommendService(
             .map(::toItem).toMutableList()
 
         val allItems = recommendList + avoidList + holdList
-        val allCodes = allItems.mapNotNull { it.stkCd }.joinToString("|")
+        val allCodes = allItems.mapNotNull { it.stkCd?.substringBefore("_") }.distinct().joinToString("|")
         if (allCodes.isNotBlank()) {
             val kiwoomStockInterestRes = stockClient.stockInterest(req = KiwoomStockInterestReq(stk_cd = allCodes))
             if (kiwoomStockInterestRes.return_code == 0) {
-                val infoMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd } ?: emptyMap()
+                val infoMap = kiwoomStockInterestRes.atn_stk_infr
+                    ?.associateBy { it.stk_cd?.substringBefore("_") } ?: emptyMap()
                 allItems.forEach { item ->
-                    infoMap[item.stkCd]?.let { info ->
+                    infoMap[item.stkCd?.substringBefore("_")]?.let { info ->
                         item.curPrc = info.cur_prc
                         item.fluRt = info.flu_rt
                         item.preSig = info.pred_pre_sig
@@ -1119,18 +1169,12 @@ class RecommendService(
     }
 
     /**
-     * 사용자 옵션 ON 인 보정 모듈들을 다수결 점수제로 평가해 effectiveType 결정.
-     *
-     * 점수 = (격상 트리거 개수) - (격하 트리거 개수)
-     *   score ≥ 1   → 한 단계 격상 (BUY → STRONG_BUY, SELL → STRONG_SELL)
-     *   score 0 + 격하 1+ → 한 단계 격하 (동률 시 격하 우선)
-     *   score -1 ~ -2 → 한 단계 격하 (STRONG → 일반)
-     *   score ≤ -3  → 두 단계 격하 (HOLD까지, 강한 모순 시그널)
+     * 사용자 옵션 ON 인 보정 모듈들을 다수결로 평가해 effectiveType 결정.
      *
      * 룰:
      *   1. 수급 분류는 백본 — 분류 방향 (BUY ↔ SELL) 절대 못 뒤집음
      *   2. 격상은 최대 한 단계 (수익 추구는 신중)
-     *   3. 격하는 보정 강도 따라 1~2단계 (손실 보호는 강하게)
+     *   3. 격하는 다수결 1단계 / 만장일치 2단계 (손실 보호는 강하게)
      */
     private fun computeEffectiveTypes(
         picks: List<StockPick>,
@@ -1142,18 +1186,11 @@ class RecommendService(
     }
 
     /**
-     * 후행지표 보정 모듈은 **만장일치 룰** 로 평가 (사용자 철학 "잃지 않는 게 우선" 반영).
+     * 후행지표 보정: 1단계 다수결 → 2단계 매크로(동행지표) 순차 적용.
      *
-     * 룰:
-     * - 격상: 활성 격상 능력 모듈 모두 격상 트리거 + 격하 시그널 0 → 한 단계 격상
-     * - 격하: 활성 격하 능력 모듈 모두 격하 트리거 + 격상 시그널 0 → 한 단계 격하
-     * - 그 외 (혼합/단일 무보정/균형) → 유지
-     * - 두 단계 격하는 폐기 (공격적 격하 회피)
-     *
-     * 단일 옵션 활성화 시 → 활성 능력 모듈 1개 → 1/1 = 만장일치 → 단독 발동 OK.
-     *
-     * 매크로(동행지표)는 점수제 밖에서 별도 한 단계 보정 추가 — 모듈 6가지 케이스 자체가
+     * 매크로(동행지표)는 다수결 밖에서 별도 한 단계 보정 추가 — 모듈 6가지 케이스 자체가
      * 내부 만장일치(지수 등락률 + 기관 + 외국인 합의) 메커니즘이라 단독 발동 정당.
+     * 매크로 누적으로 최악 격하해도 HOLD 바닥에서 정지 (백본 횡단 없음).
      */
     private fun applyAdjustments(pick: StockPick, setting: RecommendSetting): String {
         val side = when (pick.type) {
@@ -1162,30 +1199,7 @@ class RecommendService(
             else -> return pick.type  // HOLD는 보정 대상 X
         }
 
-        val activeModules = activeModules(setting)
-        val afterScoring = if (activeModules.isEmpty()) {
-            pick.type
-        } else {
-            val promotableModules = activeModules.filter { it.canPromote(side) }
-            val demotableModules = activeModules.filter { it.canDemote(side) }
-
-            val promotionCount = activeModules.count { it.shouldPromote(pick, side) }
-            val demotionCount = activeModules.count { it.shouldDemote(pick, side) }
-
-            val isUnanimousPromote = promotableModules.isNotEmpty() &&
-                promotableModules.all { it.shouldPromote(pick, side) } &&
-                demotionCount == 0
-
-            val isUnanimousDemote = demotableModules.isNotEmpty() &&
-                demotableModules.all { it.shouldDemote(pick, side) } &&
-                promotionCount == 0
-
-            when {
-                isUnanimousPromote -> promoteOnce(pick.type)
-                isUnanimousDemote -> demoteOnce(pick.type)
-                else -> pick.type
-            }
-        }
+        val afterScoring = resolveStage1(pick, activeModules(setting), side)
 
         // 2단계: 매크로 보정 (동행지표, 별도 처리). 캐시 미스 시 무보정.
         return if (setting.marketIndexEnabled) {
@@ -1236,20 +1250,6 @@ class RecommendService(
             hl52wTrigger = triggers["HighLow52w"] ?: "NONE",   // 누락 보강
             breakoutTrigger = triggers["Breakout"] ?: "NONE",  // 신규
         )
-    }
-
-    private fun promoteOnce(type: String): String = when (type) {
-        "BUY" -> "STRONG_BUY"
-        "SELL" -> "STRONG_SELL"
-        else -> type  // STRONG_BUY/STRONG_SELL은 이미 STRONG — 격상 안 함
-    }
-
-    private fun demoteOnce(type: String): String = when (type) {
-        "STRONG_BUY" -> "BUY"
-        "BUY" -> "HOLD"            // 한 단계 격하 = 등급 한 칸 다운
-        "STRONG_SELL" -> "SELL"
-        "SELL" -> "HOLD"
-        else -> type
     }
 
     private fun resolveCurrentSetting(): RecommendSetting {

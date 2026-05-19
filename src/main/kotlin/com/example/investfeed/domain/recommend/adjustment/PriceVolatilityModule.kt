@@ -30,6 +30,6 @@ class PriceVolatilityModule : AdjustmentModule {
         }
     }
 
-    /** 격하 전용 모듈 — 격상 능력 없음. 만장일치 격상 판정에서 제외. */
+    /** 격하 전용 모듈 — 격상 능력 없음. 다수결 격상풀에서 제외. */
     override fun canPromote(side: Position): Boolean = false
 }

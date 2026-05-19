@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component
  *  - flu5Pct = 노이즈 큼 (큰 변동 한 번에 부호 바뀜)
  *  - [MovingAverageModule] 골든/데드크로스 (이벤트) 와 종가 vs MA20 (상태) 는 중복 X
  *
- * **만장일치 룰 합류**: 단독 발동 X — 다른 모듈도 격상 동의 시에만 시스템이 실제 격상.
+ * **다수결 룰**: 격상풀의 한 표 — 단독 발동 X, 격상풀 과반(+격하표 0) 충족 시에만 실제 격상.
  */
 @Component
 class HighLow52wModule : AdjustmentModule {
