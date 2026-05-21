@@ -154,7 +154,7 @@ class BacktestBackfillService(
                     filled++
                 }
             } catch (e: Exception) {
-                log.error(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
+                log.warn(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
             }
         }
 

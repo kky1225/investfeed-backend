@@ -19,10 +19,13 @@ enum class SchedulerName(
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00"),
     RecommendScheduler(SchedulerType.SLOW, 300, "매일 22:00", blockedOnHoliday = true),
     BacktestBackfillScheduler(SchedulerType.SLOW, 600, "매일 22:30", blockedOnHoliday = true),
+    HoldingGradeScheduler(SchedulerType.SLOW, 600, "거래일 22:10", blockedOnHoliday = true),
+    PaperTradeExecScheduler(SchedulerType.SLOW, 600, "거래일 08:50(장전)", blockedOnHoliday = true),
     RecommendTodayDirectionScheduler(SchedulerType.SLOW, 120, "매 5분(09:00~21:55)", blockedOnHoliday = true),
     IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00"),
     HolidayRefreshScheduler(SchedulerType.SLOW, 120, "매월 1일 00:05"),
     CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분"),
     InterestSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15"),
     HoldingSyncScheduler(SchedulerType.SLOW, 600, "매일 00:00"),
+    IndexDailyCloseScheduler(SchedulerType.SLOW, 120, "매일 00:10"),
 }

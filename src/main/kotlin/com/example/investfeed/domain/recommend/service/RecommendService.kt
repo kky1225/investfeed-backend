@@ -45,7 +45,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.scheduling.annotation.Scheduled
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.math.abs
@@ -78,20 +77,6 @@ class RecommendService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 22 * * *", scheduler = "slowScheduler")
-    fun scheduledRecommendStock() {
-        log.info { "RecommendScheduler cron fired" }
-        if (holidayService.isHoliday()) {
-            log.info { "RecommendScheduler skipped: today is holiday" }
-            return
-        }
-        if (schedulerLogService.isRunning(SchedulerName.RecommendTodayDirectionScheduler)) {
-            log.warn { "RecommendScheduler skipped: RecommendTodayDirectionScheduler 실행 중 (stock_pick 충돌 방지)" }
-            return
-        }
-        runRecommendStock()
-    }
-
     @Transactional
     fun runRecommendStock() {
         schedulerLogService.execute(SchedulerName.RecommendScheduler) {
@@ -103,20 +88,6 @@ class RecommendService(
                 SecurityContextHolder.clearContext()
             }
         }
-    }
-
-    @Scheduled(cron = "0 */5 9-21 * * *", scheduler = "slowScheduler")
-    fun scheduledRefreshTodayDirection() {
-        log.info { "RecommendTodayDirectionScheduler cron fired" }
-        if (holidayService.isHoliday()) {
-            log.info { "RecommendTodayDirectionScheduler skipped: today is holiday" }
-            return
-        }
-        if (schedulerLogService.isRunning(SchedulerName.RecommendScheduler)) {
-            log.warn { "RecommendTodayDirectionScheduler skipped: RecommendScheduler 실행 중 (stock_pick 충돌 방지)" }
-            return
-        }
-        runRefreshTodayDirection()
     }
 
     @Transactional
@@ -175,7 +146,7 @@ class RecommendService(
                     else -> nullCount++
                 }
             } catch (e: Exception) {
-                log.error(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
+                log.warn(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
                 pick.todayDirection = null
                 nullCount++
             }
@@ -238,8 +209,15 @@ class RecommendService(
                     sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
             }
 
-            buyCandidates.mapNotNull { processCandidate(it, Position.BUY, todayOffset, riskMap, marketTypeMap) } +
-                sellCandidates.mapNotNull { processCandidate(it, Position.SELL, todayOffset, riskMap, marketTypeMap) }
+            buyCandidates.mapNotNull {
+                val stkCd = it.stk_cd ?: return@mapNotNull null
+                val stkNm = it.stk_nm ?: return@mapNotNull null
+                processCandidate(stkCd, stkNm, Position.BUY, todayOffset, riskMap, marketTypeMap)
+            } + sellCandidates.mapNotNull {
+                val stkCd = it.stk_cd ?: return@mapNotNull null
+                val stkNm = it.stk_nm ?: return@mapNotNull null
+                processCandidate(stkCd, stkNm, Position.SELL, todayOffset, riskMap, marketTypeMap)
+            }
         } else {
             emptyList()
         }
@@ -248,7 +226,11 @@ class RecommendService(
         stockPickRepository.deleteAll()
         stockPickRepository.saveAll(processed.map { it.toCurrentEntity() })
 
-        // 이력용 테이블 누적
+        // 이력용 테이블 — 같은 날 재실행 시 "오늘분"을 최신 실행분으로 교체(stk_cd·일자당 1건).
+        stockPickHistoryRepository.deleteByPickDateBetween(
+            now.toLocalDate().atStartOfDay(),
+            now.toLocalDate().atTime(23, 59, 59),
+        )
         stockPickHistoryRepository.saveAll(processed.map { it.toHistoryEntity(now) })
 
         // 백테스트용 매크로 일일 스냅샷 저장 (당일 1행, 이미 있으면 skip).
@@ -338,15 +320,14 @@ class RecommendService(
     }
 
     private fun processCandidate(
-        item: KiwoomInvestorTradeCloseMarketItemList,
+        stkCd: String,
+        stkNm: String,
         position: Position,
         todayOffset: Int = TODAY_OFFSET,
         riskMap: Map<String, RiskFlags> = emptyMap(),
         marketTypeMap: Map<String, String> = emptyMap(),
+        holdingMode: Boolean = false,
     ): ProcessedPick? {
-        val stkCd = item.stk_cd ?: return null
-        val stkNm = item.stk_nm ?: return null
-
         Thread.sleep(API_PACING_MS)
 
         val investorRes = try {
@@ -360,7 +341,7 @@ class RecommendService(
                 )
             )
         } catch (e: Exception) {
-            log.error(e) { "stockInvestor 호출 실패 stkCd=$stkCd position=$position" }
+            log.warn(e) { "stockInvestor 호출 실패 stkCd=$stkCd position=$position" }
             return null
         }
 
@@ -396,12 +377,12 @@ class RecommendService(
         val marketCap = try {
             stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd)).mac?.toLongOrNull()
         } catch (e: Exception) {
-            log.error(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
+            log.warn(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
             null
         }
 
         if (marketCap == null || marketCap == 0L) {
-            log.error {
+            log.warn {
                 "시총 데이터 누락으로 추천 후보 제외 stkCd=$stkCd, stkNm=$stkNm, position=$position, marketCap=$marketCap"
             }
             return null
@@ -412,7 +393,7 @@ class RecommendService(
         val prior = penfndValues.subList(todayOffset + RECENT_WINDOW, penfndValues.size)
         val priorTrendRatio = computeDominantStrengthRatio(prior)
         val foreignerAligned = isForeignerDirectionallyAligned(items, position, todayOffset)
-        val type = classify(penfndK, frgnrBlocked, effectiveRatio, position, prior, foreignerAligned)
+        val type = classify(penfndK, frgnrBlocked, effectiveRatio, position, prior, foreignerAligned, holdingMode)
         log.info {
             "[$stkNm($stkCd) $position] 분류=$type — penfndK=${"%.2f".format(penfndK)} " +
                 "(STRONG≥$K_STRONG_OVERRIDE), frgnrSignedRatio=${"%.4f%%".format(frgnrSignedRatio * 100)}, " +
@@ -547,7 +528,7 @@ class RecommendService(
                 closeAboveMa20 = closeAboveMa20,
             )
         } catch (e: Exception) {
-            log.error(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
+            log.warn(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
             PriceMetrics.UNKNOWN
         }
     }
@@ -725,13 +706,18 @@ class RecommendService(
 
     /**
      * 분류 규칙 우선순위:
-     * 1. 외국인 BLOCK → HOLD (외국인이 추천 반대 방향으로 강한 시그널)
+     * 1. 외국인 BLOCK → HOLD (추천 모드) / **한 단계 격하 (holdingMode=true 보유 평가 모드)**
      * 2. STRONG 격상 (연기금 K ≥ 3.0 또는 외국인 시총 비중 ≥ 0.1%) + prior 추세 명확(B' ≥ 70%) → STRONG
      * 3. 외국인 시총 비중 ≥ MCAP_RATIO_BUY (0.05%) → BUY/SELL
      * 4. **(옵션 B)** 외국인 방향성 동조 (12일 추세 일관) → BUY/SELL ← 신규: 시총 비중 미달 구제
      * 5. 그 외 → HOLD
      *
+     * BLOCK 처리 분기 — 추천 매매(opt-in)는 위험 회피 우선이라 HOLD 직행이 안전,
+     * 보유 평가는 위험 관리(=손절 행동도 필요) 라 한 단계 격하로 STRONG 시그널 행동 보존.
+     * 격하 매핑: STRONG_X → X, X → HOLD, HOLD → HOLD.
+     *
      * @param foreignerAligned [isForeignerDirectionallyAligned] 결과. 호출부에서 미리 계산해서 전달.
+     * @param holdingMode true 면 BLOCK 시 한 단계 격하 (보유 평가용). false 면 BLOCK 시 HOLD 직행 (추천 매매용).
      */
     internal fun classify(
         penfndK: Double,
@@ -740,19 +726,34 @@ class RecommendService(
         position: Position,
         prior: List<Long>,
         foreignerAligned: Boolean = false,
+        holdingMode: Boolean = false,
     ): String {
-        if (frgnrBlocked) return "HOLD"
         val sideName = position.name
-
         val priorTrendUnclear = computeDominantStrengthRatio(prior) < TREND_CLARITY_THRESHOLD
 
-        // STRONG 격상은 prior 추세 명확할 때만 (모호하면 1단계 격하)
-        if (penfndK >= K_STRONG_OVERRIDE && !priorTrendUnclear) return "STRONG_$sideName"
-        return when {
+        // BLOCK 아닐 때의 분류 (BLOCK 격하 매핑에도 재사용)
+        val preBlockType = when {
+            penfndK >= K_STRONG_OVERRIDE && !priorTrendUnclear -> "STRONG_$sideName"
             foreignerEffectiveRatio >= MCAP_RATIO_STRONG && !priorTrendUnclear -> "STRONG_$sideName"
-            foreignerEffectiveRatio >= MCAP_RATIO_BUY -> sideName  // BUY/SELL은 격하 영향 없음
+            foreignerEffectiveRatio >= MCAP_RATIO_BUY -> sideName
             foreignerAligned -> sideName  // 옵션 B: 시총 비중 미달이지만 외국인 12일 일관 추세
             else -> "HOLD"
+        }
+
+        if (!frgnrBlocked) return preBlockType
+        // BLOCK 케이스
+        return if (holdingMode) downgradeOneStep(preBlockType, sideName) else "HOLD"
+    }
+
+    /**
+     * BLOCK 발생 시 한 단계 격하 매핑 (보유 평가 전용).
+     * STRONG_X → X, X → HOLD, HOLD → HOLD.
+     */
+    private fun downgradeOneStep(type: String, sideName: String): String {
+        return when (type) {
+            "STRONG_$sideName" -> sideName
+            sideName -> "HOLD"
+            else -> "HOLD"  // 이미 HOLD 거나 예상 외 값
         }
     }
 
@@ -1094,6 +1095,50 @@ class RecommendService(
             "SELL" -> "HOLD"
             else -> type
         }
+
+        // ── 매매(보유평가) 전용 ───────────────────────────────────────────────
+        // 추천 resolveStage1 과 분리. 차이: HOLD 비흡수(선형 사다리), 매크로 미적용.
+        // 선형 행동 축: STRONG_SELL ↔ SELL ↔ HOLD ↔ BUY ↔ STRONG_BUY
+        //   promote = STRONG_BUY 쪽 1칸 / demote = STRONG_SELL 쪽 1칸 (양끝 캡).
+        // side 는 모듈 투표 평가용으로만 쓰이고(HOLD=보유 롱 기본 BUY), 사다리 이동엔 무관.
+        private val TRADING_LADDER = listOf("STRONG_SELL", "SELL", "HOLD", "BUY", "STRONG_BUY")
+
+        private fun promoteOnceTrading(type: String): String {
+            val i = TRADING_LADDER.indexOf(type)
+            return if (i < 0) type else TRADING_LADDER.getOrElse(i + 1) { type }
+        }
+
+        private fun demoteOnceTrading(type: String): String {
+            val i = TRADING_LADDER.indexOf(type)
+            return if (i <= 0) type else TRADING_LADDER[i - 1]
+        }
+
+        /**
+         * 보유평가 다수결 — [resolveStage1] 과 동일 분기 구조(과반 격상 1칸 / 만장일치 격하 2칸 /
+         * 과반 격하 1칸 / 반대표 0 하드비토)이되, 선형 사다리라 **HOLD 도 움직인다**(비흡수).
+         */
+        internal fun resolveStage1Trading(
+            pick: StockPick,
+            activeModules: List<AdjustmentModule>,
+            side: Position,
+        ): String {
+            if (activeModules.isEmpty()) return pick.type
+
+            val promotable = activeModules.filter { it.canPromote(side) }
+            val demotable = activeModules.filter { it.canDemote(side) }
+            val promoteVotes = promotable.count { it.shouldPromote(pick, side) }
+            val demoteVotes = demotable.count { it.shouldDemote(pick, side) }
+
+            return when {
+                promotable.isNotEmpty() && promoteVotes * 2 > promotable.size && demoteVotes == 0 ->
+                    promoteOnceTrading(pick.type)
+                demotable.isNotEmpty() && demoteVotes == demotable.size && promoteVotes == 0 ->
+                    demoteOnceTrading(demoteOnceTrading(pick.type))
+                demotable.isNotEmpty() && demoteVotes * 2 > demotable.size && promoteVotes == 0 ->
+                    demoteOnceTrading(pick.type)
+                else -> pick.type
+            }
+        }
     }
 
     fun listRecommendations(): RecommendListRes {
@@ -1215,6 +1260,100 @@ class RecommendService(
      */
     private fun activeModules(setting: RecommendSetting): List<AdjustmentModule> {
         return adjustmentModules.filter { it.isEnabled(setting) }
+    }
+
+    internal data class HoldingEvalResult(
+        val stkCd: String,
+        val stkNm: String,
+        val type: String,
+        val originSide: String?,
+        val penfndK: Double?,
+        val frgnrMcapRatio: Double?,
+        val marketType: String?,
+    )
+
+    /**
+     * 매매 경로 후행지표 보정 — [applyAdjustments] 와 분리.
+     * 차이: ① HOLD early-return 없음(HOLD 비흡수) ② 매크로(동행지표) 미적용 ③ 선형 사다리.
+     * HOLD 의 side 는 보유 롱 기본값 BUY (모듈이 BUY 관점으로 평가 → 악화 시 demote 로 SELL=청산).
+     */
+    private fun applyAdjustmentsForTrading(pick: StockPick, setting: RecommendSetting): String {
+        val side = when (pick.type) {
+            "STRONG_BUY", "BUY" -> Position.BUY
+            "STRONG_SELL", "SELL" -> Position.SELL
+            else -> Position.BUY
+        }
+        return resolveStage1Trading(pick, activeModules(setting), side)
+    }
+
+    /**
+     * 보유 종목 1개를 추천 백본과 **동일 임계**로 재평가해 매매 등급 산출.
+     *
+     * 1) BUY/SELL 양 관점으로 [processCandidate] 시도(추천과 동일: K 1.5/3.0·B′·BLOCK·부호일관성).
+     * 2) 결정적(non-HOLD) 결과 우선. 양방향 모두 비-HOLD 충돌 → HOLD. 둘 다 컷 → HOLD.
+     * 3) HOLD 라도 보유 종목은 모듈이 움직일 수 있어야 하므로 가격/거래량 지표를 **항상 확보**
+     *    (시그널 통과 픽의 priceMetrics 재사용, 둘 다 컷이면 [computePriceMetrics] 독립 호출).
+     * 4) [applyAdjustmentsForTrading] 로 모듈 다수결 보정(매크로 제외, HOLD 비흡수).
+     */
+    internal fun evaluateHoldingGrade(stkCd: String, stkNm: String): HoldingEvalResult {
+        val setting = RecommendSetting(memberId = 0L) // 첫 런: 전 모듈 ON (디폴트)
+        // 보유 평가: BLOCK 시 HOLD 직행이 아니라 한 단계 격하 — 추천(opt-in) 과 달리
+        // 보유 종목은 위험 관리(손절 행동 포함) 가 우선이라 STRONG 시그널 행동 보존.
+        val buy = processCandidate(stkCd, stkNm, Position.BUY, holdingMode = true)
+        val sell = processCandidate(stkCd, stkNm, Position.SELL, holdingMode = true)
+
+        val conflict = buy != null && sell != null && buy.type != "HOLD" && sell.type != "HOLD"
+        val chosen: ProcessedPick? = when {
+            conflict -> null
+            buy != null && buy.type != "HOLD" -> buy
+            sell != null && sell.type != "HOLD" -> sell
+            buy != null -> buy
+            sell != null -> sell
+            else -> null
+        }
+
+        val stockPick: StockPick
+        val originSide: String?
+        val penfndK: Double?
+        val frgnrMcapRatio: Double?
+        val marketType: String?
+
+        if (chosen != null) {
+            stockPick = chosen.toCurrentEntity()
+            originSide = chosen.originSide
+            penfndK = chosen.penfndK
+            frgnrMcapRatio = chosen.frgnrMcapRatio
+            marketType = chosen.marketType
+        } else {
+            // 양방향 컷/충돌 → HOLD. 모듈이 HOLD 를 움직일 수 있도록 지표 확보.
+            val pm = buy?.priceMetrics ?: sell?.priceMetrics ?: computePriceMetrics(stkCd)
+            marketType = buy?.marketType ?: sell?.marketType
+            originSide = null
+            penfndK = null
+            frgnrMcapRatio = null
+            stockPick = StockPick(
+                type = "HOLD",
+                stkCd = stkCd,
+                stkNm = stkNm,
+                marketType = marketType,
+                flu5Pct = pm.flu5Pct,
+                ma5 = pm.ma5,
+                ma20 = pm.ma20,
+                avg20dVolume = pm.avg20dVolume,
+                todayChangeRate = pm.todayChangeRate,
+                todayVolume = pm.todayVolume,
+                rsi14 = pm.rsi14,
+                rsi14Breakdown70 = pm.rsi14Breakdown70,
+                high52w = pm.high52w,
+                low52w = pm.low52w,
+                distFromHigh52w = pm.distFromHigh52w,
+                distFromLow52w = pm.distFromLow52w,
+                closeAboveMa20 = pm.closeAboveMa20,
+            )
+        }
+
+        val finalType = applyAdjustmentsForTrading(stockPick, setting)
+        return HoldingEvalResult(stkCd, stkNm, finalType, originSide, penfndK, frgnrMcapRatio, marketType)
     }
 
     /**

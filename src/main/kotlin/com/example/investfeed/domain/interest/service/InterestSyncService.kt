@@ -49,7 +49,7 @@ class InterestSyncService(
                     }
                 }
             } catch (e: Exception) {
-                log.error { "관심종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}, ${e.message}" }
+                log.warn { "관심종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}, ${e.message}" }
             }
         }
 

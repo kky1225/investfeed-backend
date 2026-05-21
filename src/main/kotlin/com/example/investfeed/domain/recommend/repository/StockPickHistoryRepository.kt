@@ -2,6 +2,7 @@ package com.example.investfeed.domain.recommend.repository
 
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -17,6 +18,15 @@ interface StockPickHistoryRepository : JpaRepository<StockPickHistory, Long> {
 
     /** 특정 시각 범위 내 추천 이력 — BacktestBackfillService 가 영업일별 history 묶음 조회용. */
     fun findByPickDateBetween(start: LocalDateTime, end: LocalDateTime): List<StockPickHistory>
+
+    /**
+     * 해당 시각 범위(= 그날 00:00~23:59:59) 이력 일괄 삭제.
+     * RecommendScheduler 가 같은 날 재실행될 때, 저장 직전 "오늘분"을 비우고 최신 실행분으로
+     * 교체하기 위함(stk_cd·일자당 1건 보장 — stock_pick 전량교체와 동일 의미를 history 오늘분에 적용).
+     */
+    @Modifying
+    @Query("DELETE FROM StockPickHistory h WHERE h.pickDate >= :start AND h.pickDate <= :end")
+    fun deleteByPickDateBetween(start: LocalDateTime, end: LocalDateTime)
 
     /**
      * 일별 백필 진행도 — pick_date 별 총 개수 / priceClose 1d/5d/20d 채움 개수 집계.

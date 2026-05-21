@@ -12,8 +12,10 @@ import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.global.holiday.HolidayService
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.math.sqrt
 
 /**
@@ -35,11 +37,16 @@ class AdminRecommendMonitoringService(
     private val stockPickRepository: StockPickRepository,
     private val stockPickHistoryRepository: StockPickHistoryRepository,
     private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
+    private val indexDailyCloseRepository: com.example.investfeed.domain.index.repository.IndexDailyCloseRepository,
+    private val holidayService: HolidayService,
 ) {
 
     companion object {
-        private const val MIN_SAMPLES_FOR_METRICS = 10
+        private val YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")
+        private const val KOSPI_CD = "001"
+        private const val KOSDAQ_CD = "101"
     }
+
 
     /**
      * 추천 신호 조회. date 미지정 = 오늘 = stock_pick, 과거 일자 = stock_pick_history.
@@ -105,28 +112,20 @@ class AdminRecommendMonitoringService(
         )
 
         val total = histories.size
-        if (total < MIN_SAMPLES_FOR_METRICS) {
-            return emptyMetrics(periodDays, total, "데이터 부족 — 최소 $MIN_SAMPLES_FOR_METRICS 개 필요, 현재 ${total}개")
-        }
 
-        // HOLD 는 평가 대상 X (방향성 없음)
+        // HOLD 는 평가 대상 X (방향성 없음). 표본 적어도 산출 진행 — 통계 신뢰도는 stdDev/표본수로 사용자가 판단.
         val evaluable = histories.filter { it.type != "HOLD" }
         if (evaluable.isEmpty()) {
-            return emptyMetrics(periodDays, total, "BUY/SELL 신호 없음 (HOLD 만 존재)")
+            return emptyMetrics(periodDays, total, "BUY/SELL 신호 없음 (HOLD 만 존재 또는 표본 0)")
         }
 
-        val metrics1d = computeHorizonMetrics(evaluable, horizon = "1d") { it.priceClose1d }
-        val metrics5d = computeHorizonMetrics(evaluable, horizon = "5d") { it.priceClose5d }
-        val metrics20d = computeHorizonMetrics(evaluable, horizon = "20d") { it.priceClose20d }
+        val metrics1d = computeHorizonMetrics(evaluable, horizon = "1d", n = 1) { it.priceClose1d }
+        val metrics5d = computeHorizonMetrics(evaluable, horizon = "5d", n = 5) { it.priceClose5d }
+        val metrics20d = computeHorizonMetrics(evaluable, horizon = "20d", n = 20) { it.priceClose20d }
 
         // 분해 (5d 기준 — 가장 표본 풍부할 가능성 + 단기 노이즈 + 장기 lag 사이 균형)
-        val byScenario = decomposeBy(evaluable) { h ->
-            // pick_date 의 매크로 스냅샷 시나리오 조회 — 매크로 환경 영향 측정 (동행지표 보정 효과 X)
-            marketIndexSnapshotRepository.findByCapturedDate(h.pickDate.toLocalDate())?.kospiScenario ?: "UNKNOWN"
-        }
         val byType = decomposeBy(evaluable) { it.type }
         val byOriginSide = decomposeBy(evaluable) { it.originSide ?: "UNKNOWN" }
-        val byModuleTrigger = decomposeBy(evaluable) { triggerPattern(it) }
 
         return AdminBacktestMetricsRes(
             periodDays = periodDays,
@@ -135,10 +134,8 @@ class AdminRecommendMonitoringService(
             metrics1d = metrics1d,
             metrics5d = metrics5d,
             metrics20d = metrics20d,
-            byScenario = byScenario,
             byType = byType,
             byOriginSide = byOriginSide,
-            byModuleTrigger = byModuleTrigger,
         )
     }
 
@@ -147,6 +144,7 @@ class AdminRecommendMonitoringService(
     private fun computeHorizonMetrics(
         items: List<StockPickHistory>,
         horizon: String,
+        n: Int,
         closeSelector: (StockPickHistory) -> Long?,
     ): HorizonMetrics {
         val returns = items.mapNotNull { h ->
@@ -158,7 +156,7 @@ class AdminRecommendMonitoringService(
         }
 
         if (returns.isEmpty()) {
-            return HorizonMetrics(horizon, 0, null, null, null, null, null)
+            return HorizonMetrics(horizon, 0, null, null, null, null, null, null)
         }
 
         val justReturns = returns.map { it.second }
@@ -171,10 +169,14 @@ class AdminRecommendMonitoringService(
             when (side) {
                 "BUY" -> ret > 0.0
                 "SELL" -> ret < 0.0
-                else -> ret > 0.0  // default BUY 가정
+                else -> ret > 0.0
             }
         }
         val hitRate = hits.toDouble() / returns.size * 100.0
+
+        // 같은 표본의 같은 N영업일 시장 평균 등락률
+        val marketRets = items.mapNotNull { marketRet(it, n) }
+        val marketMean = if (marketRets.isEmpty()) null else marketRets.average()
 
         return HorizonMetrics(
             horizon = horizon,
@@ -184,74 +186,116 @@ class AdminRecommendMonitoringService(
             stdDev = stdDev,
             maxReturn = justReturns.max(),
             minReturn = justReturns.min(),
+            marketMeanReturn = marketMean,
         )
     }
 
     /**
-     * 5d 기준 분해 집계. groupKey 함수로 group by, 각 그룹 내 평균 수익률/적중률.
+     * 분해 집계 — 그룹별 1d/5d/20d 신호 평균 + 시장 평균 + 5d 적중률.
      */
     private fun decomposeBy(
         items: List<StockPickHistory>,
         keySelector: (StockPickHistory) -> String,
     ): List<GroupMetrics> {
         return items.groupBy(keySelector).map { (key, group) ->
-            val returns = group.mapNotNull { h ->
-                val open = h.priceOpen1d ?: return@mapNotNull null
-                val close = h.priceClose5d ?: return@mapNotNull null
-                if (open <= 0L) return@mapNotNull null
-                val ret = (close - open).toDouble() / open * 100.0
-                h.originSide to ret
-            }
-
-            val mean = if (returns.isNotEmpty()) returns.map { it.second }.average() else null
-            val hits = returns.count { (side, ret) ->
-                when (side) {
-                    "BUY" -> ret > 0.0
-                    "SELL" -> ret < 0.0
-                    else -> ret > 0.0
-                }
-            }
-            val hitRate = if (returns.isNotEmpty()) hits.toDouble() / returns.size * 100.0 else null
+            val s1 = signalMean(group) { it.priceClose1d }
+            val s5 = signalMean(group) { it.priceClose5d }
+            val s20 = signalMean(group) { it.priceClose20d }
+            val m1 = marketMean(group, n = 1)
+            val m5 = marketMean(group, n = 5)
+            val m20 = marketMean(group, n = 20)
+            val hit5d = hitRate(group) { it.priceClose5d }
 
             GroupMetrics(
                 groupKey = key,
                 count = group.size,
-                evaluable5d = returns.size,
-                meanReturn5d = mean,
-                hitRate5d = hitRate,
+                signalMean1dPct = s1,
+                marketMean1dPct = m1,
+                signalMean5dPct = s5,
+                marketMean5dPct = m5,
+                signalMean20dPct = s20,
+                marketMean20dPct = m20,
+                hitRate5d = hit5d,
             )
         }.sortedByDescending { it.count }
     }
 
-    private fun triggerPattern(h: StockPickHistory): String {
-        // 발동한 후행 trigger 만 압축 표시 (NONE/null 은 생략).
-        // 매크로(동행지표) 는 의도적으로 제외 — 백테스트는 후행지표만 평가.
-        val parts = listOfNotNull(
-            tagged("PV", h.pvTrigger),
-            tagged("MA", h.maTrigger),
-            tagged("VP", h.vpTrigger),
-            tagged("RSI", h.rsiTrigger),
-            tagged("HL", h.hl52wTrigger),
-            tagged("BO", h.breakoutTrigger),
-        )
-        return if (parts.isEmpty()) "ALL_NONE" else parts.joinToString(",")
+    private fun signalMean(rows: List<StockPickHistory>, close: (StockPickHistory) -> Long?): Double? {
+        val rs = rows.mapNotNull { h ->
+            val o = h.priceOpen1d ?: return@mapNotNull null
+            val c = close(h) ?: return@mapNotNull null
+            if (o <= 0L) return@mapNotNull null
+            (c - o).toDouble() / o * 100.0
+        }
+        return if (rs.isEmpty()) null else rs.average()
     }
 
-    private fun tagged(name: String, value: String?): String? {
-        return if (value == null || value == "NONE") null else "$name=$value"
+    private fun hitRate(rows: List<StockPickHistory>, close: (StockPickHistory) -> Long?): Double? {
+        val items = rows.mapNotNull { h ->
+            val o = h.priceOpen1d ?: return@mapNotNull null
+            val c = close(h) ?: return@mapNotNull null
+            if (o <= 0L) return@mapNotNull null
+            val ret = (c - o).toDouble() / o * 100.0
+            h.originSide to ret
+        }
+        if (items.isEmpty()) return null
+        val hits = items.count { (side, ret) ->
+            when (side) { "BUY" -> ret > 0.0; "SELL" -> ret < 0.0; else -> ret > 0.0 }
+        }
+        return hits.toDouble() / items.size * 100.0
+    }
+
+    private fun marketMean(rows: List<StockPickHistory>, n: Int): Double? {
+        val rs = rows.mapNotNull { marketRet(it, n) }
+        return if (rs.isEmpty()) null else rs.average()
+    }
+
+    /**
+     * 한 표본의 시장 N영업일 수익률(%) — 종목 ret 정의와 동일 산식.
+     * (indexClose@(pickDate+N영업일) − indexOpen@(pickDate+1영업일)) / indexOpen@(pickDate+1영업일) × 100
+     * 시장구분(KOSPI/KOSDAQ)에 따라 적합한 지수 사용. 데이터 누락 시 null.
+     */
+    private fun marketRet(h: StockPickHistory, n: Int): Double? {
+        val indsCd = when (h.marketType) {
+            "KOSPI" -> KOSPI_CD
+            "KOSDAQ" -> KOSDAQ_CD
+            else -> return null
+        }
+        val pickDay = h.pickDate.toLocalDate()
+        val day1 = nthNextTradingDay(pickDay, 1)
+        val dayN = if (n == 1) day1 else nthNextTradingDay(pickDay, n)
+
+        val row1 = indexDailyCloseRepository.findByIndsCdAndDt(indsCd, day1.format(YYYYMMDD)) ?: return null
+        val rowN = if (n == 1) row1 else indexDailyCloseRepository.findByIndsCdAndDt(indsCd, dayN.format(YYYYMMDD)) ?: return null
+
+        val open1 = row1.openPrice?.toDouble() ?: return null
+        if (open1 <= 0.0) return null
+        val closeN = rowN.closePrice.toDouble()
+        return (closeN - open1) / open1 * 100.0
+    }
+
+    /**
+     * pickDate 기준 N영업일 후 거래일.
+     * holidayService.nextTradingDay(from) 가 이미 "from 이후의 첫 영업일" 을 반환하므로
+     * 추가로 plusDays(1) 하지 않아야 한다 (이전 버그: 매 반복 +2일 점프 → 시장 평균 null).
+     */
+    private fun nthNextTradingDay(from: LocalDate, n: Int): LocalDate {
+        var date = from
+        repeat(n) {
+            date = holidayService.nextTradingDay(date)
+        }
+        return date
     }
 
     private fun emptyMetrics(periodDays: Int, total: Int, reason: String) = AdminBacktestMetricsRes(
         periodDays = periodDays,
         totalSignals = total,
         insufficientReason = reason,
-        metrics1d = HorizonMetrics("1d", 0, null, null, null, null, null),
-        metrics5d = HorizonMetrics("5d", 0, null, null, null, null, null),
-        metrics20d = HorizonMetrics("20d", 0, null, null, null, null, null),
-        byScenario = emptyList(),
+        metrics1d = HorizonMetrics("1d", 0, null, null, null, null, null, null),
+        metrics5d = HorizonMetrics("5d", 0, null, null, null, null, null, null),
+        metrics20d = HorizonMetrics("20d", 0, null, null, null, null, null, null),
         byType = emptyList(),
         byOriginSide = emptyList(),
-        byModuleTrigger = emptyList(),
     )
 
     // ─── 매핑 헬퍼 ────────────────────────────────────────────────────────

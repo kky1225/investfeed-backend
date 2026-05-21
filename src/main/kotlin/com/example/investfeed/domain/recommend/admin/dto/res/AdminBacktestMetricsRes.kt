@@ -21,10 +21,8 @@ data class AdminBacktestMetricsRes(
     val metrics5d: HorizonMetrics,
     val metrics20d: HorizonMetrics,
 
-    val byScenario: List<GroupMetrics>,    // 매크로 시나리오별 (kospi_scenario 기준)
-    val byType: List<GroupMetrics>,        // 등급별 (typeWithMacro)
+    val byType: List<GroupMetrics>,        // 등급별
     val byOriginSide: List<GroupMetrics>,  // 진영별 (BUY / SELL)
-    val byModuleTrigger: List<GroupMetrics>, // 모듈 trigger 패턴별 (PV/MA/VP/RSI 조합)
 )
 
 data class HorizonMetrics(
@@ -35,12 +33,18 @@ data class HorizonMetrics(
     val stdDev: Double?,               // 수익률 표준편차
     val maxReturn: Double?,            // 최대 수익률
     val minReturn: Double?,            // 최소 수익률
+    val marketMeanReturn: Double?,     // 같은 표본 같은 N영업일 시장 평균 등락률 (KOSPI/KOSDAQ 시장구분별 가중평균)
 )
 
 data class GroupMetrics(
-    val groupKey: String,              // 분해 키 (예: "UP_BUY_BUY", "STRONG_BUY", "BUY", "PV=PROMOTE,MA=NONE,...")
+    val groupKey: String,              // 분해 키 (예: "STRONG_BUY", "BUY", "SELL")
     val count: Int,
-    val evaluable5d: Int,              // 5d 기준 평가 가능 수
-    val meanReturn5d: Double?,         // 5d 평균 수익률
-    val hitRate5d: Double?,            // 5d 적중률
+    // 1d/5d/20d 각각 신호 평균 + 시장 평균
+    val signalMean1dPct: Double?,
+    val marketMean1dPct: Double?,
+    val signalMean5dPct: Double?,
+    val marketMean5dPct: Double?,
+    val signalMean20dPct: Double?,
+    val marketMean20dPct: Double?,
+    val hitRate5d: Double?,            // 5d 적중률 (대표)
 )

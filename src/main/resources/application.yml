@@ -51,6 +51,9 @@ scheduler:
 
 kiwoom:
   default-url: https://api.kiwoom.com
+  mock-url: https://mockapi.kiwoom.com
+  mock-appkey: ${KIWOOM_MOCK_APPKEY:}
+  mock-secretkey: ${KIWOOM_MOCK_SECRETKEY:}
 
 upbit:
   default-url: https://api.upbit.com

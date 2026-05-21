@@ -27,6 +27,9 @@ object Permissions {
     /** 추천 시스템 일일 운영 모니터링 (trigger 메타, 매크로 스냅샷, 백필 진행도) */
     const val ADMIN_RECOMMEND_MONITORING = "ADMIN_RECOMMEND_MONITORING"
 
+    /** 모의투자 매매 운영 — 계좌·실현손익·거래내역 관리자 조회 (관찰 전용) */
+    const val ADMIN_PAPER_TRADE = "ADMIN_PAPER_TRADE"
+
     /** 역할 CRUD 및 순서 */
     const val ADMIN_ROLE = "ADMIN_ROLE"
 

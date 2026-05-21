@@ -10,6 +10,9 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
+import com.example.investfeed.domain.index.service.IndexService
+import com.example.investfeed.domain.papertrade.service.HoldingGradeService
+import com.example.investfeed.domain.papertrade.service.PaperTradeExecutionService
 import com.example.investfeed.domain.rebalancing.scheduler.RebalancingAlertScheduler
 import com.example.investfeed.domain.recommend.service.BacktestBackfillService
 import com.example.investfeed.domain.recommend.service.RecommendService
@@ -46,6 +49,9 @@ class ManualTriggerService(
     private val apiKeyExpiryScheduler: ApiKeyExpiryScheduler,
     private val schedulerLogCleanupScheduler: SchedulerLogCleanupScheduler,
     private val interestSyncScheduler: InterestSyncScheduler,
+    private val holdingGradeService: HoldingGradeService,
+    private val paperTradeExecutionService: PaperTradeExecutionService,
+    private val indexService: IndexService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -64,6 +70,9 @@ class ManualTriggerService(
             "ApiKeyExpiryScheduler"        to { apiKeyExpiryScheduler.checkApiKeyExpiry() },
             "SchedulerLogCleanupScheduler" to { schedulerLogCleanupScheduler.cleanup() },
             "InterestSyncScheduler"        to { interestSyncScheduler.syncAllStkNm() },
+            "HoldingGradeScheduler"        to { holdingGradeService.runHoldingGrade() },
+            "PaperTradeExecScheduler"      to { paperTradeExecutionService.runPaperTradeExec() },
+            "IndexDailyCloseScheduler"     to { indexService.runCollectIndexClose() },
         )
     }
 

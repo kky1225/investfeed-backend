@@ -15,3 +15,4 @@ class StockTradeValueListException(): InvestFeedException(code = "STOCK_0010", m
 class StockTradeVolumeListException(): InvestFeedException(code = "STOCK_0011", message = "당일 거래량 상위 순위 조회에 실패하셨습니다.")
 class StockSurgeTradeVolumeListException(): InvestFeedException(code = "STOCK_0012", message = "거래량 급증 순위 조회에 실패하셨습니다.")
 class StockInterestException(): InvestFeedException(code = "STOCK_0012", message = "관심종목 조회에 실패하셨습니다.")
+class NewHighLowException(): InvestFeedException(code = "STOCK_0013", message = "신고저가 종목 조회에 실패하였습니다.")

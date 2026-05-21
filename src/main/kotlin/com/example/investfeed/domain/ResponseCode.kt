@@ -66,6 +66,11 @@ enum class ResponseCode(
     ADMIN_RECOMMEND_SNAPSHOTS(message = "추천 모니터링 - 매크로 스냅샷 조회에 성공하셨습니다."),
     ADMIN_RECOMMEND_BACKFILL_STATUS(message = "추천 모니터링 - 백필 진행도 조회에 성공하셨습니다."),
     ADMIN_RECOMMEND_METRICS(message = "추천 모니터링 - 백테스트 집계 조회에 성공하셨습니다."),
+    ADMIN_PAPER_TRADE_REPORT(message = "모의투자 매매 - 성과 리포트 조회에 성공하셨습니다."),
+    ADMIN_PAPER_TRADE_ACCOUNT(message = "모의투자 매매 - 계좌 현황 조회에 성공하셨습니다."),
+    ADMIN_PAPER_TRADE_REALIZED_PNL(message = "모의투자 매매 - 실현손익 조회에 성공하셨습니다."),
+    ADMIN_PAPER_TRADE_TRADE_HISTORY(message = "모의투자 매매 - 거래내역 조회에 성공하셨습니다."),
+    ADMIN_PAPER_TRADE_HOLDING_GRADE(message = "모의투자 매매 - 보유 평가 조회에 성공하셨습니다."),
 
     AUTH_UNAUTHORIZED(code = "AUTH_4001", message = "인증이 필요합니다."),
     AUTH_FORBIDDEN(code = "AUTH_4003", message = "접근 권한이 없습니다."),

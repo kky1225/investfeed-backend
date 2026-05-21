@@ -1,0 +1,164 @@
+package com.example.investfeed.domain.papertrade.service
+
+import com.example.investfeed.domain.monitoring.enum.SchedulerName
+import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.papertrade.entity.HoldingGrade
+import com.example.investfeed.domain.papertrade.repository.HoldingGradeRepository
+import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.domain.recommend.service.RecommendService
+import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.kiwoom.auth.service.AuthClient
+import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
+import com.example.investfeed.kiwoom.order.client.MockAccountClient
+import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
+
+/**
+ * 보유 종목 등급 산출 스케줄러 — 매 거래일 22:10 (추천 22:00 직후, 독립 잡).
+ *
+ * 추천(컨텐츠) ≠ 보유평가(내 포지션에 행동 취하는 매매 시스템) 이므로 별도 스케줄.
+ * 22:00 추천이 이미 평가한 종목은 stock_pick 에 등급이 있으므로 **제외**하고,
+ * 추천에서 빠진(레이더 밖) 보유 종목만 [RecommendService.evaluateHoldingGrade] 로 재평가.
+ * 등급은 사용자 독립 → 전 계좌 보유의 **distinct stk_cd 1회 평가**(다계좌여도 종목당 1회).
+ *
+ * 결과는 holding_grade(eval_date 당 1행 upsert) 에 영속 → 다음 거래일 09:00 실행 잡이 소비.
+ * 매크로(동행지표)는 매매 경로 의도적 제외(evaluateHoldingGrade 내부에서 미적용).
+ */
+@Service
+class HoldingGradeService(
+    private val recommendService: RecommendService,
+    private val holdingGradeRepository: HoldingGradeRepository,
+    private val stockPickRepository: StockPickRepository,
+    private val mockAccountClient: MockAccountClient,
+    private val holidayService: HolidayService,
+    private val schedulerLogService: SchedulerLogService,
+    private val authClient: AuthClient,
+    @param:Value("\${scheduler.login-id:admin}")
+    private val schedulerLoginId: String,
+) {
+    private val log = KotlinLogging.logger {}
+
+    private data class HeldStock(val stkCd: String, val stkNm: String)
+
+    @Scheduled(cron = "0 10 22 * * *", scheduler = "slowScheduler")
+    fun scheduledHoldingGrade() {
+        log.info { "HoldingGradeScheduler cron fired" }
+        if (holidayService.isHoliday()) {
+            log.info { "HoldingGradeScheduler skipped: today is holiday" }
+            return
+        }
+        // 22:00 추천이 끝난 뒤 평가해야 "이미 평가된 후보 제외"가 정확. 단일 SLOW 스레드라
+        // 보통 큐잉으로 자연 직렬화되지만, 수동 트리거/지연 대비 명시 가드.
+        if (schedulerLogService.isRunning(SchedulerName.RecommendScheduler)) {
+            log.warn { "HoldingGradeScheduler skipped: RecommendScheduler 실행 중 (추천 완료 후 평가)" }
+            return
+        }
+        if (schedulerLogService.isRunning(SchedulerName.BacktestBackfillScheduler)) {
+            log.warn { "HoldingGradeScheduler skipped: BacktestBackfillScheduler 실행 중" }
+            return
+        }
+        runHoldingGrade()
+    }
+
+    @Transactional
+    fun runHoldingGrade() {
+        schedulerLogService.execute(SchedulerName.HoldingGradeScheduler) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+                doHoldingGrade()
+            } finally {
+                SecurityContextHolder.clearContext()
+            }
+        }
+    }
+
+    private fun doHoldingGrade() {
+        val evalDate = LocalDate.now()
+
+        // 지수 종가 수집은 별도 잡(scheduledCollectIndexClose, 00:10)으로 분리.
+        // 22:10 호출 시 키움이 당일 일봉 정산 전 응답을 줘 open/close 둘 다 부정확하게 들어가는 문제 때문.
+
+        val held = fetchHeldHoldings()
+        if (held.isEmpty()) {
+            log.info { "HoldingGradeScheduler: 보유 종목 없음 — 평가 대상 0건 (eval_date=$evalDate)" }
+            return
+        }
+
+        // 22:00 추천이 이미 평가한 종목은 stock_pick 에 등급 존재 → 09:00 잡이 거기서 읽음.
+        // 보유평가는 추천에서 빠진(레이더 밖) 종목만 재평가 (distinct, 종목당 1회).
+        // stock_pick.stk_cd 는 "028260_AL"(접미사) 형식으로 저장됨(DB 확인). 보유(fetchHeldHoldings)
+        // 정규화 규칙과 동일하게 맞춰야 "추천에 이미 평가된 보유종목" 중복제거가 실제로 동작.
+        val recommendCodes = stockPickRepository.findAll()
+            .mapNotNull { it.stkCd?.substringBefore("_")?.trimStart('A', 'a')?.ifBlank { null } }
+            .toSet()
+        val targets = held.distinctBy { it.stkCd }.filterNot { it.stkCd in recommendCodes }
+
+        var saved = 0
+        for (h in targets) {
+            try {
+                val r = recommendService.evaluateHoldingGrade(h.stkCd, h.stkNm)
+                holdingGradeRepository.findByStkCdAndEvalDate(h.stkCd, evalDate)
+                    ?.let { holdingGradeRepository.delete(it) }
+                holdingGradeRepository.save(
+                    HoldingGrade(
+                        stkCd = r.stkCd,
+                        stkNm = r.stkNm,
+                        type = r.type,
+                        originSide = r.originSide,
+                        penfndK = r.penfndK,
+                        frgnrMcapRatio = r.frgnrMcapRatio,
+                        marketType = r.marketType,
+                        evalDate = evalDate,
+                    )
+                )
+                saved++
+            } catch (e: Exception) {
+                log.error(e) { "HoldingGradeScheduler 평가 실패 stkCd=${h.stkCd}" }
+            }
+        }
+        log.info {
+            "HoldingGradeScheduler 완료 — eval_date=$evalDate, 보유 distinct=${held.distinctBy { it.stkCd }.size}, " +
+                "추천중복제외 평가=${targets.size}, 저장=$saved"
+        }
+    }
+
+    /**
+     * 키움 모의계좌 보유 종목 목록 (kt00018, mock-url). 보유수량>0 만.
+     *
+     * 모의계좌가 잔고 진실 소스. 조회 실패는 격리(로그 후 빈 리스트) — 지수 수집은 이미 끝났고,
+     * 일시적 API 블립이 잡 전체를 실패로 만들지 않도록(에러 로그는 모니터링에 그대로 노출).
+     * 첫 런은 계좌 0 보유 시작 → Phase 4 매매 전까지 빈 리스트가 정상.
+     *
+     * 종목코드 정규화: kt00018 응답은 "A005930" 형식 → 백본 평가(stockInvestor)와 맞추기 위해
+     * 선행 영문 prefix 제거 + "_" 접미사 제거. (정확한 코드 포맷 정합은 Phase 4 드라이런에서 검증.)
+     */
+    private fun fetchHeldHoldings(): List<HeldStock> {
+        return try {
+            val res = mockAccountClient.holdingList(
+                KiwoomHoldingReq(qry_tp = "2", dmst_stex_tp = "KRX")
+            )
+            res?.acnt_evlt_remn_indv_tot.orEmpty()
+                .filter { (it.rmnd_qty?.toLongOrNull() ?: 0L) > 0L }
+                .mapNotNull { h ->
+                    val rawCd = h.stk_cd ?: return@mapNotNull null
+                    val stkCd = rawCd.substringBefore("_").trimStart('A', 'a').ifBlank { return@mapNotNull null }
+                    HeldStock(stkCd = stkCd, stkNm = h.stk_nm ?: stkCd)
+                }
+        } catch (e: Exception) {
+            log.error(e) { "HoldingGradeScheduler: 모의계좌 보유 조회 실패 — 빈 리스트로 진행" }
+            emptyList()
+        }
+    }
+
+    private fun setSchedulerSecurityContext() {
+        val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
+        SecurityContextHolder.getContext().authentication = auth
+    }
+}

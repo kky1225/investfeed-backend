@@ -67,7 +67,7 @@ class MarketMacroScheduler(
                 val snapshot = MarketMacroSnapshot.from(type.name, first)
                 marketMacroCacheService.saveSnapshot(snapshot)
             }.onFailure {
-                log.error(it) { "MarketMacro polling failed: $type" }
+                log.warn(it) { "MarketMacro polling failed: $type" }
             }
         }
     }

@@ -104,7 +104,7 @@ class ExceptionAdviceController {
 
     @ExceptionHandler(InvestFeedException::class)
     fun investFeedException(e: InvestFeedException): ResponseEntity<ApiResponse<Nothing?>> {
-        log.error { "investFeedException: [${e.code}] ${e.message}" }
+        log.warn { "investFeedException: [${e.code}] ${e.message}" }
 
         return ResponseEntity(
             ApiResponse(code = e.code, message = e.message, null), HttpStatus.INTERNAL_SERVER_ERROR

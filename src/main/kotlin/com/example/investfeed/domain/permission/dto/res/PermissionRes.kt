@@ -11,20 +11,3 @@ data class PermissionRes(
     val supportedActions: List<PermissionActionRes>,
     val rolePermissions: List<RolePermissionRes>,
 )
-
-data class ApiPatternRes(
-    val id: Long,
-    val apiPattern: String,
-)
-
-data class PermissionActionRes(
-    val action: String,
-    val description: String?,
-)
-
-data class RolePermissionRes(
-    val roleId: Long,
-    val roleCode: String,
-    val roleName: String,
-    val actions: List<String>,
-)

@@ -60,6 +60,7 @@ class StockClient(
                 .block()
 
             if (res?.return_code != 0) {
+                log.warn { "stockInfoList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInfoListException()
             }
 
@@ -93,6 +94,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockDefaultInfo failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockDefaultInfoException()
             }
 
@@ -126,6 +128,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockInfo failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInfoException()
             }
 
@@ -159,6 +162,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockInvestor failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInvestorException()
             }
 
@@ -192,6 +196,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockTradeDailyList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockTradeDailyListException()
             }
 
@@ -225,6 +230,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockJumpList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockJumpListException()
             }
 
@@ -258,6 +264,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockNewPriceList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockNewPriceListException()
             }
 
@@ -291,6 +298,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "sectCodeList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectCodeListException()
             }
 
@@ -324,6 +332,7 @@ class StockClient(
                 .block()
 
             if(res?.return_code != 0) {
+                log.warn { "stockInterest failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInterestException()
             }
 
@@ -357,11 +366,14 @@ class StockClient(
                 .block()
 
             if (res?.return_code != 0) {
-                throw RuntimeException("newHighLow Error: ${res?.return_msg}")
+                log.warn { "newHighLow failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                throw NewHighLowException()
             }
 
             return res
         } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: NewHighLowException) {
             throw e
         } catch (e: Exception) {
             log.warn { "newHighLow Error: ${e.message}" }
