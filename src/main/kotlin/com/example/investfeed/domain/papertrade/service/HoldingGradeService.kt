@@ -4,7 +4,6 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.entity.HoldingGrade
 import com.example.investfeed.domain.papertrade.repository.HoldingGradeRepository
-import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -23,8 +22,10 @@ import java.time.LocalDate
  * 보유 종목 등급 산출 스케줄러 — 매 거래일 22:10 (추천 22:00 직후, 독립 잡).
  *
  * 추천(컨텐츠) ≠ 보유평가(내 포지션에 행동 취하는 매매 시스템) 이므로 별도 스케줄.
- * 22:00 추천이 이미 평가한 종목은 stock_pick 에 등급이 있으므로 **제외**하고,
- * 추천에서 빠진(레이더 밖) 보유 종목만 [RecommendService.evaluateHoldingGrade] 로 재평가.
+ * **모든 보유 종목**을 [RecommendService.evaluateHoldingGrade] 로 평가(holdingMode=true →
+ * BLOCK 한 단계 다운그레이드). 추천에 같이 잡힌 종목도 평가하여 holding_grade 에 별도 기록,
+ * 매매 잡(09:00)이 보유 종목에 대해 holding_grade 를 stock_pick 보다 우선 적용함.
+ * 보유 ∩ 추천 겹침 시 추천 백본의 보수적 HOLD 가 손절 시그널을 묻어버리는 문제 회피.
  * 등급은 사용자 독립 → 전 계좌 보유의 **distinct stk_cd 1회 평가**(다계좌여도 종목당 1회).
  *
  * 결과는 holding_grade(eval_date 당 1행 upsert) 에 영속 → 다음 거래일 09:00 실행 잡이 소비.
@@ -34,7 +35,6 @@ import java.time.LocalDate
 class HoldingGradeService(
     private val recommendService: RecommendService,
     private val holdingGradeRepository: HoldingGradeRepository,
-    private val stockPickRepository: StockPickRepository,
     private val mockAccountClient: MockAccountClient,
     private val holidayService: HolidayService,
     private val schedulerLogService: SchedulerLogService,
@@ -91,14 +91,10 @@ class HoldingGradeService(
             return
         }
 
-        // 22:00 추천이 이미 평가한 종목은 stock_pick 에 등급 존재 → 09:00 잡이 거기서 읽음.
-        // 보유평가는 추천에서 빠진(레이더 밖) 종목만 재평가 (distinct, 종목당 1회).
-        // stock_pick.stk_cd 는 "028260_AL"(접미사) 형식으로 저장됨(DB 확인). 보유(fetchHeldHoldings)
-        // 정규화 규칙과 동일하게 맞춰야 "추천에 이미 평가된 보유종목" 중복제거가 실제로 동작.
-        val recommendCodes = stockPickRepository.findAll()
-            .mapNotNull { it.stkCd?.substringBefore("_")?.trimStart('A', 'a')?.ifBlank { null } }
-            .toSet()
-        val targets = held.distinctBy { it.stkCd }.filterNot { it.stkCd in recommendCodes }
+        // 보유 종목 전체 평가(distinct, 종목당 1회). 추천에 같이 잡힌 종목도 holding_grade 에
+        // 기록 → 09:00 매매 잡이 보유 종목에 대해 holding_grade 를 stock_pick 보다 우선 적용.
+        // 추천 백본의 BLOCK→HOLD 가 손절 시그널을 묻어버리는 문제를 holdingMode=true(BLOCK→다운그레이드)로 회피.
+        val targets = held.distinctBy { it.stkCd }
 
         var saved = 0
         for (h in targets) {
@@ -124,8 +120,7 @@ class HoldingGradeService(
             }
         }
         log.info {
-            "HoldingGradeScheduler 완료 — eval_date=$evalDate, 보유 distinct=${held.distinctBy { it.stkCd }.size}, " +
-                "추천중복제외 평가=${targets.size}, 저장=$saved"
+            "HoldingGradeScheduler 완료 — eval_date=$evalDate, 보유 distinct=${targets.size}, 저장=$saved"
         }
     }
 

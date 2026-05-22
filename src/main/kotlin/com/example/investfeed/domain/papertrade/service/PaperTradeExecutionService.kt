@@ -186,8 +186,9 @@ class PaperTradeExecutionService(
      * ② 키움 모의계좌 예수금·보유 재조회 + ③ 등급 로드(직전 거래일 holding_grade + 당일 stock_pick).
      *
      * 키움 모의계좌가 잔고 진실 소스. NAV = 추정예탁자산(없으면 현금+총평가).
-     * holding_grade(직전 거래일) ∪ stock_pick(추천)은 구성상 disjoint(HoldingGrade가 추천코드 제외).
-     * 충돌 시 stock_pick(추천) 우선. 코드 정규화는 HoldingGradeService 와 동일 규칙.
+     * **보유 종목은 holding_grade 우선, 신규 매수 후보는 stock_pick 우선.** 보유 ∩ 추천 겹침 시
+     * 추천 백본의 보수적 HOLD 가 손절 시그널을 묻어버리는 문제 회피(holding_grade 는 holdingMode=true
+     * 로 BLOCK→다운그레이드 처리). 코드 정규화는 HoldingGradeService 와 동일 규칙.
      */
     private fun buildExecContext(): ExecContext {
         val deposit = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
@@ -204,22 +205,23 @@ class PaperTradeExecutionService(
         val totEvlt = parseAmt(holdingRes?.tot_evlt_amt)
         val nav = parseAmt(holdingRes?.prsm_dpst_aset_amt).takeIf { it > 0 } ?: (availableCash + totEvlt)
 
-        // ③ 등급: 직전 거래일 holding_grade + 당일 stock_pick(추천) 병합
+        // ③ 등급: 직전 거래일 holding_grade + 당일 stock_pick(추천) 병합.
         val priorTradingDay = holidayService.lastTradingDay(LocalDate.now().minusDays(1))
         val grades = mutableMapOf<String, String>()
         val seedPrices = mutableMapOf<String, Long>()
         val riskBlocked = mutableSetOf<String>()
         val normalBlocked = RiskPreset.NORMAL.blockedCategories() // {정리매매, 투자위험}
-        holdingGradeRepository.findByEvalDate(priorTradingDay).forEach { g ->
-            normCd(g.stkCd)?.let { grades[it] = g.type }
-        }
-        stockPickRepository.findAll().forEach { p ->            // 추천 우선(overwrite)
+        stockPickRepository.findAll().forEach { p ->
             val cd = normCd(p.stkCd) ?: return@forEach
             grades[cd] = p.type
             // 신규 진입 사이징가 = ma5(저장값, 라이브 호출 X). 어차피 시장가 시가 체결이라 근사 충분.
             p.ma5?.takeIf { it > 0 }?.let { seedPrices[cd] = it.toLong() }
             // ⑤-a 성향필터: NORMAL=정리매매/투자위험 종목은 신규 진입 차단(보유는 면제 — 별도 적용)
             if (normalBlocked.any { it.matches(p) }) riskBlocked += cd
+        }
+        holdingGradeRepository.findByEvalDate(priorTradingDay).forEach { g ->
+            val cd = normCd(g.stkCd) ?: return@forEach
+            if (cd in holdings) grades[cd] = g.type
         }
         return ExecContext(
             nav = nav, availableCash = availableCash,
