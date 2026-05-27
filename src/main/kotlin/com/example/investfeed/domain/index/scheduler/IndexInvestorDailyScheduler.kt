@@ -4,6 +4,7 @@ import com.example.investfeed.domain.index.repository.IndexInvestorDailyReposito
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -13,7 +14,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -23,6 +23,7 @@ class IndexInvestorDailyScheduler(
     private val indexInvestorDailyRepository: IndexInvestorDailyRepository,
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
+    private val holidayService: HolidayService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
 ) {
@@ -31,9 +32,15 @@ class IndexInvestorDailyScheduler(
 
     @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
+        log.info { "IndexInvestorDailyScheduler cron fired" }
+        val yesterdayDate = LocalDate.now().minusDays(1)
+        if (holidayService.isHoliday(yesterdayDate)) {
+            log.info { "IndexInvestorDailyScheduler skipped: yesterday($yesterdayDate) is holiday" }
+            return
+        }
         schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
             try {
-                val yesterday = LocalDate.now().minusDays(1).format(formatter)
+                val yesterday = yesterdayDate.format(formatter)
                 indexService.collectIndexInvestorDaily(yesterday)
                 log.info { "지수 투자자 일별 데이터 수집 완료: $yesterday" }
             } catch (e: Exception) {
@@ -72,7 +79,8 @@ class IndexInvestorDailyScheduler(
             var filled = 0
 
             while (!current.isAfter(yesterday)) {
-                if (current.dayOfWeek != DayOfWeek.SATURDAY && current.dayOfWeek != DayOfWeek.SUNDAY) {
+                // 주말 + 공휴일 통합 가드 — HolidayService.isHoliday(date) 가 주말도 휴일로 처리.
+                if (!holidayService.isHoliday(current)) {
                     val dt = current.format(formatter)
                     val kospiMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("001", dt)
                     val kosdaqMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("101", dt)
@@ -98,17 +106,18 @@ class IndexInvestorDailyScheduler(
         }
     }
 
-    /** 빈 테이블 초기 시드 — 어제부터 과거로 거슬러 올라가며 평일 N일치 수집. */
-    private fun backfillInitial(weekdays: Int) {
+    /** 빈 테이블 초기 시드 — 어제부터 과거로 거슬러 올라가며 거래일 N일치 수집. */
+    private fun backfillInitial(tradingDays: Int) {
         var current = LocalDate.now().minusDays(1)
         var collected = 0
         var failed = 0
-        // safety: 최대 검사 calendar 일수 제한 (평일 N일이면 최대 N*2 calendar)
-        val maxScanDays = weekdays * 2
+        // safety: 최대 검사 calendar 일수 제한 (거래일 N일이면 공휴일 감안 여유 두고 N*2 calendar)
+        val maxScanDays = tradingDays * 2
 
         repeat(maxScanDays) {
-            if (collected >= weekdays) return@repeat
-            if (current.dayOfWeek != DayOfWeek.SATURDAY && current.dayOfWeek != DayOfWeek.SUNDAY) {
+            if (collected >= tradingDays) return@repeat
+            // 주말 + 공휴일 통합 가드.
+            if (!holidayService.isHoliday(current)) {
                 val dt = current.format(formatter)
                 try {
                     indexService.collectIndexInvestorDaily(dt)
