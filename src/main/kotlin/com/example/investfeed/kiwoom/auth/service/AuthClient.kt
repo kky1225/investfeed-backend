@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
+import java.security.MessageDigest
 import java.time.Duration
 
 @Service
@@ -57,7 +58,8 @@ class AuthClient(
     }
 
     fun ensureAccessToken(loginId: String) {
-        val redisKey = getRedisKey(loginId)
+        val (appKey, _) = resolveApiKeys(loginId)
+        val redisKey = getRedisKey(appKey)
 
         log.info { "accessToken [loginId=$loginId, redisKey=$redisKey]" }
 
@@ -74,15 +76,18 @@ class AuthClient(
     }
 
     fun getAccessToken(loginId: String): String {
-        val redisKey = getRedisKey(loginId)
+        val (appKey, _) = resolveApiKeys(loginId)
+        val redisKey = getRedisKey(appKey)
         return redisTemplate.opsForValue().get(redisKey)
             ?: throw AccessTokenNotFoundException()
     }
 
     private fun refreshToken(loginId: String) {
-        val lockKey = getLockKey(loginId)
+        val (appKey, secretKey) = resolveApiKeys(loginId)
+        val lockKey = getLockKey(appKey)
+        val redisKey = getRedisKey(appKey)
 
-        log.info { "refreshToken [loginId=$loginId]" }
+        log.info { "refreshToken [loginId=$loginId, redisKey=$redisKey]" }
 
         val isLocked = redisTemplate.opsForValue().setIfAbsent(
             lockKey,
@@ -95,9 +100,6 @@ class AuthClient(
             ensureAccessToken(loginId)
             return
         }
-
-        val (appKey, secretKey) = resolveApiKeys(loginId)
-        val redisKey = getRedisKey(loginId)
 
         try {
             val accessTokenRes = kiwoomWebClient.post()
@@ -133,7 +135,7 @@ class AuthClient(
 
     // ── 모의투자 전용 토큰 ────────────────────────────────────────────────────
     // 실거래와 동일 appkey/secret 으로 **모의 도메인(kiwoom.mock-url)** 에서 토큰 발급.
-    // redis 키를 분리("...:mock:loginId")해 실거래 토큰과 섞이지 않게 한다.
+    // MOCK_APPKEY 는 application-local.yml 공통값이라 사용자별 분리 의미 없음 → 단일 키로 통일.
     // MockAccountClient / KiwoomOrderClient 가 @KiwoomMockToken 으로 사용.
 
     fun accessTokenMock() {
@@ -142,14 +144,13 @@ class AuthClient(
     }
 
     fun getCurrentAccessTokenMock(): String {
-        val loginId = getLoginIdFromSecurityContext()
-        return redisTemplate.opsForValue().get(getMockRedisKey(loginId))
+        return redisTemplate.opsForValue().get(getMockRedisKey())
             ?: throw AccessTokenNotFoundException()
     }
 
     fun ensureAccessTokenMock(loginId: String) {
         try {
-            val accessToken = redisTemplate.opsForValue().get(getMockRedisKey(loginId))
+            val accessToken = redisTemplate.opsForValue().get(getMockRedisKey())
             if (accessToken.isNullOrEmpty()) {
                 refreshTokenMock(loginId)
             }
@@ -160,8 +161,9 @@ class AuthClient(
     }
 
     private fun refreshTokenMock(loginId: String) {
-        val lockKey = getMockLockKey(loginId)
-        log.info { "refreshTokenMock [loginId=$loginId]" }
+        val lockKey = getMockLockKey()
+        val redisKey = getMockRedisKey()
+        log.info { "refreshTokenMock [loginId=$loginId, redisKey=$redisKey]" }
 
         val isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(5))
         if (isLocked == false) {
@@ -178,7 +180,6 @@ class AuthClient(
         }
         val appKey = MOCK_APPKEY
         val secretKey = MOCK_SECRETKEY
-        val redisKey = getMockRedisKey(loginId)
 
         try {
             val accessTokenRes = kiwoomWebClient.post()
@@ -207,9 +208,10 @@ class AuthClient(
         }
     }
 
-    private fun getMockRedisKey(loginId: String): String = "${REDIS_KEY_PREFIX}mock:$loginId"
+    // 모의 토큰은 MOCK_APPKEY 공통값이라 사용자별 분리 없음 → 단일 redis 키.
+    private fun getMockRedisKey(): String = "${REDIS_KEY_PREFIX}mock"
 
-    private fun getMockLockKey(loginId: String): String = "${LOCK_KEY_PREFIX}mock:$loginId"
+    private fun getMockLockKey(): String = "${LOCK_KEY_PREFIX}mock"
 
     fun validateApiKey(appKey: String, secretKey: String) {
         val res = kiwoomWebClient.post()
@@ -234,12 +236,19 @@ class AuthClient(
         return Pair(memberApiKey.appKey, memberApiKey.secretKey)
     }
 
-    private fun getRedisKey(loginId: String): String {
-        return "$REDIS_KEY_PREFIX$loginId"
+    // 같은 키움 키를 여러 계정이 공유하는 경우(예: super 운영 + 본인 사용자 계정) 토큰 공유로 충돌 회피.
+    // appkey 를 그대로 redis 키에 노출하지 않고 SHA-256 앞 16자(hex) 해시 사용.
+    private fun getRedisKey(appKey: String): String {
+        return "$REDIS_KEY_PREFIX${shortHash(appKey)}"
     }
 
-    private fun getLockKey(loginId: String): String {
-        return "$LOCK_KEY_PREFIX$loginId"
+    private fun getLockKey(appKey: String): String {
+        return "$LOCK_KEY_PREFIX${shortHash(appKey)}"
+    }
+
+    private fun shortHash(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
+        return digest.take(8).joinToString("") { "%02x".format(it) }
     }
 
     private fun getLoginIdFromSecurityContext(): String {

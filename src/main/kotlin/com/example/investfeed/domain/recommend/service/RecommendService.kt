@@ -195,31 +195,36 @@ class RecommendService(
             )
         )
 
-        val processed: List<ProcessedPick> = if (kiwoomInvestorTradeCloseMarketRes.return_code == 0) {
-            val items = kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde ?: emptyList()
-            val buyCandidates = extractIntersection(items, sortDesc = true)
-            val sellCandidates = extractIntersection(items, sortDesc = false)
+        if (kiwoomInvestorTradeCloseMarketRes.return_code != 0) {
+            throw IllegalStateException(
+                "RecommendScheduler 핵심 API(investorTradeCloseMarket) 실패 — " +
+                    "return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, " +
+                    "return_msg=${kiwoomInvestorTradeCloseMarketRes.return_msg}. " +
+                    "stock_pick 갱신을 롤백하여 직전 거래일 데이터 보존."
+            )
+        }
 
-            log.info {
-                "BUY 후보(${buyCandidates.size}): " +
-                    buyCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
-            }
-            log.info {
-                "SELL 후보(${sellCandidates.size}): " +
-                    sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
-            }
+        val items = kiwoomInvestorTradeCloseMarketRes.opaf_invsr_trde ?: emptyList()
+        val buyCandidates = extractIntersection(items, sortDesc = true)
+        val sellCandidates = extractIntersection(items, sortDesc = false)
 
-            buyCandidates.mapNotNull {
-                val stkCd = it.stk_cd ?: return@mapNotNull null
-                val stkNm = it.stk_nm ?: return@mapNotNull null
-                processCandidate(stkCd, stkNm, Position.BUY, todayOffset, riskMap, marketTypeMap)
-            } + sellCandidates.mapNotNull {
-                val stkCd = it.stk_cd ?: return@mapNotNull null
-                val stkNm = it.stk_nm ?: return@mapNotNull null
-                processCandidate(stkCd, stkNm, Position.SELL, todayOffset, riskMap, marketTypeMap)
-            }
-        } else {
-            emptyList()
+        log.info {
+            "BUY 후보(${buyCandidates.size}): " +
+                buyCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
+        }
+        log.info {
+            "SELL 후보(${sellCandidates.size}): " +
+                sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
+        }
+
+        val processed: List<ProcessedPick> = buyCandidates.mapNotNull {
+            val stkCd = it.stk_cd ?: return@mapNotNull null
+            val stkNm = it.stk_nm ?: return@mapNotNull null
+            processCandidate(stkCd, stkNm, Position.BUY, todayOffset, riskMap, marketTypeMap)
+        } + sellCandidates.mapNotNull {
+            val stkCd = it.stk_cd ?: return@mapNotNull null
+            val stkNm = it.stk_nm ?: return@mapNotNull null
+            processCandidate(stkCd, stkNm, Position.SELL, todayOffset, riskMap, marketTypeMap)
         }
 
         // 현재용 테이블 갱신
@@ -298,7 +303,8 @@ class RecommendService(
 
     /**
      * 매크로 6가지 케이스 + 중립 분류 (MarketIndexAdjustmentModule 의 조건문과 동일 의미).
-     * 백테스트 SQL 에서 GROUP BY 키로 사용.
+     * 백테스트 SQL 에서 GROUP BY 키로 사용. 실제 보정은 만장일치 2케이스(UP_BUY_BUY/DOWN_SELL_SELL)
+     * 만 적용, 나머지 다이버전스 4종 + NEUTRAL 은 무보정(중립).
      */
     private fun scenarioOf(snap: MarketMacroSnapshot?): String? {
         if (snap == null) return null
@@ -309,12 +315,12 @@ class RecommendService(
         val frgnBuy = snap.foreignNetBuy > 0
         val frgnSell = snap.foreignNetBuy < 0
         return when {
-            isUp && instBuy && frgnBuy -> "UP_BUY_BUY"           // 케이스 1: BUY 격상
-            isUp && instBuy && frgnSell -> "UP_BUY_SELL"          // 케이스 2: 다이버전스 유지
-            isUp && instSell && frgnSell -> "UP_SELL_SELL"        // 케이스 3: BUY 격하
-            isDown && instSell && frgnSell -> "DOWN_SELL_SELL"    // 케이스 4: SELL 격상
-            isDown && instBuy && frgnSell -> "DOWN_BUY_SELL"      // 케이스 5: 다이버전스 유지
-            isDown && instBuy && frgnBuy -> "DOWN_BUY_BUY"        // 케이스 6: SELL 격하
+            isUp && instBuy && frgnBuy -> "UP_BUY_BUY"           // 강세 만장일치: BUY 격상 / SELL 격하
+            isUp && instBuy && frgnSell -> "UP_BUY_SELL"          // 다이버전스 — 무보정
+            isUp && instSell && frgnSell -> "UP_SELL_SELL"        // 다이버전스(지수↑ + 수급↓) — 무보정
+            isDown && instSell && frgnSell -> "DOWN_SELL_SELL"    // 약세 만장일치: SELL 격상 / BUY 격하
+            isDown && instBuy && frgnSell -> "DOWN_BUY_SELL"      // 다이버전스 — 무보정
+            isDown && instBuy && frgnBuy -> "DOWN_BUY_BUY"        // 다이버전스(지수↓ + 수급↑) — 무보정
             else -> "NEUTRAL"
         }
     }
@@ -1270,6 +1276,8 @@ class RecommendService(
         val penfndK: Double?,
         val frgnrMcapRatio: Double?,
         val marketType: String?,
+        // HOLD 사유 — CONFLICT(BUY/SELL 양방향 시그널 충돌)일 때만 값, 그 외 NULL.
+        val evaluationReason: String? = null,
     )
 
     /**
@@ -1353,7 +1361,13 @@ class RecommendService(
         }
 
         val finalType = applyAdjustmentsForTrading(stockPick, setting)
-        return HoldingEvalResult(stkCd, stkNm, finalType, originSide, penfndK, frgnrMcapRatio, marketType)
+        // CONFLICT: 양방향 시그널 모두 통과(추세 전환 신호 가능성) — 사후 분석용 사유 기록.
+        val evaluationReason = if (conflict) "CONFLICT" else null
+        return HoldingEvalResult(
+            stkCd = stkCd, stkNm = stkNm, type = finalType,
+            originSide = originSide, penfndK = penfndK, frgnrMcapRatio = frgnrMcapRatio,
+            marketType = marketType, evaluationReason = evaluationReason,
+        )
     }
 
     /**

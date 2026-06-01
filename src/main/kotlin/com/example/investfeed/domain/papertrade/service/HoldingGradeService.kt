@@ -11,7 +11,6 @@ import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.order.client.MockAccountClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -19,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 /**
- * 보유 종목 등급 산출 스케줄러 — 매 거래일 22:10 (추천 22:00 직후, 독립 잡).
+ * 보유 종목 등급 산출 서비스 — 매 거래일 22:10 (추천 22:00 직후, 독립 잡).
  *
  * 추천(컨텐츠) ≠ 보유평가(내 포지션에 행동 취하는 매매 시스템) 이므로 별도 스케줄.
  * **모든 보유 종목**을 [RecommendService.evaluateHoldingGrade] 로 평가(holdingMode=true →
@@ -36,35 +35,15 @@ class HoldingGradeService(
     private val recommendService: RecommendService,
     private val holdingGradeRepository: HoldingGradeRepository,
     private val mockAccountClient: MockAccountClient,
-    private val holidayService: HolidayService,
     private val schedulerLogService: SchedulerLogService,
     private val authClient: AuthClient,
+    private val holidayService: HolidayService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String,
 ) {
     private val log = KotlinLogging.logger {}
 
     private data class HeldStock(val stkCd: String, val stkNm: String)
-
-    @Scheduled(cron = "0 10 22 * * *", scheduler = "slowScheduler")
-    fun scheduledHoldingGrade() {
-        log.info { "HoldingGradeScheduler cron fired" }
-        if (holidayService.isHoliday()) {
-            log.info { "HoldingGradeScheduler skipped: today is holiday" }
-            return
-        }
-        // 22:00 추천이 끝난 뒤 평가해야 "이미 평가된 후보 제외"가 정확. 단일 SLOW 스레드라
-        // 보통 큐잉으로 자연 직렬화되지만, 수동 트리거/지연 대비 명시 가드.
-        if (schedulerLogService.isRunning(SchedulerName.RecommendScheduler)) {
-            log.warn { "HoldingGradeScheduler skipped: RecommendScheduler 실행 중 (추천 완료 후 평가)" }
-            return
-        }
-        if (schedulerLogService.isRunning(SchedulerName.BacktestBackfillScheduler)) {
-            log.warn { "HoldingGradeScheduler skipped: BacktestBackfillScheduler 실행 중" }
-            return
-        }
-        runHoldingGrade()
-    }
 
     @Transactional
     fun runHoldingGrade() {
@@ -80,7 +59,13 @@ class HoldingGradeService(
     }
 
     private fun doHoldingGrade() {
-        val evalDate = LocalDate.now()
+        // 휴일에 수동 트리거되는 경우(서버 다운 후 복구 등) eval_date 를 직전 거래일로 보정.
+        // 평일 정상 실행 시엔 LocalDate.now() 그대로. RecommendService.doRecommendStock 과 동일 패턴.
+        val evalDate = if (holidayService.isHoliday()) {
+            holidayService.lastTradingDay()
+        } else {
+            LocalDate.now()
+        }
 
         // 지수 종가 수집은 별도 잡(scheduledCollectIndexClose, 00:10)으로 분리.
         // 22:10 호출 시 키움이 당일 일봉 정산 전 응답을 줘 open/close 둘 다 부정확하게 들어가는 문제 때문.
@@ -112,6 +97,7 @@ class HoldingGradeService(
                         frgnrMcapRatio = r.frgnrMcapRatio,
                         marketType = r.marketType,
                         evalDate = evalDate,
+                        evaluationReason = r.evaluationReason,
                     )
                 )
                 saved++

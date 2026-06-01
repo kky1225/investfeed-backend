@@ -48,7 +48,7 @@ class AdminPaperTradeService(
 
         val holdings = (hold?.acnt_evlt_remn_indv_tot.orEmpty()).map { h ->
             AdminPaperAccountRes.HoldingItem(
-                stkCd = normCd(h.stk_cd) ?: (h.stk_cd ?: "-"),
+                stkCd = toAlForm(h.stk_cd),
                 stkNm = h.stk_nm ?: "-",
                 rmndQty = parseAmt(h.rmnd_qty),
                 trdeAbleQty = parseAmt(h.trde_able_qty),
@@ -129,7 +129,7 @@ class AdminPaperTradeService(
             AdminPaperTradeHistoryRes.TradeItem(
                 ordDt = ordDtStr,
                 ordTm = r.ord_tm,
-                stkCd = normCd(r.stk_cd) ?: (r.stk_cd ?: "-"),
+                stkCd = toAlForm(r.stk_cd),
                 stkNm = r.stk_nm ?: "-",
                 ioTpNm = r.io_tp_nm,
                 trdeTp = r.trde_tp,
@@ -155,21 +155,25 @@ class AdminPaperTradeService(
 
         val items = holdingGradeRepository.findByEvalDate(target).map { g ->
             AdminHoldingGradeRes.HoldingGradeItem(
-                stkCd = g.stkCd,
+                stkCd = toAlForm(g.stkCd),
                 stkNm = g.stkNm,
                 type = g.type,
                 originSide = g.originSide,
                 marketType = g.marketType,
                 penfndK = g.penfndK,
                 frgnrMcapRatio = g.frgnrMcapRatio,
+                evaluationReason = g.evaluationReason,
             )
         }
         return AdminHoldingGradeRes(evalDate = target, items = items)
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
-    private fun normCd(raw: String?): String? =
-        raw?.substringBefore("_")?.trimStart('A', 'a')?.ifBlank { null }
+    private fun toAlForm(raw: String?): String {
+        if (raw.isNullOrBlank()) return "-"
+        val bare = raw.substringBefore("_").trimStart('A', 'a')
+        return if (bare.isBlank()) "-" else "${bare}_AL"
+    }
 
     /** 키움 숫자 문자열(부호·0패딩) → 절대값 Long. */
     private fun parseAmt(raw: String?): Long {

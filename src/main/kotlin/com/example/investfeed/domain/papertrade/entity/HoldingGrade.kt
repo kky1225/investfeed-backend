@@ -44,4 +44,9 @@ class HoldingGrade(
 
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    // HOLD 사유 — CONFLICT(BUY/SELL 양방향 시그널 충돌)일 때만 값 존재, 그 외 NULL.
+    // 매매 결정에는 영향 없고, 사후 분석/디버깅 단서로 사용.
+    @Column(name = "evaluation_reason")
+    val evaluationReason: String? = null,
 )

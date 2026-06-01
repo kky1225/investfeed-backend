@@ -20,7 +20,6 @@ import com.example.investfeed.kiwoom.order.dto.req.KiwoomPendingOrderReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -28,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 /**
- * 모의 매매 실행 잡 — 매 거래일 **08:50 장전**.
+ * 모의 매매 실행 서비스 — 매 거래일 **08:50 장전**.
  *
  * 09:00 정각 시작은 시가를 못 잡음(장 시작 동시호가 08:30~09:00). 08:50에 prep 끝내고
  * 시장가 주문을 동시호가 창에 제출 → 09:00 시가 체결(백테스트 price_open_1d 와 정합).
@@ -59,6 +58,7 @@ class PaperTradeExecutionService(
 
     companion object {
         private const val ORDER_PACING_MS = 1500L  // 종목 루프 키움 호출 페이싱(모의 주문 레이트리밋 회피, 500→1500)
+        private const val MAX_CONCURRENT_HOLDINGS = 20
     }
 
     /** 한 종목의 현재 보유 상태(가격은 사이징·환산용). */
@@ -82,16 +82,6 @@ class PaperTradeExecutionService(
         val grade: String,
         val price: Long,   // 사이징/현금배분 환산가(시장가라 실제 체결가는 시가)
     )
-
-    @Scheduled(cron = "0 50 8 * * *", scheduler = "slowScheduler")
-    fun scheduledPaperTradeExec() {
-        log.info { "PaperTradeExecScheduler cron fired" }
-        if (holidayService.isHoliday()) {
-            log.info { "PaperTradeExecScheduler skipped: today is holiday" }
-            return
-        }
-        runPaperTradeExec()
-    }
 
     @Transactional
     fun runPaperTradeExec() {
@@ -234,8 +224,11 @@ class PaperTradeExecutionService(
      * ④ 종목별 희망 주문 산출 (TrancheCalculator).
      * - 보유 종목: grades 등급(없으면 HOLD=동결)으로 평가, 가격=조회 현재가.
      * - 비보유 종목: stock_pick STRONG_BUY/BUY 만 신규 진입 후보(HOLD/SELL 등은 무행동 — 없는 걸 못 팖).
-     *   가격=ma5(없으면 스킵). 동시 보유 ≤10 캡(신규 진입 한정), STRONG_BUY 우선.
+     *   가격=ma5(없으면 스킵). 동시 보유 ≤20 캡(신규 진입 한정), STRONG_BUY 우선.
      * 현금 STRONG우선 배분·거래정지/상하한 사전필터·실제 발행은 서브스텝 4.
+     *
+     * 동시 보유 캡은 모의투자 수익률 검증 단계에서 표본 확보를 위해 10→20 으로 확장(2026-05-28).
+     * 실투자 단계에서는 현금 비중 정책과 함께 재검토 예정.
      */
     private fun buildOrderCandidates(ctx: ExecContext): List<OrderCandidate> {
         val candidates = mutableListOf<OrderCandidate>()
@@ -249,8 +242,8 @@ class PaperTradeExecutionService(
             }
         }
 
-        // 신규 진입 — 비보유 + STRONG_BUY/BUY 만, 성향필터(정리매매·투자위험) 통과, 동시보유 ≤10 캡, STRONG 우선
-        val newSlots = (10 - ctx.holdings.size).coerceAtLeast(0)
+        // 신규 진입 — 비보유 + STRONG_BUY/BUY 만, 성향필터(정리매매·투자위험) 통과, 동시보유 ≤20 캡, STRONG 우선
+        val newSlots = (MAX_CONCURRENT_HOLDINGS - ctx.holdings.size).coerceAtLeast(0)
         val newEntryCds = ctx.grades.keys
             .filter { it !in ctx.holdings && (ctx.grades[it] == "STRONG_BUY" || ctx.grades[it] == "BUY") }
             .sortedBy { if (ctx.grades[it] == "STRONG_BUY") 0 else 1 }

@@ -14,5 +14,6 @@ data class AdminHoldingGradeRes(
         val marketType: String?,      // KOSPI / KOSDAQ
         val penfndK: Double?,
         val frgnrMcapRatio: Double?,
+        val evaluationReason: String?,  // CONFLICT(양방향 시그널 충돌)일 때만, 그 외 null
     )
 }

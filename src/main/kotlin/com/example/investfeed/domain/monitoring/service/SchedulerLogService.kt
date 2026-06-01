@@ -126,6 +126,12 @@ class SchedulerLogService(
         return elapsed <= status.timeoutSec
     }
 
+    fun isSucceededSince(scheduler: SchedulerName, since: LocalDateTime): Boolean {
+        val status = schedulerStatusRepository.findById(scheduler.name).orElse(null) ?: return false
+        val lastSuccess = status.lastSuccessAt ?: return false
+        return !lastSuccess.isBefore(since)
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     internal fun markStarted(scheduler: SchedulerName, at: LocalDateTime) {
         val entity = schedulerStatusRepository.findById(scheduler.name).orElse(
