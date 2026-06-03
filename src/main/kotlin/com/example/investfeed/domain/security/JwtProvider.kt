@@ -41,23 +41,33 @@ class JwtProvider(
     }
 
     fun generateRefreshToken(loginId: String): String {
+        val refreshToken = buildRefreshToken(loginId)
+        storeRefreshToken(loginId, refreshToken)
+        return refreshToken
+    }
+
+    fun buildRefreshToken(loginId: String): String {
         val now = Date()
-        val refreshToken = Jwts.builder()
+        return Jwts.builder()
             .subject(loginId)
             .claim("type", "refresh")
             .issuedAt(now)
             .expiration(Date(now.time + transDays(refreshTokenExpiration)))
             .signWith(key)
             .compact()
+    }
 
+    fun storeRefreshToken(loginId: String, refreshToken: String) {
         redisTemplate.opsForValue().set(
             "${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId",
             refreshToken,
             refreshTokenExpiration,
             TimeUnit.DAYS
         )
-        return refreshToken
     }
+
+    fun getStoredRefreshToken(loginId: String): String? =
+        redisTemplate.opsForValue().get("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
 
     fun getAuthentication(token: String): Authentication {
         val loginId = getClaims(token).subject
@@ -74,13 +84,10 @@ class JwtProvider(
         }
     }
 
-    fun validateRefreshToken(refreshToken: String): Boolean {
+    fun isRefreshTokenSignatureValid(refreshToken: String): Boolean {
         return try {
             val claims = getClaims(refreshToken)
-            if (claims.expiration.before(Date()) || claims["type"] != "refresh") return false
-            val loginId = claims.subject
-            val stored = redisTemplate.opsForValue().get("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
-            stored == refreshToken
+            !claims.expiration.before(Date()) && claims["type"] == "refresh"
         } catch (e: Exception) {
             false
         }

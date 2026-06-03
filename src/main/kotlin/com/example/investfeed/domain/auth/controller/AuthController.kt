@@ -96,6 +96,7 @@ class AuthController(
     ): ResponseEntity<ApiResponse<TokenRes>> {
         val result = authService.reissue(refreshToken)
         response.addHeader(HttpHeaders.SET_COOKIE, createAccessTokenCookie(result.accessToken))
+        response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(result.refreshToken))
 
         return ResponseEntity(
             ApiResponse(

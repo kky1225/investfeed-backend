@@ -9,6 +9,7 @@ import com.example.investfeed.domain.auth.exception.AccountPermanentlyLockedExce
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import com.example.investfeed.domain.auth.exception.ApiKeyRegistrationLockedException
 import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
+import com.example.investfeed.domain.auth.exception.RefreshTokenReuseDetectedException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordLockedException
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
@@ -50,6 +51,7 @@ class ExceptionAdviceController {
             is AccountLockedByFailureException -> "AUTH_4012" to LoginErrorRes(e.lockRemainingSeconds)
             is AccountLockedException -> "AUTH_4013" to LoginErrorRes(e.lockRemainingSeconds)
             is AccountPermanentlyLockedException -> "AUTH_4014" to null
+            is RefreshTokenReuseDetectedException -> "AUTH_4017" to null
             else -> "AUTH_4011" to null
         }
 

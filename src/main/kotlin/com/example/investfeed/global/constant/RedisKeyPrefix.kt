@@ -26,6 +26,7 @@ enum class RedisKeyPrefix(
     SECONDARY_AUTH_LOCK("SEC_LOCK:", "관리자 2차 인증 실패 잠금"),
     SECONDARY_AUTH_FAIL("SEC_FAIL:", "관리자 2차 인증 실패 카운터"),
     REFRESH_TOKEN("RT:", "JWT refresh token"),
+    REFRESH_ROTATE("RTROT:", "JWT refresh token 재발급 유예 매핑"),
     BLACKLIST("BL:", "JWT access token 블랙리스트"),
     API_CALL("api_call:", "외부 API 일별 호출 카운터"),
 }

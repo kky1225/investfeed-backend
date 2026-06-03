@@ -52,6 +52,7 @@ class AuthService(
     private val preAuthTokenTtlSetup = 610L
     private val preAuthTokenTtlVerify = 310L
     private val secondaryAuthTtl = 30L
+    private val refreshGraceSeconds = 60L
 
     data class LoginResult(
         val tokenRes: TokenRes,
@@ -418,7 +419,8 @@ class AuthService(
 
     data class ReissueResult(
         val tokenRes: TokenRes,
-        val accessToken: String
+        val accessToken: String,
+        val refreshToken: String
     )
 
     fun reissue(refreshToken: String?): ReissueResult {
@@ -426,13 +428,38 @@ class AuthService(
             throw RefreshTokenMissingException()
         }
 
-        if (!jwtProvider.validateRefreshToken(refreshToken)) {
+        if (!jwtProvider.isRefreshTokenSignatureValid(refreshToken)) {
             throw RefreshTokenInvalidException()
         }
 
         val loginId = jwtProvider.getLoginId(refreshToken)
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+
+        val rotateKey = "${RedisKeyPrefix.REFRESH_ROTATE.prefix}$refreshToken"
+        val current = jwtProvider.getStoredRefreshToken(loginId)
+
+        val newRefreshToken: String = if (refreshToken == current) {
+            val candidate = jwtProvider.buildRefreshToken(loginId)
+            val won = redisTemplate.opsForValue()
+                .setIfAbsent(rotateKey, candidate, refreshGraceSeconds, TimeUnit.SECONDS) ?: false
+            if (won) {
+                jwtProvider.storeRefreshToken(loginId, candidate)
+                candidate
+            } else {
+                redisTemplate.opsForValue().get(rotateKey)
+                    ?: jwtProvider.getStoredRefreshToken(loginId)
+                    ?: throw RefreshTokenInvalidException()
+            }
+        } else {
+            // 2) 현재 토큰은 아니지만 직전에 회전된 토큰(grace 윈도우 내) → 같은 새 토큰 반환
+            // 3) grace 에도 없으면 폐기 토큰 재사용 = 탈취 의심 → 세션 폐기
+            redisTemplate.opsForValue().get(rotateKey) ?: run {
+                jwtProvider.deleteRefreshToken(loginId)
+                log.error { "refresh token 재사용 감지 — 세션 폐기 (loginId=$loginId)" }
+                throw RefreshTokenReuseDetectedException()
+            }
+        }
 
         return ReissueResult(
             tokenRes = TokenRes(
@@ -443,7 +470,8 @@ class AuthService(
                 defaultPath = member.role.defaultLandingPath,
                 permissions = loadUserPermissions(member.role.id)
             ),
-            accessToken = jwtProvider.generateAccessToken(loginId)
+            accessToken = jwtProvider.generateAccessToken(loginId),
+            refreshToken = newRefreshToken
         )
     }
 
