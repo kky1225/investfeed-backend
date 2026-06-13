@@ -29,8 +29,6 @@ class MovingAverageModule : AdjustmentModule {
         }
     }
 
+    // 방향은 shouldPromote 로만 표현(BUY=골든크로스 / SELL=데드크로스) — shouldDemote 미사용.
     override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
-
-    /** 격상 전용 모듈 — 격하 능력 없음. 다수결 격하풀에서 제외. */
-    override fun canDemote(side: Position): Boolean = false
 }

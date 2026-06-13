@@ -20,7 +20,7 @@ class PaperFill(
     val stkCd: String,
 
     @Column(name = "side", nullable = false)
-    val side: String, // BUY / SELL
+    val side: String, // BUY / SELL / CNCL(전날 미체결 취소) / REJ(주문거부·실패, 체결 아님)
 
     @Column(name = "fill_date", nullable = false)
     val fillDate: LocalDate,

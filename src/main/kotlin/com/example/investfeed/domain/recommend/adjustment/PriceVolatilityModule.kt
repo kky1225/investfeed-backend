@@ -20,6 +20,7 @@ class PriceVolatilityModule : AdjustmentModule {
 
     override fun isEnabled(setting: RecommendSetting): Boolean = setting.priceVolatilityEnabled
 
+    // 격상(shouldPromote) 미사용 — 변동성=위험이라 격하만 함.
     override fun shouldPromote(pick: StockPick, side: Position): Boolean = false
 
     override fun shouldDemote(pick: StockPick, side: Position): Boolean {
@@ -29,7 +30,4 @@ class PriceVolatilityModule : AdjustmentModule {
             Position.SELL -> flu5 >= 10.0
         }
     }
-
-    /** 격하 전용 모듈 — 격상 능력 없음. 다수결 격상풀에서 제외. */
-    override fun canPromote(side: Position): Boolean = false
 }

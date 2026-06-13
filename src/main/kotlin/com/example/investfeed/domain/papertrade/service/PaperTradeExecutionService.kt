@@ -7,6 +7,7 @@ import com.example.investfeed.domain.papertrade.repository.HoldingGradeRepositor
 import com.example.investfeed.domain.papertrade.repository.PaperFillRepository
 import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -48,6 +49,7 @@ class PaperTradeExecutionService(
     private val paperFillRepository: PaperFillRepository,
     private val holdingGradeRepository: HoldingGradeRepository,
     private val stockPickRepository: StockPickRepository,
+    private val recommendService: RecommendService,
     private val holidayService: HolidayService,
     private val schedulerLogService: SchedulerLogService,
     private val authClient: AuthClient,
@@ -70,6 +72,7 @@ class PaperTradeExecutionService(
         val availableCash: Long,              // 주문가능금액
         val holdings: Map<String, HeldPos>,   // 정규화 stkCd → 보유
         val grades: Map<String, String>,      // 정규화 stkCd → 등급
+        val targetRatios: Map<String, Double?>, // 정규화 stkCd → 목표 비중(보유, BLOCK 부분=0.10/그외 null)
         val seedPrices: Map<String, Long>,    // 정규화 stkCd → 신규진입 사이징가(ma5)
         val riskBlocked: Set<String>,         // ⑤-a NORMAL 차단(정리매매·투자위험) — 신규진입만 적용
     )
@@ -159,9 +162,11 @@ class PaperTradeExecutionService(
                 log.error(e) { "주문 실패 ${c.stkCd} ${c.side} ${c.qty}" }
                 paperFillRepository.save(
                     PaperFill(
-                        stkCd = c.stkCd, side = c.side.name, fillDate = today,
+                        // 거부/실패는 체결이 아니므로 BUY/SELL 로 기록하지 않음(집계 오염 방지).
+                        // CNCL 과 동일하게 별도 side("REJ")로 분리, 시도 방향은 note 에 보존.
+                        stkCd = c.stkCd, side = "REJ", fillDate = today,
                         quantity = c.qty, price = c.price, kiwoomOrderNo = null,
-                        note = "주문거부/실패: ${e.message?.take(180)}",
+                        note = "주문거부/실패(${c.side.name}): ${e.message?.take(170)}",
                     )
                 )
             }
@@ -198,12 +203,15 @@ class PaperTradeExecutionService(
         // ③ 등급: 직전 거래일 holding_grade + 당일 stock_pick(추천) 병합.
         val priorTradingDay = holidayService.lastTradingDay(LocalDate.now().minusDays(1))
         val grades = mutableMapOf<String, String>()
+        val targetRatios = mutableMapOf<String, Double?>()
         val seedPrices = mutableMapOf<String, Long>()
         val riskBlocked = mutableSetOf<String>()
         val normalBlocked = RiskPreset.NORMAL.blockedCategories() // {정리매매, 투자위험}
         stockPickRepository.findAll().forEach { p ->
             val cd = normCd(p.stkCd) ?: return@forEach
-            grades[cd] = p.type
+            // 신규진입 등급 = 추천과 동일한 Stage1(절대 점수제, 진영 클램프, 전체 모듈, 매크로 제외).
+            // 백본(p.type) 그대로 쓰면 데드크로스 등 모듈 격하를 못 봐서 추천(HOLD)과 어긋남 → 추천 등급으로 통일.
+            grades[cd] = recommendService.newEntryGrade(p)
             // 신규 진입 사이징가 = ma5(저장값, 라이브 호출 X). 어차피 시장가 시가 체결이라 근사 충분.
             p.ma5?.takeIf { it > 0 }?.let { seedPrices[cd] = it.toLong() }
             // ⑤-a 성향필터: NORMAL=정리매매/투자위험 종목은 신규 진입 차단(보유는 면제 — 별도 적용)
@@ -211,12 +219,15 @@ class PaperTradeExecutionService(
         }
         holdingGradeRepository.findByEvalDate(priorTradingDay).forEach { g ->
             val cd = normCd(g.stkCd) ?: return@forEach
-            if (cd in holdings) grades[cd] = g.type
+            if (cd in holdings) {
+                grades[cd] = g.type
+                targetRatios[cd] = g.targetWeightRatio
+            }
         }
         return ExecContext(
             nav = nav, availableCash = availableCash,
-            holdings = holdings, grades = grades, seedPrices = seedPrices,
-            riskBlocked = riskBlocked,
+            holdings = holdings, grades = grades, targetRatios = targetRatios,
+            seedPrices = seedPrices, riskBlocked = riskBlocked,
         )
     }
 
@@ -233,10 +244,10 @@ class PaperTradeExecutionService(
     private fun buildOrderCandidates(ctx: ExecContext): List<OrderCandidate> {
         val candidates = mutableListOf<OrderCandidate>()
 
-        // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부)
+        // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부). 목표비중(BLOCK 부분=0.10)도 전달.
         for ((cd, pos) in ctx.holdings) {
             val grade = ctx.grades[cd] ?: "HOLD"
-            val o = trancheCalculator.calculate(grade, pos.qty, pos.price, ctx.nav)
+            val o = trancheCalculator.calculate(grade, pos.qty, pos.price, ctx.nav, ctx.targetRatios[cd])
             if (o.side != TrancheSide.NONE && o.qty > 0L) {
                 candidates += OrderCandidate(cd, o.side, o.qty, grade, pos.price)
             }
