@@ -30,6 +30,15 @@ class StockPick(
     @Column(name = "frgnr_mcap_ratio")
     val frgnrMcapRatio: Double? = null,
 
+    @Column(name = "frgnr_opposite_k")
+    val frgnrOppositeK: Double? = null,    // 외국인 추천 반대 방향 K (BLOCK 강도 — 강반대 3.0↑ HOLD / 중간 1.5~3.0 방향유지)
+
+    @Column(name = "prior_trend_ratio")
+    val priorTrendRatio: Double? = null,   // B′ 연기금 prior 추세 명확성 비율 (≥0.7 STRONG 격상 허용)
+
+    @Column(name = "foreigner_aligned")
+    val foreignerAligned: Boolean? = null,  // 옵션B: 외국인 12일 추세 동조 (시총비중 미달 구제)
+
     @Column(name = "origin_side")
     val originSide: String? = null,
 

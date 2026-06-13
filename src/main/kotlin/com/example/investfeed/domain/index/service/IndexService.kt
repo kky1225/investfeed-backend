@@ -431,6 +431,7 @@ class IndexService(
 
     fun collectIndexInvestorDaily(date: String) {
         val targetIndexes = listOf(IndexType.KOSPI, IndexType.KOSDAQ)
+        val failures = mutableListOf<String>()
 
         targetIndexes.forEach { indexType ->
             try {
@@ -496,7 +497,12 @@ class IndexService(
                 Thread.sleep(100)
             } catch (e: Exception) {
                 log.warn { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
+                failures += "${indexType.indsCd}(${e.message})"
             }
+        }
+
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException("지수 투자자 일별 데이터 수집 실패 (date=$date): ${failures.joinToString(", ")}")
         }
     }
 

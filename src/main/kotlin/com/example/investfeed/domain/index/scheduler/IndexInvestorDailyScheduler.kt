@@ -39,13 +39,17 @@ class IndexInvestorDailyScheduler(
             return
         }
         schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
+            setSchedulerSecurityContext()
             try {
+                authClient.accessToken()
                 val yesterday = yesterdayDate.format(formatter)
                 indexService.collectIndexInvestorDaily(yesterday)
                 log.info { "지수 투자자 일별 데이터 수집 완료: $yesterday" }
             } catch (e: Exception) {
                 log.error { "지수 투자자 일별 데이터 수집 스케줄러 실패: ${e.message}" }
                 throw e
+            } finally {
+                SecurityContextHolder.clearContext()
             }
         }
     }
@@ -53,8 +57,7 @@ class IndexInvestorDailyScheduler(
     // 서버 시작 시 누락 데이터 자동 보정 (로컬 환경용, AWS 배포 후 제거 예정)
     @EventListener(ApplicationReadyEvent::class)
     fun fillMissingData() {
-        val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
-        SecurityContextHolder.getContext().authentication = auth
+        setSchedulerSecurityContext()
         try {
             authClient.accessToken()
             // 코스피/코스닥 중 더 오래된 날짜 기준
@@ -131,5 +134,10 @@ class IndexInvestorDailyScheduler(
         }
 
         log.info { "지수 투자자 일별 초기 시드 완료: ${collected}일치 수집 (실패 ${failed}건)" }
+    }
+
+    private fun setSchedulerSecurityContext() {
+        val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
+        SecurityContextHolder.getContext().authentication = auth
     }
 }

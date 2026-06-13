@@ -17,14 +17,14 @@ import org.springframework.stereotype.Component
  * | 저점 +15% 이상 + 종가 > MA20 (Stage 2 진입) | **격상** | — |
  * | 고점 -15% 이하 + 종가 < MA20 (Stage 4 진입) | — | **격상** |
  *
- * **격하 룰**: 없음 ([canDemote] = false). 진입 시그널만 표시 — 다른 모듈이 격하 담당.
+ * **격하(shouldDemote) 미사용** — 방향은 shouldPromote 로만 표현(매수쪽=저점반등 / 매도쪽=고점하락).
  *
  * **왜 MA20 vs flu5Pct**:
  *  - MA20 = 평활화된 추세 위치 (학술 표준)
  *  - flu5Pct = 노이즈 큼 (큰 변동 한 번에 부호 바뀜)
  *  - [MovingAverageModule] 골든/데드크로스 (이벤트) 와 종가 vs MA20 (상태) 는 중복 X
  *
- * **다수결 룰**: 격상풀의 한 표 — 단독 발동 X, 격상풀 과반(+격하표 0) 충족 시에만 실제 격상.
+ * **점수제**: 매수쪽/매도쪽 한 표 — 단독으로 등급을 못 바꾸고, 표 합산이 문턱(매수 net≥2 / 매도 net≥1) 넘을 때만 이동.
  */
 @Component
 class HighLow52wModule : AdjustmentModule {
@@ -42,8 +42,6 @@ class HighLow52wModule : AdjustmentModule {
         }
     }
 
-    override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
-
     // 격하 시그널 없음 — 진입 시그널 전용 모듈.
-    override fun canDemote(side: Position): Boolean = false
+    override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
 }

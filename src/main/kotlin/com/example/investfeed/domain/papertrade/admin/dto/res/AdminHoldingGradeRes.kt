@@ -14,6 +14,12 @@ data class AdminHoldingGradeRes(
         val marketType: String?,      // KOSPI / KOSDAQ
         val penfndK: Double?,
         val frgnrMcapRatio: Double?,
-        val evaluationReason: String?,  // CONFLICT(양방향 시그널 충돌)일 때만, 그 외 null
+        // 결정 근거 (왜 이 등급/비중/사유인지)
+        val frgnrOppositeK: Double?,    // 외국인 반대 K (BLOCK·freeze·부분비중 강도)
+        val frgnrSameDirK: Double?,     // 외국인 동조 K (하드스톱)
+        val priorTrendRatio: Double?,   // B′ 추세 명확성 (STRONG)
+        val foreignerAligned: Boolean?, // 옵션B 외국인 동조
+        val evaluationReason: String?,  // HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / CONFLICT (복수면 '|'), 없으면 null
+        val targetWeightRatio: Double?, // 외국인 BLOCK 부분비중 0.10, 그 외 null(기본)
     )
 }

@@ -12,6 +12,7 @@ import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -39,6 +40,7 @@ class AdminRecommendMonitoringService(
     private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
     private val indexDailyCloseRepository: com.example.investfeed.domain.index.repository.IndexDailyCloseRepository,
     private val holidayService: HolidayService,
+    private val recommendService: RecommendService,
 ) {
 
     companion object {
@@ -47,22 +49,23 @@ class AdminRecommendMonitoringService(
         private const val KOSDAQ_CD = "101"
     }
 
-
-    /**
-     * 추천 신호 조회. date 미지정 = 오늘 = stock_pick, 과거 일자 = stock_pick_history.
-     */
     fun listPicks(date: LocalDate?): List<AdminRecommendPickRes> {
         val today = LocalDate.now()
-        val useCurrent = date == null || date == today
+        val target = date ?: today
 
-        return if (useCurrent) {
-            stockPickRepository.findAllByOrderByStkCdAsc().map { it.toAdminRes() }
+        return if (target == today) {
+            val asOf = stockPickHistoryRepository.findMaxPickDate()?.toLocalDate()
+            if (asOf == today) {
+                stockPickRepository.findAllByOrderByStkCdAsc()
+                    .map { it.toAdminRes().copy(pickDate = today) }
+            } else {
+                emptyList()
+            }
         } else {
-            val histories = stockPickHistoryRepository.findByPickDateBetween(
-                date!!.atStartOfDay(),
-                date.atTime(23, 59, 59),
-            )
-            histories.sortedBy { it.stkCd }.map { it.toAdminRes() }
+            stockPickHistoryRepository.findByPickDateBetween(
+                target.atStartOfDay(),
+                target.atTime(23, 59, 59),
+            ).sortedBy { it.stkCd }.map { it.toAdminRes() }
         }
     }
 
@@ -300,24 +303,43 @@ class AdminRecommendMonitoringService(
 
     // ─── 매핑 헬퍼 ────────────────────────────────────────────────────────
 
-    /** stock_pick (현재 상태) — 가격/수익률 컬럼은 null. */
-    private fun StockPick.toAdminRes(): AdminRecommendPickRes = AdminRecommendPickRes(
-        stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
-        type = type,
-        pvTrigger = pvTrigger, maTrigger = maTrigger, vpTrigger = vpTrigger, rsiTrigger = rsiTrigger,
-        hl52wTrigger = hl52wTrigger, breakoutTrigger = breakoutTrigger,
-        rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
-        ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
+    private fun StockPickHistory.toModulePick(): StockPick = StockPick(
+        type = type, stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
+        ma5 = ma5, ma20 = ma20,
         todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
+        rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
         high52w = high52w, low52w = low52w,
         distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,
-        closeAboveMa20 = closeAboveMa20,
-        pickDate = null, pickPrice = null,
-        priceOpen1d = null, priceClose1d = null, priceClose5d = null, priceClose20d = null,
-        ret1d = null, ret5d = null, ret20d = null,
+        closeAboveMa20 = closeAboveMa20, flu5Pct = flu5Pct,
     )
 
-    /** stock_pick_history — 가격 + 수익률 계산 포함. */
+    private fun StockPick.toAdminRes(): AdminRecommendPickRes {
+        val trig = recommendService.moduleAbsoluteTriggers(this)
+        return AdminRecommendPickRes(
+            stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
+            type = type,
+            effectiveType = recommendService.newEntryGrade(this),
+            backboneReason = RecommendService.backboneReason(
+                type, originSide, penfndK, frgnrMcapRatio, priorTrendRatio, foreignerAligned, frgnrBlocked, frgnrOppositeK,
+            ),
+            penfndK = penfndK, frgnrBlocked = frgnrBlocked, frgnrOppositeK = frgnrOppositeK, frgnrMcapRatio = frgnrMcapRatio,
+            frgnrSameDirK = null, priorTrendRatio = priorTrendRatio, foreignerAligned = foreignerAligned,
+            marketCap = null,
+            pvTrigger = trig["PriceVolatility"], maTrigger = trig["MovingAverage"],
+            vpTrigger = trig["VolumePrice"], rsiTrigger = trig["Rsi"],
+            hl52wTrigger = trig["HighLow52w"], breakoutTrigger = trig["Breakout"],
+            rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
+            ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
+            todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
+            high52w = high52w, low52w = low52w,
+            distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,
+            closeAboveMa20 = closeAboveMa20,
+            pickDate = null, pickPrice = null,
+            priceOpen1d = null, priceClose1d = null, priceClose5d = null, priceClose20d = null,
+            ret1d = null, ret5d = null, ret20d = null,
+        )
+    }
+
     private fun StockPickHistory.toAdminRes(): AdminRecommendPickRes {
         val openOrNull = priceOpen1d?.takeIf { it > 0L }
         val ret = { close: Long? ->
@@ -325,11 +347,21 @@ class AdminRecommendMonitoringService(
                 (close - openOrNull).toDouble() / openOrNull * 100.0
             } else null
         }
+        val mp = toModulePick()
+        val trig = recommendService.moduleAbsoluteTriggers(mp)
         return AdminRecommendPickRes(
             stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
             type = type,
-            pvTrigger = pvTrigger, maTrigger = maTrigger, vpTrigger = vpTrigger, rsiTrigger = rsiTrigger,
-            hl52wTrigger = hl52wTrigger, breakoutTrigger = breakoutTrigger,
+            effectiveType = recommendService.newEntryGrade(mp),
+            backboneReason = RecommendService.backboneReason(
+                type, originSide, penfndK, frgnrMcapRatio, priorTrendRatio, foreignerAligned, frgnrBlocked, frgnrOppositeK,
+            ),
+            penfndK = penfndK, frgnrBlocked = frgnrBlocked, frgnrOppositeK = frgnrOppositeK, frgnrMcapRatio = frgnrMcapRatio,
+            frgnrSameDirK = frgnrSameDirK, priorTrendRatio = priorTrendRatio, foreignerAligned = foreignerAligned,
+            marketCap = marketCap,
+            pvTrigger = trig["PriceVolatility"], maTrigger = trig["MovingAverage"],
+            vpTrigger = trig["VolumePrice"], rsiTrigger = trig["Rsi"],
+            hl52wTrigger = trig["HighLow52w"], breakoutTrigger = trig["Breakout"],
             rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
             ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
             todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,

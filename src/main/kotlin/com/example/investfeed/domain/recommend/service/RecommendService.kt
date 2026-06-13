@@ -374,6 +374,10 @@ class RecommendService(
 
         val penfndK = computeK(penfndValues, position, todayOffset)
         val frgnrBlocked = isForeignerBlocked(items, position, todayOffset)
+        // 외국인이 추천 반대 방향으로 매매하는 강도(K). 보유평가 3티어(≥3.0/1.5~3.0/<1.5) 판정에 사용.
+        val frgnrOppositeK = computeK(frgnrValues, if (position == Position.BUY) Position.SELL else Position.BUY, todayOffset)
+        // 외국인 같은방향(동조) K — 하드스톱(연기금·외국인 둘 다 강매도) 판정 + 검증 데이터.
+        val frgnrSameDirK = computeK(frgnrValues, position, todayOffset)
         log.info {
             "[$stkNm($stkCd) $position] 시그널 통과 — penfndK=${"%.2f".format(penfndK)}, frgnrBlocked=$frgnrBlocked, " +
                 "연기금=$penfndValues, 외국인=$frgnrValues"
@@ -399,7 +403,7 @@ class RecommendService(
         val prior = penfndValues.subList(todayOffset + RECENT_WINDOW, penfndValues.size)
         val priorTrendRatio = computeDominantStrengthRatio(prior)
         val foreignerAligned = isForeignerDirectionallyAligned(items, position, todayOffset)
-        val type = classify(penfndK, frgnrBlocked, effectiveRatio, position, prior, foreignerAligned, holdingMode)
+        val type = classify(penfndK, frgnrBlocked, frgnrOppositeK, effectiveRatio, position, prior, foreignerAligned, holdingMode)
         log.info {
             "[$stkNm($stkCd) $position] 분류=$type — penfndK=${"%.2f".format(penfndK)} " +
                 "(STRONG≥$K_STRONG_OVERRIDE), frgnrSignedRatio=${"%.4f%%".format(frgnrSignedRatio * 100)}, " +
@@ -442,7 +446,11 @@ class RecommendService(
             marketType = marketType,
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
+            frgnrK = frgnrOppositeK,
+            frgnrSameDirK = frgnrSameDirK,
             frgnrMcapRatio = frgnrSignedRatio,
+            priorTrendRatio = priorTrendRatio,
+            foreignerAligned = foreignerAligned,
             pickPrice = pickPrice,
             marketCap = marketCap,
             originSide = position.name,
@@ -712,22 +720,25 @@ class RecommendService(
 
     /**
      * 분류 규칙 우선순위:
-     * 1. 외국인 BLOCK → HOLD (추천 모드) / **한 단계 격하 (holdingMode=true 보유 평가 모드)**
+     * 1. 외국인 BLOCK → **강반대(K≥3.0) HOLD / 중간반대(1.5~3.0) 방향 유지** (추천·매매 공통 방향)
      * 2. STRONG 격상 (연기금 K ≥ 3.0 또는 외국인 시총 비중 ≥ 0.1%) + prior 추세 명확(B' ≥ 70%) → STRONG
      * 3. 외국인 시총 비중 ≥ MCAP_RATIO_BUY (0.05%) → BUY/SELL
      * 4. **(옵션 B)** 외국인 방향성 동조 (12일 추세 일관) → BUY/SELL ← 신규: 시총 비중 미달 구제
      * 5. 그 외 → HOLD
      *
-     * BLOCK 처리 분기 — 추천 매매(opt-in)는 위험 회피 우선이라 HOLD 직행이 안전,
-     * 보유 평가는 위험 관리(=손절 행동도 필요) 라 한 단계 격하로 STRONG 시그널 행동 보존.
-     * 격하 매핑: STRONG_X → X, X → HOLD, HOLD → HOLD.
+     * BLOCK 처리 — 추천·매매 **방향(direction) 일치**: 외국인 강반대(K≥3.0)면 HOLD(방향 동결),
+     * 중간반대(1.5~3.0)면 preBlockType(신호 방향) 유지. 매매는 여기에 더해 부분비중(10%)·하드스톱을
+     * [evaluateHoldingGrade] 가 부여한다 (추천=방향 / 매매=방향+규모). holdingMode=true 는 BLOCK 시
+     * preBlockType 을 그대로 둬서 evaluateHoldingGrade 가 3티어(동결/부분/전량)를 재결정하게 한다.
      *
+     * @param frgnrOppositeK 외국인 추천 반대 방향 K. 강반대(≥3.0) 판정용 (매매 freeze 와 동일 지표·임계).
      * @param foreignerAligned [isForeignerDirectionallyAligned] 결과. 호출부에서 미리 계산해서 전달.
-     * @param holdingMode true 면 BLOCK 시 한 단계 격하 (보유 평가용). false 면 BLOCK 시 HOLD 직행 (추천 매매용).
+     * @param holdingMode true=BLOCK 시 preBlockType 유지(3티어는 호출부). false(추천)=강반대 HOLD/중간반대 방향 유지.
      */
     internal fun classify(
         penfndK: Double,
         frgnrBlocked: Boolean,
+        frgnrOppositeK: Double,
         foreignerEffectiveRatio: Double,
         position: Position,
         prior: List<Long>,
@@ -747,20 +758,9 @@ class RecommendService(
         }
 
         if (!frgnrBlocked) return preBlockType
-        // BLOCK 케이스
-        return if (holdingMode) downgradeOneStep(preBlockType, sideName) else "HOLD"
-    }
-
-    /**
-     * BLOCK 발생 시 한 단계 격하 매핑 (보유 평가 전용).
-     * STRONG_X → X, X → HOLD, HOLD → HOLD.
-     */
-    private fun downgradeOneStep(type: String, sideName: String): String {
-        return when (type) {
-            "STRONG_$sideName" -> sideName
-            sideName -> "HOLD"
-            else -> "HOLD"  // 이미 HOLD 거나 예상 외 값
-        }
+        if (holdingMode) return preBlockType   // 매매: 방향 유지, 3티어(동결/부분/전량)는 evaluateHoldingGrade
+        // 추천도 매매와 방향 일치: 외국인 강반대(K≥3.0) → HOLD(방향 동결), 중간반대(1.5~3.0) → 방향 유지.
+        return if (frgnrOppositeK >= K_FOREIGNER_STRONG) "HOLD" else preBlockType
     }
 
     /**
@@ -823,7 +823,11 @@ class RecommendService(
         val marketType: String?,
         val penfndK: Double,
         val frgnrBlocked: Boolean,
+        val frgnrK: Double,             // 외국인 추천 반대 방향 K (보유평가 3티어 판정용)
+        val frgnrSameDirK: Double,      // 외국인 추천 같은방향(동조) K (하드스톱 판정/검증용)
         val frgnrMcapRatio: Double?,
+        val priorTrendRatio: Double,    // B′ 연기금 prior 추세 명확성 비율 (STRONG 격상 게이트)
+        val foreignerAligned: Boolean,  // 옵션B: 외국인 12일 추세 동조
         val pickPrice: Long,
         val marketCap: Long?,
         val originSide: String,
@@ -839,6 +843,9 @@ class RecommendService(
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrMcapRatio,
+            frgnrOppositeK = frgnrK,
+            priorTrendRatio = priorTrendRatio,
+            foreignerAligned = foreignerAligned,
             originSide = originSide,
             isManaged = riskFlags.isManaged,
             isDelisting = riskFlags.isDelisting,
@@ -876,6 +883,10 @@ class RecommendService(
             penfndK = penfndK,
             frgnrBlocked = frgnrBlocked,
             frgnrMcapRatio = frgnrMcapRatio,
+            frgnrSameDirK = frgnrSameDirK,
+            frgnrOppositeK = frgnrK,
+            priorTrendRatio = priorTrendRatio,
+            foreignerAligned = foreignerAligned,
             pickPrice = pickPrice,
             marketCap = marketCap,
             originSide = originSide,
@@ -958,6 +969,11 @@ class RecommendService(
      * 연기금 [position] 시그널(K_SIGNAL + 부호 일관성) 만족 여부.
      * 외국인 BLOCK 검사는 별도 단계에서 수행 (분류 시 BLOCK이면 HOLD로 분류).
      *
+     * 부호 일관성은 **매수(BUY) 방향에만** 요구한다(비대칭).
+     * - BUY(신규 진입·보유 추가매수): 익스포저 증가 → 단발 오진입 시 실손실 → 2일 부호 일관성 유지(노이즈 차단).
+     * - SELL(추천 매도리포트·보유 청산): 익스포저 감소 → 오진 시 기회비용뿐 → 일관성 면제로 빠른 청산 허용.
+     *   (강도 게이트 K_SIGNAL 은 양방향 그대로 유지 → 약한 신호는 여전히 컷)
+     *
      * @param todayOffset 평일=1 (idx 0 in-progress 제외), 휴일 force=0 (idx 0 = 마지막 거래일 포함).
      */
     internal fun evaluateSignal(
@@ -967,7 +983,11 @@ class RecommendService(
     ): Boolean {
         val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
         val penfnd = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
-        return evaluateColumn(penfnd, position, K_SIGNAL, requireSignConsistency = true, todayOffset = todayOffset)
+        return evaluateColumn(
+            penfnd, position, K_SIGNAL,
+            requireSignConsistency = (position == Position.BUY),
+            todayOffset = todayOffset,
+        )
     }
 
     /**
@@ -1045,6 +1065,8 @@ class RecommendService(
         private const val K_SIGNAL = 1.5          // 연기금 시그널 통과 임계 (평균/평균)
         private const val K_BLOCK = 1.5           // 외국인 차단 임계 (평균/평균)
         private const val K_STRONG_OVERRIDE = 3.0 // 연기금 STRONG 격상 임계 (평균/평균)
+        private const val K_FOREIGNER_STRONG = 3.0  // 외국인 강한 반대 임계 — 보유평가 BLOCK 시 HOLD 동결
+        private const val BLOCK_PARTIAL_RATIO = 0.10 // 외국인 중간반대(1.5~3.0) 시 목표 비중(부분 트림/매수)
         private const val TREND_CLARITY_THRESHOLD = 0.7 // prior 강도 비율 임계 (미만이면 STRONG 격하)
         private const val MCAP_RATIO_BUY = 0.0005    // 0.05%
         private const val MCAP_RATIO_STRONG = 0.001  // 0.1%
@@ -1053,97 +1075,128 @@ class RecommendService(
         private const val KIWOOM_BROKER_NAME = "키움증권"
         private const val STREAK_LOOKBACK_DAYS = 45L      // history / 운영 사이클 조회 기간
 
+        // ── Stage1 절대 방향 사다리 + 점수제 ──────────────────────────────────
+        // 추천·매매 공통. STRONG_SELL(0) ─ SELL(1) ─ HOLD(2) ─ BUY(3) ─ STRONG_BUY(4).
+        private val GRADE_LADDER = listOf("STRONG_SELL", "SELL", "HOLD", "BUY", "STRONG_BUY")
+        private const val UP_MARGIN = 2     // 매수쪽(+1) 이동 임계 (매수 신중) — 백테스트로 확정 예정
+        private const val DOWN_MARGIN = 1   // 매도쪽(-1) 이동 임계 (매도 빠르게) — 백테스트로 확정 예정
+
         /**
-         * Stage 1 — 활성 보정 모듈 다수결로 한 단계 격상/격하 결정 (순수 함수, 테스트 대상).
+         * Stage 1 — 절대 방향 한 줄 사다리 점수제 보정 (순수 함수, 테스트 대상). 추천·매매 공통.
          *
-         * 풀(pool) = 사용자가 켠 모듈 중 격상/격하 **능력** 보유 집합. 투표는 트리거 발동 수.
-         * - 격상: 격상풀 과반 + 격하표 0 → 1칸 (STRONG 종착이라 자연 캡)
-         * - 격하 만장일치: 격하풀 전원 + 격상표 0 → 2칸 (HOLD 바닥에서 자연 정지)
-         * - 격하 다수결: 격하풀 과반 + 격상표 0 → 1칸
-         * - 반대표 1개라도 있으면 해당 방향 무효 (대칭 하드 비토)
-         * - 만장일치 ⊂ 다수결 이므로 만장일치 분기를 다수결 분기보다 먼저 둔다.
+         * 사다리: STRONG_SELL(0) ~ SELL(1) ~ HOLD(2) ~ BUY(3) ~ STRONG_BUY(4).
+         * 각 모듈을 **절대 기준**으로 읽어 매수쪽(bull)/매도쪽(bear) 표를 집계한다(bullVote/bearVote).
+         *   net = bull - bear
+         *   net >= UP_MARGIN(2)   -> 매수쪽 +1칸 (매수 신중)
+         *   net <= -DOWN_MARGIN(1) -> 매도쪽 -1칸 (매도 빠르게)
+         *   그 외 -> 유지
+         * 이동 후 loIdx~hiIdx 로 클램프(한 사이클 1칸).
+         *   - 추천: 진영 내(매수픽 HOLD~STRONG_BUY, 매도픽 STRONG_SELL~HOLD) -> 방향 못 넘음.
+         *   - 매매: 전체 0~4 -> HOLD 가 반대 진영까지 넘어감(절대 투표가 방향 결정 -> originSide 불필요).
          *
-         * activeModules 빈 리스트면 원본 유지. HOLD 는 호출 전([applyAdjustments])에서 차단됨.
+         * activeModules 빈 리스트 / 시작 등급이 사다리 밖이면 원본 유지.
+         * 추천의 HOLD 는 호출 전([applyAdjustments])에서 early-return.
          */
-        internal fun resolveStage1(
+        internal fun resolveStage1Line(
             pick: StockPick,
             activeModules: List<AdjustmentModule>,
-            side: Position,
+            loIdx: Int,
+            hiIdx: Int,
         ): String {
-            if (activeModules.isEmpty()) return pick.type
+            val start = GRADE_LADDER.indexOf(pick.type)
+            if (start < 0 || activeModules.isEmpty()) return pick.type
 
-            val promotable = activeModules.filter { it.canPromote(side) }
-            val demotable = activeModules.filter { it.canDemote(side) }
-            val promoteVotes = promotable.count { it.shouldPromote(pick, side) }
-            val demoteVotes = demotable.count { it.shouldDemote(pick, side) }
-
-            return when {
-                promotable.isNotEmpty() && promoteVotes * 2 > promotable.size && demoteVotes == 0 ->
-                    promoteOnce(pick.type)
-                demotable.isNotEmpty() && demoteVotes == demotable.size && promoteVotes == 0 ->
-                    demoteOnce(demoteOnce(pick.type))
-                demotable.isNotEmpty() && demoteVotes * 2 > demotable.size && promoteVotes == 0 ->
-                    demoteOnce(pick.type)
-                else -> pick.type
-            }
-        }
-
-        private fun promoteOnce(type: String): String = when (type) {
-            "BUY" -> "STRONG_BUY"
-            "SELL" -> "STRONG_SELL"
-            else -> type  // STRONG_BUY/STRONG_SELL은 이미 STRONG — 격상 안 함
-        }
-
-        private fun demoteOnce(type: String): String = when (type) {
-            "STRONG_BUY" -> "BUY"
-            "BUY" -> "HOLD"            // 한 단계 격하 = 등급 한 칸 다운
-            "STRONG_SELL" -> "SELL"
-            "SELL" -> "HOLD"
-            else -> type
-        }
-
-        // ── 매매(보유평가) 전용 ───────────────────────────────────────────────
-        // 추천 resolveStage1 과 분리. 차이: HOLD 비흡수(선형 사다리), 매크로 미적용.
-        // 선형 행동 축: STRONG_SELL ↔ SELL ↔ HOLD ↔ BUY ↔ STRONG_BUY
-        //   promote = STRONG_BUY 쪽 1칸 / demote = STRONG_SELL 쪽 1칸 (양끝 캡).
-        // side 는 모듈 투표 평가용으로만 쓰이고(HOLD=보유 롱 기본 BUY), 사다리 이동엔 무관.
-        private val TRADING_LADDER = listOf("STRONG_SELL", "SELL", "HOLD", "BUY", "STRONG_BUY")
-
-        private fun promoteOnceTrading(type: String): String {
-            val i = TRADING_LADDER.indexOf(type)
-            return if (i < 0) type else TRADING_LADDER.getOrElse(i + 1) { type }
-        }
-
-        private fun demoteOnceTrading(type: String): String {
-            val i = TRADING_LADDER.indexOf(type)
-            return if (i <= 0) type else TRADING_LADDER[i - 1]
+            val bull = activeModules.count { bullVote(it, pick) }
+            val bear = activeModules.count { bearVote(it, pick) }
+            return applyTally(start, bull, bear, loIdx, hiIdx)
         }
 
         /**
-         * 보유평가 다수결 — [resolveStage1] 과 동일 분기 구조(과반 격상 1칸 / 만장일치 격하 2칸 /
-         * 과반 격하 1칸 / 반대표 0 하드비토)이되, 선형 사다리라 **HOLD 도 움직인다**(비흡수).
+         * 매수쪽(상향) 절대 신호 — 모듈 코드 미변경, 기존 메서드에서 추출.
+         * 골든크로스/상승+거래량/저점반등/신고가/RSI<50/급등 등. (모듈은 한 픽에 한 방향만 투표 — 상호배타)
          */
-        internal fun resolveStage1Trading(
-            pick: StockPick,
-            activeModules: List<AdjustmentModule>,
-            side: Position,
-        ): String {
-            if (activeModules.isEmpty()) return pick.type
+        private fun bullVote(module: AdjustmentModule, pick: StockPick): Boolean =
+            module.shouldPromote(pick, Position.BUY) || module.shouldDemote(pick, Position.SELL)
 
-            val promotable = activeModules.filter { it.canPromote(side) }
-            val demotable = activeModules.filter { it.canDemote(side) }
-            val promoteVotes = promotable.count { it.shouldPromote(pick, side) }
-            val demoteVotes = demotable.count { it.shouldDemote(pick, side) }
+        /**
+         * 매도쪽(하향) 절대 신호 — 모듈 코드 미변경, 기존 메서드에서 추출.
+         * 데드크로스/하락+거래량/고점하락/신저가/breakdown70/급락 등.
+         */
+        private fun bearVote(module: AdjustmentModule, pick: StockPick): Boolean =
+            module.shouldPromote(pick, Position.SELL) || module.shouldDemote(pick, Position.BUY)
 
-            return when {
-                promotable.isNotEmpty() && promoteVotes * 2 > promotable.size && demoteVotes == 0 ->
-                    promoteOnceTrading(pick.type)
-                demotable.isNotEmpty() && demoteVotes == demotable.size && promoteVotes == 0 ->
-                    demoteOnceTrading(demoteOnceTrading(pick.type))
-                demotable.isNotEmpty() && demoteVotes * 2 > demotable.size && promoteVotes == 0 ->
-                    demoteOnceTrading(pick.type)
-                else -> pick.type
+        /** net(bull−bear) 마진 판정 → ±1칸 이동 → 클램프. [resolveStage1Line] 전용. */
+        private fun applyTally(start: Int, bull: Int, bear: Int, loIdx: Int, hiIdx: Int): String {
+            val net = bull - bear
+            val moved = when {
+                net >= UP_MARGIN -> start + 1
+                net <= -DOWN_MARGIN -> start - 1
+                else -> start
             }
+            return GRADE_LADDER[moved.coerceIn(loIdx, hiIdx)]
+        }
+
+        /**
+         * 백본 분류 근거 한 줄 재구성 — [classify] preBlockType 분기·상수와 동기화. 관리자 상세 표시용.
+         * 저장 필드만으로 "왜 이 등급인지" 설명. priorTrendRatio(B′)/foreignerAligned 가 null(구 데이터)이면 일부 불명.
+         */
+        internal fun backboneReason(
+            type: String,
+            originSide: String?,
+            penfndK: Double?,
+            frgnrMcapRatio: Double?,
+            priorTrendRatio: Double?,
+            foreignerAligned: Boolean?,
+            frgnrBlocked: Boolean?,
+            frgnrOppositeK: Double?,
+        ): String {
+            if (originSide != Position.BUY.name && originSide != Position.SELL.name) return "-"
+            val sideKr = if (originSide == Position.BUY.name) "매수" else "매도"
+            val oppKStr = "%.1f".format(frgnrOppositeK ?: 0.0)
+            // ① 외국인 BLOCK 2티어: 강반대(반대 K≥3.0) → HOLD 직행 / 중간반대(1.5~3.0) → 방향 유지(아래 정상 근거)
+            if (frgnrBlocked == true && (frgnrOppositeK ?: 0.0) >= K_FOREIGNER_STRONG) {
+                return "외국인 강반대(반대 K $oppKStr ≥ $K_FOREIGNER_STRONG) → 방향 동결 HOLD"
+            }
+
+            val k = penfndK ?: 0.0
+            val kStr = "%.1f".format(k)
+            // 외국인 시총비중을 추천 방향으로 정렬(양수 = 추천 방향으로 강함)
+            val eff = (frgnrMcapRatio ?: 0.0).let { if (originSide == Position.BUY.name) it else -it }
+            val effStr = "%.3f%%".format(eff * 100)
+            val strongBar = "%.2f%%".format(MCAP_RATIO_STRONG * 100)
+            val buyBar = "%.2f%%".format(MCAP_RATIO_BUY * 100)
+            val bpStr = priorTrendRatio?.let { "%.2f".format(it) }
+            val strongStrength = k >= K_STRONG_OVERRIDE || eff >= MCAP_RATIO_STRONG
+
+            // 세 수급 신호를 항상 표기: ① 외국인 BLOCK ② 연기금 K ③ 외국인 시총비중
+            val kMark = if (k >= K_STRONG_OVERRIDE) "≥$K_STRONG_OVERRIDE✓" else "<$K_STRONG_OVERRIDE"
+            val mcapMark = when {
+                eff >= MCAP_RATIO_STRONG -> "≥$strongBar✓"
+                eff >= MCAP_RATIO_BUY -> "≥$buyBar(STRONG 미달)"
+                else -> "미달"
+            }
+            val blockSig = if (frgnrBlocked == true) "외국인 중간반대(반대 K $oppKStr, 방향 유지)" else "외국인 BLOCK 없음"
+            val sig = "$blockSig · 연기금 K $kStr $kMark · 외국인 시총비중 $effStr $mcapMark"
+
+            // B′ 게이트 + 결론. B′ 값이 NULL(구 데이터)이어도 등급으로 통과/미달 추론.
+            val tail = when {
+                type.startsWith("STRONG") ->
+                    "· B′ ${if (bpStr != null) "$bpStr ≥ $TREND_CLARITY_THRESHOLD" else "통과(값 미저장)"} → STRONG 충족 → STRONG_$sideKr"
+                strongStrength ->
+                    "· B′ ${if (bpStr != null) "$bpStr < $TREND_CLARITY_THRESHOLD 미달" else "미달(등급으로 추론, 값 미저장)"} → STRONG 차단 → " +
+                        when {
+                            eff >= MCAP_RATIO_BUY -> "시총비중 ≥$buyBar → ${sideKr}(일반)"
+                            foreignerAligned == true -> "옵션B(외국인 동조) → ${sideKr}(일반)"
+                            else -> "추가 근거 없음 → HOLD"
+                        }
+                eff >= MCAP_RATIO_BUY ->
+                    "→ 시총비중 ≥$buyBar → ${sideKr}(일반)"
+                foreignerAligned == true ->
+                    "→ 옵션B(외국인 동조) → ${sideKr}(일반)"
+                else ->
+                    "→ 세 신호 모두 미달 → HOLD"
+            }
+            return "$sig $tail"
         }
     }
 
@@ -1244,13 +1297,14 @@ class RecommendService(
      * 매크로 누적으로 최악 격하해도 HOLD 바닥에서 정지 (백본 횡단 없음).
      */
     private fun applyAdjustments(pick: StockPick, setting: RecommendSetting): String {
-        val side = when (pick.type) {
-            "STRONG_BUY", "BUY" -> Position.BUY
-            "STRONG_SELL", "SELL" -> Position.SELL
-            else -> return pick.type  // HOLD는 보정 대상 X
+        // 추천은 진영(방향)을 못 넘는다 → 자기 진영 내로 클램프. HOLD 는 보정 대상 X(early-return).
+        val (loIdx, hiIdx) = when (pick.type) {
+            "STRONG_BUY", "BUY" -> 2 to 4    // [HOLD .. STRONG_BUY]
+            "STRONG_SELL", "SELL" -> 0 to 2  // [STRONG_SELL .. HOLD]
+            else -> return pick.type         // HOLD는 보정 대상 X
         }
 
-        val afterScoring = resolveStage1(pick, activeModules(setting), side)
+        val afterScoring = resolveStage1Line(pick, activeModules(setting), loIdx, hiIdx)
 
         // 2단계: 매크로 보정 (동행지표, 별도 처리). 캐시 미스 시 무보정.
         return if (setting.marketIndexEnabled) {
@@ -1275,24 +1329,55 @@ class RecommendService(
         val originSide: String?,
         val penfndK: Double?,
         val frgnrMcapRatio: Double?,
+        // 결정 근거 (왜 이 등급/비중/사유인지 추적용)
+        val frgnrOppositeK: Double? = null,
+        val frgnrSameDirK: Double? = null,
+        val priorTrendRatio: Double? = null,
+        val foreignerAligned: Boolean? = null,
         val marketType: String?,
-        // HOLD 사유 — CONFLICT(BUY/SELL 양방향 시그널 충돌)일 때만 값, 그 외 NULL.
+        // 평가 사유 라벨 — HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / CONFLICT (복수면 '|' 결합), 없으면 NULL.
         val evaluationReason: String? = null,
+        // 목표 비중 — 외국인 중간반대(1.5~3.0) 부분 트림/매수 시 0.10, 그 외 NULL(기본).
+        val targetWeightRatio: Double? = null,
     )
 
     /**
-     * 매매 경로 후행지표 보정 — [applyAdjustments] 와 분리.
-     * 차이: ① HOLD early-return 없음(HOLD 비흡수) ② 매크로(동행지표) 미적용 ③ 선형 사다리.
-     * HOLD 의 side 는 보유 롱 기본값 BUY (모듈이 BUY 관점으로 평가 → 악화 시 demote 로 SELL=청산).
+     * 매매 경로 후행지표 보정 — [applyAdjustments] 와 동일한 [resolveStage1Line] 사용.
+     * 기본 클램프는 전체 [0..4](HOLD 양방향 크로싱). 외국인 BLOCK 중간반대 시 호출부가
+     * 진영 내(loIdx/hiIdx)로 좁혀 STRONG/일반만 갈리게 한다. 매크로(동행지표)는 매매 경로엔 미적용.
      */
-    private fun applyAdjustmentsForTrading(pick: StockPick, setting: RecommendSetting): String {
-        val side = when (pick.type) {
-            "STRONG_BUY", "BUY" -> Position.BUY
-            "STRONG_SELL", "SELL" -> Position.SELL
-            else -> Position.BUY
+    private fun applyAdjustmentsForTrading(
+        pick: StockPick,
+        setting: RecommendSetting,
+        loIdx: Int = 0,
+        hiIdx: Int = 4,
+    ): String = resolveStage1Line(pick, activeModules(setting), loIdx, hiIdx)
+
+    /**
+     * 매매 "신규진입"용 등급 — 추천과 동일한 Stage1(절대 점수제, **진영 클램프 + 전체 모듈, 매크로 제외**).
+     * stock_pick.type(백본)에 모듈 보정을 입혀 추천 등급과 일치시킨다.
+     * 예: BUY 백본이라도 데드크로스(매도표)면 HOLD → 신규진입 후보에서 제외(추천이 HOLD 로 거른 것과 동일).
+     * resolveStage1Line 으로 모듈을 직접 재평가하므로 반대 진영 신호도 정확히 반영(저장 트리거 누락 없음).
+     */
+    fun newEntryGrade(pick: StockPick): String {
+        val (loIdx, hiIdx) = when (pick.type) {
+            "STRONG_BUY", "BUY" -> 2 to 4
+            "STRONG_SELL", "SELL" -> 0 to 2
+            else -> return pick.type   // HOLD 는 보정 대상 X
         }
-        return resolveStage1Trading(pick, activeModules(setting), side)
+        return resolveStage1Line(pick, adjustmentModules, loIdx, hiIdx)
     }
+
+    fun moduleAbsoluteTriggers(pick: StockPick): Map<String, String> =
+        adjustmentModules.associate { m ->
+            val bull = m.shouldPromote(pick, Position.BUY) || m.shouldDemote(pick, Position.SELL)
+            val bear = m.shouldPromote(pick, Position.SELL) || m.shouldDemote(pick, Position.BUY)
+            m.name to when {
+                bull -> "PROMOTE"
+                bear -> "DEMOTE"
+                else -> "NONE"
+            }
+        }
 
     /**
      * 보유 종목 1개를 추천 백본과 **동일 임계**로 재평가해 매매 등급 산출.
@@ -1360,13 +1445,54 @@ class RecommendService(
             )
         }
 
-        val finalType = applyAdjustmentsForTrading(stockPick, setting)
-        // CONFLICT: 양방향 시그널 모두 통과(추세 전환 신호 가능성) — 사후 분석용 사유 기록.
-        val evaluationReason = if (conflict) "CONFLICT" else null
+        // 외국인 BLOCK 3티어 (보유평가 전용) — chosen 이 방향 신호일 때만 적용.
+        //   K≥3.0 → HOLD 동결(target null) / 1.5~3.0 → 진영 클램프 보정 + 목표 10% / 그 외 → 풀 클램프 + 기본 target.
+        // 하드스톱 — 연기금·외국인 둘 다 강매도면 즉시 전량 청산(모듈 우회).
+        //   연기금: STRONG_SELL(B′통과) + penfndK≥3.0 / 외국인: 동조 K≥3.0 + 시총비중≤−0.1%(분모폭발 보정).
+        val hardStop = chosen != null
+            && chosen.originSide == Position.SELL.name
+            && chosen.type == "STRONG_SELL"
+            && chosen.penfndK >= K_STRONG_OVERRIDE
+            && chosen.frgnrSameDirK >= K_FOREIGNER_STRONG
+            && (chosen.frgnrMcapRatio ?: 0.0) <= -MCAP_RATIO_STRONG
+        val blocked = chosen != null && chosen.type != "HOLD" && chosen.frgnrBlocked
+        val finalType: String
+        val targetWeightRatio: Double?
+        val tier: String?   // 사유 라벨 (어느 티어로 결정됐나)
+        when {
+            hardStop -> {
+                finalType = "HARD_SELL"          // 즉시 전량 청산
+                targetWeightRatio = null
+                tier = "HARD_SELL"
+            }
+            blocked && chosen!!.frgnrK >= K_FOREIGNER_STRONG -> {
+                finalType = "HOLD"               // 외국인 강한 반대 → 전량 보유(동결)
+                targetWeightRatio = null
+                tier = "BLOCK_FREEZE"
+            }
+            blocked -> {
+                // 등급은 모듈 보정을 거치되(STRONG/일반=사이클만 갈림) 진영을 벗어나지 못하게 클램프.
+                val (lo, hi) = if (chosen!!.originSide == Position.SELL.name) 0 to 1 else 3 to 4
+                finalType = applyAdjustmentsForTrading(stockPick, setting, lo, hi)
+                targetWeightRatio = BLOCK_PARTIAL_RATIO   // 부분 트림/매수 목표 10%
+                tier = "BLOCK_PARTIAL"
+            }
+            else -> {
+                finalType = applyAdjustmentsForTrading(stockPick, setting)  // 기본 풀 클램프 [0..4]
+                targetWeightRatio = null
+                tier = null
+            }
+        }
+        // 사유 라벨 = 티어(HARD_SELL/BLOCK_FREEZE/BLOCK_PARTIAL) + CONFLICT(양방향 시그널 충돌) 결합.
+        val evaluationReason = listOfNotNull(tier, if (conflict) "CONFLICT" else null)
+            .joinToString("|").ifEmpty { null }
         return HoldingEvalResult(
             stkCd = stkCd, stkNm = stkNm, type = finalType,
             originSide = originSide, penfndK = penfndK, frgnrMcapRatio = frgnrMcapRatio,
+            frgnrOppositeK = chosen?.frgnrK, frgnrSameDirK = chosen?.frgnrSameDirK,
+            priorTrendRatio = chosen?.priorTrendRatio, foreignerAligned = chosen?.foreignerAligned,
             marketType = marketType, evaluationReason = evaluationReason,
+            targetWeightRatio = targetWeightRatio,
         )
     }
 

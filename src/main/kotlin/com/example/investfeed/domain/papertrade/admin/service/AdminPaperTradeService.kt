@@ -162,7 +162,12 @@ class AdminPaperTradeService(
                 marketType = g.marketType,
                 penfndK = g.penfndK,
                 frgnrMcapRatio = g.frgnrMcapRatio,
+                frgnrOppositeK = g.frgnrOppositeK,
+                frgnrSameDirK = g.frgnrSameDirK,
+                priorTrendRatio = g.priorTrendRatio,
+                foreignerAligned = g.foreignerAligned,
                 evaluationReason = g.evaluationReason,
+                targetWeightRatio = g.targetWeightRatio,
             )
         }
         return AdminHoldingGradeRes(evalDate = target, items = items)

@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.auth.entity
 
+import com.example.investfeed.common.util.AesEncryptor
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -45,6 +46,7 @@ class Member(
 
     var lockExpiresAt: LocalDateTime? = null,
 
+    @Convert(converter = AesEncryptor::class)
     var totpSecret: String? = null,
 
     var secondaryPassword: String? = null,

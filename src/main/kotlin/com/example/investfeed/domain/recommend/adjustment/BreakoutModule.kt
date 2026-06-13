@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component
  * **HighLow52w 와 구분** (둘 다 ka10001 52주 고저 수치를 읽되 발동 로직만 다름):
  *  - HighLow52w = 52주 **위치 판단** (저점 +15% 반등 / 고점 -15% 하락) — 바닥/천장권 진입
  *  - Breakout   = 52주 **모멘텀 확인** (신고가 95% / 신저가 5% + 거래량) — 추세 정점 돌파
- *  - 다수결 룰이므로 가격 위치상 동시 발동 안 돼도 각자 격상풀의 한 표로 유효 (별도 트랙 아님)
+ *  - 점수제이므로 가격 위치상 동시 발동 안 돼도 각자 매수쪽/매도쪽 한 표로 유효 (별도 트랙 아님)
  *
- * **격상 룰** (격하 없음, `canDemote = false`):
+ * **격상 룰** (격하 없음 — 모멘텀 확인 전용):
  *
  * | 시그널 | BUY 진영 | SELL 진영 |
  * |---|---|---|
@@ -45,10 +45,8 @@ class BreakoutModule : AdjustmentModule {
         }
     }
 
-    override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
-
     // 격하 시그널 없음 — 모멘텀 확인 전용 모듈.
-    override fun canDemote(side: Position): Boolean = false
+    override fun shouldDemote(pick: StockPick, side: Position): Boolean = false
 
     /**
      * 당일 거래량이 20일 평균의 [RvolThreshold] 배 이상인지 (VolumePriceModule 과 공유 임계).

@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.recommend.service
 
-import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
@@ -19,19 +18,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
-/**
- * 백테스트 인프라 — N영업일 후 시가/종가 백필 스케줄러.
- *
- * 매일 22:30 (RecommendScheduler 22:00 직후) 실행:
- * - 어제(T-1영업일) 추천 history → priceOpen1d, priceClose1d (오늘 시가/종가)
- * - 5영업일 전 추천 history → priceClose5d (오늘 종가)
- * - 20영업일 전 추천 history → priceClose20d (오늘 종가)
- *
- * 백테스트 모델 가정: T일 22:00 추천 → T+1일 시가 매수 → T+N일 종가 평가.
- * 따라서 N영업일 후의 종가는 항상 **오늘** 종가이므로, 오늘 22:30 시점 chartDayList 응답 첫 row 활용.
- *
- * 외부 API 추가 호출 없이 기존 [StockChartClient.chartDayList] 재활용.
- */
 @Service
 class BacktestBackfillService(
     private val stockChartClient: StockChartClient,
@@ -74,10 +60,13 @@ class BacktestBackfillService(
 
     private fun doBackfill() {
         val today = LocalDate.now()
-        // 오늘 기준 N 영업일 전 일자 (T-1, T-5, T-20 = 추천일자 pickDate 의 LocalDate)
-        val date1d = nthLastTradingDayBefore(today, 1)
-        val date5d = nthLastTradingDayBefore(today, 5)
-        val date20d = nthLastTradingDayBefore(today, 20)
+        // 기준일 = 가장 최근 완료된 거래일. 오늘이 거래일이면 오늘, 휴일/자정 직후 지연 실행이면 직전 거래일.
+        val referenceDay = holidayService.lastTradingDay(today)
+        val refKey = referenceDay.format(YYYYMMDD)
+        // 기준일 기준 N 영업일 전 일자 (= 추천일자 pickDate. 이 픽들의 forward 가 기준일 가격).
+        val date1d = nthLastTradingDayBefore(referenceDay, 1)
+        val date5d = nthLastTradingDayBefore(referenceDay, 5)
+        val date20d = nthLastTradingDayBefore(referenceDay, 20)
 
         // 대상 history 모두 조회 (같은 날짜 중복 제거)
         val datesByOffset = listOf(
@@ -117,7 +106,7 @@ class BacktestBackfillService(
                 val res = stockChartClient.chartDayList(
                     req = KiwoomStockChartDayReq(
                         stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
+                        base_dt = refKey,
                         upd_stkpc_tp = "1",
                     )
                 )
@@ -127,14 +116,13 @@ class BacktestBackfillService(
                 }
                 val rows = res.stk_dt_pole_chart_qry ?: continue
 
-                // 응답 첫 row = today (가장 최근 일봉). 시가/종가 추출.
-                val todayKey = today.format(YYYYMMDD)
-                val todayRow = rows.firstOrNull { it.dt == todayKey } ?: rows.firstOrNull()
-                val todayOpen = todayRow?.open_pric?.toLongOrNull()?.let { abs(it) }
-                val todayClose = todayRow?.cur_prc?.toLongOrNull()?.let { abs(it) }
+                // 기준 거래일 일봉의 시가/종가 추출 (없으면 응답 최신 row 폴백).
+                val refRow = rows.firstOrNull { it.dt == refKey } ?: rows.firstOrNull()
+                val refOpen = refRow?.open_pric?.toLongOrNull()?.let { abs(it) }
+                val refClose = refRow?.cur_prc?.toLongOrNull()?.let { abs(it) }
 
-                if (todayOpen == null && todayClose == null) {
-                    log.warn { "chartDayList 응답에 오늘 가격 없음 stkCd=$stkCd today=$todayKey" }
+                if (refOpen == null && refClose == null) {
+                    log.warn { "chartDayList 응답에 기준일 가격 없음 stkCd=$stkCd ref=$refKey" }
                     continue
                 }
 
@@ -142,14 +130,14 @@ class BacktestBackfillService(
                     val pickLocalDate = history.pickDate.toLocalDate()
                     val offsets = pickDateToOffsets[pickLocalDate] ?: continue
                     if (BacktestOffset.D1 in offsets) {
-                        history.priceOpen1d = todayOpen
-                        history.priceClose1d = todayClose
+                        history.priceOpen1d = refOpen
+                        history.priceClose1d = refClose
                     }
                     if (BacktestOffset.D5 in offsets) {
-                        history.priceClose5d = todayClose
+                        history.priceClose5d = refClose
                     }
                     if (BacktestOffset.D20 in offsets) {
-                        history.priceClose20d = todayClose
+                        history.priceClose20d = refClose
                     }
                     filled++
                 }

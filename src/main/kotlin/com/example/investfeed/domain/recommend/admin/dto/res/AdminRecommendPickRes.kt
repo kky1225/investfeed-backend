@@ -20,7 +20,19 @@ data class AdminRecommendPickRes(
     val stkNm: String,
     val marketType: String?,           // KOSPI / KOSDAQ
     val originSide: String?,           // BUY / SELL (raw classify 진영)
-    val type: String,                  // raw classify 등급 (백테스트 신호 기준)
+    val type: String,                  // raw classify 등급 (수급/백본, 모듈 보정 전)
+    val effectiveType: String,         // Stage1 모듈 보정 최종 등급 (전체 모듈 ON, 매크로 제외)
+
+    // ─── 수급 (백본 근거) — 왜 이 등급인지 ───────────────────────────────
+    val backboneReason: String,        // classify 근거 한 줄 재구성
+    val penfndK: Double?,              // 연기금 K (≥3.0 + B′통과 → STRONG)
+    val frgnrBlocked: Boolean?,        // 외국인 반대매매 BLOCK 여부
+    val frgnrOppositeK: Double?,       // 외국인 반대 K (BLOCK 강도 — 강반대 3.0↑ HOLD / 중간 1.5~3.0 방향유지)
+    val frgnrMcapRatio: Double?,       // 외국인 시총비중 signed (≥0.1% STRONG / ≥0.05% 일반)
+    val frgnrSameDirK: Double?,        // 외국인 동조 K (history 만)
+    val priorTrendRatio: Double?,      // B′ 추세 명확성 비율 (≥0.7 STRONG 격상 게이트)
+    val foreignerAligned: Boolean?,    // 옵션B: 외국인 12일 추세 동조
+    val marketCap: Long?,              // 시총(억) (history 만)
 
     // ─── 후행 모듈 트리거 ────────────────────────────────────────────────
     // 매크로(동행지표) 는 의도적으로 제외 — 시간 lag 시 의미 변질하므로 백테스트에서 분리.

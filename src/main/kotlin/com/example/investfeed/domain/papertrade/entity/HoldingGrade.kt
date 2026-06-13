@@ -36,6 +36,19 @@ class HoldingGrade(
     @Column(name = "frgnr_mcap_ratio")
     val frgnrMcapRatio: Double? = null,
 
+    // ─── 결정 근거 (왜 이 등급/비중/사유인지 추적용) ───
+    @Column(name = "frgnr_opposite_k")
+    val frgnrOppositeK: Double? = null,    // 외국인 반대 K (BLOCK·freeze·부분비중 강도 근거)
+
+    @Column(name = "frgnr_same_dir_k")
+    val frgnrSameDirK: Double? = null,     // 외국인 동조 K (하드스톱 근거)
+
+    @Column(name = "prior_trend_ratio")
+    val priorTrendRatio: Double? = null,   // B′ 연기금 prior 추세 명확성 (STRONG 근거)
+
+    @Column(name = "foreigner_aligned")
+    val foreignerAligned: Boolean? = null, // 옵션B 외국인 12일 동조
+
     @Column(name = "market_type")
     val marketType: String? = null, // KOSPI/KOSDAQ
 
@@ -45,8 +58,11 @@ class HoldingGrade(
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
-    // HOLD 사유 — CONFLICT(BUY/SELL 양방향 시그널 충돌)일 때만 값 존재, 그 외 NULL.
-    // 매매 결정에는 영향 없고, 사후 분석/디버깅 단서로 사용.
+    // 평가 사유 라벨 — HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / CONFLICT (복수면 '|' 결합), 없으면 NULL.
     @Column(name = "evaluation_reason")
     val evaluationReason: String? = null,
+
+    // 목표 비중 — 외국인 BLOCK 중간반대(1.5~3.0) 시 0.10(부분 트림/매수), 그 외 NULL(기본 매수 20%/매도 0%).
+    @Column(name = "target_weight_ratio")
+    val targetWeightRatio: Double? = null,
 )

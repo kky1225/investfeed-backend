@@ -95,9 +95,14 @@ class HoldingGradeService(
                         originSide = r.originSide,
                         penfndK = r.penfndK,
                         frgnrMcapRatio = r.frgnrMcapRatio,
+                        frgnrOppositeK = r.frgnrOppositeK,
+                        frgnrSameDirK = r.frgnrSameDirK,
+                        priorTrendRatio = r.priorTrendRatio,
+                        foreignerAligned = r.foreignerAligned,
                         marketType = r.marketType,
                         evalDate = evalDate,
                         evaluationReason = r.evaluationReason,
+                        targetWeightRatio = r.targetWeightRatio,
                     )
                 )
                 saved++
