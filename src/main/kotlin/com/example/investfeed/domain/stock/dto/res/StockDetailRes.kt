@@ -11,4 +11,5 @@ data class StockDetailRes(
     var stockProgramChartList: List<StockProgramChart>? = null,
     var stockShortSellingList: List<StockShortSelling>? = null,
     var dividendList: List<StockDividendRes>? = null,
+    var viList: List<StockVi>? = null,
 )

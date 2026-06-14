@@ -350,6 +350,33 @@ class StockService(
 
         val dividendList = stockDividendService.getDividendList(stkCd, kiwoomStockInfoRes.marketCode)
 
+        val viList: List<StockVi> = try {
+            stockClient.viList(req = KiwoomStockViListReq(stk_cd = stkCd))
+                .motn_stk
+                ?.map { item ->
+                    val direction = listOf(item.dynm_dispty_rt, item.static_dispty_rt, item.open_pric_pre_flu_rt)
+                        .firstOrNull { rate -> ((rate?.trim()?.removePrefix("+")?.toDoubleOrNull()) ?: 0.0) != 0.0 }
+                        ?.let { rate -> if (rate.trim().startsWith("-")) "하락" else "상승" }
+                        ?: ""
+
+                    StockVi(
+                        motnPric = item.motn_pric,
+                        motnTime = item.trde_cntr_proc_time,
+                        relisTime = item.virelis_time,
+                        viType = item.viaplc_tp,
+                        dynmDisptyRt = item.dynm_dispty_rt,
+                        staticDisptyRt = item.static_dispty_rt,
+                        openPricPreFluRt = item.open_pric_pre_flu_rt,
+                        vimotnCnt = item.vimotn_cnt,
+                        direction = direction,
+                        active = item.virelis_time.isNullOrBlank() || item.virelis_time == "000000",
+                    )
+                } ?: emptyList()
+        } catch (e: Exception) {
+            log.warn { "getStock viList Error: stkCd=$stkCd, ${e.message}" }
+            emptyList()
+        }
+
         return StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
@@ -358,6 +385,7 @@ class StockService(
             stockProgramList = stockProgramList,
             stockShortSellingList = stockShortSellingList,
             dividendList = dividendList,
+            viList = viList,
         )
     }
 

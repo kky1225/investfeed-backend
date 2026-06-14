@@ -16,3 +16,4 @@ class StockTradeVolumeListException(): InvestFeedException(code = "STOCK_0011", 
 class StockSurgeTradeVolumeListException(): InvestFeedException(code = "STOCK_0012", message = "거래량 급증 순위 조회에 실패하셨습니다.")
 class StockInterestException(): InvestFeedException(code = "STOCK_0012", message = "관심종목 조회에 실패하셨습니다.")
 class NewHighLowException(): InvestFeedException(code = "STOCK_0013", message = "신고저가 종목 조회에 실패하였습니다.")
+class StockViListException(): InvestFeedException(code = "STOCK_0014", message = "변동성완화장치 발동 종목 조회에 실패하셨습니다.")

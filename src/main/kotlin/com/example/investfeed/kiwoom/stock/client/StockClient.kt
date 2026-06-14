@@ -18,11 +18,13 @@ import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockViListReq
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockDefaultInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInfoRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomNewHighLowRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterestRes
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestorRes
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockViListRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -105,6 +107,40 @@ class StockClient(
             throw e
         }catch (e: Exception) {
             log.warn { "stockInfo Error" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    @KiwoomToken
+    fun viList(
+        req: KiwoomStockViListReq
+    ): KiwoomStockViListRes {
+        val accessToken = authClient.getCurrentAccessToken()
+
+        try {
+            val res = kiwoomWebClient.post()
+                .uri(DEFAULT_URL + STOCK_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ka10054")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomStockViListRes>()
+                .block()
+
+            if (res?.return_code != 0) {
+                log.warn { "viList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                throw StockViListException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: StockViListException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "viList Error: ${e.message}" }
 
             throw RuntimeException(e.message)
         }
