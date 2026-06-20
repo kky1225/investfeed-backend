@@ -48,6 +48,9 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.math.abs
+import kotlin.math.ln
+import kotlin.math.sqrt
+import com.example.investfeed.domain.papertrade.service.TrancheCalculator
 
 @Service
 class RecommendService(
@@ -67,10 +70,6 @@ class RecommendService(
     private val marketIndexAdjustmentModule: MarketIndexAdjustmentModule,
     private val marketMacroCacheService: MarketMacroCacheService,
     private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
-    /**
-     * 점수제 보정 모듈 목록. Spring 이 자동으로 모든 [AdjustmentModule] `@Component`
-     * 구현체를 모아서 주입한다. 새 모듈 추가 시 본 클래스 수정 없이 모듈 클래스만 만들면 자동 합류.
-     */
     private val adjustmentModules: List<AdjustmentModule>,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
@@ -130,7 +129,6 @@ class RecommendService(
                     return@forEach
                 }
                 val firstItem = res.stk_invsr_orgn?.firstOrNull()
-                // 날짜 명시 비교: 오늘 데이터 없으면 null (휴일/자정/휴장일)
                 if (firstItem?.dt != today) {
                     pick.todayDirection = null
                     nullCount++
@@ -176,7 +174,6 @@ class RecommendService(
 
     private fun doRecommendStock() {
         val isHoliday = holidayService.isHoliday()
-        val todayOffset = if (isHoliday) 0 else TODAY_OFFSET
 
         val now = if (isHoliday) {
             holidayService.lastTradingDay().atTime(22, 0)
@@ -220,11 +217,11 @@ class RecommendService(
         val processed: List<ProcessedPick> = buyCandidates.mapNotNull {
             val stkCd = it.stk_cd ?: return@mapNotNull null
             val stkNm = it.stk_nm ?: return@mapNotNull null
-            processCandidate(stkCd, stkNm, Position.BUY, todayOffset, riskMap, marketTypeMap)
+            processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap)
         } + sellCandidates.mapNotNull {
             val stkCd = it.stk_cd ?: return@mapNotNull null
             val stkNm = it.stk_nm ?: return@mapNotNull null
-            processCandidate(stkCd, stkNm, Position.SELL, todayOffset, riskMap, marketTypeMap)
+            processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap)
         }
 
         // 현재용 테이블 갱신
@@ -252,13 +249,6 @@ class RecommendService(
         }
     }
 
-    /**
-     * 22시 스케줄러 시점에 Redis 매크로 캐시 (16:00 polling 결과) 를 DB 에 1행 영속.
-     * 백테스트/디버깅용 — 매크로 시나리오별 N일 후 수익률 분석 등 사후 추적 가능하게 함.
-     *
-     * 중복 호출 방지: captured_date UNIQUE — 같은 날 이미 있으면 skip.
-     * 캐시 미스 (KOSPI/KOSDAQ 둘 다 없음) 시 저장 스킵.
-     */
     private fun saveMarketIndexSnapshot(now: LocalDateTime) {
         val date = now.toLocalDate()
         marketIndexSnapshotRepository.findByCapturedDate(date)?.let {
@@ -301,11 +291,6 @@ class RecommendService(
         else -> "NEUTRAL"
     }
 
-    /**
-     * 매크로 6가지 케이스 + 중립 분류 (MarketIndexAdjustmentModule 의 조건문과 동일 의미).
-     * 백테스트 SQL 에서 GROUP BY 키로 사용. 실제 보정은 만장일치 2케이스(UP_BUY_BUY/DOWN_SELL_SELL)
-     * 만 적용, 나머지 다이버전스 4종 + NEUTRAL 은 무보정(중립).
-     */
     private fun scenarioOf(snap: MarketMacroSnapshot?): String? {
         if (snap == null) return null
         val isUp = snap.priceChangeRate.signum() > 0
@@ -329,7 +314,6 @@ class RecommendService(
         stkCd: String,
         stkNm: String,
         position: Position,
-        todayOffset: Int = TODAY_OFFSET,
         riskMap: Map<String, RiskFlags> = emptyMap(),
         marketTypeMap: Map<String, String> = emptyMap(),
         holdingMode: Boolean = false,
@@ -360,24 +344,24 @@ class RecommendService(
             return null
         }
 
-        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
         val penfndValues = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
         val frgnrValues = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
 
         // 연기금 시그널 통과 못 하면 추천 풀에서 제외.
-        if (!evaluateSignal(items, position, todayOffset)) {
+        if (!evaluateSignal(items, position)) {
             log.info {
                 "[$stkNm($stkCd) $position] 시그널 미달 컷 — 연기금 시계열=$penfndValues"
             }
             return null
         }
 
-        val penfndK = computeK(penfndValues, position, todayOffset)
-        val frgnrBlocked = isForeignerBlocked(items, position, todayOffset)
+        val penfndK = computeK(penfndValues, position)
+        val frgnrBlocked = isForeignerBlocked(items, position)
         // 외국인이 추천 반대 방향으로 매매하는 강도(K). 보유평가 3티어(≥3.0/1.5~3.0/<1.5) 판정에 사용.
-        val frgnrOppositeK = computeK(frgnrValues, if (position == Position.BUY) Position.SELL else Position.BUY, todayOffset)
+        val frgnrOppositeK = computeK(frgnrValues, if (position == Position.BUY) Position.SELL else Position.BUY)
         // 외국인 같은방향(동조) K — 하드스톱(연기금·외국인 둘 다 강매도) 판정 + 검증 데이터.
-        val frgnrSameDirK = computeK(frgnrValues, position, todayOffset)
+        val frgnrSameDirK = computeK(frgnrValues, position)
         log.info {
             "[$stkNm($stkCd) $position] 시그널 통과 — penfndK=${"%.2f".format(penfndK)}, frgnrBlocked=$frgnrBlocked, " +
                 "연기금=$penfndValues, 외국인=$frgnrValues"
@@ -398,11 +382,11 @@ class RecommendService(
             return null
         }
 
-        val frgnrSignedRatio = computeForeignerSignedMcapRatio(window, marketCap, todayOffset)
+        val frgnrSignedRatio = computeForeignerSignedMcapRatio(window, marketCap)
         val effectiveRatio = effectiveForeignerRatio(frgnrSignedRatio, position)
-        val prior = penfndValues.subList(todayOffset + RECENT_WINDOW, penfndValues.size)
+        val prior = penfndValues.subList(RECENT_WINDOW, penfndValues.size)
         val priorTrendRatio = computeDominantStrengthRatio(prior)
-        val foreignerAligned = isForeignerDirectionallyAligned(items, position, todayOffset)
+        val foreignerAligned = isForeignerDirectionallyAligned(items, position)
         val type = classify(penfndK, frgnrBlocked, frgnrOppositeK, effectiveRatio, position, prior, foreignerAligned, holdingMode)
         log.info {
             "[$stkNm($stkCd) $position] 분류=$type — penfndK=${"%.2f".format(penfndK)} " +
@@ -482,6 +466,14 @@ class RecommendService(
             val ma5 = if (closes.size >= 5) closes.take(5).map { it.toDouble() }.average() else null
             val ma20 = if (closes.size >= 20) closes.take(20).map { it.toDouble() }.average() else null
 
+            // 20일 실현변동성 (인접일 log수익률 std × √252, 연율화) — 변동성 스케일 캡 사이징용.
+            val realizedVol = if (closes.size >= 21 && closes.take(21).all { it > 0L }) {
+                val logRets = (0 until 20).map { ln(closes[it].toDouble() / closes[it + 1].toDouble()) }
+                val mean = logRets.average()
+                val variance = logRets.sumOf { (it - mean) * (it - mean) } / logRets.size
+                sqrt(variance) * sqrt(252.0)
+            } else null
+
             // VolumePriceModule 평가용 — 종목 당일 등락률 + 당일 거래량 + 20일 평균 거래량
             val todayChangeRate = if (closes.size >= 2 && closes[1] > 0) {
                 (closes[0] - closes[1]).toDouble() / closes[1] * 100
@@ -530,6 +522,7 @@ class RecommendService(
                 flu5Pct = flu5Pct,
                 ma5 = ma5,
                 ma20 = ma20,
+                realizedVol = realizedVol,
                 todayChangeRate = todayChangeRate,
                 todayVolume = todayVolume,
                 avg20dVolume = avg20dVolume,
@@ -579,6 +572,7 @@ class RecommendService(
         val flu5Pct: Double?,
         val ma5: Double?,
         val ma20: Double?,
+        val realizedVol: Double? = null,
         val todayChangeRate: Double? = null,
         val todayVolume: Long? = null,
         val avg20dVolume: Long? = null,
@@ -696,13 +690,12 @@ class RecommendService(
     internal fun isForeignerDirectionallyAligned(
         items: List<KiwoomStockInvestor>,
         position: Position,
-        todayOffset: Int = TODAY_OFFSET,
     ): Boolean {
-        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
-        if (window.size <= todayOffset + RECENT_WINDOW) return false
+        val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
+        if (window.size <= RECENT_WINDOW) return false
         val frgnr = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
-        val recent = frgnr.subList(todayOffset, todayOffset + RECENT_WINDOW)
-        val prior = frgnr.subList(todayOffset + RECENT_WINDOW, frgnr.size)
+        val recent = frgnr.subList(0, RECENT_WINDOW)
+        val prior = frgnr.subList(RECENT_WINDOW, frgnr.size)
         if (prior.isEmpty()) return false
 
         // 조건 ①: prior 10일 추세 명확 (B' 와 동일 임계 재사용)
@@ -768,13 +761,11 @@ class RecommendService(
      * BUY: recent 일평균 매수 / prior 일평균 매도
      * SELL: recent 일평균 매도 / prior 일평균 매수
      * 의미: K = "매수 강도가 매도 강도의 K배" (또는 그 반대).
-     *
-     * @param todayOffset 평일 정규 실행 시 1 (idx 0 제외), 휴일 force 트리거 시 0 (idx 0 = 마지막 거래일 포함).
      */
-    internal fun computeK(values: List<Long>, position: Position, todayOffset: Int = TODAY_OFFSET): Double {
-        if (values.size <= todayOffset + RECENT_WINDOW) return 0.0
-        val recent = values.subList(todayOffset, todayOffset + RECENT_WINDOW)
-        val prior = values.subList(todayOffset + RECENT_WINDOW, values.size)
+    internal fun computeK(values: List<Long>, position: Position): Double {
+        if (values.size <= RECENT_WINDOW) return 0.0
+        val recent = values.subList(0, RECENT_WINDOW)
+        val prior = values.subList(RECENT_WINDOW, values.size)
         if (prior.isEmpty()) return 0.0
         val priorAvg = prior.sum().toDouble() / prior.size
         val recentAvg = recent.sum().toDouble() / recent.size
@@ -789,17 +780,14 @@ class RecommendService(
      *
      * 키움 ka10001의 mac 필드는 **억원 단위**라 원으로 환산해서 분모로 사용.
      * 결과 부호: 양수=매수 방향, 음수=매도 방향.
-     *
-     * @param todayOffset 평일=1 (idx 0 제외), 휴일 force=0 (idx 0 포함).
      */
     private fun computeForeignerSignedMcapRatio(
         window: List<KiwoomStockInvestor>,
         marketCap: Long,
-        todayOffset: Int = TODAY_OFFSET,
     ): Double {
         if (marketCap <= 0L) return 0.0
-        val recent = if (window.size > todayOffset) {
-            window.subList(todayOffset, minOf(todayOffset + RECENT_WINDOW, window.size))
+        val recent = if (window.isNotEmpty()) {
+            window.subList(0, minOf(RECENT_WINDOW, window.size))
         } else emptyList()
         val signedAmount = recent.sumOf {
             val qty = it.frgnr_invsr?.toLongOrNull() ?: 0L
@@ -846,6 +834,7 @@ class RecommendService(
             frgnrOppositeK = frgnrK,
             priorTrendRatio = priorTrendRatio,
             foreignerAligned = foreignerAligned,
+            realizedVol = priceMetrics.realizedVol,
             originSide = originSide,
             isManaged = riskFlags.isManaged,
             isDelisting = riskFlags.isDelisting,
@@ -887,6 +876,7 @@ class RecommendService(
             frgnrOppositeK = frgnrK,
             priorTrendRatio = priorTrendRatio,
             foreignerAligned = foreignerAligned,
+            realizedVol = priceMetrics.realizedVol,
             pickPrice = pickPrice,
             marketCap = marketCap,
             originSide = originSide,
@@ -974,48 +964,38 @@ class RecommendService(
      * - SELL(추천 매도리포트·보유 청산): 익스포저 감소 → 오진 시 기회비용뿐 → 일관성 면제로 빠른 청산 허용.
      *   (강도 게이트 K_SIGNAL 은 양방향 그대로 유지 → 약한 신호는 여전히 컷)
      *
-     * @param todayOffset 평일=1 (idx 0 in-progress 제외), 휴일 force=0 (idx 0 = 마지막 거래일 포함).
      */
     internal fun evaluateSignal(
         items: List<KiwoomStockInvestor>,
         position: Position,
-        todayOffset: Int = TODAY_OFFSET,
     ): Boolean {
-        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
         val penfnd = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
         return evaluateColumn(
             penfnd, position, K_SIGNAL,
             requireSignConsistency = (position == Position.BUY),
-            todayOffset = todayOffset,
         )
     }
 
     /**
      * 외국인이 추천 방향과 반대로 강한 시그널(K_BLOCK + 부호 일관성)이면 차단.
      *
-     * @param todayOffset 평일=1, 휴일 force=0.
      */
     internal fun isForeignerBlocked(
         items: List<KiwoomStockInvestor>,
         position: Position,
-        todayOffset: Int = TODAY_OFFSET,
     ): Boolean {
-        val window = items.take(todayOffset + RECENT_WINDOW + PRIOR_WINDOW)
+        val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
         val frgnr = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
         val opposite = if (position == Position.BUY) Position.SELL else Position.BUY
-        return evaluateColumn(frgnr, opposite, K_BLOCK, requireSignConsistency = true, todayOffset = todayOffset)
+        return evaluateColumn(frgnr, opposite, K_BLOCK, requireSignConsistency = true)
     }
 
     /**
      * 평균/평균 비교 식. K = "매수 강도가 매도 강도의 K배" (또는 매도 강도가 매수의 K배).
      *
-     * 인덱스 구조 (todayOffset=1 평일 기본):
-     * - idx 0 (당일, 평가 제외)
-     * - idx 1 ~ idx 2 = recent (어제 + 엊그제)
-     * - idx 3 ~ end = prior 10일
-     *
-     * 휴일 force 트리거(todayOffset=0):
-     * - idx 0 ~ idx 1 = recent (마지막 거래일 + 그 직전 거래일, 모두 완전 집계됨)
+     * 인덱스 구조:
+     * - idx 0 ~ idx 1 = recent (당일 + 전일)
      * - idx 2 ~ end = prior 10일
      *
      * BUY: 이전 N일 누적 순매도 + 최근 2일 누적 순매수가 일평균 매도분의 [k]배 이상
@@ -1027,12 +1007,11 @@ class RecommendService(
         position: Position,
         k: Double,
         requireSignConsistency: Boolean,
-        todayOffset: Int = TODAY_OFFSET,
     ): Boolean {
-        if (values.size <= todayOffset + RECENT_WINDOW) return false
+        if (values.size <= RECENT_WINDOW) return false
 
-        val recent = values.subList(todayOffset, todayOffset + RECENT_WINDOW)
-        val prior = values.subList(todayOffset + RECENT_WINDOW, values.size)
+        val recent = values.subList(0, RECENT_WINDOW)
+        val prior = values.subList(RECENT_WINDOW, values.size)
         if (prior.isEmpty()) return false
 
         // signed sum: 양수면 매수 우세, 음수면 매도 우세
@@ -1059,14 +1038,13 @@ class RecommendService(
 
     companion object {
         private const val TOP_N = 100
-        private const val TODAY_OFFSET = 1   // idx 0 = 당일 (평가 제외, 보조 지표용)
-        private const val RECENT_WINDOW = 2  // idx 1+2 = 어제+엊그제
-        private const val PRIOR_WINDOW = 10  // idx 3~12
+        private const val RECENT_WINDOW = 2  // idx 0+1 = 당일+전일
+        private const val PRIOR_WINDOW = 10  // idx 2~11
         private const val K_SIGNAL = 1.5          // 연기금 시그널 통과 임계 (평균/평균)
         private const val K_BLOCK = 1.5           // 외국인 차단 임계 (평균/평균)
         private const val K_STRONG_OVERRIDE = 3.0 // 연기금 STRONG 격상 임계 (평균/평균)
         private const val K_FOREIGNER_STRONG = 3.0  // 외국인 강한 반대 임계 — 보유평가 BLOCK 시 HOLD 동결
-        private const val BLOCK_PARTIAL_RATIO = 0.10 // 외국인 중간반대(1.5~3.0) 시 목표 비중(부분 트림/매수)
+        private const val BLOCK_PARTIAL_FACTOR = 0.5 // 외국인 중간반대(1.5~3.0) 시 변동성 캡에 곱하는 배수(절반)
         private const val TREND_CLARITY_THRESHOLD = 0.7 // prior 강도 비율 임계 (미만이면 STRONG 격하)
         private const val MCAP_RATIO_BUY = 0.0005    // 0.05%
         private const val MCAP_RATIO_STRONG = 0.001  // 0.1%
@@ -1411,6 +1389,7 @@ class RecommendService(
         val frgnrMcapRatio: Double?
         val marketType: String?
 
+        val pm = buy?.priceMetrics ?: sell?.priceMetrics ?: computePriceMetrics(stkCd)
         if (chosen != null) {
             stockPick = chosen.toCurrentEntity()
             originSide = chosen.originSide
@@ -1419,7 +1398,6 @@ class RecommendService(
             marketType = chosen.marketType
         } else {
             // 양방향 컷/충돌 → HOLD. 모듈이 HOLD 를 움직일 수 있도록 지표 확보.
-            val pm = buy?.priceMetrics ?: sell?.priceMetrics ?: computePriceMetrics(stkCd)
             marketType = buy?.marketType ?: sell?.marketType
             originSide = null
             penfndK = null
@@ -1432,6 +1410,7 @@ class RecommendService(
                 flu5Pct = pm.flu5Pct,
                 ma5 = pm.ma5,
                 ma20 = pm.ma20,
+                realizedVol = pm.realizedVol,
                 avg20dVolume = pm.avg20dVolume,
                 todayChangeRate = pm.todayChangeRate,
                 todayVolume = pm.todayVolume,
@@ -1444,6 +1423,9 @@ class RecommendService(
                 closeAboveMa20 = pm.closeAboveMa20,
             )
         }
+
+        // 변동성 스케일 종목별 캡 — 매수 상한으로만 사용(보유 중 변동성 변화로 강제 트림 안 함).
+        val volCap = TrancheCalculator.volCap(pm.realizedVol)
 
         // 외국인 BLOCK 3티어 (보유평가 전용) — chosen 이 방향 신호일 때만 적용.
         //   K≥3.0 → HOLD 동결(target null) / 1.5~3.0 → 진영 클램프 보정 + 목표 10% / 그 외 → 풀 클램프 + 기본 target.
@@ -1474,12 +1456,13 @@ class RecommendService(
                 // 등급은 모듈 보정을 거치되(STRONG/일반=사이클만 갈림) 진영을 벗어나지 못하게 클램프.
                 val (lo, hi) = if (chosen!!.originSide == Position.SELL.name) 0 to 1 else 3 to 4
                 finalType = applyAdjustmentsForTrading(stockPick, setting, lo, hi)
-                targetWeightRatio = BLOCK_PARTIAL_RATIO   // 부분 트림/매수 목표 10%
+                targetWeightRatio = (volCap * BLOCK_PARTIAL_FACTOR)
+                    .coerceIn(TrancheCalculator.VOL_FLOOR, TrancheCalculator.W_MAX_RATIO)   // 변동성 캡 × 부분배수, floor 클램프
                 tier = "BLOCK_PARTIAL"
             }
             else -> {
                 finalType = applyAdjustmentsForTrading(stockPick, setting)  // 기본 풀 클램프 [0..4]
-                targetWeightRatio = null
+                targetWeightRatio = if (finalType == "BUY" || finalType == "STRONG_BUY") volCap else null
                 tier = null
             }
         }

@@ -1,6 +1,7 @@
 package com.example.investfeed.global.config
 
 import io.netty.channel.ChannelOption
+import io.netty.resolver.DefaultAddressResolverGroup
 import reactor.netty.http.client.HttpClient
 import reactor.netty.resources.ConnectionProvider
 import java.time.Duration
@@ -27,11 +28,9 @@ object WebClientHttpClientFactory {
         .pendingAcquireTimeout(Duration.ofSeconds(5)) // 풀 고갈 시 5초 대기 후 실패
         .build()
 
-    /**
-     * connect timeout 5초, response(read) timeout 60초 + 유휴 연결 자동 정리 적용된 HttpClient 반환.
-     */
     fun createDefaultHttpClient(): HttpClient {
         return HttpClient.create(connectionProvider)
+            .resolver(DefaultAddressResolverGroup.INSTANCE)   // JDK/시스템 리졸버 — Netty 기본 비동기 리졸버의 cold/혼잡 간헐 실패 회피
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS)
             .responseTimeout(RESPONSE_TIMEOUT)
     }

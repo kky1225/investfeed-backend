@@ -10,11 +10,18 @@ data class TrancheOrder(val side: TrancheSide, val qty: Long)
 @Service
 class TrancheCalculator {
     companion object {
-        const val W_MAX_RATIO = 0.20      // 종목당 최대 비중 (상한)
-        const val STRONG_BUY_CYCLES = 5
-        const val BUY_CYCLES = 10
-        const val STRONG_SELL_CYCLES = 3
-        const val SELL_CYCLES = 5
+        const val W_MAX_RATIO = 0.10
+        const val VOL_REF = 0.25
+        const val VOL_FLOOR = 0.05
+        const val STRONG_BUY_CYCLES = 3
+        const val BUY_CYCLES = 5
+        const val STRONG_SELL_CYCLES = 2
+        const val SELL_CYCLES = 3
+
+        fun volCap(realizedVol: Double?): Double {
+            if (realizedVol == null || realizedVol <= 0.0) return W_MAX_RATIO
+            return (W_MAX_RATIO * VOL_REF / realizedVol).coerceIn(VOL_FLOOR, W_MAX_RATIO)
+        }
     }
 
     /**
@@ -23,7 +30,7 @@ class TrancheCalculator {
      * @param price        1주 가격(원) — 사이징·환산용 (시장가 주문이라 직전 현재가 기준)
      * @param navTotal     총 포트폴리오 평가액(원) = 현금 + 보유평가
      * @param targetRatio  목표 비중. 매수=상한(cap), 매도=하한(floor). null 이면 기본(매수 [W_MAX_RATIO], 매도 0).
-     *                     외국인 BLOCK 부분비중(0.10) 등 호출부에서 주입. 스텝 밴드도 이 목표로 결정.
+     *                     변동성 캡([volCap]) · 외국인 BLOCK 부분비중 등 호출부에서 주입. 스텝 밴드도 이 목표로 결정.
      */
     fun calculate(
         grade: String,

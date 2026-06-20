@@ -53,6 +53,10 @@ data class AdminRecommendPickRes(
     val todayVolume: Long?,
     val avg20dVolume: Long?,
 
+    // ─── 사이징 (변동성 스케일 캡) ────────────────────────────────────────
+    val realizedVol: Double?,          // 20일 실현변동성(연율, ratio) — 캡 산정 입력
+    val volCapRatio: Double?,          // 적용 종목당 캡(ratio 0.05~0.10) = volCap(realizedVol)
+
     // ─── 52주 위치 (HighLow52wModule, Stage Analysis) ─────────────────────
     val high52w: Long?,
     val low52w: Long?,

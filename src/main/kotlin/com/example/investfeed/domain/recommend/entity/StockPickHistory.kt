@@ -86,6 +86,9 @@ class StockPickHistory(
     @Column(name = "ma20")
     val ma20: Double? = null,
 
+    @Column(name = "realized_vol")
+    val realizedVol: Double? = null,
+
     // VolumePriceModule 평가용
     @Column(name = "avg_20d_volume")
     val avg20dVolume: Long? = null,

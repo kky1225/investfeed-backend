@@ -75,6 +75,10 @@ class StockPick(
     @Column(name = "ma20")
     val ma20: Double? = null,
 
+    // 변동성 스케일 사이징용 — 20일 실현변동성(연율). 신규진입 캡 산정에 사용.
+    @Column(name = "realized_vol")
+    val realizedVol: Double? = null,
+
     // VolumePriceModule 평가용 - 22:00 스케줄러가 일봉 차트로 계산해 저장
     @Column(name = "avg_20d_volume")
     val avg20dVolume: Long? = null,

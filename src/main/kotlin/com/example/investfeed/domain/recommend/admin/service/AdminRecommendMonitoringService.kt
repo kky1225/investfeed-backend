@@ -12,6 +12,7 @@ import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
+import com.example.investfeed.domain.papertrade.service.TrancheCalculator
 import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
 import org.springframework.stereotype.Service
@@ -334,6 +335,7 @@ class AdminRecommendMonitoringService(
             high52w = high52w, low52w = low52w,
             distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,
             closeAboveMa20 = closeAboveMa20,
+            realizedVol = realizedVol, volCapRatio = realizedVol?.let { TrancheCalculator.volCap(it) },
             pickDate = null, pickPrice = null,
             priceOpen1d = null, priceClose1d = null, priceClose5d = null, priceClose20d = null,
             ret1d = null, ret5d = null, ret20d = null,
@@ -368,6 +370,7 @@ class AdminRecommendMonitoringService(
             high52w = high52w, low52w = low52w,
             distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,
             closeAboveMa20 = closeAboveMa20,
+            realizedVol = realizedVol, volCapRatio = realizedVol?.let { TrancheCalculator.volCap(it) },
             pickDate = pickDate.toLocalDate(),
             pickPrice = pickPrice,
             priceOpen1d = priceOpen1d, priceClose1d = priceClose1d,

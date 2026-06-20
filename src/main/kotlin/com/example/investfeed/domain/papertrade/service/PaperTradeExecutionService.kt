@@ -72,7 +72,7 @@ class PaperTradeExecutionService(
         val availableCash: Long,              // 주문가능금액
         val holdings: Map<String, HeldPos>,   // 정규화 stkCd → 보유
         val grades: Map<String, String>,      // 정규화 stkCd → 등급
-        val targetRatios: Map<String, Double?>, // 정규화 stkCd → 목표 비중(보유, BLOCK 부분=0.10/그외 null)
+        val targetRatios: Map<String, Double?>, // 정규화 stkCd → 목표 비중(보유=holding_grade volCap×block / 신규진입=volCap)
         val seedPrices: Map<String, Long>,    // 정규화 stkCd → 신규진입 사이징가(ma5)
         val riskBlocked: Set<String>,         // ⑤-a NORMAL 차단(정리매매·투자위험) — 신규진입만 적용
     )
@@ -212,6 +212,8 @@ class PaperTradeExecutionService(
             // 신규진입 등급 = 추천과 동일한 Stage1(절대 점수제, 진영 클램프, 전체 모듈, 매크로 제외).
             // 백본(p.type) 그대로 쓰면 데드크로스 등 모듈 격하를 못 봐서 추천(HOLD)과 어긋남 → 추천 등급으로 통일.
             grades[cd] = recommendService.newEntryGrade(p)
+            // 신규진입 캡 = 변동성 스케일 volCap(저장된 realized_vol). 보유분이면 아래 holding_grade 로 덮어씀.
+            targetRatios[cd] = TrancheCalculator.volCap(p.realizedVol)
             // 신규 진입 사이징가 = ma5(저장값, 라이브 호출 X). 어차피 시장가 시가 체결이라 근사 충분.
             p.ma5?.takeIf { it > 0 }?.let { seedPrices[cd] = it.toLong() }
             // ⑤-a 성향필터: NORMAL=정리매매/투자위험 종목은 신규 진입 차단(보유는 면제 — 별도 적용)
@@ -244,7 +246,7 @@ class PaperTradeExecutionService(
     private fun buildOrderCandidates(ctx: ExecContext): List<OrderCandidate> {
         val candidates = mutableListOf<OrderCandidate>()
 
-        // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부). 목표비중(BLOCK 부분=0.10)도 전달.
+        // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부). 목표비중(holding_grade volCap×block)도 전달.
         for ((cd, pos) in ctx.holdings) {
             val grade = ctx.grades[cd] ?: "HOLD"
             val o = trancheCalculator.calculate(grade, pos.qty, pos.price, ctx.nav, ctx.targetRatios[cd])
@@ -265,7 +267,7 @@ class PaperTradeExecutionService(
             val price = ctx.seedPrices[cd] ?: continue       // ma5 없으면 사이징 불가 → 스킵
             if (price <= 0L) continue
             val grade = ctx.grades.getValue(cd)
-            val o = trancheCalculator.calculate(grade, 0L, price, ctx.nav)
+            val o = trancheCalculator.calculate(grade, 0L, price, ctx.nav, ctx.targetRatios[cd])
             if (o.side == TrancheSide.BUY && o.qty > 0L) {
                 candidates += OrderCandidate(cd, o.side, o.qty, grade, price)
                 used++
