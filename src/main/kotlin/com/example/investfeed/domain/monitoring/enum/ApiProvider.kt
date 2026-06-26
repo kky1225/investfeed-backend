@@ -1,13 +1,8 @@
 package com.example.investfeed.domain.monitoring.enum
 
-/**
- * 외부 API provider 카탈로그.
- *
- * - dailyLimit: 명시적 일간 한도 (없으면 null). 운영 도구상 진행률 표시 용도.
- * - 한도가 없어도 7일 호출 추세는 항상 표시 — IP 차단/재시도 폭주/무한 루프 등 호출 폭증 조기 감지 목적.
- */
 enum class ApiProvider(val label: String, val dailyLimit: Long?) {
     KIWOOM("키움증권", null),
+    TOSS("토스증권", null),
     UPBIT("Upbit", null),
     FRED("FRED", null),
     ECOS("ECOS (한국은행)", null),                          // 공식 문서상 일일 한도 미공개 (rate limit 위주로 추정)

@@ -20,6 +20,8 @@ enum class RedisKeyPrefix(
     INVESTOR_CLOSE_MARKET("investor:closeMarket:", "투자자별 장마감 데이터 캐시"),
     KIWOOM_ACCESS_TOKEN("kiwoom:access_token:", "키움 OAuth access token"),
     KIWOOM_ACCESS_TOKEN_LOCK("lock:kiwoom:access_token:", "키움 OAuth access token 갱신 락"),
+    TOSS_ACCESS_TOKEN("toss:access_token:", "토스 OAuth access token"),
+    TOSS_ACCESS_TOKEN_LOCK("lock:toss:access_token:", "토스 OAuth access token 갱신 락"),
     PRE_AUTH_TOKEN("PRE_AUTH:", "TOTP 등록 전 임시 토큰"),
     PRE_AUTH_SECRET("PRE_AUTH_SECRET:", "TOTP 등록 전 임시 secret"),
     SECONDARY_AUTH("SEC_AUTH:", "관리자 2차 인증 세션"),

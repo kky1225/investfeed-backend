@@ -14,6 +14,7 @@ import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.security.JwtProvider
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.totp.TotpService
+import com.example.investfeed.toss.auth.service.TossAuthClient
 import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -42,6 +43,7 @@ class AuthService(
     private val loginAttemptService: LoginAttemptService,
     private val apiKeyAttemptService: ApiKeyAttemptService,
     private val kiwoomAuthClient: KiwoomAuthClient,
+    private val tossAuthClient: TossAuthClient,
     private val cryptoHoldingClient: CryptoHoldingClient,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
@@ -527,6 +529,7 @@ class AuthService(
         try {
             when (broker.name) {
                 "키움증권" -> kiwoomAuthClient.validateApiKey(req.appKey, req.secretKey)
+                "토스증권" -> tossAuthClient.validateApiKey(req.appKey, req.secretKey)
                 "업비트"   -> cryptoHoldingClient.validateApiKey(req.appKey, req.secretKey)
                 else -> { /* 기타 broker 는 검증 미적용 */ }
             }

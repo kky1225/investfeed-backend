@@ -168,6 +168,14 @@ class AdminPaperTradeService(
                 foreignerAligned = g.foreignerAligned,
                 evaluationReason = g.evaluationReason,
                 targetWeightRatio = g.targetWeightRatio,
+                preAdjustmentType = g.preAdjustmentType,
+                backboneReason = g.backboneReason,
+                pvTrigger = g.pvTrigger,
+                maTrigger = g.maTrigger,
+                vpTrigger = g.vpTrigger,
+                rsiTrigger = g.rsiTrigger,
+                hl52wTrigger = g.hl52wTrigger,
+                breakoutTrigger = g.breakoutTrigger,
             )
         }
         return AdminHoldingGradeRes(evalDate = target, items = items)

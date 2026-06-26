@@ -103,6 +103,14 @@ class HoldingGradeService(
                         evalDate = evalDate,
                         evaluationReason = r.evaluationReason,
                         targetWeightRatio = r.targetWeightRatio,
+                        preAdjustmentType = r.preAdjustmentType,
+                        backboneReason = r.backboneReason,
+                        pvTrigger = r.pvTrigger,
+                        maTrigger = r.maTrigger,
+                        vpTrigger = r.vpTrigger,
+                        rsiTrigger = r.rsiTrigger,
+                        hl52wTrigger = r.hl52wTrigger,
+                        breakoutTrigger = r.breakoutTrigger,
                     )
                 )
                 saved++

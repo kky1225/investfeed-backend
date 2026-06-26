@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service
 class AssetDashboardService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val holdingService: HoldingService,
+    private val tossHoldingService: TossHoldingService,
     private val cryptoHoldingService: CryptoHoldingService,
     private val manualHoldingService: ManualHoldingService,
     private val cryptoManualHoldingService: CryptoManualHoldingService,
@@ -38,7 +39,10 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                val res = holdingService.listHoldings()
+                val res = when (broker.broker.name) {
+                    "토스증권" -> tossHoldingService.listTossHoldings()
+                    else -> holdingService.listHoldings()
+                }
                 bEvltAmt = res.totEvltAmt.toLongOrNull() ?: 0
                 bPurAmt = res.totPurAmt.toLongOrNull() ?: 0
                 bCash = res.balance.toLongOrNull() ?: 0

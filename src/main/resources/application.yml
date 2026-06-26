@@ -55,6 +55,9 @@ kiwoom:
   mock-appkey: ${KIWOOM_MOCK_APPKEY:}
   mock-secretkey: ${KIWOOM_MOCK_SECRETKEY:}
 
+toss:
+  default-url: https://openapi.tossinvest.com
+
 upbit:
   default-url: https://api.upbit.com
 

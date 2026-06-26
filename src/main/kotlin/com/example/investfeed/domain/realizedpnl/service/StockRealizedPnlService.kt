@@ -25,13 +25,12 @@ class StockRealizedPnlService(
 
     fun syncStockRealizedPnls(req: RealizedPnlSyncReq): RealizedPnlListRes {
         val apiBrokers = memberBrokerRepository.findByMemberIdAndBrokerMarketOrderByOrderIndex(getMemberId(), MarketType.STOCK)
-            .filter { it.broker.type == BrokerType.API }
+            .filter { it.broker.type == BrokerType.API && it.broker.name == "키움증권" }
 
         val resultItems = mutableListOf<RealizedPnlItem>()
         var idSeq = 1L
         val now = LocalDate.now()
 
-        // 기간 범위 결정: 전체/연별/월별 모두 한번의 API 호출
         val startDate = when {
             req.year == null -> "20070801"
             req.month != null -> YearMonth.of(req.year, req.month).atDay(1).format(dateFormatter)
@@ -51,7 +50,6 @@ class StockRealizedPnlService(
 
             val dailyItems = (kiwoomRes.dt_rlzt_pl ?: emptyList())
                 .filter { daily ->
-                    // 매수/매도/손익이 모두 0인 항목은 제외
                     val buyAmt = parseLong(daily.buy_amt)
                     val sellAmt = parseLong(daily.sell_amt)
                     val pnl = parseLong(daily.tdy_sel_pl)
@@ -59,7 +57,6 @@ class StockRealizedPnlService(
                 }
             if (dailyItems.isEmpty()) continue
 
-            // 일별 데이터를 연월별로 그룹핑 (키: "202401" 형태)
             val monthlyGroups = dailyItems.groupBy { daily ->
                 daily.dt?.substring(0, 6) ?: ""
             }.filterKeys { it.isNotEmpty() }

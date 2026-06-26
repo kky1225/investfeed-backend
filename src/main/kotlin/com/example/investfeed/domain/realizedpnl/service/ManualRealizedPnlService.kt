@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.realizedpnl.service
 
-import com.example.investfeed.domain.holding.entity.BrokerType
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.realizedpnl.dto.req.ManualRealizedPnlCreateReq
@@ -52,8 +51,8 @@ class ManualRealizedPnlService(
         val memberBroker = memberBrokerRepository.findByMemberIdAndId(memberId, req.brokerId)
             ?: throw IllegalArgumentException("증권사를 찾을 수 없습니다.")
 
-        if (memberBroker.broker.type != BrokerType.MANUAL) {
-            throw IllegalArgumentException("수동 입력 증권사가 아닙니다.")
+        if (memberBroker.broker.name == "키움증권") {
+            throw IllegalArgumentException("자동 동기화 증권사는 수동 입력할 수 없습니다.")
         }
 
         if (memberBroker.broker.market != MarketType.STOCK) {

@@ -1313,17 +1313,18 @@ class RecommendService(
         val priorTrendRatio: Double? = null,
         val foreignerAligned: Boolean? = null,
         val marketType: String?,
-        // 평가 사유 라벨 — HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / CONFLICT (복수면 '|' 결합), 없으면 NULL.
         val evaluationReason: String? = null,
-        // 목표 비중 — 외국인 중간반대(1.5~3.0) 부분 트림/매수 시 0.10, 그 외 NULL(기본).
         val targetWeightRatio: Double? = null,
+        val preAdjustmentType: String? = null,
+        val backboneReason: String? = null,
+        val pvTrigger: String? = null,
+        val maTrigger: String? = null,
+        val vpTrigger: String? = null,
+        val rsiTrigger: String? = null,
+        val hl52wTrigger: String? = null,
+        val breakoutTrigger: String? = null,
     )
 
-    /**
-     * 매매 경로 후행지표 보정 — [applyAdjustments] 와 동일한 [resolveStage1Line] 사용.
-     * 기본 클램프는 전체 [0..4](HOLD 양방향 크로싱). 외국인 BLOCK 중간반대 시 호출부가
-     * 진영 내(loIdx/hiIdx)로 좁혀 STRONG/일반만 갈리게 한다. 매크로(동행지표)는 매매 경로엔 미적용.
-     */
     private fun applyAdjustmentsForTrading(
         pick: StockPick,
         setting: RecommendSetting,
@@ -1331,12 +1332,6 @@ class RecommendService(
         hiIdx: Int = 4,
     ): String = resolveStage1Line(pick, activeModules(setting), loIdx, hiIdx)
 
-    /**
-     * 매매 "신규진입"용 등급 — 추천과 동일한 Stage1(절대 점수제, **진영 클램프 + 전체 모듈, 매크로 제외**).
-     * stock_pick.type(백본)에 모듈 보정을 입혀 추천 등급과 일치시킨다.
-     * 예: BUY 백본이라도 데드크로스(매도표)면 HOLD → 신규진입 후보에서 제외(추천이 HOLD 로 거른 것과 동일).
-     * resolveStage1Line 으로 모듈을 직접 재평가하므로 반대 진영 신호도 정확히 반영(저장 트리거 누락 없음).
-     */
     fun newEntryGrade(pick: StockPick): String {
         val (loIdx, hiIdx) = when (pick.type) {
             "STRONG_BUY", "BUY" -> 2 to 4
@@ -1357,19 +1352,8 @@ class RecommendService(
             }
         }
 
-    /**
-     * 보유 종목 1개를 추천 백본과 **동일 임계**로 재평가해 매매 등급 산출.
-     *
-     * 1) BUY/SELL 양 관점으로 [processCandidate] 시도(추천과 동일: K 1.5/3.0·B′·BLOCK·부호일관성).
-     * 2) 결정적(non-HOLD) 결과 우선. 양방향 모두 비-HOLD 충돌 → HOLD. 둘 다 컷 → HOLD.
-     * 3) HOLD 라도 보유 종목은 모듈이 움직일 수 있어야 하므로 가격/거래량 지표를 **항상 확보**
-     *    (시그널 통과 픽의 priceMetrics 재사용, 둘 다 컷이면 [computePriceMetrics] 독립 호출).
-     * 4) [applyAdjustmentsForTrading] 로 모듈 다수결 보정(매크로 제외, HOLD 비흡수).
-     */
     internal fun evaluateHoldingGrade(stkCd: String, stkNm: String): HoldingEvalResult {
-        val setting = RecommendSetting(memberId = 0L) // 첫 런: 전 모듈 ON (디폴트)
-        // 보유 평가: BLOCK 시 HOLD 직행이 아니라 한 단계 격하 — 추천(opt-in) 과 달리
-        // 보유 종목은 위험 관리(손절 행동 포함) 가 우선이라 STRONG 시그널 행동 보존.
+        val setting = RecommendSetting(memberId = 0L)
         val buy = processCandidate(stkCd, stkNm, Position.BUY, holdingMode = true)
         val sell = processCandidate(stkCd, stkNm, Position.SELL, holdingMode = true)
 
@@ -1424,13 +1408,8 @@ class RecommendService(
             )
         }
 
-        // 변동성 스케일 종목별 캡 — 매수 상한으로만 사용(보유 중 변동성 변화로 강제 트림 안 함).
         val volCap = TrancheCalculator.volCap(pm.realizedVol)
 
-        // 외국인 BLOCK 3티어 (보유평가 전용) — chosen 이 방향 신호일 때만 적용.
-        //   K≥3.0 → HOLD 동결(target null) / 1.5~3.0 → 진영 클램프 보정 + 목표 10% / 그 외 → 풀 클램프 + 기본 target.
-        // 하드스톱 — 연기금·외국인 둘 다 강매도면 즉시 전량 청산(모듈 우회).
-        //   연기금: STRONG_SELL(B′통과) + penfndK≥3.0 / 외국인: 동조 K≥3.0 + 시총비중≤−0.1%(분모폭발 보정).
         val hardStop = chosen != null
             && chosen.originSide == Position.SELL.name
             && chosen.type == "STRONG_SELL"
@@ -1440,20 +1419,19 @@ class RecommendService(
         val blocked = chosen != null && chosen.type != "HOLD" && chosen.frgnrBlocked
         val finalType: String
         val targetWeightRatio: Double?
-        val tier: String?   // 사유 라벨 (어느 티어로 결정됐나)
+        val tier: String?
         when {
             hardStop -> {
-                finalType = "HARD_SELL"          // 즉시 전량 청산
+                finalType = "HARD_SELL"
                 targetWeightRatio = null
                 tier = "HARD_SELL"
             }
             blocked && chosen!!.frgnrK >= K_FOREIGNER_STRONG -> {
-                finalType = "HOLD"               // 외국인 강한 반대 → 전량 보유(동결)
+                finalType = "HOLD"
                 targetWeightRatio = null
                 tier = "BLOCK_FREEZE"
             }
             blocked -> {
-                // 등급은 모듈 보정을 거치되(STRONG/일반=사이클만 갈림) 진영을 벗어나지 못하게 클램프.
                 val (lo, hi) = if (chosen!!.originSide == Position.SELL.name) 0 to 1 else 3 to 4
                 finalType = applyAdjustmentsForTrading(stockPick, setting, lo, hi)
                 targetWeightRatio = (volCap * BLOCK_PARTIAL_FACTOR)
@@ -1466,9 +1444,21 @@ class RecommendService(
                 tier = null
             }
         }
-        // 사유 라벨 = 티어(HARD_SELL/BLOCK_FREEZE/BLOCK_PARTIAL) + CONFLICT(양방향 시그널 충돌) 결합.
         val evaluationReason = listOfNotNull(tier, if (conflict) "CONFLICT" else null)
             .joinToString("|").ifEmpty { null }
+
+        val triggers = moduleAbsoluteTriggers(stockPick)
+        val backboneReasonStr = backboneReason(
+            type = stockPick.type,
+            originSide = originSide,
+            penfndK = penfndK,
+            frgnrMcapRatio = frgnrMcapRatio,
+            priorTrendRatio = chosen?.priorTrendRatio,
+            foreignerAligned = chosen?.foreignerAligned,
+            frgnrBlocked = chosen?.frgnrBlocked,
+            frgnrOppositeK = chosen?.frgnrK,
+        )
+
         return HoldingEvalResult(
             stkCd = stkCd, stkNm = stkNm, type = finalType,
             originSide = originSide, penfndK = penfndK, frgnrMcapRatio = frgnrMcapRatio,
@@ -1476,18 +1466,17 @@ class RecommendService(
             priorTrendRatio = chosen?.priorTrendRatio, foreignerAligned = chosen?.foreignerAligned,
             marketType = marketType, evaluationReason = evaluationReason,
             targetWeightRatio = targetWeightRatio,
+            preAdjustmentType = stockPick.type,
+            backboneReason = backboneReasonStr,
+            pvTrigger = triggers["PriceVolatility"],
+            maTrigger = triggers["MovingAverage"],
+            vpTrigger = triggers["VolumePrice"],
+            rsiTrigger = triggers["Rsi"],
+            hl52wTrigger = triggers["HighLow52w"],
+            breakoutTrigger = triggers["Breakout"],
         )
     }
 
-    /**
-     * 백테스트/디버깅용 — 22:00 스케줄러 시점에 **모든 후행 모듈 ON** 가정으로
-     * 각 모듈의 raw trigger 결과만 저장 (만장일치 룰 적용 전).
-     *
-     * 매크로(동행지표)는 의도적으로 제외 — 시간 lag 시 의미 변질.
-     * 매크로 보정은 [applyAdjustments] 가 사용자 응답 시점에 실시간 적용 (DB 저장 X).
-     *
-     * HOLD 종목 = 보정 대상 X → 모든 trigger NONE.
-     */
     private fun evaluateBacktestMeta(pick: StockPick): BacktestMeta {
         val side = when (pick.type) {
             "STRONG_BUY", "BUY" -> Position.BUY
@@ -1509,8 +1498,8 @@ class RecommendService(
             maTrigger = triggers["MovingAverage"] ?: "NONE",
             vpTrigger = triggers["VolumePrice"] ?: "NONE",
             rsiTrigger = triggers["Rsi"] ?: "NONE",
-            hl52wTrigger = triggers["HighLow52w"] ?: "NONE",   // 누락 보강
-            breakoutTrigger = triggers["Breakout"] ?: "NONE",  // 신규
+            hl52wTrigger = triggers["HighLow52w"] ?: "NONE",
+            breakoutTrigger = triggers["Breakout"] ?: "NONE",
         )
     }
 
@@ -1531,7 +1520,6 @@ class RecommendService(
             .toSet()
     }
 
-    /** stkCd 별 최근 STREAK_LOOKBACK_DAYS 일 history (pickDate desc). 빈 입력이면 emptyMap. */
     private fun loadRecentHistoryByStkCd(stkCds: List<String>): Map<String, List<StockPickHistory>> {
         if (stkCds.isEmpty()) return emptyMap()
         val after = LocalDateTime.now().minusDays(STREAK_LOOKBACK_DAYS)
@@ -1540,14 +1528,6 @@ class RecommendService(
             .groupBy { it.stkCd }
     }
 
-    /**
-     * 추천 결과가 실제로 저장된 운영일 집합 (desc).
-     *
-     * stock_pick_history 의 distinct pickDate (date 단위) 를 사용한다.
-     * - 수동 트리거든 정상 cron 이든 history 에 row 가 만들어진 날만 운영일로 인정 → streak 계산 일관
-     * - 휴장 수동 force 트리거가 빈 결과로 끝난 날은 history row 가 없어 자연 제외 → false positive 방지
-     * - 휴일 force 모드에서 pickDate 가 직전 거래일 22:00 으로 들어가도 동일 기준으로 처리됨
-     */
     private fun loadOperatingDates(): List<LocalDate> {
         val after = LocalDateTime.now().minusDays(STREAK_LOOKBACK_DAYS)
         return stockPickHistoryRepository
@@ -1563,19 +1543,6 @@ class RecommendService(
         return auth.name
     }
 
-    /**
-     * 같은 진영(매수: STRONG_BUY+BUY / 매도: STRONG_SELL+SELL)으로 연속 추천된 일수 계산.
-     *
-     * 알고리즘: 최근 운영일부터 거꾸로 훑으며
-     * - 그 운영일에 이 종목 row 가 없거나(추천 풀에서 빠진 날) → 단절
-     * - row 가 있어도 진영이 다르면(HOLD 또는 반대) → 단절
-     * - 같은 진영이면 streak++
-     *
-     * 규칙:
-     * - currentType 이 HOLD/알 수 없는 값 → 0
-     * - 같은 날짜 row 여러 개면 가장 늦은 시각 row 채택 (manual trigger 중복 방지)
-     * - operatingDates 에 없는 날(휴장/시스템 다운)은 자연스럽게 skip → 휴장 전후 streak 유지
-     */
     internal fun computeStreakDays(
         histories: List<StockPickHistory>,
         currentType: String,

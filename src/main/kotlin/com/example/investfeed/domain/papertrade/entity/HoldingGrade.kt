@@ -65,4 +65,28 @@ class HoldingGrade(
     // 목표 비중 — 외국인 BLOCK 중간반대(1.5~3.0) 시 0.10(부분 트림/매수), 그 외 NULL(기본 매수 20%/매도 0%).
     @Column(name = "target_weight_ratio")
     val targetWeightRatio: Double? = null,
+
+    @Column(name = "pre_adjustment_type")
+    val preAdjustmentType: String? = null,
+
+    @Column(name = "backbone_reason")
+    val backboneReason: String? = null,
+
+    @Column(name = "pv_trigger")
+    val pvTrigger: String? = null,
+
+    @Column(name = "ma_trigger")
+    val maTrigger: String? = null,
+
+    @Column(name = "vp_trigger")
+    val vpTrigger: String? = null,
+
+    @Column(name = "rsi_trigger")
+    val rsiTrigger: String? = null,
+
+    @Column(name = "hl52w_trigger")
+    val hl52wTrigger: String? = null,
+
+    @Column(name = "breakout_trigger")
+    val breakoutTrigger: String? = null,
 )
