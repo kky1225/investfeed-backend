@@ -43,7 +43,7 @@ class AdminPaperTradeService(
         val totalPur = parseAmt(hold?.tot_pur_amt)
         val totalEvlt = parseAmt(hold?.tot_evlt_amt)
         val totalPl = parseSignedLong(hold?.tot_evlt_pl)
-        val totalPrftRt = hold?.tot_prft_rt?.toDoubleOrNull()
+        val totalPrftRt = parseRate(hold?.tot_prft_rt)
         val nav = parseAmt(hold?.prsm_dpst_aset_amt).takeIf { it > 0 } ?: (deposit + totalEvlt)
 
         val holdings = (hold?.acnt_evlt_remn_indv_tot.orEmpty()).map { h ->
@@ -57,8 +57,8 @@ class AdminPaperTradeService(
                 purAmt = parseAmt(h.pur_amt),
                 evltAmt = parseAmt(h.evlt_amt),
                 evltvPrft = parseSignedLong(h.evltv_prft),
-                prftRt = h.prft_rt?.toDoubleOrNull(),
-                possRt = h.poss_rt?.toDoubleOrNull(),
+                prftRt = parseRate(h.prft_rt),
+                possRt = parseRate(h.poss_rt),
             )
         }
 
@@ -197,5 +197,9 @@ class AdminPaperTradeService(
     /** 부호 유지 Long (손익 컬럼용). */
     private fun parseSignedLong(raw: String?): Long {
         return raw?.replace(Regex("[^0-9-]"), "")?.toLongOrNull() ?: 0L
+    }
+
+    private fun parseRate(raw: String?): Double? {
+        return raw?.replace("..", ".")?.toDoubleOrNull()
     }
 }

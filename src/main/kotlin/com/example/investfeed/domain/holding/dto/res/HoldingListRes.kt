@@ -22,4 +22,5 @@ data class HoldingItem(
     val rmndQty: String, // 보유수량
     val possRt: String, // 보유비중(%)
     val predClosePric: String, // 전일종가
+    val dayPl: String = "0", // 당일 손익(원). 증권사 API가 직접 제공하는 경우 사용(예: 토스), 미제공 시 0
 )

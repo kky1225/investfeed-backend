@@ -34,7 +34,7 @@ class TossHoldingService(
         private const val BROKER_NAME = "토스증권"
     }
 
-    private data class Valuation(val curPrc: Long, val purPric: Long, val evltAmt: Long, val purAmt: Long)
+    private data class Valuation(val curPrc: Long, val purPric: Long, val evltAmt: Long, val purAmt: Long, val dayPl: Long, val evltPl: Long, val prftRt: Double)
 
     fun listTossHoldings(): HoldingListRes {
         val loginId = getLoginId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
@@ -61,6 +61,7 @@ class TossHoldingService(
 
         var totEvltAmt = 0L
         var totPurAmt = 0L
+        var totEvltPl = 0L
 
         val holdingList = items.mapNotNull { item ->
             val symbol = item.symbol ?: return@mapNotNull null
@@ -69,8 +70,7 @@ class TossHoldingService(
 
             totEvltAmt += v.evltAmt
             totPurAmt += v.purAmt
-            val evltPl = v.evltAmt - v.purAmt
-            val prftRt = if (v.purAmt > 0) evltPl.toDouble() / v.purAmt * 100 else 0.0
+            totEvltPl += v.evltPl
 
             HoldingItem(
                 stkCd = stkCd,
@@ -79,11 +79,12 @@ class TossHoldingService(
                 purPric = v.purPric.toString(),
                 purAmt = v.purAmt.toString(),
                 evltAmt = v.evltAmt.toString(),
-                evltvPrft = evltPl.toString(),
-                prftRt = String.format("%.2f", prftRt),
+                evltvPrft = v.evltPl.toString(),
+                prftRt = String.format("%.2f", v.prftRt),
                 rmndQty = item.quantity ?: "0",
                 possRt = "0",
                 predClosePric = "0",
+                dayPl = v.dayPl.toString(),
             )
         }
 
@@ -93,7 +94,7 @@ class TossHoldingService(
             hi.copy(possRt = String.format("%.2f", possRt))
         }
 
-        val totEvltPl = totEvltAmt - totPurAmt
+        // 계좌 합계 손익은 종목별 토스 평가손익의 합. 토스는 계좌 단위 합계/수익률을 안 주므로 수익률만 합계로 산출.
         val totPrftRt = if (totPurAmt > 0) totEvltPl.toDouble() / totPurAmt * 100 else 0.0
 
         memberHoldingSyncService.sync(
@@ -126,6 +127,10 @@ class TossHoldingService(
         val itemEvltAmt = item.marketValue?.amount?.toDoubleOrNull() ?: 0.0
         val avgPrice = item.averagePurchasePrice?.toDoubleOrNull() ?: 0.0
         val lastPrice = item.lastPrice?.toDoubleOrNull() ?: 0.0
+        val itemDayPl = item.dailyProfitLoss?.amount?.toDoubleOrNull() ?: 0.0
+        val itemEvltPl = item.profitLoss?.amount?.toDoubleOrNull() ?: 0.0
+        // 토스 rate는 비율(0.1077 = 10.77%) → ×100으로 % 변환
+        val itemPrftRt = (item.profitLoss?.rate?.toDoubleOrNull() ?: 0.0) * 100
 
         val rate = if (TossSymbolMapper.isUs(item.marketCountry)) usdKrwRate else 1.0
         return Valuation(
@@ -133,6 +138,9 @@ class TossHoldingService(
             purPric = (avgPrice * rate).toLong(),
             evltAmt = (itemEvltAmt * rate).toLong(),
             purAmt = (itemPurAmt * rate).toLong(),
+            dayPl = (itemDayPl * rate).toLong(),
+            evltPl = (itemEvltPl * rate).toLong(),
+            prftRt = itemPrftRt,
         )
     }
 
