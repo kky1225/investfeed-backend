@@ -10,7 +10,6 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.recommend.dto.req.RecommendListStreamReq
 import com.example.investfeed.domain.recommend.dto.res.RecommendListItem
 import com.example.investfeed.domain.recommend.dto.res.RecommendListRes
-import com.example.investfeed.domain.recommend.entity.MarketIndexSnapshot
 import com.example.investfeed.domain.recommend.entity.RecommendSetting
 import com.example.investfeed.domain.recommend.entity.RiskPreset
 import com.example.investfeed.domain.recommend.entity.StockPick
@@ -18,9 +17,6 @@ import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.Position
 import com.example.investfeed.domain.recommend.adjustment.AdjustmentModule
 import com.example.investfeed.domain.recommend.marketmacro.MarketIndexAdjustmentModule
-import com.example.investfeed.domain.recommend.marketmacro.MarketMacroCacheService
-import com.example.investfeed.domain.recommend.marketmacro.MarketMacroSnapshot
-import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
@@ -68,8 +64,6 @@ class RecommendService(
     private val schedulerLogService: SchedulerLogService,
     private val recommendSettingService: RecommendSettingService,
     private val marketIndexAdjustmentModule: MarketIndexAdjustmentModule,
-    private val marketMacroCacheService: MarketMacroCacheService,
-    private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
     private val adjustmentModules: List<AdjustmentModule>,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String
@@ -235,9 +229,6 @@ class RecommendService(
         )
         stockPickHistoryRepository.saveAll(processed.map { it.toHistoryEntity(now) })
 
-        // 백테스트용 매크로 일일 스냅샷 저장 (당일 1행, 이미 있으면 skip).
-        saveMarketIndexSnapshot(now)
-
         val counts = processed.groupingBy { it.type }.eachCount()
         log.info {
             "추천 분류 저장 완료 - " +
@@ -246,67 +237,6 @@ class RecommendService(
                 "HOLD: ${counts["HOLD"] ?: 0}, " +
                 "SELL: ${counts["SELL"] ?: 0}, " +
                 "STRONG_SELL: ${counts["STRONG_SELL"] ?: 0}"
-        }
-    }
-
-    private fun saveMarketIndexSnapshot(now: LocalDateTime) {
-        val date = now.toLocalDate()
-        marketIndexSnapshotRepository.findByCapturedDate(date)?.let {
-            log.info { "MarketIndexSnapshot 이미 존재 ($date), 저장 스킵" }
-            return
-        }
-
-        val kospi = marketMacroCacheService.getSnapshot("KOSPI")
-        val kosdaq = marketMacroCacheService.getSnapshot("KOSDAQ")
-
-        if (kospi == null && kosdaq == null) {
-            log.warn { "매크로 캐시 미스 (KOSPI/KOSDAQ 둘 다 없음) — MarketIndexSnapshot 저장 스킵 ($date)" }
-            return
-        }
-
-        marketIndexSnapshotRepository.save(
-            MarketIndexSnapshot(
-                capturedDate = date,
-                kospiChangeRate = kospi?.priceChangeRate?.toDouble(),
-                kospiForeignerSign = signOf(kospi?.foreignNetBuy),
-                kospiInstitutionSign = signOf(kospi?.institutionalNetBuy),
-                kospiScenario = scenarioOf(kospi),
-                kosdaqChangeRate = kosdaq?.priceChangeRate?.toDouble(),
-                kosdaqForeignerSign = signOf(kosdaq?.foreignNetBuy),
-                kosdaqInstitutionSign = signOf(kosdaq?.institutionalNetBuy),
-                kosdaqScenario = scenarioOf(kosdaq),
-                capturedAt = now,
-            )
-        )
-        log.info {
-            "MarketIndexSnapshot 저장 완료 ($date) - " +
-                "KOSPI=${scenarioOf(kospi) ?: "MISS"}, KOSDAQ=${scenarioOf(kosdaq) ?: "MISS"}"
-        }
-    }
-
-    private fun signOf(value: Long?): String? = when {
-        value == null -> null
-        value > 0 -> "BUY"
-        value < 0 -> "SELL"
-        else -> "NEUTRAL"
-    }
-
-    private fun scenarioOf(snap: MarketMacroSnapshot?): String? {
-        if (snap == null) return null
-        val isUp = snap.priceChangeRate.signum() > 0
-        val isDown = snap.priceChangeRate.signum() < 0
-        val instBuy = snap.institutionalNetBuy > 0
-        val instSell = snap.institutionalNetBuy < 0
-        val frgnBuy = snap.foreignNetBuy > 0
-        val frgnSell = snap.foreignNetBuy < 0
-        return when {
-            isUp && instBuy && frgnBuy -> "UP_BUY_BUY"           // 강세 만장일치: BUY 격상 / SELL 격하
-            isUp && instBuy && frgnSell -> "UP_BUY_SELL"          // 다이버전스 — 무보정
-            isUp && instSell && frgnSell -> "UP_SELL_SELL"        // 다이버전스(지수↑ + 수급↓) — 무보정
-            isDown && instSell && frgnSell -> "DOWN_SELL_SELL"    // 약세 만장일치: SELL 격상 / BUY 격하
-            isDown && instBuy && frgnSell -> "DOWN_BUY_SELL"      // 다이버전스 — 무보정
-            isDown && instBuy && frgnBuy -> "DOWN_BUY_BUY"        // 다이버전스(지수↓ + 수급↑) — 무보정
-            else -> "NEUTRAL"
         }
     }
 
@@ -921,7 +851,7 @@ class RecommendService(
      *  - 22시 시점에 적용해 저장하면 시간 lag (T일 마감 매크로 → T+1일 매수)
      *  - 동행지표가 후행지표로 변질 → 백테스트 가정 부정확
      *  - 운영 시 [applyAdjustments] 가 실시간 매크로 적용 (DB 저장 X)
-     *  - 매크로 환경 영향은 market_index_snapshot 분해로 측정
+     *  - 매크로 환경 영향은 확정 지수 데이터(index_investor_daily: flu_rt/수급 → AdminRecommendMonitoringService.listMarketSnapshots) 분해로 측정
      */
     private data class BacktestMeta(
         val pvTrigger: String?,

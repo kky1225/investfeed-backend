@@ -1,7 +1,6 @@
 package com.example.investfeed.domain.recommend.admin.dto.res
 
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 data class AdminMarketSnapshotRes(
     val capturedDate: LocalDate,
@@ -17,6 +16,4 @@ data class AdminMarketSnapshotRes(
     val kosdaqForeignerSign: String?,
     val kosdaqInstitutionSign: String?,
     val kosdaqScenario: String?,
-
-    val capturedAt: LocalDateTime,
 )

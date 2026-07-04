@@ -6,10 +6,10 @@ import com.example.investfeed.domain.recommend.admin.dto.res.AdminMarketSnapshot
 import com.example.investfeed.domain.recommend.admin.dto.res.AdminRecommendPickRes
 import com.example.investfeed.domain.recommend.admin.dto.res.GroupMetrics
 import com.example.investfeed.domain.recommend.admin.dto.res.HorizonMetrics
-import com.example.investfeed.domain.recommend.entity.MarketIndexSnapshot
+import com.example.investfeed.domain.index.repository.IndexDailyCloseRepository
+import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.recommend.entity.StockPick
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
-import com.example.investfeed.domain.recommend.repository.MarketIndexSnapshotRepository
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.papertrade.service.TrancheCalculator
@@ -38,8 +38,8 @@ import kotlin.math.sqrt
 class AdminRecommendMonitoringService(
     private val stockPickRepository: StockPickRepository,
     private val stockPickHistoryRepository: StockPickHistoryRepository,
-    private val marketIndexSnapshotRepository: MarketIndexSnapshotRepository,
-    private val indexDailyCloseRepository: com.example.investfeed.domain.index.repository.IndexDailyCloseRepository,
+    private val indexDailyCloseRepository: IndexDailyCloseRepository,
+    private val indexInvestorDailyRepository: IndexInvestorDailyRepository,
     private val holidayService: HolidayService,
     private val recommendService: RecommendService,
 ) {
@@ -72,11 +72,73 @@ class AdminRecommendMonitoringService(
 
     // ─── 2. Environment (매크로 스냅샷) ────────────────────────────────────
 
+    /**
+     * 매크로 스냅샷 — index_investor_daily(확정 수집: 등락률 flu_rt + 수급) 단일 소스로 산출.
+     * 등락률은 키움 ka10051 원본값(수집 시 % 정규화 저장), 부호/시나리오만 파생.
+     * 소스는 스케줄(07시) + 시작 시 백필 + 수동 트리거로 자가 복구되므로 서버 중단이 있어도 항상 확정값.
+     */
     fun listMarketSnapshots(days: Int = 30): List<AdminMarketSnapshotRes> {
-        val after = LocalDate.now().minusDays(days.toLong())
-        return marketIndexSnapshotRepository
-            .findByCapturedDateAfterOrderByCapturedDateDesc(after)
-            .map { it.toAdminRes() }
+        val fromDt = LocalDate.now().minusDays(days.toLong()).format(YYYYMMDD)
+
+        val kospi = dailyMacroByDt(KOSPI_CD, fromDt)
+        val kosdaq = dailyMacroByDt(KOSDAQ_CD, fromDt)
+
+        return (kospi.keys + kosdaq.keys)
+            .sortedDescending()
+            .map { dt ->
+                val date = LocalDate.parse(dt, YYYYMMDD)
+                val k = kospi[dt]
+                val q = kosdaq[dt]
+                AdminMarketSnapshotRes(
+                    capturedDate = date,
+                    kospiChangeRate = k?.rate,
+                    kospiForeignerSign = k?.frgnSign,
+                    kospiInstitutionSign = k?.instSign,
+                    kospiScenario = scenarioOf(k?.rate, k?.instSign, k?.frgnSign),
+                    kosdaqChangeRate = q?.rate,
+                    kosdaqForeignerSign = q?.frgnSign,
+                    kosdaqInstitutionSign = q?.instSign,
+                    kosdaqScenario = scenarioOf(q?.rate, q?.instSign, q?.frgnSign),
+                )
+            }
+    }
+
+    private data class DailyMacro(val rate: Double?, val frgnSign: String?, val instSign: String?)
+
+    private fun dailyMacroByDt(indsCd: String, fromDt: String): Map<String, DailyMacro> =
+        indexInvestorDailyRepository.findByIndsCdAndDtGreaterThanEqualOrderByDtAsc(indsCd, fromDt)
+            .associate {
+                it.dt to DailyMacro(
+                    rate = it.fluRt?.toDoubleOrNull(),
+                    frgnSign = signOf(it.frgnrNetprps.toLongOrNull()),
+                    instSign = signOf(it.orgnNetprps.toLongOrNull()),
+                )
+            }
+
+    private fun signOf(value: Long?): String? = when {
+        value == null -> null
+        value > 0 -> "BUY"
+        value < 0 -> "SELL"
+        else -> "NEUTRAL"
+    }
+
+    private fun scenarioOf(rate: Double?, instSign: String?, frgnSign: String?): String? {
+        if (rate == null || instSign == null || frgnSign == null) return null
+        val isUp = rate > 0
+        val isDown = rate < 0
+        val instBuy = instSign == "BUY"
+        val instSell = instSign == "SELL"
+        val frgnBuy = frgnSign == "BUY"
+        val frgnSell = frgnSign == "SELL"
+        return when {
+            isUp && instBuy && frgnBuy -> "UP_BUY_BUY"           // 강세 만장일치: BUY 격상 / SELL 격하
+            isUp && instBuy && frgnSell -> "UP_BUY_SELL"          // 다이버전스 — 무보정
+            isUp && instSell && frgnSell -> "UP_SELL_SELL"        // 다이버전스(지수↑ + 수급↓) — 무보정
+            isDown && instSell && frgnSell -> "DOWN_SELL_SELL"    // 약세 만장일치: SELL 격상 / BUY 격하
+            isDown && instBuy && frgnSell -> "DOWN_BUY_SELL"      // 다이버전스 — 무보정
+            isDown && instBuy && frgnBuy -> "DOWN_BUY_BUY"        // 다이버전스(지수↓ + 수급↑) — 무보정
+            else -> "NEUTRAL"
+        }
     }
 
     // ─── 3. Operational Health (백필 진행도) ──────────────────────────────
@@ -381,16 +443,4 @@ class AdminRecommendMonitoringService(
         )
     }
 
-    private fun MarketIndexSnapshot.toAdminRes(): AdminMarketSnapshotRes = AdminMarketSnapshotRes(
-        capturedDate = capturedDate,
-        kospiChangeRate = kospiChangeRate,
-        kospiForeignerSign = kospiForeignerSign,
-        kospiInstitutionSign = kospiInstitutionSign,
-        kospiScenario = kospiScenario,
-        kosdaqChangeRate = kosdaqChangeRate,
-        kosdaqForeignerSign = kosdaqForeignerSign,
-        kosdaqInstitutionSign = kosdaqInstitutionSign,
-        kosdaqScenario = kosdaqScenario,
-        capturedAt = capturedAt,
-    )
 }

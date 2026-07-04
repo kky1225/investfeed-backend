@@ -30,6 +30,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Collections.emptyList
@@ -467,6 +468,10 @@ class IndexService(
                     val natnNetprps = investor.natn_netprps.replace("--", "-")
                     val jnsinkmNetprps = investor.jnsinkm_netprps.replace("--", "-")
                     val nativeTrmtFrgnrNetprps = investor.native_trmt_frgnr_netprps.replace("--", "-")
+                    val fluRt = investor.flu_rt.replace("--", "-").replace("..", ".")
+                        .toBigDecimalOrNull()
+                        ?.divide(BigDecimal(100), 2, RoundingMode.HALF_UP)
+                        ?.toPlainString()
 
                     val latest = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc(indexType.indsCd)
                     if (latest != null && latest.dt == date && latest.indNetprps == indNetprps && latest.frgnrNetprps == frgnrNetprps && latest.orgnNetprps == orgnNetprps) {
@@ -490,6 +495,7 @@ class IndexService(
                             natnNetprps = natnNetprps,
                             jnsinkmNetprps = jnsinkmNetprps,
                             nativeTrmtFrgnrNetprps = nativeTrmtFrgnrNetprps,
+                            fluRt = fluRt,
                         )
                     )
                 }

@@ -56,4 +56,7 @@ class IndexInvestorDaily(
 
     @Column(nullable = false)
     val nativeTrmtFrgnrNetprps: String = "0", // 내국인대우외국인순매수
+
+    @Column(length = 20)
+    val fluRt: String? = null, // 지수 등락률(%). ka10051 flu_rt(0.01% 단위 정수)를 % 값으로 정규화해 저장 (예: "-0.20"). 종가 히스토리 밖 과거 행은 null
 )
