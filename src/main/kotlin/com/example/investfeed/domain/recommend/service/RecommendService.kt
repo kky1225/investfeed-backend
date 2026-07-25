@@ -445,7 +445,7 @@ class RecommendService(
             val high52w = defaultInfo?._250hgst?.toLongOrNull()?.let { abs(it) }
             val low52w = defaultInfo?._250lwst?.toLongOrNull()?.let { abs(it) }
             val distFromHigh52w = defaultInfo?._250hgst_pric_pre_rt?.toDoubleOrNull()
-            val distFromLow52w = defaultInfo?._250lwst_pric_pre_rtm?.toDoubleOrNull()
+            val distFromLow52w = defaultInfo?._250lwst_pric_pre_rt?.toDoubleOrNull()
             val closeAboveMa20 = ma20?.let { today.toDouble() > it }
 
             PriceMetrics(

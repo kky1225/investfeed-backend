@@ -26,7 +26,7 @@ class StockDividendClient(
 ) {
     private val log = KotlinLogging.logger {}
 
-    private val DIVIDEND_PATH = "/1160100/service/GetStocDiviInfoService/getDiviInfo"
+    private val DIVIDEND_PATH = "/1160100/GetStocDiviInfoService_V2/getDiviInfo_V2"
 
     fun getDividendInfo(pageNo: Int, numOfRows: Int = 5000): Pair<List<DividendApiItem>, Int> {
         try {
@@ -41,7 +41,13 @@ class StockDividendClient(
 
             val statusCode = connection.responseCode
             if (statusCode !in 200..299) {
+                val errorBody = runCatching {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() }
+                }.getOrNull()
                 connection.disconnect()
+                log.error {
+                    "getDividendInfo 비정상 응답: statusCode=$statusCode, url=$defaultUrl$DIVIDEND_PATH, body=${errorBody?.take(500)}"
+                }
                 throw StockDividendApiException()
             }
 

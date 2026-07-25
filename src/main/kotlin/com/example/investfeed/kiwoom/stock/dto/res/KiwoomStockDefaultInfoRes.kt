@@ -46,8 +46,8 @@ data class KiwoomStockDefaultInfoRes(
     var _250hgst_pric_pre_rt: String? = null, // 250최고가대비율
     @JsonProperty("250lwst_pric_dt")
     var _250lwst_pric_dt: String? = null, // 250최저가일
-    @JsonProperty("250lwst_pric_pre_rtm")
-    var _250lwst_pric_pre_rtm: String? = null, // 250최저가대비율
+    @JsonProperty("250lwst_pric_pre_rt")
+    var _250lwst_pric_pre_rt: String? = null, // 250최저가대비율
     var cur_prc: String? = null, // 현재가
     var pre_sig: String? = null, // 대비기호
     var pred_pre: String? = null, // 전일대비
