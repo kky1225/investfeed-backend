@@ -19,6 +19,9 @@ class InterestItem(
     @Column(nullable = false)
     var stkNm: String,
 
+    @Column
+    val stexTp: String? = null, // NULL: 국내, ND/NY/NA: 미국 거래소
+
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 

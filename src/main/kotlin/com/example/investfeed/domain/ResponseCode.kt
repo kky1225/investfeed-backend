@@ -12,6 +12,7 @@ enum class ResponseCode(
     MULTI_VIEW_STOCK_STREAM(message = "실시간 멀티뷰 주식 조회에 성공하셨습니다."),
     MULTI_VIEW_CRYPTO_STREAM(message = "실시간 멀티뷰 코인 조회에 성공하셨습니다."),
     RANK_STREAM(message = "실시간 주식 순위 조회에 성공하셨습니다."),
+    US_RANK_STREAM(message = "실시간 미국 주식 순위 조회에 성공하셨습니다."),
 
     TIME_NOW(message = "현재 서버 시간 조회에 성공하셨습니다."),
 
@@ -20,9 +21,11 @@ enum class ResponseCode(
     SECT_STOCK_LIST(message = "업종별 주식 목록 조회에 성공하셨습니다."),
 
     RANK_LIST(message = "주식 순위 조회에 성공하셨습니다."),
+    US_RANK_LIST(message = "미국 주식 순위 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
     STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
     STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
+    US_STOCK_SEARCH(message = "미국 종목 검색에 성공하셨습니다."),
     STOCK_PROGRAM_CHART(message = "종목 시간별 프로그램 매매 조회에 성공하셨습니다."),
 
     INVESTOR_LIST(message = "투자자별 목록 조회에 성공하셨습니다."),

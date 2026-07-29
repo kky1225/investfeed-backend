@@ -47,3 +47,5 @@ logs/
 CLAUDE.md
 .worktreeinclude
 .claude/rules/external-api.md
+
+*.sql

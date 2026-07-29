@@ -1,8 +1,13 @@
 package com.example.investfeed.common.util
 
 import java.time.LocalTime
+import java.time.ZoneId
 
 object MarketTimeUtil {
+    val US_ZONE: ZoneId = ZoneId.of("America/New_York")
+    val US_OPEN: LocalTime = LocalTime.of(9, 30) // 미국 동부 기준 (서머타임 자동 반영)
+    val US_CLOSE: LocalTime = LocalTime.of(16, 0)
+
     val KRX_OPEN: LocalTime = LocalTime.of(9, 0)
     val KRX_CLOSE: LocalTime = LocalTime.of(15, 30)
     val NXT_OPEN: LocalTime = LocalTime.of(8, 0)
@@ -17,6 +22,9 @@ object MarketTimeUtil {
 
     fun isNxtOpen(now: LocalTime = LocalTime.now()): Boolean =
         !now.isBefore(NXT_OPEN) && now.isBefore(NXT_CLOSE)
+
+    fun isUsOpen(now: LocalTime = LocalTime.now(US_ZONE)): Boolean =
+        !now.isBefore(US_OPEN) && now.isBefore(US_CLOSE)
 
     fun isKrxOpen(now: LocalTime = LocalTime.now()): Boolean =
         !now.isBefore(KRX_OPEN) && now.isBefore(KRX_CLOSE)

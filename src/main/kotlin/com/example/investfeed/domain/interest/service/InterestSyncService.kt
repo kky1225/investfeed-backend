@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.interest.service
 
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
+import com.example.investfeed.domain.us.stock.service.UsStockInfoService
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import mu.KotlinLogging
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 class InterestSyncService(
     private val interestItemRepository: InterestItemRepository,
     private val stockClient: StockClient,
+    private val usStockInfoService: UsStockInfoService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -18,16 +20,13 @@ class InterestSyncService(
         private const val CHUNK_SIZE = 100
     }
 
-    /**
-     * 모든 관심종목의 stkNm 을 키움 API 응답값과 비교해 다르면 UPDATE.
-     * 일 1회 InterestSyncScheduler 에서 호출.
-     */
     @Transactional
     fun syncAllStkNm() {
         val allItems = interestItemRepository.findAll()
         if (allItems.isEmpty()) return
 
-        val distinctStkCds = allItems.map { it.stkCd }.distinct()
+        val (usItems, krItems) = allItems.partition { it.stexTp != null }
+        val distinctStkCds = krItems.map { it.stkCd }.distinct()
         var updatedCount = 0
         var processedCount = 0
 
@@ -39,7 +38,7 @@ class InterestSyncService(
 
                 val responseMap = res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
 
-                allItems.filter { it.stkCd in chunk }.forEach { item ->
+                krItems.filter { it.stkCd in chunk }.forEach { item ->
                     processedCount++
                     val freshStkNm = responseMap[item.stkCd]?.stk_nm
                     if (!freshStkNm.isNullOrBlank() && freshStkNm != item.stkNm) {
@@ -50,6 +49,20 @@ class InterestSyncService(
                 }
             } catch (e: Exception) {
                 log.warn { "관심종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}, ${e.message}" }
+            }
+        }
+
+        usItems.forEach { item ->
+            try {
+                processedCount++
+                val freshStkNm = usStockInfoService.getStkNm(stexTp = item.stexTp!!, stkCd = item.stkCd)
+                if (!freshStkNm.isNullOrBlank() && freshStkNm != item.stkNm) {
+                    log.info { "미국 관심종목 stkNm 갱신: stkCd=${item.stkCd}, ${item.stkNm} -> $freshStkNm" }
+                    item.stkNm = freshStkNm
+                    updatedCount++
+                }
+            } catch (e: Exception) {
+                log.warn { "미국 관심종목 stkNm 동기화 실패: stkCd=${item.stkCd}, ${e.message}" }
             }
         }
 

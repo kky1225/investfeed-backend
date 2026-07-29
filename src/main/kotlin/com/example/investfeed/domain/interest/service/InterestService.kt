@@ -16,6 +16,14 @@ import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
+import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
+import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
+import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStream
+import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamItem
+import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamReq
+import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
+import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -25,8 +33,11 @@ class InterestService(
     private val groupRepository: InterestGroupRepository,
     private val itemRepository: InterestItemRepository,
     private val stockClient: StockClient,
-    private val stockSocketClient: StockSocketClient
+    private val stockSocketClient: StockSocketClient,
+    private val usStockClient: UsStockClient,
+    private val usStockSocketClient: UsStockSocketClient
 ) {
+    private val log = KotlinLogging.logger {}
 
     @Transactional(readOnly = true)
     fun getGroups(memberId: Long): List<InterestGroupRes> {
@@ -75,28 +86,52 @@ class InterestService(
         val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
-        val interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm) }
+        val interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm, it.stexTp) }
 
         if (interestItemRes.isEmpty()) {
             return emptyList()
         }
 
-        val kiwoomStockInterestRes = stockClient.stockInterest(
-            req = KiwoomStockInterestReq(
-                stk_cd = interestItemRes.joinToString("|") { it.stkCd }
-            )
-        )
+        val (usItems, krItems) = interestItemRes.partition { it.stexTp != null }
 
-        if (kiwoomStockInterestRes.return_code == 0) {
-            interestItemRes.forEach { interest ->
-                val matched = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }
-                interest.curPrc = matched?.cur_prc
-                interest.fluRt = matched?.flu_rt
-                interest.preSig = matched?.pred_pre_sig
+        if (krItems.isNotEmpty()) {
+            try {
+                val kiwoomStockInterestRes = stockClient.stockInterest(
+                    req = KiwoomStockInterestReq(
+                        stk_cd = krItems.joinToString("|") { it.stkCd }
+                    )
+                )
+
+                if (kiwoomStockInterestRes.return_code == 0) {
+                    krItems.forEach { interest ->
+                        val matched = kiwoomStockInterestRes.atn_stk_infr?.find { it.stk_cd == interest.stkCd }
+                        interest.curPrc = matched?.cur_prc
+                        interest.fluRt = matched?.flu_rt
+                        interest.preSig = matched?.pred_pre_sig
+                    }
+                }
+            } catch (e: Exception) {
+                log.error { "국내 관심종목 시세 조회 실패 : ${e.message}" }
             }
         }
 
+        usItems.forEach { interest ->
+            val quote = getUsQuote(stexTp = interest.stexTp!!, stkCd = interest.stkCd)
+            interest.curPrc = quote?.cur_prc
+            interest.fluRt = quote?.flu_rt
+            interest.preSig = quote?.pred_pre_sig
+        }
+
         return interestItemRes
+    }
+
+    private fun getUsQuote(stexTp: String, stkCd: String): KiwoomUsStockInfoRes? {
+        return try {
+            usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = stexTp, stk_cd = stkCd))
+        } catch (e: Exception) {
+            log.error { "미국 관심종목 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            null
+        }
     }
 
     fun addItem(memberId: Long, groupId: Long, req: AddItemReq): InterestItemRes {
@@ -110,10 +145,11 @@ class InterestService(
                 groupId = groupId,
                 stkCd = req.stkCd,
                 stkNm = req.stkNm,
+                stexTp = req.stexTp,
                 displayOrder = nextOrder
             )
         )
-        return InterestItemRes(item.id, item.stkCd, item.stkNm)
+        return InterestItemRes(item.id, item.stkCd, item.stkNm, item.stexTp)
     }
 
     fun removeItem(memberId: Long, groupId: Long, itemId: Long) {
@@ -138,20 +174,43 @@ class InterestService(
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
         val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
-        val stkCdList = items.map { it.stkCd }
+        val (usItems, krItems) = items.partition { it.stexTp != null }
 
-        stockSocketClient.stockListStream(
-            req = KiwoomStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomStockStream(
-                        item = stkCdList,
-                        type = listOf("0B")
+        if (krItems.isNotEmpty()) {
+            stockSocketClient.stockListStream(
+                req = KiwoomStockStreamReq(
+                    trnm = "REG",
+                    grp_no = "0001",
+                    refresh = "0",
+                    data = listOf(
+                        KiwoomStockStream(
+                            item = krItems.map { it.stkCd },
+                            type = listOf("0B")
+                        )
                     )
                 )
             )
-        )
+        }
+
+        if (usItems.isNotEmpty()) {
+            usStockSocketClient.usStockListStream(
+                req = KiwoomUsStockStreamReq(
+                    trnm = "REG",
+                    grp_no = "0001",
+                    refresh = "0",
+                    data = listOf(
+                        KiwoomUsStockStream(
+                            item = usItems.map {
+                                KiwoomUsStockStreamItem(
+                                    jmcode = it.stkCd,
+                                    stex_tp = it.stexTp!!
+                                )
+                            },
+                            type = listOf("FE")
+                        )
+                    )
+                )
+            )
+        }
     }
 }

@@ -77,6 +77,12 @@ object Permissions {
     /** 거래대금/등락률 순위 */
     const val STOCK_RANK = "STOCK_RANK"
 
+    /** 미국 주식 거래대금/거래량/거래량급증 순위 */
+    const val US_STOCK_RANK = "US_STOCK_RANK"
+
+    /** 미국 종목 검색/리스트 */
+    const val US_STOCK_INFO = "US_STOCK_INFO"
+
     /** 추천 종목 */
     const val STOCK_RECOMMEND = "STOCK_RECOMMEND"
 

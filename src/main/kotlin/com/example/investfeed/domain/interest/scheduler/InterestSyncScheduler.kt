@@ -12,13 +12,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 
-/**
- * 관심종목 + 수동 보유종목의 stkNm 을 키움 API 응답값과 동기화한다.
- *
- * - cron: 매일 새벽 5시 15분 (사용자 활동 적은 시간, 다른 슬로우 스케줄러와 충돌 회피, 장 시작 8시 전)
- * - 자동 키움 보유종목은 HoldingSyncScheduler 가 처리하므로 제외
- * - 회사명 변경(예: LIG넥스원 → LIG디펜스앤에어로스페이스)을 일 1회 반영
- */
 @Component
 class InterestSyncScheduler(
     private val interestSyncService: InterestSyncService,
