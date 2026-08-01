@@ -14,6 +14,7 @@ import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.papertrade.service.HoldingGradeService
 import com.example.investfeed.domain.papertrade.service.PaperTradeExecutionService
 import com.example.investfeed.domain.rebalancing.scheduler.RebalancingAlertScheduler
+import com.example.investfeed.domain.stock.scheduler.StockMasterSyncScheduler
 import com.example.investfeed.domain.recommend.service.BacktestBackfillService
 import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
@@ -25,14 +26,6 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 
-/**
- * 관리자가 SLOW 스케줄러를 수동으로 즉시 실행하도록 하는 서비스.
- *
- * - INTERRUPTED / FAILED 로 실패했을 때 다음 정규 스케줄까지 기다리지 않고 복구하는 용도.
- * - FAST 스케줄러(매분)는 어차피 곧 다시 도니 수동 실행 제공 안 함.
- * - 호출 스레드는 slowScheduler 풀에 위임 → 컨트롤러 응답은 즉시 반환, 실행은 백그라운드.
- * - 현재 실행 중(last_started_at > last_finished_at 이고 timeout 내)이면 거부 — 중복 실행 방지.
- */
 @Service
 class ManualTriggerService(
     @Qualifier("slowScheduler") private val taskScheduler: TaskScheduler,
@@ -49,6 +42,7 @@ class ManualTriggerService(
     private val apiKeyExpiryScheduler: ApiKeyExpiryScheduler,
     private val schedulerLogCleanupScheduler: SchedulerLogCleanupScheduler,
     private val interestSyncScheduler: InterestSyncScheduler,
+    private val stockMasterSyncScheduler: StockMasterSyncScheduler,
     private val holdingGradeService: HoldingGradeService,
     private val paperTradeExecutionService: PaperTradeExecutionService,
     private val indexService: IndexService,
@@ -70,6 +64,7 @@ class ManualTriggerService(
             "ApiKeyExpiryScheduler"        to { apiKeyExpiryScheduler.checkApiKeyExpiry() },
             "SchedulerLogCleanupScheduler" to { schedulerLogCleanupScheduler.cleanup() },
             "InterestSyncScheduler"        to { interestSyncScheduler.syncAllStkNm() },
+            "StockMasterSyncScheduler"     to { stockMasterSyncScheduler.syncStockMaster() },
             "HoldingGradeScheduler"        to { holdingGradeService.runHoldingGrade() },
             "PaperTradeExecScheduler"      to { paperTradeExecutionService.runPaperTradeExec() },
             "IndexDailyCloseScheduler"     to { indexService.runCollectIndexClose() },

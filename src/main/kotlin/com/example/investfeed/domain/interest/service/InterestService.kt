@@ -11,6 +11,7 @@ import com.example.investfeed.domain.interest.entity.InterestGroup
 import com.example.investfeed.domain.interest.entity.InterestItem
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
+import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
@@ -35,7 +36,8 @@ class InterestService(
     private val stockClient: StockClient,
     private val stockSocketClient: StockSocketClient,
     private val usStockClient: UsStockClient,
-    private val usStockSocketClient: UsStockSocketClient
+    private val usStockSocketClient: UsStockSocketClient,
+    private val stockMasterRepository: StockMasterRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -93,6 +95,12 @@ class InterestService(
         }
 
         val (usItems, krItems) = interestItemRes.partition { it.stexTp != null }
+
+        if (krItems.isNotEmpty()) {
+            val marketMap = stockMasterRepository.findByStkCdIn(krItems.map { it.stkCd.substringBefore("_") }.distinct())
+                .associate { it.stkCd to it.mrktNm }
+            krItems.forEach { it.mrktNm = marketMap[it.stkCd.substringBefore("_")] }
+        }
 
         if (krItems.isNotEmpty()) {
             try {

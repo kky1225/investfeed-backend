@@ -26,6 +26,7 @@ enum class SchedulerName(
     HolidayRefreshScheduler(SchedulerType.SLOW, 120, "매월 1일 00:05"),
     CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분"),
     InterestSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15"),
+    StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00"),
     HoldingSyncScheduler(SchedulerType.SLOW, 600, "매일 00:00"),
     IndexDailyCloseScheduler(SchedulerType.SLOW, 120, "매일 00:10"),
 }

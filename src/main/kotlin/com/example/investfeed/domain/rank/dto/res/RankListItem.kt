@@ -8,4 +8,5 @@ data class RankListItem(
     var curPrc: String? = null, // 현재가
     var trdePrica: String? = null, // 거래대금
     var nxtEnable: String? = null, // NXT가능여부
+    var mrktNm: String? = null, // 시장명
 )

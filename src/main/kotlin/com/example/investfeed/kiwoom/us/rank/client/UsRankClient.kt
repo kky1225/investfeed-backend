@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.toEntity
 
 @Component
 class UsRankClient(
@@ -24,6 +25,10 @@ class UsRankClient(
     private final val RANK_URL = "/api/us/rkinfo"
     private final val STKINFO_URL = "/api/us/stkinfo"
 
+    companion object {
+        private const val MAX_RANK_SIZE = 100
+    }
+
     @KiwoomToken
     fun usStockTradeValueList(
         req: KiwoomUsStockTradeValueListReq
@@ -31,21 +36,47 @@ class UsRankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
-                .uri(DEFAULT_URL + RANK_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "usa20540")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomUsStockTradeValueListRes::class.java)
-                .block()
+            val list = mutableListOf<KiwoomUsStockTradeValueRes>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
 
-            if(res?.return_code != 0) {
-                throw UsStockTradeValueListException()
+            while (true) {
+                val entity = kiwoomWebClient.post()
+                    .uri(DEFAULT_URL + RANK_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "usa20540")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus( { it.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomUsStockTradeValueListRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw UsStockTradeValueListException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.result_list?.forEach { list.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N" || list.size >= MAX_RANK_SIZE) {
+                    break
+                }
             }
 
-            return res
+            return KiwoomUsStockTradeValueListRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                result_list = list.take(MAX_RANK_SIZE)
+            )
         }catch (e: KiwoomApiException) {
             throw e
         }catch (e: UsStockTradeValueListException) {
@@ -64,21 +95,47 @@ class UsRankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
-                .uri(DEFAULT_URL + RANK_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "usa20530")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomUsStockTradeVolumeListRes::class.java)
-                .block()
+            val list = mutableListOf<KiwoomUsStockTradeVolumeRes>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
 
-            if(res?.return_code != 0) {
-                throw UsStockTradeVolumeListException()
+            while (true) {
+                val entity = kiwoomWebClient.post()
+                    .uri(DEFAULT_URL + RANK_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "usa20530")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomUsStockTradeVolumeListRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw UsStockTradeVolumeListException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.result_list?.forEach { list.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N" || list.size >= MAX_RANK_SIZE) {
+                    break
+                }
             }
 
-            return res
+            return KiwoomUsStockTradeVolumeListRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                result_list = list.take(MAX_RANK_SIZE)
+            )
         }catch(e: KiwoomApiException){
             throw e
         }catch(e: UsStockTradeVolumeListException){
@@ -97,21 +154,47 @@ class UsRankClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
-                .uri(DEFAULT_URL + STKINFO_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "usa20520")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono(KiwoomUsSurgeTradeVolumeListRes::class.java)
-                .block()
+            val list = mutableListOf<KiwoomUsSurgeTradeVolumeRes>()
+            var contYn = "N"
+            var nextKey = ""
+            var returnCode = 0
+            var returnMsg = ""
 
-            if(res?.return_code != 0) {
-                throw UsSurgeTradeVolumeListException()
+            while (true) {
+                val entity = kiwoomWebClient.post()
+                    .uri(DEFAULT_URL + STKINFO_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                    .header("api-id", "usa20520")
+                    .header("cont-yn", contYn)
+                    .header("next-key", nextKey)
+                    .bodyValue(req)
+                    .retrieve()
+                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .toEntity<KiwoomUsSurgeTradeVolumeListRes>()
+                    .block()
+
+                if (entity?.body?.return_code != 0) {
+                    throw UsSurgeTradeVolumeListException()
+                }
+
+                entity.body?.let { returnCode = it.return_code }
+                entity.body?.let { returnMsg = it.return_msg }
+
+                entity.body?.result_list?.forEach { list.add(it) }
+
+                contYn = entity.headers.getFirst("cont-yn") ?: "N"
+                nextKey = entity.headers.getFirst("next-key") ?: ""
+
+                if (contYn == "N" || list.size >= MAX_RANK_SIZE) {
+                    break
+                }
             }
 
-            return res
+            return KiwoomUsSurgeTradeVolumeListRes(
+                return_code = returnCode,
+                return_msg = returnMsg,
+                result_list = list.take(MAX_RANK_SIZE)
+            )
         }catch(e: KiwoomApiException){
             throw e
         }catch(e: UsSurgeTradeVolumeListException){

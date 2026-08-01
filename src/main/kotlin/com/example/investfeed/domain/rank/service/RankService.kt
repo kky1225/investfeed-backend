@@ -3,6 +3,7 @@ package com.example.investfeed.domain.rank.service
 import com.example.investfeed.domain.rank.dto.req.RankListReq
 import com.example.investfeed.domain.rank.dto.res.RankListItem
 import com.example.investfeed.domain.rank.dto.res.RankListRes
+import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.kiwoom.rank.client.RankClient
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
@@ -15,10 +16,28 @@ import java.time.format.DateTimeFormatter
 @Service
 class RankService(
     private val rankClient: RankClient,
+    private val stockMasterRepository: StockMasterRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
     fun listRanks(
+        req: RankListReq
+    ): RankListRes {
+        return fillMarketNames(listRanksInternal(req))
+    }
+
+    private fun fillMarketNames(res: RankListRes): RankListRes {
+        val rankList = res.rankList ?: return res
+        val codes = rankList.mapNotNull { it.stkCd?.substringBefore("_") }.distinct()
+        if (codes.isEmpty()) return res
+
+        val marketMap = stockMasterRepository.findByStkCdIn(codes).associate { it.stkCd to it.mrktNm }
+        rankList.forEach { it.mrktNm = marketMap[it.stkCd?.substringBefore("_")] }
+
+        return res
+    }
+
+    private fun listRanksInternal(
         req: RankListReq
     ): RankListRes {
         when (req.type) {

@@ -8,4 +8,5 @@ data class InterestItemRes(
     var curPrc: String? = null,
     var fluRt: String? = null,
     var preSig: String? = null,
+    var mrktNm: String? = null, // 국내 시장명
 )

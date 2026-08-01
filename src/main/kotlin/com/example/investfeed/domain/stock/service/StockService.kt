@@ -20,6 +20,7 @@ import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
 import com.example.investfeed.domain.dividend.service.StockDividendService
+import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
@@ -31,8 +32,13 @@ class StockService(
     private val stockSocketClient: StockSocketClient,
     private val shortSellingClient: ShortSellingClient,
     private val stockDividendService: StockDividendService,
+    private val stockMasterRepository: StockMasterRepository,
 ) {
     private val log = KotlinLogging.logger {}
+
+    // 키움은 코스피를 "거래소"로 내려줌 — 표기 통일 (stock_master 동기화와 동일 규칙)
+    private fun normalizeMarketName(marketName: String?): String? =
+        if (marketName == "거래소") "코스피" else marketName
 
     fun getStock(
         stkCd: String,
@@ -92,7 +98,7 @@ class StockService(
                 auditInfo = kiwoomStockInfoRes.auditInfo,
                 state = kiwoomStockInfoRes.state,
                 marketCode = kiwoomStockInfoRes.marketCode,
-                marketName = kiwoomStockInfoRes.marketName,
+                marketName = normalizeMarketName(kiwoomStockInfoRes.marketName),
                 upName = kiwoomStockInfoRes.upName,
             ).apply {
                 when {
@@ -430,7 +436,7 @@ class StockService(
                 auditInfo = kiwoomStockInfoRes.auditInfo,
                 state = kiwoomStockInfoRes.state,
                 marketCode = kiwoomStockInfoRes.marketCode,
-                marketName = kiwoomStockInfoRes.marketName,
+                marketName = normalizeMarketName(kiwoomStockInfoRes.marketName),
                 upName = kiwoomStockInfoRes.upName,
             )
         }
@@ -501,15 +507,8 @@ class StockService(
     fun searchStocks(
         keyword: String
     ): List<StockSearchItem> {
-        val marketTypes = listOf("0", "10", "8", "60")
-        return marketTypes
-            .flatMap { mrktTp ->
-                stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp))?.list ?: emptyList()
-            }
-            .filter { it.name?.contains(keyword, ignoreCase = true) == true }
-            .distinctBy { it.code }
-            .map { StockSearchItem(stkCd = it.code!! + "_AL", stkNm = it.name!!, marketName = it.marketName!!) }
-            .take(20)
+        return stockMasterRepository.findTop20ByStkNmContainingIgnoreCase(keyword)
+            .map { StockSearchItem(stkCd = it.stkCd + "_AL", stkNm = it.stkNm, marketName = it.mrktNm ?: "") }
     }
 
     fun streamStocks(
