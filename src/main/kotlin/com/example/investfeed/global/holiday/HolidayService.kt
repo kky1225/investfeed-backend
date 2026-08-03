@@ -16,10 +16,6 @@ class HolidayService(
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
-    /**
-     * 월 단위 공휴일 캐싱. key 예: "202604" → 해당 월의 공휴일 날짜(yyyyMMdd) 집합
-     * 기존에는 단일 월만 보관했지만 nextTradingDay 계산 시 월 경계를 넘을 수 있어 Map 으로 확장.
-     */
     private val monthlyHolidays: MutableMap<String, Set<String>> = mutableMapOf()
 
     @Scheduled(cron = "0 5 0 1 * *", scheduler = "slowScheduler")
@@ -30,20 +26,24 @@ class HolidayService(
         }
     }
 
-    /** 오늘이 휴일(주말/공휴일) 인지 검사. 기존 호출 호환 유지. */
     fun isHoliday(): Boolean = isHoliday(LocalDate.now())
 
-    /** 임의의 날짜가 휴일(주말/공휴일) 인지 검사. 미로드 월은 lazy load. */
     fun isHoliday(date: LocalDate): Boolean {
         if (date.dayOfWeek.value >= 6) return true
         val holidays = holidaysOf(date.year, date.monthValue)
-        return holidays.contains(date.format(formatter))
+        return holidays.contains(date.format(formatter)) || isYearEndClosingDay(date)
     }
 
-    /**
-     * `from` 이후의 첫 거래일(평일 + 공휴일 아님) 반환.
-     * 최대 60일 탐색 — 실제로 연속 휴장이 이 한도를 넘을 가능성은 매우 낮음. 초과 시 경고 로그 + 마지막 후보 반환.
-     */
+    private fun isYearEndClosingDay(date: LocalDate): Boolean {
+        if (date.monthValue != 12) return false
+        val holidays = holidaysOf(date.year, 12)
+        var closure = LocalDate.of(date.year, 12, 31)
+        while (closure.dayOfWeek.value >= 6 || holidays.contains(closure.format(formatter))) {
+            closure = closure.minusDays(1)
+        }
+        return date == closure
+    }
+
     fun nextTradingDay(from: LocalDate): LocalDate {
         var candidate = from.plusDays(1)
         repeat(60) {

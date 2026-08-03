@@ -20,8 +20,6 @@ class PaperTradeExecutionScheduler(
     companion object {
         private const val RECOMMEND_CRON_HOUR = 22
         private const val RECOMMEND_CRON_MIN = 0
-        private const val HOLDING_GRADE_CRON_HOUR = 22
-        private const val HOLDING_GRADE_CRON_MIN = 10
     }
 
     @Scheduled(cron = "0 50 8 * * *", scheduler = "slowScheduler")
@@ -32,8 +30,6 @@ class PaperTradeExecutionScheduler(
             return
         }
 
-        // 직전 거래일(월요일이면 금요일, 명절 다음 거래일이면 직전 거래일) 의 야간 잡 신선도 검증.
-        // RecommendScheduler 22:00 / HoldingGradeScheduler 22:10 둘 다 직전 거래일 사이클에 성공해야 진행.
         val priorTradingDay = holidayService.lastTradingDay(LocalDate.now().minusDays(1))
         val recommendThreshold = priorTradingDay.atTime(RECOMMEND_CRON_HOUR, RECOMMEND_CRON_MIN)
         if (!schedulerLogService.isSucceededSince(SchedulerName.RecommendScheduler, recommendThreshold)) {
@@ -43,10 +39,10 @@ class PaperTradeExecutionScheduler(
             }
             return
         }
-        val holdingGradeThreshold = priorTradingDay.atTime(HOLDING_GRADE_CRON_HOUR, HOLDING_GRADE_CRON_MIN)
-        if (!schedulerLogService.isSucceededSince(SchedulerName.HoldingGradeScheduler, holdingGradeThreshold)) {
+        val recommendSuccessAt = schedulerLogService.lastSuccessAt(SchedulerName.RecommendScheduler)
+        if (recommendSuccessAt == null || !schedulerLogService.isSucceededSince(SchedulerName.HoldingGradeScheduler, recommendSuccessAt)) {
             log.error {
-                "PaperTradeExecScheduler 중단: HoldingGradeScheduler 가 $holdingGradeThreshold 이후 성공한 적 없음. " +
+                "PaperTradeExecScheduler 중단: HoldingGradeScheduler 가 추천 성공($recommendSuccessAt) 이후 성공한 적 없음. " +
                     "holding_grade 가 stale 데이터일 위험 — 매매 보류."
             }
             return

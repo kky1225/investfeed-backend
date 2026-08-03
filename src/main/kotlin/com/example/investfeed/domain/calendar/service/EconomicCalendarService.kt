@@ -638,7 +638,8 @@ class EconomicCalendarService(
     }
 
     private fun mergeManualEvents(apiResult: CalendarEventsRes, year: Int, month: Int): CalendarEventsRes {
-        val manualEvents = calendarEventRepository.findByYearAndMonthAndTypeIn(year, month, setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION"))
+        val manualEvents = calendarEventRepository.findByYearAndMonthAndTypeIn(year, month, setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION", "HOLIDAY"))
+            .filter { it.type != "HOLIDAY" || it.source == "MANUAL" }
         if (manualEvents.isEmpty()) return apiResult
 
         val today = LocalDate.now()
@@ -900,22 +901,37 @@ class EconomicCalendarService(
         }.getOrElse { "발표" }
     }
 
-    /** 한국 공휴일 */
     private fun fetchHolidayEvents(year: Int, month: Int): List<CalendarEvent> {
         val today = LocalDate.now()
-        return holidayClient.getHolidayInfos(year, month).map { h ->
+        val holidayInfos = holidayClient.getHolidayInfos(year, month)
+        val events = holidayInfos.map { h ->
             val dateStr = "${h.date.substring(0, 4)}-${h.date.substring(4, 6)}-${h.date.substring(6, 8)}"
             CalendarEvent(
                 date = dateStr, name = h.name, country = "KR", value = null,
                 isFuture = LocalDate.parse(dateStr, DATE_FMT).isAfter(today),
                 type = "HOLIDAY", source = "HOLIDAY",
             )
+        }.toMutableList()
+
+        if (month == 12) {
+            val yyyymmdd = DateTimeFormatter.ofPattern("yyyyMMdd")
+            val holidaySet = holidayInfos.map { it.date }.toSet()
+            var closure = LocalDate.of(year, 12, 31)
+            while (closure.dayOfWeek.value >= 6 || holidaySet.contains(closure.format(yyyymmdd))) {
+                closure = closure.minusDays(1)
+            }
+            events.add(
+                CalendarEvent(
+                    date = closure.toString(), name = "연말 휴장일 (KRX)", country = "KR", value = null,
+                    isFuture = closure.isAfter(today),
+                    type = "HOLIDAY", source = "HOLIDAY",
+                )
+            )
         }
+
+        return events
     }
 
-    // ==================================================================================
-    // MANUAL 이벤트 enrichment (기준금리/GDP/FOMC 값 매칭)
-    // ==================================================================================
 
     /**
      * MANUAL 이벤트에 API 값 채우기
