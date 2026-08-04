@@ -71,7 +71,7 @@ naver-news:
   client-secret: ${NAVER_NEWS_CLIENT_SECRET}
 
 data-go-kr:
-  default-url: http://apis.data.go.kr
+  default-url: https://apis.data.go.kr
   service-key: ${DATA_GO_KR_SERVICE_KEY}
 
 ecos:
