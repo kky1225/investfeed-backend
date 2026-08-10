@@ -30,21 +30,19 @@ class IndexInvestorDailyScheduler(
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
+    companion object {
+        private const val API_PACING_MS = 200L
+    }
+
     @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
     fun collectDaily() {
         log.info { "IndexInvestorDailyScheduler cron fired" }
-        val yesterdayDate = LocalDate.now().minusDays(1)
-        if (holidayService.isHoliday(yesterdayDate)) {
-            log.info { "IndexInvestorDailyScheduler skipped: yesterday($yesterdayDate) is holiday" }
-            return
-        }
         schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                val yesterday = yesterdayDate.format(formatter)
-                indexService.collectIndexInvestorDaily(yesterday)
-                log.info { "지수 투자자 일별 데이터 수집 완료: $yesterday" }
+                val filled = catchupMissing()
+                log.info { "지수 투자자 일별 데이터 수집 완료: ${filled}일치" }
             } catch (e: Exception) {
                 log.error { "지수 투자자 일별 데이터 수집 스케줄러 실패: ${e.message}" }
                 throw e
@@ -54,51 +52,12 @@ class IndexInvestorDailyScheduler(
         }
     }
 
-    // 서버 시작 시 누락 데이터 자동 보정 (로컬 환경용, AWS 배포 후 제거 예정)
     @EventListener(ApplicationReadyEvent::class)
     fun fillMissingData() {
         setSchedulerSecurityContext()
         try {
             authClient.accessToken()
-            // 코스피/코스닥 중 더 오래된 날짜 기준
-            val lastKospi = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("001")
-            val lastKosdaq = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("101")
-            val lastDtKospi = lastKospi?.dt
-            val lastDtKosdaq = lastKosdaq?.dt
-
-            // 빈 테이블 — 어제 기준으로 과거 100 평일치 초기 시드
-            if (lastDtKospi == null && lastDtKosdaq == null) {
-                backfillInitial(100)
-                return
-            }
-
-            val lastDt = listOfNotNull(lastDtKospi, lastDtKosdaq).min()
-            val lastDate = LocalDate.parse(lastDt, formatter)
-            val yesterday = LocalDate.now().minusDays(1)
-
-            if (!lastDate.isBefore(yesterday)) return
-
-            var current = lastDate.plusDays(1)
-            var filled = 0
-
-            while (!current.isAfter(yesterday)) {
-                // 주말 + 공휴일 통합 가드 — HolidayService.isHoliday(date) 가 주말도 휴일로 처리.
-                if (!holidayService.isHoliday(current)) {
-                    val dt = current.format(formatter)
-                    val kospiMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("001", dt)
-                    val kosdaqMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("101", dt)
-                    if (kospiMissing || kosdaqMissing) {
-                        try {
-                            indexService.collectIndexInvestorDaily(dt)
-                            filled++
-                        } catch (e: Exception) {
-                            log.warn { "지수 투자자 일별 데이터 보정 실패 ($dt): ${e.message}" }
-                        }
-                    }
-                }
-                current = current.plusDays(1)
-            }
-
+            val filled = catchupMissing()
             if (filled > 0) {
                 log.info { "지수 투자자 일별 데이터 보정 완료: ${filled}일치 수집" }
             }
@@ -109,17 +68,53 @@ class IndexInvestorDailyScheduler(
         }
     }
 
-    /** 빈 테이블 초기 시드 — 어제부터 과거로 거슬러 올라가며 거래일 N일치 수집. */
+    private fun catchupMissing(): Int {
+        val lastDtKospi = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("001")?.dt
+        val lastDtKosdaq = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("101")?.dt
+
+        if (lastDtKospi == null && lastDtKosdaq == null) {
+            backfillInitial(100)
+            return 0
+        }
+
+        val lastDt = listOfNotNull(lastDtKospi, lastDtKosdaq).min()
+        val lastDate = LocalDate.parse(lastDt, formatter)
+        val yesterday = LocalDate.now().minusDays(1)
+
+        if (!lastDate.isBefore(yesterday)) return 0
+
+        var current = lastDate.plusDays(1)
+        var filled = 0
+
+        while (!current.isAfter(yesterday)) {
+            if (!holidayService.isHoliday(current)) {
+                val dt = current.format(formatter)
+                val kospiMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("001", dt)
+                val kosdaqMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("101", dt)
+                if (kospiMissing || kosdaqMissing) {
+                    try {
+                        if (filled > 0) Thread.sleep(API_PACING_MS)
+                        indexService.collectIndexInvestorDaily(dt)
+                        filled++
+                    } catch (e: Exception) {
+                        log.warn { "지수 투자자 일별 데이터 보정 실패 ($dt): ${e.message}" }
+                    }
+                }
+            }
+            current = current.plusDays(1)
+        }
+
+        return filled
+    }
+
     private fun backfillInitial(tradingDays: Int) {
         var current = LocalDate.now().minusDays(1)
         var collected = 0
         var failed = 0
-        // safety: 최대 검사 calendar 일수 제한 (거래일 N일이면 공휴일 감안 여유 두고 N*2 calendar)
         val maxScanDays = tradingDays * 2
 
         repeat(maxScanDays) {
             if (collected >= tradingDays) return@repeat
-            // 주말 + 공휴일 통합 가드.
             if (!holidayService.isHoliday(current)) {
                 val dt = current.format(formatter)
                 try {

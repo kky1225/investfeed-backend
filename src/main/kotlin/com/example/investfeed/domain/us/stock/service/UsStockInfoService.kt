@@ -3,6 +3,7 @@ package com.example.investfeed.domain.us.stock.service
 import com.example.investfeed.domain.us.stock.dto.req.UsStockChartType
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChart
+import com.example.investfeed.domain.us.stock.dto.res.UsStockChartRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDailyPrice
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDetailRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockInfo
@@ -11,6 +12,8 @@ import com.example.investfeed.domain.us.stock.entity.UsStockMaster
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
 import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
+import com.example.investfeed.kiwoom.us.chart.dto.res.KiwoomUsStockChartRes
+import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
 import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoListReq
@@ -53,28 +56,27 @@ class UsStockInfoService(
         usStockMasterRepository.findByStexTpAndStkCd(stexTp, stkCd)
             ?.let { it.stkNm ?: it.stkEnm }
 
-    fun getUsStockDetail(
+    private fun fetchChartRes(
         stkCd: String,
         req: UsStockDetailReq
-    ): UsStockDetailRes {
-        val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
-
+    ): KiwoomUsStockChartRes {
         val chartReq = KiwoomUsStockChartReq(
             stex_tp = req.stexTp,
             stk_cd = stkCd,
             tic_scope = req.chartType.ticScope
         )
 
-        val chartRes = when (req.chartType) {
+        return when (req.chartType) {
             UsStockChartType.DAY -> usStockChartClient.usStockDayChart(chartReq)
             UsStockChartType.WEEK -> usStockChartClient.usStockWeekChart(chartReq)
             UsStockChartType.MONTH -> usStockChartClient.usStockMonthChart(chartReq)
             UsStockChartType.YEAR -> usStockChartClient.usStockYearChart(chartReq)
             else -> usStockChartClient.usStockMinuteChart(chartReq)
         }
+    }
 
-        // 키움은 최신순 -> 차트는 과거순으로 뒤집어 반환
-        val chartList = (chartRes.result_list ?: emptyList())
+    private fun mapChartList(chartRes: KiwoomUsStockChartRes): List<UsStockChart> =
+        (chartRes.result_list ?: emptyList())
             .map {
                 UsStockChart(
                     dt = it.cntr_tm ?: it.dt,
@@ -88,8 +90,27 @@ class UsStockInfoService(
             }
             .reversed()
 
-        // 일별 시세는 일봉 차트(usa06012)로 조립 — usa20590은 페이지당 20건이라 연속조회 부담이 큼.
-        // 차트 탭이 "일"이면 이미 받은 응답 재사용.
+    fun getUsStockChart(
+        stkCd: String,
+        req: UsStockDetailReq
+    ): UsStockChartRes {
+        val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
+
+        return UsStockChartRes(
+            usStockInfo = mapUsStockInfo(info),
+            chartList = mapChartList(fetchChartRes(stkCd, req)),
+        )
+    }
+
+    fun getUsStockDetail(
+        stkCd: String,
+        req: UsStockDetailReq
+    ): UsStockDetailRes {
+        val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
+
+        val chartRes = fetchChartRes(stkCd, req)
+        val chartList = mapChartList(chartRes)
+
         val dailyPriceList = try {
             val dayChartRes = if (req.chartType == UsStockChartType.DAY) chartRes
                 else usStockChartClient.usStockDayChart(KiwoomUsStockChartReq(stex_tp = req.stexTp, stk_cd = stkCd))
@@ -120,41 +141,44 @@ class UsStockInfoService(
         }
 
         return UsStockDetailRes(
-            usStockInfo = UsStockInfo(
-                stexTp = info.stex_tp,
-                stkCd = info.stk_cd,
-                stkNm = info.stk_nm,
-                stkEnm = info.stk_enm,
-                curPrc = info.cur_prc,
-                predPreSig = info.pred_pre_sig,
-                predPre = info.pred_pre,
-                fluRt = info.flu_rt,
-                accTrdeQty = info.acc_trde_qty,
-                baseExrt = info.base_exrt,
-                wk52HgstPric = info.wk52_hgst_pric,
-                wk52HgstPricDt = info.wk52_hgst_pric_dt,
-                wk52HgstPricPreRt = info.wk52_hgst_pric_pre_rt,
-                wk52LwstPric = info.wk52_lwst_pric,
-                wk52LwstPricDt = info.wk52_lwst_pric_dt,
-                wk52LwstPricPreRt = info.wk52_lwst_pric_pre_rt,
-                preOpenPric = info.pre_open_pric,
-                preHighPric = info.pre_high_pric,
-                preLowPric = info.pre_low_pric,
-                baseClosePric = info.base_close_pric,
-                openPric = info.open_pric,
-                highPric = info.high_pric,
-                lowPric = info.low_pric,
-                stkCnt = info.stk_cnt,
-                mac = info.mac,
-                lgIndsCd = info.lg_inds_cd,
-                smIndsCd = info.sm_inds_cd,
-                currUnit = info.curr_unit,
-                trdSuspTp = info.trd_susp_tp,
-            ),
+            usStockInfo = mapUsStockInfo(info),
             chartList = chartList,
             dailyPriceList = dailyPriceList,
         )
     }
+
+    private fun mapUsStockInfo(info: KiwoomUsStockInfoRes): UsStockInfo =
+        UsStockInfo(
+            stexTp = info.stex_tp,
+            stkCd = info.stk_cd,
+            stkNm = info.stk_nm,
+            stkEnm = info.stk_enm,
+            curPrc = info.cur_prc,
+            predPreSig = info.pred_pre_sig,
+            predPre = info.pred_pre,
+            fluRt = info.flu_rt,
+            accTrdeQty = info.acc_trde_qty,
+            baseExrt = info.base_exrt,
+            wk52HgstPric = info.wk52_hgst_pric,
+            wk52HgstPricDt = info.wk52_hgst_pric_dt,
+            wk52HgstPricPreRt = info.wk52_hgst_pric_pre_rt,
+            wk52LwstPric = info.wk52_lwst_pric,
+            wk52LwstPricDt = info.wk52_lwst_pric_dt,
+            wk52LwstPricPreRt = info.wk52_lwst_pric_pre_rt,
+            preOpenPric = info.pre_open_pric,
+            preHighPric = info.pre_high_pric,
+            preLowPric = info.pre_low_pric,
+            baseClosePric = info.base_close_pric,
+            openPric = info.open_pric,
+            highPric = info.high_pric,
+            lowPric = info.low_pric,
+            stkCnt = info.stk_cnt,
+            mac = info.mac,
+            lgIndsCd = info.lg_inds_cd,
+            smIndsCd = info.sm_inds_cd,
+            currUnit = info.curr_unit,
+            trdSuspTp = info.trd_susp_tp,
+        )
 
     fun streamUsStock(stkCd: String, stexTp: String) {
         usStockSocketClient.usStockListStream(

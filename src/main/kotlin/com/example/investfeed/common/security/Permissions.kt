@@ -83,6 +83,9 @@ object Permissions {
     /** 미국 종목 검색/리스트 */
     const val US_STOCK_INFO = "US_STOCK_INFO"
 
+    /** 미국 업종별 데이터 */
+    const val US_STOCK_SECT = "US_STOCK_SECT"
+
     /** 추천 종목 */
     const val STOCK_RECOMMEND = "STOCK_RECOMMEND"
 

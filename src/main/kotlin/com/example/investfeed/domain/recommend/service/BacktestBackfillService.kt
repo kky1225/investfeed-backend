@@ -2,6 +2,7 @@ package com.example.investfeed.domain.recommend.service
 
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.recommend.entity.StockPickHistory
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -15,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
@@ -31,17 +33,14 @@ class BacktestBackfillService(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        private const val API_PACING_MS = 200L  // RecommendService 와 동일 페이싱
+        private const val API_PACING_MS = 200L
         private val YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")
+        private val MARKET_CLOSED_AT: LocalTime = LocalTime.of(22, 30)
     }
 
     @Scheduled(cron = "0 30 22 * * *", scheduler = "slowScheduler")
     fun scheduledBackfill() {
         log.info { "BacktestBackfillScheduler cron fired" }
-        if (holidayService.isHoliday()) {
-            log.info { "BacktestBackfillScheduler skipped: today is holiday" }
-            return
-        }
         runBackfill()
     }
 
@@ -59,45 +58,41 @@ class BacktestBackfillService(
     }
 
     private fun doBackfill() {
-        val today = LocalDate.now()
-        // 기준일 = 가장 최근 완료된 거래일. 오늘이 거래일이면 오늘, 휴일/자정 직후 지연 실행이면 직전 거래일.
-        val referenceDay = holidayService.lastTradingDay(today)
-        val refKey = referenceDay.format(YYYYMMDD)
-        // 기준일 기준 N 영업일 전 일자 (= 추천일자 pickDate. 이 픽들의 forward 가 기준일 가격).
-        val date1d = nthLastTradingDayBefore(referenceDay, 1)
-        val date5d = nthLastTradingDayBefore(referenceDay, 5)
-        val date20d = nthLastTradingDayBefore(referenceDay, 20)
+        val lastClosed = lastClosedTradingDay()
+        val lastClosedKey = lastClosed.format(YYYYMMDD)
 
-        // 대상 history 모두 조회 (같은 날짜 중복 제거)
-        val datesByOffset = listOf(
-            date1d to BacktestOffset.D1,
-            date5d to BacktestOffset.D5,
-            date20d to BacktestOffset.D20,
-        )
-
-        val pickDateToOffsets: Map<LocalDate, Set<BacktestOffset>> = datesByOffset
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, list) -> list.toSet() }
-
-        val histories = pickDateToOffsets.keys.flatMap { d ->
-            stockPickHistoryRepository.findByPickDateBetween(
-                d.atStartOfDay(),
-                d.atTime(23, 59, 59),
-            )
-        }
-
-        if (histories.isEmpty()) {
-            log.info { "BacktestBackfill: 대상 history 없음 (date1d=$date1d, date5d=$date5d, date20d=$date20d)" }
+        val candidates = stockPickHistoryRepository.findBackfillCandidates()
+        if (candidates.isEmpty()) {
+            log.info { "BacktestBackfill: 미충전 픽 없음" }
             return
         }
 
-        log.info {
-            "BacktestBackfill 시작 — 대상 history=${histories.size} " +
-                "(date1d=$date1d, date5d=$date5d, date20d=$date20d)"
+        val refsByPickDay = candidates
+            .map { it.pickDate.toLocalDate() }
+            .distinct()
+            .associateWith { pickDay ->
+                Triple(
+                    nthTradingDayAfter(pickDay, 1),
+                    nthTradingDayAfter(pickDay, 5),
+                    nthTradingDayAfter(pickDay, 20),
+                )
+            }
+
+        val targets = candidates.filter { history ->
+            val (ref1d, ref5d, ref20d) = refsByPickDay.getValue(history.pickDate.toLocalDate())
+            ((history.priceOpen1d == null || history.priceClose1d == null) && ref1d <= lastClosed) ||
+                (history.priceClose5d == null && ref5d <= lastClosed) ||
+                (history.priceClose20d == null && ref20d <= lastClosed)
+        }
+        if (targets.isEmpty()) {
+            log.info { "BacktestBackfill: 캐치업 대상 없음 (기준일 미도래 ${candidates.size}건)" }
+            return
         }
 
-        // 종목별로 묶어서 chartDayList 1회 호출 (같은 종목이 여러 N 에 걸쳐도 1회)
-        val byStock = histories.groupBy { it.stkCd }
+        log.info { "BacktestBackfill 시작 — 대상 history=${targets.size} (마지막 마감 거래일=$lastClosed)" }
+
+        val byStock = targets.groupBy { it.stkCd }
+        val changed = mutableListOf<StockPickHistory>()
         var filled = 0
 
         for ((stkCd, list) in byStock) {
@@ -106,7 +101,7 @@ class BacktestBackfillService(
                 val res = stockChartClient.chartDayList(
                     req = KiwoomStockChartDayReq(
                         stk_cd = stkCd,
-                        base_dt = refKey,
+                        base_dt = lastClosedKey,
                         upd_stkpc_tp = "1",
                     )
                 )
@@ -114,50 +109,57 @@ class BacktestBackfillService(
                     log.warn { "chartDayList 실패 stkCd=$stkCd return_code=${res.return_code}" }
                     continue
                 }
-                val rows = res.stk_dt_pole_chart_qry ?: continue
-
-                // 기준 거래일 일봉의 시가/종가 추출 (없으면 응답 최신 row 폴백).
-                val refRow = rows.firstOrNull { it.dt == refKey } ?: rows.firstOrNull()
-                val refOpen = refRow?.open_pric?.toLongOrNull()?.let { abs(it) }
-                val refClose = refRow?.cur_prc?.toLongOrNull()?.let { abs(it) }
-
-                if (refOpen == null && refClose == null) {
-                    log.warn { "chartDayList 응답에 기준일 가격 없음 stkCd=$stkCd ref=$refKey" }
-                    continue
-                }
+                val rowByDt = (res.stk_dt_pole_chart_qry ?: emptyList()).associateBy { it.dt }
 
                 for (history in list) {
-                    val pickLocalDate = history.pickDate.toLocalDate()
-                    val offsets = pickDateToOffsets[pickLocalDate] ?: continue
-                    if (BacktestOffset.D1 in offsets) {
-                        history.priceOpen1d = refOpen
-                        history.priceClose1d = refClose
+                    val (ref1d, ref5d, ref20d) = refsByPickDay.getValue(history.pickDate.toLocalDate())
+                    var touched = false
+
+                    if ((history.priceOpen1d == null || history.priceClose1d == null) && ref1d <= lastClosed) {
+                        rowByDt[ref1d.format(YYYYMMDD)]?.let { row ->
+                            row.open_pric?.toLongOrNull()?.let { history.priceOpen1d = abs(it) }
+                            row.cur_prc?.toLongOrNull()?.let { history.priceClose1d = abs(it) }
+                            touched = true
+                        }
                     }
-                    if (BacktestOffset.D5 in offsets) {
-                        history.priceClose5d = refClose
+                    if (history.priceClose5d == null && ref5d <= lastClosed) {
+                        rowByDt[ref5d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
+                            history.priceClose5d = abs(it)
+                            touched = true
+                        }
                     }
-                    if (BacktestOffset.D20 in offsets) {
-                        history.priceClose20d = refClose
+                    if (history.priceClose20d == null && ref20d <= lastClosed) {
+                        rowByDt[ref20d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
+                            history.priceClose20d = abs(it)
+                            touched = true
+                        }
                     }
-                    filled++
+                    if (touched) {
+                        changed += history
+                        filled++
+                    }
                 }
             } catch (e: Exception) {
                 log.warn(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
             }
         }
 
-        stockPickHistoryRepository.saveAll(histories)
-        log.info { "BacktestBackfill 완료 — 채움=$filled / 대상=${histories.size}" }
+        stockPickHistoryRepository.saveAll(changed)
+        log.info { "BacktestBackfill 완료 — 채움=$filled / 대상=${targets.size}" }
     }
 
-    /**
-     * 오늘 기준 N 영업일 전 일자. n=1 이면 직전 거래일 (어제가 영업일이면 어제, 아니면 그 이전).
-     */
-    private fun nthLastTradingDayBefore(from: LocalDate, n: Int): LocalDate {
-        var date = from
-        repeat(n) {
-            date = holidayService.lastTradingDay(date.minusDays(1))
+    private fun lastClosedTradingDay(): LocalDate {
+        val today = LocalDate.now()
+        return if (!holidayService.isHoliday(today) && LocalTime.now() >= MARKET_CLOSED_AT) {
+            today
+        } else {
+            holidayService.lastTradingDay(today.minusDays(1))
         }
+    }
+
+    private fun nthTradingDayAfter(from: LocalDate, n: Int): LocalDate {
+        var date = from
+        repeat(n) { date = holidayService.nextTradingDay(date) }
         return date
     }
 
@@ -165,6 +167,4 @@ class BacktestBackfillService(
         val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
         SecurityContextHolder.getContext().authentication = auth
     }
-
-    private enum class BacktestOffset { D1, D5, D20 }
 }

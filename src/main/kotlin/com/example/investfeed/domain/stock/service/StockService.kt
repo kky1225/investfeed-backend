@@ -1,14 +1,16 @@
 package com.example.investfeed.domain.stock.service
 
-import com.example.investfeed.domain.stock.dto.req.StockDetailReq
-import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
-import com.example.investfeed.domain.stock.dto.req.StockStreamReq
-import com.example.investfeed.domain.stock.dto.res.*
-import com.example.investfeed.kiwoom.chart.client.StockChartClient
-import com.example.investfeed.kiwoom.chart.dto.stock.req.*
-import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.domain.dividend.service.StockDividendService
+import com.example.investfeed.domain.stock.dto.req.StockDetailReq
+import com.example.investfeed.domain.stock.dto.req.StockStreamReq
+import com.example.investfeed.domain.stock.dto.res.*
+import com.example.investfeed.domain.stock.repository.StockMasterRepository
+import com.example.investfeed.kiwoom.chart.client.StockChartClient
+import com.example.investfeed.kiwoom.chart.dto.stock.req.*
+import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartDay
+import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeMinuteReq
@@ -19,8 +21,6 @@ import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellin
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
-import com.example.investfeed.domain.dividend.service.StockDividendService
-import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
@@ -36,7 +36,6 @@ class StockService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    // 키움은 코스피를 "거래소"로 내려줌 — 표기 통일 (stock_master 동기화와 동일 규칙)
     private fun normalizeMarketName(marketName: String?): String? =
         if (marketName == "거래소") "코스피" else marketName
 
@@ -152,6 +151,7 @@ class StockService(
         }
 
         val chartListRes: MutableList<StockChart> = mutableListOf()
+        var kiwoomDayChartList: List<KiwoomStockChartDay>? = null
         when(req.chartType) {
             StockChartType.DAY -> {
                 val kiwoomStockChartDayRes = stockChartClient.chartDayList(
@@ -163,6 +163,7 @@ class StockService(
                 )
 
                 if (kiwoomStockChartDayRes.return_code == 0) {
+                    kiwoomDayChartList = kiwoomStockChartDayRes.stk_dt_pole_chart_qry
                     kiwoomStockChartDayRes.stk_dt_pole_chart_qry?.forEach {
                         chartListRes.add(
                             StockChart(
@@ -383,6 +384,38 @@ class StockService(
             emptyList()
         }
 
+        val dailyPriceList = try {
+            val dayList = kiwoomDayChartList
+                ?: stockChartClient.chartDayList(
+                    req = KiwoomStockChartDayReq(
+                        stk_cd = stkCd,
+                        base_dt = DateUtil.today("yyyyMMdd"),
+                        upd_stkpc_tp = "1"
+                    )
+                ).stk_dt_pole_chart_qry
+                ?: emptyList()
+
+            dayList.mapIndexed { index, it ->
+                val curPrc = it.cur_prc?.removePrefix("+")?.removePrefix("-")?.toLongOrNull() ?: 0L
+                val predClosePric = dayList.getOrNull(index + 1)?.cur_prc
+                    ?.removePrefix("+")?.removePrefix("-")?.toLongOrNull() ?: 0L
+                val predPre = curPrc - predClosePric
+                val fluRt = if (predClosePric > 0L) predPre.toDouble() / predClosePric * 100 else 0.0
+
+                StockDailyPrice(
+                    dt = it.dt,
+                    curPrc = it.cur_prc,
+                    predPreSig = if (predPre > 0L) "2" else if (predPre < 0L) "5" else "3",
+                    predPre = if (predPre > 0L) "+$predPre" else "$predPre",
+                    fluRt = if (predClosePric <= 0L) "" else if (predPre > 0L) "+%.2f".format(fluRt) else "%.2f".format(fluRt),
+                    accTrdeQty = it.trde_qty,
+                )
+            }
+        } catch (e: Exception) {
+            log.error { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            emptyList()
+        }
+
         return StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
@@ -390,6 +423,7 @@ class StockService(
             stockInvestorList = stockInvestorList,
             stockProgramList = stockProgramList,
             stockShortSellingList = stockShortSellingList,
+            dailyPriceList = dailyPriceList,
             dividendList = dividendList,
             viList = viList,
         )

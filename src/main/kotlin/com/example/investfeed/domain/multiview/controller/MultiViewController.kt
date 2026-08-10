@@ -12,10 +12,17 @@ import com.example.investfeed.domain.crypto.dto.req.CryptoDetailReq
 import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.multiview.dto.req.MultiViewStreamReq
+import com.example.investfeed.domain.multiview.dto.req.MultiViewUsStreamReq
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.StockChartRes
 import com.example.investfeed.domain.stock.service.StockService
+import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamItem
+import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamReq
+import com.example.investfeed.domain.us.rank.service.UsRankService
+import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
+import com.example.investfeed.domain.us.stock.dto.res.UsStockChartRes
+import com.example.investfeed.domain.us.stock.service.UsStockInfoService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -32,6 +39,8 @@ class MultiViewController(
     private val stockService: StockService,
     private val cryptoService: CryptoService,
     private val commodityService: CommodityService,
+    private val usStockInfoService: UsStockInfoService,
+    private val usRankService: UsRankService,
 ) {
 
     @GetMapping("/charts/stock/{stkCd}")
@@ -45,6 +54,21 @@ class MultiViewController(
                 code = ResponseCode.STOCK_DETAIL.code,
                 message = ResponseCode.STOCK_DETAIL.message,
                 result = stockService.getStockChart(stkCd = stkCd, req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/charts/us-stock/{stkCd}")
+    @RequiresAction(action = Actions.READ)
+    fun getUsStockChart(
+        @PathVariable stkCd: String,
+        req: UsStockDetailReq,
+    ): ResponseEntity<ApiResponse<UsStockChartRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.US_STOCK_DETAIL.code,
+                message = ResponseCode.US_STOCK_DETAIL.message,
+                result = usStockInfoService.getUsStockChart(stkCd = stkCd, req = req)
             ), HttpStatus.OK
         )
     }
@@ -93,6 +117,31 @@ class MultiViewController(
             ApiResponse(
                 code = ResponseCode.MULTI_VIEW_STOCK_STREAM.code,
                 message = ResponseCode.MULTI_VIEW_STOCK_STREAM.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("/us-stocks/stream")
+    @RequiresAction(action = Actions.SUBSCRIBE)
+    fun streamMultiViewUsStocks(
+        @RequestBody req: MultiViewUsStreamReq
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        usRankService.streamUsStocks(
+            UsStockStreamReq(
+                items = req.items.map {
+                    UsStockStreamItem(
+                        stkCd = it.stkCd,
+                        stexTp = it.stexTp
+                    )
+                }
+            )
+        )
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MULTI_VIEW_US_STOCK_STREAM.code,
+                message = ResponseCode.MULTI_VIEW_US_STOCK_STREAM.message,
                 result = null
             ), HttpStatus.OK
         )

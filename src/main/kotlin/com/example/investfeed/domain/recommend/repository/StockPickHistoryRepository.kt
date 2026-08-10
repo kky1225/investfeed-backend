@@ -21,6 +21,13 @@ interface StockPickHistoryRepository : JpaRepository<StockPickHistory, Long> {
     @Query("SELECT MAX(h.pickDate) FROM StockPickHistory h")
     fun findMaxPickDate(): LocalDateTime?
 
+    @Query("""
+        SELECT h FROM StockPickHistory h
+        WHERE h.priceOpen1d IS NULL OR h.priceClose1d IS NULL
+           OR h.priceClose5d IS NULL OR h.priceClose20d IS NULL
+    """)
+    fun findBackfillCandidates(): List<StockPickHistory>
+
     @Modifying
     @Query("DELETE FROM StockPickHistory h WHERE h.pickDate >= :start AND h.pickDate <= :end")
     fun deleteByPickDateBetween(start: LocalDateTime, end: LocalDateTime)
