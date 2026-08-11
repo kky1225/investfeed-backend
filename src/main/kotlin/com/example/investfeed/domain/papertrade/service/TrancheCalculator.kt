@@ -18,6 +18,8 @@ class TrancheCalculator {
         const val STRONG_SELL_CYCLES = 2
         const val SELL_CYCLES = 3
 
+        const val MIN_TRANCHE_SELL_RATIO = W_MAX_RATIO / SELL_CYCLES
+
         fun volCap(realizedVol: Double?): Double {
             if (realizedVol == null || realizedVol <= 0.0) return W_MAX_RATIO
             return (W_MAX_RATIO * VOL_REF / realizedVol).coerceIn(VOL_FLOOR, W_MAX_RATIO)
@@ -31,6 +33,8 @@ class TrancheCalculator {
      * @param navTotal     총 포트폴리오 평가액(원) = 현금 + 보유평가
      * @param targetRatio  목표 비중. 매수=상한(cap), 매도=하한(floor). null 이면 기본(매수 [W_MAX_RATIO], 매도 0).
      *                     변동성 캡([volCap]) · 외국인 BLOCK 부분비중 등 호출부에서 주입. 스텝 밴드도 이 목표로 결정.
+     * @param soldCycles   이번 매도 사이클에서 이미 집행한 회차 수(paper_fill.cycle_index 기준, 신규면 0).
+     *                     남은 사이클 산출용 — 매도에만 사용.
      */
     fun calculate(
         grade: String,
@@ -38,6 +42,7 @@ class TrancheCalculator {
         price: Long,
         navTotal: Long,
         targetRatio: Double? = null,
+        soldCycles: Int = 0,
     ): TrancheOrder {
         if (price <= 0L || navTotal <= 0L) return TrancheOrder(TrancheSide.NONE, 0)
         val currentValue = currentQty * price
@@ -63,8 +68,14 @@ class TrancheCalculator {
                 val floorValue = (floor * navTotal).toLong()
                 val excess = currentValue - floorValue               // 하한 위로 남은 양
                 if (excess <= 0L) return TrancheOrder(TrancheSide.NONE, 0) // 이미 하한 이하 → 보유
-                val stepValue = ((W_MAX_RATIO - floor) * navTotal / cycles).toLong()
-                val sellValue = minOf(stepValue, excess)
+
+                // 분자는 상한(W_MAX_RATIO)이 아니라 **실제 초과분(excess)**, 분모는 남은 사이클.
+                // 상한 고정 분자를 쓰면 보유가 작을수록 1회에 전량이 되어(NAV 3.33% 미만이면 SELL 도 즉시 전량)
+                // SELL / STRONG_SELL / HARD_SELL 3단계 구분이 붕괴함. 남은 사이클로 나누면 마지막 회차에
+                // 분모가 1이 되어 잔량이 전부 정리되므로 수렴도 보장됨.
+                val remainingCycles = (cycles - soldCycles).coerceAtLeast(1)
+                val minTranche = (MIN_TRANCHE_SELL_RATIO * navTotal).toLong()
+                val sellValue = if (excess <= minTranche) excess else excess / remainingCycles
                 val rawQty = sellValue / price                       // floor
                 val qty = minOf(currentQty, maxOf(1L, rawQty))
                 TrancheOrder(TrancheSide.SELL, qty)

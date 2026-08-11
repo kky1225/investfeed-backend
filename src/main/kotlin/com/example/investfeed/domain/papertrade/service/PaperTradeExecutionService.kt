@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 /**
@@ -59,14 +58,14 @@ class PaperTradeExecutionService(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        private const val ORDER_PACING_MS = 1500L  // 종목 루프 키움 호출 페이싱(모의 주문 레이트리밋 회피, 500→1500)
+        private const val ORDER_PACING_MS = 1500L
         private const val MAX_CONCURRENT_HOLDINGS = 20
+        private val CYCLE_SIDES = listOf("BUY", "SELL")
     }
 
-    /** 한 종목의 현재 보유 상태(가격은 사이징·환산용). */
     private data class HeldPos(val qty: Long, val price: Long)
+    private data class LastCycle(val side: String, val index: Int)
 
-    /** ②③ 결과 — 트랜치/주문(서브스텝 3·4)의 입력. */
     private data class ExecContext(
         val nav: Long,                        // 총 평가액 (현금 + 보유평가)
         val availableCash: Long,              // 주문가능금액
@@ -75,18 +74,18 @@ class PaperTradeExecutionService(
         val targetRatios: Map<String, Double?>, // 정규화 stkCd → 목표 비중(보유=holding_grade volCap×block / 신규진입=volCap)
         val seedPrices: Map<String, Long>,    // 정규화 stkCd → 신규진입 사이징가(ma5)
         val riskBlocked: Set<String>,         // ⑤-a NORMAL 차단(정리매매·투자위험) — 신규진입만 적용
+        val lastCycles: Map<String, LastCycle>, // 정규화 stkCd → 직전 사이클 체결(보유 종목만 조회)
     )
 
-    /** ④ 산출 — 종목별 희망 주문(시장가). 사전필터·현금배분·발행은 서브스텝 4. */
     private data class OrderCandidate(
         val stkCd: String,
         val side: TrancheSide,
         val qty: Long,
         val grade: String,
         val price: Long,   // 사이징/현금배분 환산가(시장가라 실제 체결가는 시가)
+        val cycleIndex: Int, // 이번 주문의 사이클 회차(1부터)
     )
 
-    @Transactional
     fun runPaperTradeExec() {
         schedulerLogService.execute(SchedulerName.PaperTradeExecScheduler) {
             setSchedulerSecurityContext()
@@ -154,7 +153,8 @@ class PaperTradeExecutionService(
                     PaperFill(
                         stkCd = c.stkCd, side = c.side.name, fillDate = today,
                         quantity = c.qty, price = c.price, kiwoomOrderNo = res.ord_no,
-                        note = "시장가 동시호가 제출(등급=${c.grade}, 사이징가=${c.price})",
+                        cycleIndex = c.cycleIndex,
+                        note = "시장가 동시호가 제출(등급=${c.grade}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
                     )
                 )
                 ok++
@@ -162,8 +162,6 @@ class PaperTradeExecutionService(
                 log.error(e) { "주문 실패 ${c.stkCd} ${c.side} ${c.qty}" }
                 paperFillRepository.save(
                     PaperFill(
-                        // 거부/실패는 체결이 아니므로 BUY/SELL 로 기록하지 않음(집계 오염 방지).
-                        // CNCL 과 동일하게 별도 side("REJ")로 분리, 시도 방향은 note 에 보존.
                         stkCd = c.stkCd, side = "REJ", fillDate = today,
                         quantity = c.qty, price = c.price, kiwoomOrderNo = null,
                         note = "주문거부/실패(${c.side.name}): ${e.message?.take(170)}",
@@ -226,11 +224,27 @@ class PaperTradeExecutionService(
                 targetRatios[cd] = g.targetWeightRatio
             }
         }
+        val lastCycles = holdings.keys.mapNotNull { cd ->
+            paperFillRepository
+                .findFirstByStkCdAndSideInOrderByFillDateDescIdDesc(cd, CYCLE_SIDES)
+                ?.let { cd to LastCycle(it.side, it.cycleIndex ?: 1) }
+        }.toMap()
+
         return ExecContext(
             nav = nav, availableCash = availableCash,
             holdings = holdings, grades = grades, targetRatios = targetRatios,
-            seedPrices = seedPrices, riskBlocked = riskBlocked,
+            seedPrices = seedPrices, riskBlocked = riskBlocked, lastCycles = lastCycles,
         )
+    }
+
+    private fun nextCycleIndex(ctx: ExecContext, stkCd: String, side: TrancheSide): Int {
+        val last = ctx.lastCycles[stkCd] ?: return 1
+        return if (last.side == side.name) last.index + 1 else 1
+    }
+
+    private fun soldCycles(ctx: ExecContext, stkCd: String): Int {
+        val last = ctx.lastCycles[stkCd] ?: return 0
+        return if (last.side == TrancheSide.SELL.name) last.index else 0
     }
 
     /**
@@ -249,9 +263,11 @@ class PaperTradeExecutionService(
         // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부). 목표비중(holding_grade volCap×block)도 전달.
         for ((cd, pos) in ctx.holdings) {
             val grade = ctx.grades[cd] ?: "HOLD"
-            val o = trancheCalculator.calculate(grade, pos.qty, pos.price, ctx.nav, ctx.targetRatios[cd])
+            val o = trancheCalculator.calculate(
+                grade, pos.qty, pos.price, ctx.nav, ctx.targetRatios[cd], soldCycles(ctx, cd),
+            )
             if (o.side != TrancheSide.NONE && o.qty > 0L) {
-                candidates += OrderCandidate(cd, o.side, o.qty, grade, pos.price)
+                candidates += OrderCandidate(cd, o.side, o.qty, grade, pos.price, nextCycleIndex(ctx, cd, o.side))
             }
         }
 
@@ -269,7 +285,7 @@ class PaperTradeExecutionService(
             val grade = ctx.grades.getValue(cd)
             val o = trancheCalculator.calculate(grade, 0L, price, ctx.nav, ctx.targetRatios[cd])
             if (o.side == TrancheSide.BUY && o.qty > 0L) {
-                candidates += OrderCandidate(cd, o.side, o.qty, grade, price)
+                candidates += OrderCandidate(cd, o.side, o.qty, grade, price, cycleIndex = 1)
                 used++
             }
         }

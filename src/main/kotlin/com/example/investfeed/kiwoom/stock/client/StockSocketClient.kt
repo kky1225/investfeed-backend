@@ -1,6 +1,7 @@
 package com.example.investfeed.kiwoom.stock.client
 
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
@@ -15,6 +16,7 @@ class StockSocketClient(
     private val objectMapper: ObjectMapper,
     private val authClient: AuthClient,
     private val webSocketHandler: WebSocketHandler,
+    private val holidayService: HolidayService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -26,7 +28,7 @@ class StockSocketClient(
 
         val accessToken = authClient.getCurrentAccessToken()
 
-        if(MarketTimeUtil.isNxtOpen()) {
+        if(!holidayService.isHoliday() && MarketTimeUtil.isNxtOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()

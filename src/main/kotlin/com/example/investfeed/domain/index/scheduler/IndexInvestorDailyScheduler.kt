@@ -54,18 +54,23 @@ class IndexInvestorDailyScheduler(
 
     @EventListener(ApplicationReadyEvent::class)
     fun fillMissingData() {
-        setSchedulerSecurityContext()
-        try {
-            authClient.accessToken()
-            val filled = catchupMissing()
-            if (filled > 0) {
-                log.info { "지수 투자자 일별 데이터 보정 완료: ${filled}일치 수집" }
-            }
-        } catch (e: Exception) {
-            log.error { "지수 투자자 일별 데이터 보정 실패: ${e.message}" }
-        } finally {
-            SecurityContextHolder.clearContext()
+        if (schedulerLogService.isRunning(SchedulerName.IndexInvestorDailyScheduler)) {
+            log.warn { "IndexInvestorDailyScheduler 기동 보정 skip: 이미 실행 중" }
+            return
         }
+
+        runCatching {
+            schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
+                setSchedulerSecurityContext()
+                try {
+                    authClient.accessToken()
+                    val filled = catchupMissing()
+                    log.info { "지수 투자자 일별 데이터 보정 완료: ${filled}일치 수집" }
+                } finally {
+                    SecurityContextHolder.clearContext()
+                }
+            }
+        }.onFailure { log.error { "지수 투자자 일별 데이터 보정 실패: ${it.message}" } }
     }
 
     private fun catchupMissing(): Int {

@@ -6,7 +6,8 @@ import com.example.investfeed.domain.calendar.repository.CalendarEventRepository
 import com.example.investfeed.ecos.client.EcosClient
 import com.example.investfeed.fred.client.FredClient
 import com.example.investfeed.global.constant.RedisKeyPrefix
-import com.example.investfeed.global.holiday.HolidayClient
+import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.MarketHolidayRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -25,7 +26,7 @@ import java.util.concurrent.TimeUnit
 class EconomicCalendarService(
     private val ecosClient: EcosClient,
     private val fredClient: FredClient,
-    private val holidayClient: HolidayClient,
+    private val marketHolidayRepository: MarketHolidayRepository,
     private val calendarEventRepository: CalendarEventRepository,
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
@@ -653,10 +654,6 @@ class EconomicCalendarService(
     private fun isManualEnrichable(entity: CalendarEventEntity): Boolean =
         entity.type in setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION")
 
-    // ==================================================================================
-    // API 이벤트 수집 (한국 월별 지표 + FRED 릴리즈 + 공휴일)
-    // ==================================================================================
-
     private fun fetchApiEvents(year: Int, month: Int): List<CalendarEvent> {
         val events = mutableListOf<CalendarEvent>()
         events.addAll(fetchKrMonthlyEvents(year, month))
@@ -903,9 +900,11 @@ class EconomicCalendarService(
 
     private fun fetchHolidayEvents(year: Int, month: Int): List<CalendarEvent> {
         val today = LocalDate.now()
-        val holidayInfos = holidayClient.getHolidayInfos(year, month)
-        val events = holidayInfos.map { h ->
-            val dateStr = "${h.date.substring(0, 4)}-${h.date.substring(4, 6)}-${h.date.substring(6, 8)}"
+        val monthKey = "$year${String.format("%02d", month)}"
+        val holidays = marketHolidayRepository
+            .findAllByMarketAndDtBetween(HolidayService.MARKET_KR, "${monthKey}01", "${monthKey}31")
+        val events = holidays.map { h ->
+            val dateStr = "${h.dt.substring(0, 4)}-${h.dt.substring(4, 6)}-${h.dt.substring(6, 8)}"
             CalendarEvent(
                 date = dateStr, name = h.name, country = "KR", value = null,
                 isFuture = LocalDate.parse(dateStr, DATE_FMT).isAfter(today),
@@ -915,7 +914,7 @@ class EconomicCalendarService(
 
         if (month == 12) {
             val yyyymmdd = DateTimeFormatter.ofPattern("yyyyMMdd")
-            val holidaySet = holidayInfos.map { it.date }.toSet()
+            val holidaySet = holidays.map { it.dt }.toSet()
             var closure = LocalDate.of(year, 12, 31)
             while (closure.dayOfWeek.value >= 6 || holidaySet.contains(closure.format(yyyymmdd))) {
                 closure = closure.minusDays(1)

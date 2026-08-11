@@ -1,6 +1,7 @@
 package com.example.investfeed.kiwoom.realtime.client
 
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
@@ -16,6 +17,7 @@ class RealTimeClient(
     private val objectMapper: ObjectMapper,
     private val authClient: AuthClient,
     private val webSocketHandler: WebSocketHandler,
+    private val holidayService: HolidayService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -27,7 +29,7 @@ class RealTimeClient(
 
         val accessToken = authClient.getCurrentAccessToken()
 
-        if(MarketTimeUtil.isKrxOpen()) {
+        if(!holidayService.isHoliday() && MarketTimeUtil.isKrxOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()
@@ -54,7 +56,8 @@ class RealTimeClient(
 
         val accessToken = authClient.getCurrentAccessToken()
 
-        if(MarketTimeUtil.isKrxOpen()) {
+        // 휴장일엔 체결 데이터가 없으므로 소켓 등록 자체를 생략
+        if(!holidayService.isHoliday() && MarketTimeUtil.isKrxOpen()) {
             val kiwoomWebSocketClient = KiwoomWebSocketClient()
             kiwoomWebSocketClient.setAccessToken(accessToken)
             kiwoomWebSocketClient.connectBlocking()
