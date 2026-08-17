@@ -40,13 +40,24 @@ class MonitoringService(
     private val entityManager: EntityManager,
     private val apiCallCounterService: ApiCallCounterService,
     private val holidayService: HolidayService,
+    private val schedulerCycleEvaluator: SchedulerCycleEvaluator,
     @Qualifier("fastScheduler") private val fastScheduler: ThreadPoolTaskScheduler,
     @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun getStatuses(): List<SchedulerStatusRes> =
-        schedulerStatusRepository.findAllByOrderBySchedulerNameAsc().map { SchedulerStatusRes.from(it, computeState(it)) }
+    fun getStatuses(): List<SchedulerStatusRes> {
+        val now = LocalDateTime.now()
+        val isHoliday = holidayService.isHoliday(now.toLocalDate())
+        return schedulerStatusRepository.findAllByOrderBySchedulerNameAsc().map {
+            SchedulerStatusRes.from(it, computeState(it), computeFireStatus(it, now, isHoliday))
+        }
+    }
+
+    private fun computeFireStatus(s: SchedulerStatus, now: LocalDateTime, isHoliday: Boolean): String {
+        val scheduler = SchedulerName.entries.firstOrNull { it.name == s.schedulerName } ?: return "NONE"
+        return schedulerCycleEvaluator.evaluate(scheduler, s.lastFiredAt, s.lastStartedAt, now, isHoliday).name
+    }
 
     fun getCatalog(): List<SchedulerCatalogRes> =
         SchedulerName.entries.map { SchedulerCatalogRes.from(it) }
@@ -168,7 +179,10 @@ class MonitoringService(
                 )
             )
         }
-        return SchedulerStatusRes.from(status, computeState(status))
+        val now = LocalDateTime.now()
+        return SchedulerStatusRes.from(
+            status, computeState(status), computeFireStatus(status, now, holidayService.isHoliday(now.toLocalDate()))
+        )
     }
 
     /**

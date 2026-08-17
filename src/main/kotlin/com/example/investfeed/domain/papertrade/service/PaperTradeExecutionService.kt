@@ -26,19 +26,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 
-/**
- * 모의 매매 실행 서비스 — 매 거래일 **08:50 장전**.
- *
- * 09:00 정각 시작은 시가를 못 잡음(장 시작 동시호가 08:30~09:00). 08:50에 prep 끝내고
- * 시장가 주문을 동시호가 창에 제출 → 09:00 시가 체결(백테스트 price_open_1d 와 정합).
- *
- * 처리 순서(고정): ① 전날 미체결 취소 → ② 예수금·보유 재조회 → ③ 등급 로드 → ④ 트랜치 →
- * ⑤ 사전필터(⑤-a 신규진입 성향=NORMAL 정리매매·투자위험 / ⑤-b 거래정지 실시간 전후보)
- * → ⑥ 현금 STRONG우선 배분 → ⑦ 시장가 동시호가 제출 → ⑧ paper_fill 행동 로그.
- *
- * 상하한 사전필터 없음(장전 판정 불가, 미체결→다음날 ① 취소로 자연 처리). 실제 체결가는
- * 시가(09:00)라 paper_fill엔 사이징가+메모만 기록(키움 모의계좌가 잔고 진실 소스).
- */
 @Service
 class PaperTradeExecutionService(
     private val kiwoomOrderClient: KiwoomOrderClient,
@@ -61,6 +48,10 @@ class PaperTradeExecutionService(
         private const val ORDER_PACING_MS = 1500L
         private const val MAX_CONCURRENT_HOLDINGS = 20
         private val CYCLE_SIDES = listOf("BUY", "SELL")
+        private const val SECOND_PHASE_ATTEMPTS = 5       // 2차 매수 시도 횟수 (09:01~03, 30초 간격)
+        private const val SECOND_PHASE_RETRY_MS = 30_000L // 시가 단일가 임의연장(~30초) + 반영 지연 감안
+        private const val PHASE_FIRST = 1                 // paper_fill.phase — 08:50 1차
+        private const val PHASE_SECOND = 2                // paper_fill.phase — 09:01 2차 (잔여 차감 기준)
     }
 
     private data class HeldPos(val qty: Long, val price: Long)
@@ -75,6 +66,8 @@ class PaperTradeExecutionService(
         val seedPrices: Map<String, Long>,    // 정규화 stkCd → 신규진입 사이징가(ma5)
         val riskBlocked: Set<String>,         // ⑤-a NORMAL 차단(정리매매·투자위험) — 신규진입만 적용
         val lastCycles: Map<String, LastCycle>, // 정규화 stkCd → 직전 사이클 체결(보유 종목만 조회)
+        val explicitHolds: Map<String, String?>, // holding_grade 명시 type=HOLD 보유 (코드 → origin_side, 회수 1~3티어용)
+        val moduleHalfCodes: Set<String>,        // MODULE_HALF 라벨 보유 (모듈 승급 BUY — 회수 4티어: 목표 초과분 회수용)
     )
 
     private data class OrderCandidate(
@@ -84,7 +77,18 @@ class PaperTradeExecutionService(
         val grade: String,
         val price: Long,   // 사이징/현금배분 환산가(시장가라 실제 체결가는 시가)
         val cycleIndex: Int, // 이번 주문의 사이클 회차(1부터)
+        val recoveryOrigin: String? = null, // ⑥-b 현금회수 매도만 non-null (수급 티어 라벨 — note 구분용)
     )
+
+    private data class SkipCandidate(
+        val stkCd: String,
+        val qty: Long,       // 미발행 잔여 수량 (부분 매수 시 잔여분만)
+        val price: Long,
+        val grade: String,
+        val newEntry: Boolean,
+        val cycleIndex: Int,
+    )
+
 
     fun runPaperTradeExec() {
         schedulerLogService.execute(SchedulerName.PaperTradeExecScheduler) {
@@ -123,22 +127,30 @@ class PaperTradeExecutionService(
             log.info { "PaperTradeExecScheduler: 거래정지 ${candidates.size - filtered.size}건 제외" }
         }
 
-        // ⑥ 현금 STRONG우선 배분: 매도는 전부 발행, 매수는 STRONG_BUY 우선 + 가용현금 한도까지
+        // ⑥ 현금 STRONG우선 배분: 매도는 전부 발행, 매수는 STRONG_BUY 우선 + 부분 매수(살 수 있는 만큼),
+        // 잔여 수량은 SKIP — 기록(측정) 및 2차 매수(09:01) 입력.
         val sells = filtered.filter { it.side == TrancheSide.SELL }
         val buys = filtered.filter { it.side == TrancheSide.BUY }
             .sortedBy { if (it.grade == "STRONG_BUY") 0 else 1 }
         val fundedBuys = mutableListOf<OrderCandidate>()
+        val skips = mutableListOf<SkipCandidate>()
         var cashLeft = ctx.availableCash
         for (b in buys) {
-            val cost = b.qty * b.price
-            if (cost <= cashLeft) {
-                fundedBuys += b
-                cashLeft -= cost
-            } else {
-                log.info { "PaperTradeExecScheduler: 현금부족 스킵 ${b.stkCd}(${b.grade}) cost=$cost left=$cashLeft" }
+            val affordable = minOf(b.qty, cashLeft / b.price)
+            if (affordable >= 1L) {
+                fundedBuys += if (affordable == b.qty) b else b.copy(qty = affordable)
+                cashLeft -= affordable * b.price
+            }
+            val rest = b.qty - affordable
+            if (rest >= 1L) {
+                skips += SkipCandidate(b.stkCd, rest, b.price, b.grade, b.stkCd !in ctx.holdings, b.cycleIndex)
+                log.info { "PaperTradeExecScheduler: 현금부족 스킵 ${b.stkCd}(${b.grade}) ${rest}주 left=$cashLeft" }
             }
         }
-        val toOrder = sells + fundedBuys
+
+        // ⑥-b 현금회수 매도 — 신규진입 스킵 부족액만큼 HOLD 보유를 트랜치 매도해 2차 매수 자금 확보
+        val recoverySells = buildRecoverySells(ctx, sells, skips, halted)
+        val toOrder = sells + recoverySells + fundedBuys
 
         // ⑦ 시장가 주문(동시호가 창 제출) + ⑧ paper_fill 행동 로그. 거부는 격리(스킵+기록, 진행).
         val today = LocalDate.now()
@@ -153,8 +165,12 @@ class PaperTradeExecutionService(
                     PaperFill(
                         stkCd = c.stkCd, side = c.side.name, fillDate = today,
                         quantity = c.qty, price = c.price, kiwoomOrderNo = res.ord_no,
-                        cycleIndex = c.cycleIndex,
-                        note = "시장가 동시호가 제출(등급=${c.grade}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
+                        cycleIndex = c.cycleIndex, grade = c.grade,
+                        newEntry = if (c.side == TrancheSide.BUY) c.stkCd !in ctx.holdings else null,
+                        phase = PHASE_FIRST,
+                        note = c.recoveryOrigin
+                            ?.let { "현금회수 매도($it, 사이징가=${c.price}, ${c.cycleIndex}회차)" }
+                            ?: "시장가 동시호가 제출(등급=${c.grade}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
                     )
                 )
                 ok++
@@ -164,25 +180,31 @@ class PaperTradeExecutionService(
                     PaperFill(
                         stkCd = c.stkCd, side = "REJ", fillDate = today,
                         quantity = c.qty, price = c.price, kiwoomOrderNo = null,
+                        grade = c.grade, phase = PHASE_FIRST,
                         note = "주문거부/실패(${c.side.name}): ${e.message?.take(170)}",
                     )
                 )
             }
         }
+        // ⑧-b 스킵 기록 — 1차 시점 부족분 측정 + 2차 매수(09:01)의 입력 (DB 가 인계 매체, 재시작 안전)
+        skips.forEach { s ->
+            paperFillRepository.save(
+                PaperFill(
+                    stkCd = s.stkCd, side = "SKIP", fillDate = today,
+                    quantity = s.qty, price = s.price, cycleIndex = s.cycleIndex,
+                    grade = s.grade, newEntry = s.newEntry, phase = PHASE_FIRST,
+                    note = "현금부족 스킵(등급=${s.grade}, ${if (s.newEntry) "신규진입" else "보유추가"})",
+                )
+            )
+        }
+
         log.info {
             "PaperTradeExecScheduler 완료 — 후보 ${candidates.size}, 발행대상 ${toOrder.size}" +
-                "(매도 ${sells.size}/매수 ${fundedBuys.size}), 성공 $ok"
+                "(매도 ${sells.size}/회수 ${recoverySells.size}/매수 ${fundedBuys.size}), " +
+                "스킵 ${skips.size}, 성공 $ok"
         }
     }
 
-    /**
-     * ② 키움 모의계좌 예수금·보유 재조회 + ③ 등급 로드(직전 거래일 holding_grade + 당일 stock_pick).
-     *
-     * 키움 모의계좌가 잔고 진실 소스. NAV = 추정예탁자산(없으면 현금+총평가).
-     * **보유 종목은 holding_grade 우선, 신규 매수 후보는 stock_pick 우선.** 보유 ∩ 추천 겹침 시
-     * 추천 백본의 보수적 HOLD 가 손절 시그널을 묻어버리는 문제 회피(holding_grade 는 holdingMode=true
-     * 로 BLOCK→다운그레이드 처리). 코드 정규화는 HoldingGradeService 와 동일 규칙.
-     */
     private fun buildExecContext(): ExecContext {
         val deposit = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
         val availableCash = parseAmt(deposit.ord_alow_amt) .takeIf { it > 0 } ?: parseAmt(deposit.entr)
@@ -217,11 +239,17 @@ class PaperTradeExecutionService(
             // ⑤-a 성향필터: NORMAL=정리매매/투자위험 종목은 신규 진입 차단(보유는 면제 — 별도 적용)
             if (normalBlocked.any { it.matches(p) }) riskBlocked += cd
         }
+        val explicitHolds = mutableMapOf<String, String?>()
+        val moduleHalfCodes = mutableSetOf<String>()
         holdingGradeRepository.findByEvalDate(priorTradingDay).forEach { g ->
             val cd = normCd(g.stkCd) ?: return@forEach
             if (cd in holdings) {
                 grades[cd] = g.type
                 targetRatios[cd] = g.targetWeightRatio
+                // 명시적 HOLD 만 회수 매도 대상 (평가 누락으로 기본 HOLD 처리된 종목은 제외).
+                if (g.type == "HOLD") explicitHolds[cd] = g.originSide
+                // 모듈 승급 BUY(반 비중) — 등급 계층이 붙인 라벨을 소비 (회수 4티어 대상 식별).
+                if (g.evaluationReason?.contains("MODULE_HALF") == true) moduleHalfCodes += cd
             }
         }
         val lastCycles = holdings.keys.mapNotNull { cd ->
@@ -234,7 +262,185 @@ class PaperTradeExecutionService(
             nav = nav, availableCash = availableCash,
             holdings = holdings, grades = grades, targetRatios = targetRatios,
             seedPrices = seedPrices, riskBlocked = riskBlocked, lastCycles = lastCycles,
+            explicitHolds = explicitHolds, moduleHalfCodes = moduleHalfCodes,
         )
+    }
+
+    /**
+     * ⑥-b 현금회수 매도 — 매수 스킵 부족액만큼 HOLD 보유를 부분 매도해 2차 매수(09:01) 자금 확보.
+     *
+     * 순서는 수급 4티어:
+     *   1~3. HOLD (origin_side): SELL 기원 → null(중립) → BUY 기원. 티어 내 보유금액 큰 순.
+     *   4.   MODULE_HALF BUY 의 **목표(반 비중) 초과분** — 등급은 BUY 유지, floor=반 비중 목표까지만
+     *        회수(초과 종목은 room≤0 이라 매수 후보가 없어 자기모순 불가). 티어 내 초과금액 큰 순.
+     * 종목당 min(SELL 트랜치, 남은부족액) — 전량 강제 없음, 부족액 못 채우면 못 채운 채 종료.
+     */
+    private fun buildRecoverySells(
+        ctx: ExecContext,
+        sells: List<OrderCandidate>,
+        skips: List<SkipCandidate>,
+        halted: Set<String>,
+    ): List<OrderCandidate> {
+        val gradeSellProceeds = sells.sumOf { it.qty * it.price }
+        var remaining = skips.sumOf { it.qty * it.price } - gradeSellProceeds
+        if (remaining <= 0L) return emptyList()
+
+        val result = mutableListOf<OrderCandidate>()
+        val holds = ctx.holdings
+            .filterKeys { it in ctx.explicitHolds && it !in halted }
+            .entries
+            .sortedWith(
+                compareBy<Map.Entry<String, HeldPos>> {
+                    when (ctx.explicitHolds[it.key]) { "SELL" -> 0; null -> 1; else -> 2 }
+                }.thenByDescending { it.value.qty * it.value.price }
+            )
+        for ((cd, pos) in holds) {
+            if (remaining <= 0L) break
+            if (pos.price <= 0L) continue
+            val o = trancheCalculator.calculate("SELL", pos.qty, pos.price, ctx.nav, null, soldCycles(ctx, cd))
+            if (o.side != TrancheSide.SELL || o.qty <= 0L) continue
+            val capped = minOf(o.qty, maxOf(1L, remaining / pos.price))
+            val originLabel = when (ctx.explicitHolds[cd]) { "SELL" -> "HOLD·SELL기원"; "BUY" -> "HOLD·BUY기원"; else -> "HOLD·중립" }
+            result += OrderCandidate(
+                cd, TrancheSide.SELL, capped, "HOLD", pos.price,
+                nextCycleIndex(ctx, cd, TrancheSide.SELL), recoveryOrigin = originLabel,
+            )
+            remaining -= capped * pos.price
+        }
+
+        // 4티어 — HOLD 로 부족하면 모듈 승급 BUY(MODULE_HALF)의 목표 초과분 회수.
+        // 등급은 BUY 유지: 평소엔 동결(매수 정지)일 뿐이지만, 현금이 필요할 때는 등급 계층이
+        // "여기 있으면 안 된다"고 판정한 초과 자본부터 순수 수급 신호로 옮긴다. floor=반 비중 목표.
+        if (remaining > 0L) {
+            val halfOvers = ctx.holdings
+                .filterKeys { it in ctx.moduleHalfCodes && it !in halted }
+                .entries
+                .mapNotNull { (cd, pos) ->
+                    val floor = ctx.targetRatios[cd] ?: return@mapNotNull null
+                    if (pos.price <= 0L) return@mapNotNull null
+                    val excess = pos.qty * pos.price - (floor * ctx.nav).toLong()
+                    if (excess > 0L) Triple(cd, pos, floor) to excess else null
+                }
+                .sortedByDescending { it.second } // 초과금액 큰 순 — 최소 종목 수로 부족액 커버
+            for ((entry, _) in halfOvers) {
+                if (remaining <= 0L) break
+                val (cd, pos, floor) = entry
+                val o = trancheCalculator.calculate("SELL", pos.qty, pos.price, ctx.nav, floor, soldCycles(ctx, cd))
+                if (o.side != TrancheSide.SELL || o.qty <= 0L) continue
+                val capped = minOf(o.qty, maxOf(1L, remaining / pos.price))
+                result += OrderCandidate(
+                    cd, TrancheSide.SELL, capped, "BUY", pos.price,
+                    nextCycleIndex(ctx, cd, TrancheSide.SELL), recoveryOrigin = "모듈BUY초과",
+                )
+                remaining -= capped * pos.price
+            }
+        }
+
+        if (result.isNotEmpty()) {
+            log.info {
+                "PaperTradeExecScheduler 현금회수 매도 ${result.size}건 (등급매도대금 $gradeSellProceeds 선차감): " +
+                    result.joinToString { "${it.stkCd}:${it.qty}주(${it.recoveryOrigin})" }
+            }
+        }
+        return result
+    }
+
+    fun runSecondPhaseBuys() {
+        val today = LocalDate.now()
+        if (paperFillRepository.findByFillDateAndSide(today, "SKIP").isEmpty()) {
+            log.info { "PaperTradeSecondBuyScheduler: 당일 스킵 없음 — 종료" }
+            return
+        }
+        schedulerLogService.execute(SchedulerName.PaperTradeSecondBuyScheduler) {
+            setSchedulerSecurityContext()
+            try {
+                authClient.accessToken()
+                doSecondPhaseBuys(today)
+            } finally {
+                SecurityContextHolder.clearContext()
+            }
+        }
+    }
+
+    /** 당일 SKIP 대비 미발행 잔여 후보 산출 — 같은 종목 SKIP 이 중복이면 최신 행(수동 재실행 대비). */
+    private fun loadRemainingSkips(today: LocalDate): List<SkipCandidate> {
+        val issued = (paperFillRepository.findByFillDateAndSide(today, "BUY") +
+            paperFillRepository.findByFillDateAndSide(today, "REJ"))
+            .filter { it.phase == PHASE_SECOND }
+            .groupBy { it.stkCd }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity } }
+
+        return paperFillRepository.findByFillDateAndSide(today, "SKIP")
+            .groupBy { it.stkCd }
+            .mapNotNull { (_, rows) -> rows.maxByOrNull { it.id } }
+            .mapNotNull { s ->
+                val remaining = s.quantity - (issued[s.stkCd] ?: 0L)
+                if (remaining < 1L || s.price <= 0L) null
+                else SkipCandidate(
+                    stkCd = s.stkCd, qty = remaining, price = s.price,
+                    grade = s.grade ?: "BUY", newEntry = s.newEntry ?: false,
+                    cycleIndex = s.cycleIndex ?: 1,
+                )
+            }
+            // 발행 우선순위: STRONG_BUY 신규 → BUY 신규 → 보유 추가매수
+            .sortedWith(compareBy({ !it.newEntry }, { if (it.grade == "STRONG_BUY") 0 else 1 }))
+    }
+
+    private fun doSecondPhaseBuys(today: LocalDate) {
+        var items = loadRemainingSkips(today)
+        if (items.isEmpty()) {
+            log.info { "PaperTradeSecondBuyScheduler: 스킵 전량 기발행 — 종료(멱등)" }
+            return
+        }
+        for (attempt in 1..SECOND_PHASE_ATTEMPTS) {
+            if (attempt > 1) Thread.sleep(SECOND_PHASE_RETRY_MS)
+            val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
+            var cash = parseAmt(dep.ord_alow_amt)
+            // 회차별 주문가능금액 = 시가 매도 대금 반영 추적 — 모의서버 재사용금 지원 여부의 실측 근거
+            log.info { "PaperTradeSecondBuyScheduler ${attempt}회차 — 주문가능금액=$cash, 잔여후보 ${items.size}건" }
+            val unfilled = mutableListOf<SkipCandidate>()
+            for (s in items) {
+                val affordable = if (s.price > 0L) minOf(s.qty, cash / s.price) else 0L
+                if (affordable < 1L) {
+                    unfilled += s
+                    continue
+                }
+                Thread.sleep(ORDER_PACING_MS)
+                try {
+                    val req = KiwoomOrderReq(dmst_stex_tp = "KRX", stk_cd = s.stkCd, ord_qty = affordable.toString())
+                    val res = kiwoomOrderClient.placeBuyOrder(req)
+                    paperFillRepository.save(
+                        PaperFill(
+                            stkCd = s.stkCd, side = "BUY", fillDate = today,
+                            quantity = affordable, price = s.price, kiwoomOrderNo = res.ord_no,
+                            cycleIndex = s.cycleIndex, grade = s.grade,
+                            newEntry = s.newEntry, phase = PHASE_SECOND,
+                            note = "시장가 2차 발행(등급=${s.grade}, 사이징가=${s.price}, 시도 ${attempt}회차)",
+                        )
+                    )
+                    cash -= affordable * s.price
+                    val rest = s.qty - affordable
+                    if (rest >= 1L) unfilled += s.copy(qty = rest)
+                } catch (e: Exception) {
+                    log.error(e) { "2차 매수 실패 ${s.stkCd} ${affordable}주" }
+                    paperFillRepository.save(
+                        PaperFill(
+                            // REJ 도 phase=2 로 기록 → 잔여 차감에 포함되어 재시작 후에도 재시도하지 않음(기존 정책 유지)
+                            stkCd = s.stkCd, side = "REJ", fillDate = today,
+                            quantity = affordable, price = s.price,
+                            grade = s.grade, phase = PHASE_SECOND,
+                            note = "주문거부/실패(2차 BUY): ${e.message?.take(170)}",
+                        )
+                    )
+                }
+            }
+            items = unfilled
+            if (items.isEmpty()) break
+        }
+        log.info {
+            if (items.isEmpty()) "PaperTradeSecondBuyScheduler 완료 — 스킵 전량 소화"
+            else "PaperTradeSecondBuyScheduler 완료 — 미소화 ${items.size}건 소멸(익일 정상 사이클)"
+        }
     }
 
     private fun nextCycleIndex(ctx: ExecContext, stkCd: String, side: TrancheSide): Int {

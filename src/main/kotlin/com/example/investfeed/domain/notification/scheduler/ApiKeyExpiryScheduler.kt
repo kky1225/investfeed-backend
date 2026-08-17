@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.notification.entity.Direction
@@ -12,12 +13,6 @@ import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/**
- * API Key 유효기간 만료 알림 스케줄러.
- *
- * 매일 오전 9시에 실행하여 전체 API Key 를 순회하면서
- * 만료 30일 전 / 7일 전 / 당일에 1회씩 알림을 발송한다.
- */
 @Component
 class ApiKeyExpiryScheduler(
     private val memberApiKeyRepository: MemberApiKeyRepository,
@@ -27,7 +22,7 @@ class ApiKeyExpiryScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 9 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.API_KEY_EXPIRY, scheduler = "slowScheduler")
     fun checkApiKeyExpiry() {
         schedulerLogService.execute(SchedulerName.ApiKeyExpiryScheduler) {
             val start = System.currentTimeMillis()

@@ -9,6 +9,7 @@ import com.example.investfeed.domain.notification.config.NotificationWebSocketHa
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.rebalancing.repository.RebalancingSettingRepository
@@ -40,7 +41,7 @@ class RebalancingAlertScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.REBALANCING_ALERT, scheduler = "slowScheduler")
     fun checkRebalancing() {
         schedulerLogService.execute(SchedulerName.RebalancingAlertScheduler) {
             setSchedulerSecurityContext()

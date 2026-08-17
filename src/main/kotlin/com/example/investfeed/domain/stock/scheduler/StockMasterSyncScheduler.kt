@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.stock.scheduler
 
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
@@ -29,7 +30,7 @@ class StockMasterSyncScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 5 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.STOCK_MASTER_SYNC, scheduler = "slowScheduler")
     fun syncStockMaster() {
         schedulerLogService.execute(SchedulerName.StockMasterSyncScheduler) {
             sync(syncKr = true, syncUs = true)

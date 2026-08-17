@@ -8,6 +8,8 @@ data class SchedulerStatusRes(
     val schedulerType: String,
     val timeoutSec: Int,
     val state: String,              // SUCCESS / WARNING / FAILED / STUCK / PENDING
+    val fireStatus: String,         // FIRED / MISSED / NONE — 이번 사이클(직전 22:00~) 발화 여부
+    val lastFiredAt: LocalDateTime?,
     val lastStartedAt: LocalDateTime?,
     val lastFinishedAt: LocalDateTime?,
     val lastSuccessAt: LocalDateTime?,
@@ -17,11 +19,13 @@ data class SchedulerStatusRes(
     val updatedAt: LocalDateTime,
 ) {
     companion object {
-        fun from(e: SchedulerStatus, state: String) = SchedulerStatusRes(
+        fun from(e: SchedulerStatus, state: String, fireStatus: String = "NONE") = SchedulerStatusRes(
             schedulerName = e.schedulerName,
             schedulerType = e.schedulerType,
             timeoutSec = e.timeoutSec,
             state = state,
+            fireStatus = fireStatus,
+            lastFiredAt = e.lastFiredAt,
             lastStartedAt = e.lastStartedAt,
             lastFinishedAt = e.lastFinishedAt,
             lastSuccessAt = e.lastSuccessAt,

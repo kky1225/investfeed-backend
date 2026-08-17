@@ -67,6 +67,7 @@ class ManualTriggerService(
             "StockMasterSyncScheduler"     to { stockMasterSyncScheduler.syncStockMaster() },
             "HoldingGradeScheduler"        to { holdingGradeService.runHoldingGrade() },
             "PaperTradeExecScheduler"      to { paperTradeExecutionService.runPaperTradeExec() },
+            "PaperTradeSecondBuyScheduler" to { paperTradeExecutionService.runSecondPhaseBuys() },
             "IndexDailyCloseScheduler"     to { indexService.runCollectIndexClose() },
         )
     }

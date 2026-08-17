@@ -538,7 +538,7 @@ class RecommendService(
         }
     }
 
-    private fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
+    internal fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
         return try {
             val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList()
             Thread.sleep(API_PACING_MS)
@@ -1044,10 +1044,9 @@ class RecommendService(
             return GRADE_LADDER[moved.coerceIn(loIdx, hiIdx)]
         }
 
-        /**
-         * 백본 분류 근거 한 줄 재구성 — [classify] preBlockType 분기·상수와 동기화. 관리자 상세 표시용.
-         * 저장 필드만으로 "왜 이 등급인지" 설명. priorTrendRatio(B′)/foreignerAligned 가 null(구 데이터)이면 일부 불명.
-         */
+        private fun fmtX(v: Double): String =
+            if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+
         internal fun backboneReason(
             type: String,
             originSide: String?,
@@ -1057,54 +1056,89 @@ class RecommendService(
             foreignerAligned: Boolean?,
             frgnrBlocked: Boolean?,
             frgnrOppositeK: Double?,
+            conflict: Boolean = false,
         ): String {
-            if (originSide != Position.BUY.name && originSide != Position.SELL.name) return "-"
-            val sideKr = if (originSide == Position.BUY.name) "매수" else "매도"
-            val oppKStr = "%.1f".format(frgnrOppositeK ?: 0.0)
+            val signalBar = fmtX(K_SIGNAL)
+            val strongKBar = fmtX(K_STRONG_OVERRIDE)
+            val trendBar = "%.0f%%".format(TREND_CLARITY_THRESHOLD * 100)
+            val strongBar = "%.2f%%".format(MCAP_RATIO_STRONG * 100)
+            val buyBar = "%.2f%%".format(MCAP_RATIO_BUY * 100)
+
+            // 방향 미확정 — 백본 지표가 아예 없는 케이스. 이유가 둘이라 구분해서 적는다(과거엔 "-" 로만 남아 원인 추적 불가).
+            if (originSide != Position.BUY.name && originSide != Position.SELL.name) {
+                return if (conflict) "매수와 매도 신호가 동시에 잡혀 방향을 정하지 못했습니다. 그래서 보류(HOLD)입니다."
+                else "연기금 매매가 매수·매도 어느 쪽으로도 앞 10일 대비 ${signalBar}배에 못 미쳤습니다. " +
+                    "수급 방향 자체가 잡히지 않아 보류(HOLD)입니다."
+            }
+            val isBuy = originSide == Position.BUY.name
+            val sideKr = if (isBuy) "매수" else "매도"
+            val boughtSold = if (isBuy) "샀" else "팔았"
+            val oppKStr = fmtX(frgnrOppositeK ?: 0.0)
+
             // ① 외국인 BLOCK 2티어: 강반대(반대 K≥3.0) → HOLD 직행 / 중간반대(1.5~3.0) → 방향 유지(아래 정상 근거)
             if (frgnrBlocked == true && (frgnrOppositeK ?: 0.0) >= K_FOREIGNER_STRONG) {
-                return "외국인 강반대(반대 K $oppKStr ≥ $K_FOREIGNER_STRONG) → 방향 동결 HOLD"
+                return "외국인이 연기금과 반대 방향으로 ${oppKStr}배 강하게 움직이고 있습니다. " +
+                    "큰손끼리 엇갈리는 상황이라 손대지 않고 보류(HOLD)했습니다."
             }
 
             val k = penfndK ?: 0.0
-            val kStr = "%.1f".format(k)
-            // 외국인 시총비중을 추천 방향으로 정렬(양수 = 추천 방향으로 강함)
-            val eff = (frgnrMcapRatio ?: 0.0).let { if (originSide == Position.BUY.name) it else -it }
-            val effStr = "%.3f%%".format(eff * 100)
-            val strongBar = "%.2f%%".format(MCAP_RATIO_STRONG * 100)
-            val buyBar = "%.2f%%".format(MCAP_RATIO_BUY * 100)
-            val bpStr = priorTrendRatio?.let { "%.2f".format(it) }
-            val strongStrength = k >= K_STRONG_OVERRIDE || eff >= MCAP_RATIO_STRONG
+            val kStr = fmtX(k)
+            val eff = (frgnrMcapRatio ?: 0.0).let { if (isBuy) it else -it }
+            val effStr = "%.3f%%".format(abs(eff) * 100)
+            val bpPct = priorTrendRatio?.let { "%.0f%%".format(it * 100) }
+            val strongByK = k >= K_STRONG_OVERRIDE
+            val strongByMcap = eff >= MCAP_RATIO_STRONG
+            val strongStrength = strongByK || strongByMcap
 
-            // 세 수급 신호를 항상 표기: ① 외국인 BLOCK ② 연기금 K ③ 외국인 시총비중
-            val kMark = if (k >= K_STRONG_OVERRIDE) "≥$K_STRONG_OVERRIDE✓" else "<$K_STRONG_OVERRIDE"
-            val mcapMark = when {
-                eff >= MCAP_RATIO_STRONG -> "≥$strongBar✓"
-                eff >= MCAP_RATIO_BUY -> "≥$buyBar(STRONG 미달)"
-                else -> "미달"
+            val parts = mutableListOf<String>()
+            if (frgnrBlocked == true) {
+                parts += "외국인이 반대 방향으로 ${oppKStr}배 움직이고 있지만 " +
+                    "제동을 걸 만큼(${strongKBar}배)은 아니라 방향은 그대로 뒀습니다."
             }
-            val blockSig = if (frgnrBlocked == true) "외국인 중간반대(반대 K $oppKStr, 방향 유지)" else "외국인 BLOCK 없음"
-            val sig = "$blockSig · 연기금 K $kStr $kMark · 외국인 시총비중 $effStr $mcapMark"
 
-            // B′ 게이트 + 결론. B′ 값이 NULL(구 데이터)이어도 등급으로 통과/미달 추론.
-            val tail = when {
-                type.startsWith("STRONG") ->
-                    "· B′ ${if (bpStr != null) "$bpStr ≥ $TREND_CLARITY_THRESHOLD" else "통과(값 미저장)"} → STRONG 충족 → STRONG_$sideKr"
-                strongStrength ->
-                    "· B′ ${if (bpStr != null) "$bpStr < $TREND_CLARITY_THRESHOLD 미달" else "미달(등급으로 추론, 값 미저장)"} → STRONG 차단 → " +
-                        when {
-                            eff >= MCAP_RATIO_BUY -> "시총비중 ≥$buyBar → ${sideKr}(일반)"
-                            foreignerAligned == true -> "옵션B(외국인 동조) → ${sideKr}(일반)"
-                            else -> "추가 근거 없음 → HOLD"
-                        }
-                eff >= MCAP_RATIO_BUY ->
-                    "→ 시총비중 ≥$buyBar → ${sideKr}(일반)"
-                foreignerAligned == true ->
-                    "→ 옵션B(외국인 동조) → ${sideKr}(일반)"
-                else ->
-                    "→ 세 신호 모두 미달 → HOLD"
+            val strengthPhrase = when {
+                strongByK && strongByMcap ->
+                    "연기금이 앞 10일보다 ${kStr}배 강하게 ${boughtSold}고, 외국인도 시가총액의 ${effStr}를 ${sideKr}해 기준(${strongBar})을 넘었습니다"
+                strongByK -> "연기금이 앞 10일보다 ${kStr}배 강하게 ${boughtSold}습니다"
+                else -> "외국인이 시가총액의 ${effStr}를 ${sideKr}해 기준(${strongBar})을 넘었습니다"
             }
-            return "$sig $tail"
+            val mcapNormalPhrase = "외국인이 시가총액의 ${effStr}를 ${sideKr}해 기준(${buyBar})을 넘었습니다"
+            val alignedPhrase = "외국인이 12일 내내 같은 방향을 유지했습니다"
+
+            when {
+                type.startsWith("STRONG") -> {
+                    parts += strengthPhrase + "."
+                    parts += if (bpPct != null)
+                        "최근 매매도 ${bpPct} 한 방향으로 꾸준해 기준(${trendBar})을 충족했습니다. 그래서 강한 ${sideKr} 신호로 판단했습니다."
+                    else "꾸준함 조건도 충족해 강한 ${sideKr} 신호로 판단했습니다(당시 수치는 미저장)."
+                }
+                strongStrength -> {
+                    parts += strengthPhrase + "."
+                    parts += if (bpPct != null)
+                        "다만 최근 매매가 ${bpPct}만 한 방향이라 꾸준함 기준(${trendBar})에 미달해, 강한 신호로는 인정하지 않았습니다."
+                    else "다만 꾸준함 기준(${trendBar})에 미달해 강한 신호로는 인정하지 않았습니다(당시 수치는 미저장)."
+                    parts += when {
+                        eff >= MCAP_RATIO_BUY -> "$mcapNormalPhrase. 그래서 일반 ${sideKr}로 판단했습니다."
+                        foreignerAligned == true -> "$alignedPhrase. 그래서 일반 ${sideKr}로 판단했습니다."
+                        else -> "받쳐줄 다른 근거도 없어 보류(HOLD)했습니다."
+                    }
+                }
+                eff >= MCAP_RATIO_BUY -> {
+                    parts += "연기금 ${sideKr} 강도가 ${kStr}배로 기준(${strongKBar}배)에 못 미쳤습니다."
+                    parts += "$mcapNormalPhrase. 그래서 일반 ${sideKr}로 판단했습니다."
+                }
+                foreignerAligned == true -> {
+                    parts += "연기금 ${sideKr} 강도가 ${kStr}배로 기준(${strongKBar}배)에 못 미쳤습니다."
+                    parts += "$alignedPhrase. 그래서 일반 ${sideKr}로 판단했습니다."
+                }
+                else -> {
+                    parts += "연기금 ${sideKr} 강도가 ${kStr}배로 기준(${strongKBar}배)에 못 미쳤습니다."
+                    parts += if (eff < 0)
+                        "외국인은 오히려 반대 방향으로 시가총액의 ${effStr}만큼 움직였습니다. 근거가 없어 보류(HOLD)했습니다."
+                    else "외국인 ${sideKr} 규모도 시가총액의 ${effStr}로 기준(${buyBar})에 못 미쳐 보류(HOLD)했습니다."
+                }
+            }
+            return parts.joinToString(" ")
         }
     }
 
@@ -1282,10 +1316,15 @@ class RecommendService(
             }
         }
 
-    internal fun evaluateHoldingGrade(stkCd: String, stkNm: String): HoldingEvalResult {
+    internal fun evaluateHoldingGrade(
+        stkCd: String,
+        stkNm: String,
+        meta: Pair<Map<String, RiskFlags>, Map<String, String>>? = null,
+    ): HoldingEvalResult {
         val setting = RecommendSetting(memberId = 0L)
-        val buy = processCandidate(stkCd, stkNm, Position.BUY, holdingMode = true)
-        val sell = processCandidate(stkCd, stkNm, Position.SELL, holdingMode = true)
+        val (riskMap, marketTypeMap) = meta ?: buildStockMetadataMaps()
+        val buy = processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap, holdingMode = true)
+        val sell = processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap, holdingMode = true)
 
         val conflict = buy != null && sell != null && buy.type != "HOLD" && sell.type != "HOLD"
         val chosen: ProcessedPick? = when {
@@ -1370,8 +1409,17 @@ class RecommendService(
             }
             else -> {
                 finalType = applyAdjustmentsForTrading(stockPick, setting)  // 기본 풀 클램프 [0..4]
-                targetWeightRatio = if (finalType == "BUY" || finalType == "STRONG_BUY") volCap else null
-                tier = null
+                val buyGrade = finalType == "BUY" || finalType == "STRONG_BUY"
+                // 비중은 수급(백본)이, 속도는 최종 등급이 정한다 — 백본 HOLD 에서 모듈 승급만으로
+                // 만들어진 매수 등급은 반 비중(순추세 모듈의 매수 방향 발산 제한. 매도 방향 권한은 무제한 유지
+                // — 매도는 보유량 소진으로 자기제한). VOL_FLOOR 재클램프 없음: floor 고착(5%) 종목에서
+                // 클램프하면 반 비중이 무효화됨(×0.5 결과 2.5% 가 의도).
+                targetWeightRatio = when {
+                    !buyGrade -> null
+                    stockPick.type == "HOLD" -> volCap * BLOCK_PARTIAL_FACTOR
+                    else -> volCap
+                }
+                tier = if (buyGrade && stockPick.type == "HOLD") "MODULE_HALF" else null
             }
         }
         val evaluationReason = listOfNotNull(tier, if (conflict) "CONFLICT" else null)
@@ -1387,6 +1435,7 @@ class RecommendService(
             foreignerAligned = chosen?.foreignerAligned,
             frgnrBlocked = chosen?.frgnrBlocked,
             frgnrOppositeK = chosen?.frgnrK,
+            conflict = conflict,
         )
 
         return HoldingEvalResult(

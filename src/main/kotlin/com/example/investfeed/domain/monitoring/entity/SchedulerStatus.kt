@@ -17,6 +17,9 @@ class SchedulerStatus(
     var timeoutSec: Int = 180,
 
     @Column
+    var lastFiredAt: LocalDateTime? = null,
+
+    @Column
     var lastStartedAt: LocalDateTime? = null,
 
     @Column

@@ -5,6 +5,7 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.goal.entity.GoalType
 import com.example.investfeed.domain.goal.repository.InvestmentGoalRepository
 import com.example.investfeed.domain.goal.service.InvestmentGoalService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.notification.service.NotificationService
@@ -34,7 +35,7 @@ class GoalAlertScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 * * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.GOAL_ALERT, scheduler = "slowScheduler")
     fun checkGoals() {
         schedulerLogService.execute(SchedulerName.GoalAlertScheduler) {
             setSchedulerSecurityContext()

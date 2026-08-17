@@ -20,5 +20,6 @@ data class AdminPaperTradeHistoryRes(
         val ordQty: Long,             // 주문수량
         val ordUv: Long,              // 주문단가
         val ordNo: String?,
+        val tradeReason: String?,     // 매매 사유 (paper_fill.note, 주문번호 매칭) — 등급/사이징가/회차, 현금회수·2차 발행 등
     )
 }

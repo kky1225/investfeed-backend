@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.recommend.marketmacro
 
 import com.example.investfeed.domain.dashboard.DashboardIndexType
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.global.holiday.HolidayService
@@ -26,13 +27,14 @@ class MarketMacroScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 * 9-15 * * MON-FRI", scheduler = "fastScheduler")
+    @Scheduled(cron = SchedulerCron.MARKET_MACRO_DURING, scheduler = "fastScheduler")
     fun pollDuringMarket() = run()
 
-    @Scheduled(cron = "0 0 16 * * MON-FRI", scheduler = "fastScheduler")
+    @Scheduled(cron = SchedulerCron.MARKET_MACRO_CLOSE, scheduler = "fastScheduler")
     fun pollAtClose() = run()
 
     private fun run() {
+        schedulerLogService.markFired(SchedulerName.MarketMacroScheduler)
         if (holidayService.isHoliday()) return
         schedulerLogService.execute(SchedulerName.MarketMacroScheduler) {
             setSchedulerSecurityContext()

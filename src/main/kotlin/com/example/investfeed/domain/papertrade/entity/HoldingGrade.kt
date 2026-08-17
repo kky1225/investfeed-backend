@@ -58,11 +58,11 @@ class HoldingGrade(
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
-    // 평가 사유 라벨 — HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / CONFLICT (복수면 '|' 결합), 없으면 NULL.
+    // HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / MODULE_HALF / CONFLICT (복수면 '|' 결합), 없으면 NULL.
     @Column(name = "evaluation_reason")
     val evaluationReason: String? = null,
 
-    // 목표 비중 — 외국인 BLOCK 중간반대(1.5~3.0) 시 0.10(부분 트림/매수), 그 외 NULL(기본 매수 20%/매도 0%).
+    // 외국인 BLOCK 중간반대(1.5~3.0) 시 0.10(부분 트림/매수), 그 외 NULL(기본 매수 20%/매도 0%).
     @Column(name = "target_weight_ratio")
     val targetWeightRatio: Double? = null,
 

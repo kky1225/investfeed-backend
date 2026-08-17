@@ -4,6 +4,7 @@ import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.entity.Broker
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.notification.entity.Direction
@@ -39,7 +40,7 @@ class HoldingSyncScheduler(
         private const val OTHER_FAILURE_THRESHOLD = 0.10  // 기타실패율 10% 초과 시 시스템 이슈 의심
     }
 
-    @Scheduled(cron = "0 0 0 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.HOLDING_SYNC, scheduler = "slowScheduler")
     fun syncAllHoldings() {
         schedulerLogService.execute(SchedulerName.HoldingSyncScheduler) {
             log.info { "보유종목 동기화 스케줄러 시작" }

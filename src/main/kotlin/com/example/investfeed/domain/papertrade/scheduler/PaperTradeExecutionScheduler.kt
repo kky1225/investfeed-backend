@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.papertrade.scheduler
 
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.service.PaperTradeExecutionService
@@ -22,9 +23,10 @@ class PaperTradeExecutionScheduler(
         private const val RECOMMEND_CRON_MIN = 0
     }
 
-    @Scheduled(cron = "0 50 8 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.PAPER_TRADE_EXEC, scheduler = "slowScheduler")
     fun scheduledPaperTradeExec() {
         log.info { "PaperTradeExecScheduler cron fired" }
+        schedulerLogService.markFired(SchedulerName.PaperTradeExecScheduler)
         if (holidayService.isHoliday()) {
             log.info { "PaperTradeExecScheduler skipped: today is holiday" }
             return
@@ -49,5 +51,16 @@ class PaperTradeExecutionScheduler(
         }
 
         paperTradeExecutionService.runPaperTradeExec()
+    }
+
+    @Scheduled(cron = SchedulerCron.PAPER_TRADE_SECOND_BUY, scheduler = "slowScheduler")
+    fun scheduledSecondPhaseBuys() {
+        log.info { "PaperTradeSecondBuyScheduler cron fired" }
+        schedulerLogService.markFired(SchedulerName.PaperTradeSecondBuyScheduler)
+        if (holidayService.isHoliday()) {
+            log.info { "PaperTradeSecondBuyScheduler skipped: today is holiday" }
+            return
+        }
+        paperTradeExecutionService.runSecondPhaseBuys()
     }
 }

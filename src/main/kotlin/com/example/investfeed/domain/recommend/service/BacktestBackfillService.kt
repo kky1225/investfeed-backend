@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.recommend.service
 
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.recommend.entity.StockPickHistory
@@ -38,7 +39,7 @@ class BacktestBackfillService(
         private val MARKET_CLOSED_AT: LocalTime = LocalTime.of(22, 30)
     }
 
-    @Scheduled(cron = "0 30 22 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.BACKTEST_BACKFILL, scheduler = "slowScheduler")
     fun scheduledBackfill() {
         log.info { "BacktestBackfillScheduler cron fired" }
         runBackfill()

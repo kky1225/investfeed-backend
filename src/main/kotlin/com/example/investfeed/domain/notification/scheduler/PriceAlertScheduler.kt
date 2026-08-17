@@ -9,6 +9,7 @@ import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.notification.service.NotificationService
@@ -50,7 +51,7 @@ class PriceAlertScheduler(
         val CRYPTO_THRESHOLDS = listOf(5.0, 10.0, 20.0, 30.0)
     }
 
-    @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
+    @Scheduled(cron = SchedulerCron.PRICE_ALERT, scheduler = "fastScheduler")
     fun checkPriceAlerts() {
         schedulerLogService.execute(SchedulerName.PriceAlertScheduler) {
             setSchedulerSecurityContext()

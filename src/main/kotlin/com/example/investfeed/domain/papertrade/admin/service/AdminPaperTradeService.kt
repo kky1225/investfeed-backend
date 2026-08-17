@@ -8,6 +8,7 @@ import com.example.investfeed.domain.papertrade.admin.dto.res.AdminPaperAccountR
 import com.example.investfeed.domain.papertrade.admin.dto.res.AdminPaperRealizedPnlRes
 import com.example.investfeed.domain.papertrade.admin.dto.res.AdminPaperTradeHistoryRes
 import com.example.investfeed.domain.papertrade.repository.HoldingGradeRepository
+import com.example.investfeed.domain.papertrade.repository.PaperFillRepository
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.order.client.MockAccountClient
@@ -18,14 +19,11 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/**
- * 관리자 모의투자 매매 페이지용 데이터 집계.
- * 단일 모의계좌 전제 — 회원/계좌별 격리 없음.
- */
 @Service
 class AdminPaperTradeService(
     private val mockAccountClient: MockAccountClient,
     private val holdingGradeRepository: HoldingGradeRepository,
+    private val paperFillRepository: PaperFillRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -33,7 +31,6 @@ class AdminPaperTradeService(
         private val YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")
     }
 
-    // ── /account ─────────────────────────────────────────────────────────────
     fun getAccount(): AdminPaperAccountRes {
         val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
         val hold = mockAccountClient.holdingList(KiwoomHoldingReq(qry_tp = "1", dmst_stex_tp = "KRX"))
@@ -111,9 +108,9 @@ class AdminPaperTradeService(
         return AdminPaperRealizedPnlRes(viewMode = req.viewMode, year = req.year, month = req.month, items = grouped)
     }
 
-    // ── /trade-history (kt00007 계좌별 주문체결내역 상세, qry_tp=4) ───────────
     fun getTradeHistory(req: AdminPaperTradeHistoryReq): AdminPaperTradeHistoryRes {
-        val ordDtStr = (req.ordDt ?: LocalDate.now()).format(YYYYMMDD)
+        val ordDate = req.ordDt ?: LocalDate.now()
+        val ordDtStr = ordDate.format(YYYYMMDD)
         val res = mockAccountClient.tradeFills(
             KiwoomTradeFillsReq(
                 ord_dt = ordDtStr,
@@ -125,6 +122,9 @@ class AdminPaperTradeService(
                 dmst_stex_tp = "KRX", // 모의는 KRX만 지원
             )
         )
+        val tradeReasons = paperFillRepository.findByFillDate(ordDate)
+            .filter { it.kiwoomOrderNo != null && it.note != null }
+            .associateBy({ normOrdNo(it.kiwoomOrderNo!!) }, { it.note!! })
         val items = (res?.acnt_ord_cntr_prps_dtl.orEmpty()).map { r ->
             AdminPaperTradeHistoryRes.TradeItem(
                 ordDt = ordDtStr,
@@ -138,16 +138,14 @@ class AdminPaperTradeService(
                 ordQty = parseAmt(r.ord_qty),
                 ordUv = parseAmt(r.ord_uv),
                 ordNo = r.ord_no,
+                tradeReason = r.ord_no?.let { tradeReasons[normOrdNo(it)] },
             )
         }
         return AdminPaperTradeHistoryRes(ordDt = ordDtStr, items = items)
     }
 
-    // ── /holding-grade (보유 평가 탭) ────────────────────────────────────────
-    /**
-     * 22:10 HoldingGradeScheduler 가 저장한 보유 평가 결과 조회 (eval_date 단위).
-     * evalDate 미지정 시 가장 최근 평가일자 사용. 데이터 없으면 evalDate=null + 빈 items.
-     */
+    private fun normOrdNo(raw: String): String = raw.trim().trimStart('0').ifEmpty { "0" }
+
     fun getHoldingGrade(req: AdminHoldingGradeReq): AdminHoldingGradeRes {
         val target = req.evalDate
             ?: holdingGradeRepository.findFirstByOrderByEvalDateDesc()?.evalDate
@@ -181,20 +179,17 @@ class AdminPaperTradeService(
         return AdminHoldingGradeRes(evalDate = target, items = items)
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
     private fun toAlForm(raw: String?): String {
         if (raw.isNullOrBlank()) return "-"
         val bare = raw.substringBefore("_").trimStart('A', 'a')
         return if (bare.isBlank()) "-" else "${bare}_AL"
     }
 
-    /** 키움 숫자 문자열(부호·0패딩) → 절대값 Long. */
     private fun parseAmt(raw: String?): Long {
         val v = raw?.replace(Regex("[^0-9-]"), "")?.toLongOrNull() ?: return 0L
         return if (v < 0) -v else v
     }
 
-    /** 부호 유지 Long (손익 컬럼용). */
     private fun parseSignedLong(raw: String?): Long {
         return raw?.replace(Regex("[^0-9-]"), "")?.toLongOrNull() ?: 0L
     }

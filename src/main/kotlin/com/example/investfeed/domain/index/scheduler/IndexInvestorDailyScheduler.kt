@@ -2,6 +2,7 @@ package com.example.investfeed.domain.index.scheduler
 
 import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.index.service.IndexService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.global.holiday.HolidayService
@@ -34,7 +35,7 @@ class IndexInvestorDailyScheduler(
         private const val API_PACING_MS = 200L
     }
 
-    @Scheduled(cron = "0 0 7 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.INDEX_INVESTOR_DAILY, scheduler = "slowScheduler")
     fun collectDaily() {
         log.info { "IndexInvestorDailyScheduler cron fired" }
         schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {

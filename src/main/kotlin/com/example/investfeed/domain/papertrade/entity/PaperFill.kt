@@ -37,6 +37,15 @@ class PaperFill(
     @Column(name = "cycle_index")
     val cycleIndex: Int? = null, // 트랜치 사이클 번호
 
+    @Column(name = "grade")
+    val grade: String? = null, // 발행/스킵 시점 등급 (2차 우선순위·순수/모듈 성과 측정용)
+
+    @Column(name = "new_entry")
+    val newEntry: Boolean? = null, // 신규진입 여부 (매수/스킵 행)
+
+    @Column(name = "phase")
+    val phase: Int? = null, // 1=1차(08:50), 2=2차(09:01) — 2차 잔여 산출의 차감 기준
+
     @Column(name = "note")
     val note: String? = null, // 거부 사유/체결 메모 등
 

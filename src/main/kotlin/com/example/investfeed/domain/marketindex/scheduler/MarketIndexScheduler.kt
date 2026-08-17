@@ -2,6 +2,7 @@ package com.example.investfeed.domain.marketindex.scheduler
 
 import com.example.investfeed.domain.marketindex.crawler.NaverMarketIndexCrawler
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import mu.KotlinLogging
@@ -17,7 +18,7 @@ class MarketIndexScheduler(
 
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
+    @Scheduled(cron = SchedulerCron.MARKET_INDEX, scheduler = "fastScheduler")
     fun crawlAndSave() {
         schedulerLogService.execute(SchedulerName.MarketIndexScheduler) {
             try {

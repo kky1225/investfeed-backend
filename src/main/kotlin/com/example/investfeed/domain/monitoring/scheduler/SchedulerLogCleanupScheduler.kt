@@ -3,6 +3,7 @@ package com.example.investfeed.domain.monitoring.scheduler
 import com.example.investfeed.domain.monitoring.repository.ErrorLogRepository
 import com.example.investfeed.domain.monitoring.repository.LogAckHistoryRepository
 import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import mu.KotlinLogging
@@ -11,10 +12,6 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
-/**
- * scheduler_log 90일 초과 행 자동 정리.
- * 매일 새벽 4시 실행.
- */
 @Component
 class SchedulerLogCleanupScheduler(
     private val schedulerLogRepository: SchedulerLogRepository,
@@ -24,7 +21,7 @@ class SchedulerLogCleanupScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 0 4 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.SCHEDULER_LOG_CLEANUP, scheduler = "slowScheduler")
     @Transactional
     fun cleanup() {
         schedulerLogService.execute(SchedulerName.SchedulerLogCleanupScheduler) {

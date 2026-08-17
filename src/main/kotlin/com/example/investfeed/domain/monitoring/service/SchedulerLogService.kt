@@ -16,16 +16,6 @@ import java.time.LocalDateTime
 
 enum class SchedulerType { FAST, SLOW }
 
-/**
- * 스케줄러 실행을 감싸서 실행 이력/최근 상태를 기록한다.
- *
- * - FAST (매분): 정상 실행 시 scheduler_status 만 UPSERT, scheduler_log INSERT 스킵.
- *                단, duration > timeout_sec 이면 INTERRUPTED 로 scheduler_log INSERT.
- * - SLOW (시간/일 단위): 성공/실패 무관 scheduler_log INSERT + scheduler_status UPSERT.
- *   · duration > timeout_sec 이어도 결국 성공한 경우 status='INTERRUPTED' 로 기록 → 24h WARNING 표시.
- *
- * 기록 실패가 실제 스케줄러 동작을 막지 않도록 모든 DB 호출은 runCatching 으로 감싼다.
- */
 @Service
 class SchedulerLogService(
     private val schedulerLogRepository: SchedulerLogRepository,
@@ -34,7 +24,6 @@ class SchedulerLogService(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        /** MDC 키. 스케줄러 실행 중 발생한 ERROR 로그를 어떤 스케줄러 것인지 식별하기 위함. */
         const val MDC_SCHEDULER_NAME = "schedulerName"
     }
 
@@ -43,6 +32,7 @@ class SchedulerLogService(
         val type = scheduler.type
         val startedAt = LocalDateTime.now()
         MDC.put(MDC_SCHEDULER_NAME, name)
+        markFired(scheduler)
         runCatching { markStarted(scheduler, startedAt) }
             .onFailure { log.error { "scheduler_status markStarted 실패 ($name): ${it.message}" } }
 
@@ -108,6 +98,25 @@ class SchedulerLogService(
             throw e
         } finally {
             MDC.remove(MDC_SCHEDULER_NAME)
+        }
+    }
+
+    fun markFired(scheduler: SchedulerName) {
+        runCatching { updateFiredAt(scheduler, LocalDateTime.now()) }
+            .onFailure { log.error { "scheduler_status last_fired_at 갱신 실패 (${scheduler.name}): ${it.message}" } }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    internal fun updateFiredAt(scheduler: SchedulerName, at: LocalDateTime) {
+        val entity = schedulerStatusRepository.findById(scheduler.name).orElse(
+            SchedulerStatus(schedulerName = scheduler.name, schedulerType = scheduler.type.name)
+        )
+
+        if (entity != null) {
+            entity.schedulerType = scheduler.type.name
+            entity.lastFiredAt = at
+            entity.updatedAt = LocalDateTime.now()
+            schedulerStatusRepository.save(entity)
         }
     }
 

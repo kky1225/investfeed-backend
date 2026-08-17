@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.dividend.scheduler
 
 import com.example.investfeed.domain.dividend.service.StockDividendService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import mu.KotlinLogging
@@ -14,7 +15,7 @@ class StockDividendScheduler(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Scheduled(cron = "0 30 13 * * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.STOCK_DIVIDEND, scheduler = "slowScheduler")
     fun collectDaily() {
         schedulerLogService.execute(SchedulerName.StockDividendScheduler) {
             try {

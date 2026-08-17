@@ -2,6 +2,7 @@ package com.example.investfeed.domain.investor.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.investor.service.InvestorService
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.global.holiday.HolidayService
@@ -14,15 +15,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import java.time.LocalTime
 
-/**
- * 투자자별 장마감 순위(ka10066) 데이터를 매분 백그라운드로 Redis 에 갱신한다.
- *
- * - 실행 구간: 평일 15:36 ~ 21:00
- *   · 15:36 (KRX_TRADE_CLOSE) 부터 장마감 데이터 집계 시작
- *   · 20:00 NXT 마감 이후 데이터 확정, 21:00 까지는 정정거래 대비 여유
- * - 휴일(주말/공휴일) skip
- * - 실행 결과가 없어도 사용자 요청은 InvestorService 의 on-demand fallback 으로 처리됨
- */
 @Component
 class InvestorCloseMarketScheduler(
     private val investorService: InvestorService,
@@ -39,7 +31,7 @@ class InvestorCloseMarketScheduler(
         private val RUN_END: LocalTime = LocalTime.of(21, 0)
     }
 
-    @Scheduled(cron = "0 * * * * *", scheduler = "fastScheduler")
+    @Scheduled(cron = SchedulerCron.INVESTOR_CLOSE_MARKET, scheduler = "fastScheduler")
     fun refresh() {
         schedulerLogService.execute(SchedulerName.InvestorCloseMarketScheduler) {
             if (holidayService.isHoliday()) return@execute

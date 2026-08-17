@@ -1,5 +1,6 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import mu.KotlinLogging
@@ -30,7 +31,7 @@ class HolidayService(
 
     private val monthlyHolidays: MutableMap<String, Set<String>> = ConcurrentHashMap()
 
-    @Scheduled(cron = "0 5 0 1 * *", scheduler = "slowScheduler")
+    @Scheduled(cron = SchedulerCron.HOLIDAY_REFRESH, scheduler = "slowScheduler")
     fun refreshHolidays() {
         schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
             syncHolidays()
