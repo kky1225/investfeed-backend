@@ -32,7 +32,7 @@ enum class SchedulerName(
     HoldingGradeScheduler(SchedulerType.SLOW, 600, "거래일 22:10", blockedOnHoliday = true, crons = listOf(SchedulerCron.HOLDING_GRADE)),
     BacktestBackfillScheduler(SchedulerType.SLOW, 600, "매일 22:30", crons = listOf(SchedulerCron.BACKTEST_BACKFILL)),
     HoldingSyncScheduler(SchedulerType.SLOW, 600, "매일 00:00", crons = listOf(SchedulerCron.HOLDING_SYNC)),
-    HolidayRefreshScheduler(SchedulerType.SLOW, 120, "매월 1일 00:05", crons = listOf(SchedulerCron.HOLIDAY_REFRESH)),
+    HolidayRefreshScheduler(SchedulerType.SLOW, 300, "매일 00:05", crons = listOf(SchedulerCron.HOLIDAY_REFRESH)),
     IndexDailyCloseScheduler(SchedulerType.SLOW, 120, "매일 00:10", crons = listOf(SchedulerCron.INDEX_DAILY_CLOSE)),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00", crons = listOf(SchedulerCron.SCHEDULER_LOG_CLEANUP)),
     StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00", crons = listOf(SchedulerCron.STOCK_MASTER_SYNC)),

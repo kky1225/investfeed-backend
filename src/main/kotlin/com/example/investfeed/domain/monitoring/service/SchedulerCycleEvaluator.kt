@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.monitoring.service
 
+import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerFireStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import mu.KotlinLogging
@@ -28,8 +29,7 @@ class SchedulerCycleEvaluator {
 
     fun evaluate(
         scheduler: SchedulerName,
-        lastFiredAt: LocalDateTime?,
-        lastStartedAt: LocalDateTime?,
+        status: SchedulerStatus,
         now: LocalDateTime,
         isHoliday: Boolean,
     ): SchedulerFireStatus {
@@ -47,15 +47,19 @@ class SchedulerCycleEvaluator {
         val interval = intervalOf(expressions, cycleStart) ?: return SchedulerFireStatus.NONE
         if (interval < MIN_TRACKED_INTERVAL) return SchedulerFireStatus.NONE
 
-        val firedAt = listOfNotNull(lastFiredAt, lastStartedAt).maxOrNull()
-        val firedInCycle = firedAt != null && !firedAt.isBefore(cycleStart)
+        val completedAt = listOfNotNull(status.lastSuccessAt, status.lastFailureAt).maxOrNull()
+        if (completedAt != null && !completedAt.isBefore(cycleStart)) return SchedulerFireStatus.FIRED
 
-        val base = if (firedInCycle) firedAt!!.plus(FIRE_SKEW) else cycleStart.minusNanos(1)
-        val nextDue = nextAfter(expressions, base) ?: return if (firedInCycle) SchedulerFireStatus.FIRED else SchedulerFireStatus.NONE
+        val startedAt = listOfNotNull(status.lastFiredAt, status.lastStartedAt).maxOrNull()
+        if (startedAt != null &&
+            !startedAt.isBefore(cycleStart.minus(FIRE_SKEW)) &&
+            Duration.between(startedAt, now).seconds <= status.timeoutSec
+        ) return SchedulerFireStatus.NONE
 
+        val nextDue = nextAfter(expressions, cycleStart.minusNanos(1)) ?: return SchedulerFireStatus.NONE
         if (nextDue.plus(graceOf(expressions, nextDue)).isBefore(now)) return SchedulerFireStatus.MISSED
 
-        return if (firedInCycle) SchedulerFireStatus.FIRED else SchedulerFireStatus.NONE
+        return SchedulerFireStatus.NONE
     }
 
     private fun nextAfter(expressions: List<CronExpression>, from: LocalDateTime): LocalDateTime? =

@@ -86,6 +86,9 @@ object Permissions {
     /** 미국 업종별 데이터 */
     const val US_STOCK_SECT = "US_STOCK_SECT"
 
+    /** 미국 환전 적용환율/환전 계산기/원달러 추이 */
+    const val US_STOCK_EXCHANGE = "US_STOCK_EXCHANGE"
+
     /** 추천 종목 */
     const val STOCK_RECOMMEND = "STOCK_RECOMMEND"
 

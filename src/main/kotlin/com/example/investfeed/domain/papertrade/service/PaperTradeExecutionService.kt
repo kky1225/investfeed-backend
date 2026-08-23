@@ -68,6 +68,7 @@ class PaperTradeExecutionService(
         val lastCycles: Map<String, LastCycle>, // 정규화 stkCd → 직전 사이클 체결(보유 종목만 조회)
         val explicitHolds: Map<String, String?>, // holding_grade 명시 type=HOLD 보유 (코드 → origin_side, 회수 1~3티어용)
         val moduleHalfCodes: Set<String>,        // MODULE_HALF 라벨 보유 (모듈 승급 BUY — 회수 4티어: 목표 초과분 회수용)
+        val pickK: Map<String, Double>,          // 정규화 stkCd → 당일 픽 연기금 K (신규진입 동급 내 우선순위용)
     )
 
     private data class OrderCandidate(
@@ -87,6 +88,7 @@ class PaperTradeExecutionService(
         val grade: String,
         val newEntry: Boolean,
         val cycleIndex: Int,
+        val slotWait: Boolean = false, // true=만석이지만 당일 전량 매도 발행분만큼 슬롯이 열릴 예정 — 2차(09:01)에서 보유 수 재확인 후 진입
     )
 
 
@@ -113,10 +115,11 @@ class PaperTradeExecutionService(
                 "보유=${ctx.holdings.size}종목, 등급=${ctx.grades.size}종목"
         }
 
-        // ④ 종목별 희망 주문 산출
-        val candidates = buildOrderCandidates(ctx)
+        // ④ 종목별 희망 주문 산출 (+ 만석 시 전량 매도 예정분만큼의 슬롯대기 SKIP)
+        val (candidates, slotWaits) = buildOrderCandidates(ctx)
         log.info {
-            "PaperTradeExecScheduler 주문후보 ${candidates.size}건: " +
+            "PaperTradeExecScheduler 주문후보 ${candidates.size}건" +
+                (if (slotWaits.isNotEmpty()) ", 슬롯대기 ${slotWaits.size}건" else "") + ": " +
                 candidates.joinToString { "${it.stkCd}:${it.side}:${it.qty}(${it.grade})" }
         }
 
@@ -147,6 +150,11 @@ class PaperTradeExecutionService(
                 log.info { "PaperTradeExecScheduler: 현금부족 스킵 ${b.stkCd}(${b.grade}) ${rest}주 left=$cashLeft" }
             }
         }
+
+        // 슬롯대기 SKIP 합류 (거래정지 제외) — 부족액 산정·⑧-b 기록·2차 매수 입력을 현금 스킵과 동일 경로로 공유
+        skips += slotWaits.filter { it.stkCd !in halted }
+        // 2차 발행 순서는 SKIP 행 id 순 — 등급 → 동급 내 연기금 K 큰 순으로 정렬해 기록 순서 = 우선순위가 되게 한다
+        skips.sortWith(compareBy({ if (it.grade == "STRONG_BUY") 0 else 1 }, { -(ctx.pickK[it.stkCd] ?: 0.0) }))
 
         // ⑥-b 현금회수 매도 — 신규진입 스킵 부족액만큼 HOLD 보유를 트랜치 매도해 2차 매수 자금 확보
         val recoverySells = buildRecoverySells(ctx, sells, skips, halted)
@@ -193,7 +201,8 @@ class PaperTradeExecutionService(
                     stkCd = s.stkCd, side = "SKIP", fillDate = today,
                     quantity = s.qty, price = s.price, cycleIndex = s.cycleIndex,
                     grade = s.grade, newEntry = s.newEntry, phase = PHASE_FIRST,
-                    note = "현금부족 스킵(등급=${s.grade}, ${if (s.newEntry) "신규진입" else "보유추가"})",
+                    note = if (s.slotWait) "슬롯대기 스킵(등급=${s.grade}, 전량매도 발행분 슬롯 개방 대기)"
+                    else "현금부족 스킵(등급=${s.grade}, ${if (s.newEntry) "신규진입" else "보유추가"})",
                 )
             )
         }
@@ -226,9 +235,11 @@ class PaperTradeExecutionService(
         val targetRatios = mutableMapOf<String, Double?>()
         val seedPrices = mutableMapOf<String, Long>()
         val riskBlocked = mutableSetOf<String>()
+        val pickK = mutableMapOf<String, Double>()
         val normalBlocked = RiskPreset.NORMAL.blockedCategories() // {정리매매, 투자위험}
         stockPickRepository.findAll().forEach { p ->
             val cd = normCd(p.stkCd) ?: return@forEach
+            p.penfndK?.let { pickK[cd] = it }
             // 신규진입 등급 = 추천과 동일한 Stage1(절대 점수제, 진영 클램프, 전체 모듈, 매크로 제외).
             // 백본(p.type) 그대로 쓰면 데드크로스 등 모듈 격하를 못 봐서 추천(HOLD)과 어긋남 → 추천 등급으로 통일.
             grades[cd] = recommendService.newEntryGrade(p)
@@ -262,7 +273,7 @@ class PaperTradeExecutionService(
             nav = nav, availableCash = availableCash,
             holdings = holdings, grades = grades, targetRatios = targetRatios,
             seedPrices = seedPrices, riskBlocked = riskBlocked, lastCycles = lastCycles,
-            explicitHolds = explicitHolds, moduleHalfCodes = moduleHalfCodes,
+            explicitHolds = explicitHolds, moduleHalfCodes = moduleHalfCodes, pickK = pickK,
         )
     }
 
@@ -347,11 +358,11 @@ class PaperTradeExecutionService(
 
     fun runSecondPhaseBuys() {
         val today = LocalDate.now()
-        if (paperFillRepository.findByFillDateAndSide(today, "SKIP").isEmpty()) {
-            log.info { "PaperTradeSecondBuyScheduler: 당일 스킵 없음 — 종료" }
-            return
-        }
         schedulerLogService.execute(SchedulerName.PaperTradeSecondBuyScheduler) {
+            if (paperFillRepository.findByFillDateAndSide(today, "SKIP").isEmpty()) {
+                log.info { "PaperTradeSecondBuyScheduler: 당일 스킵 없음 — 종료" }
+                return@execute
+            }
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
@@ -373,6 +384,9 @@ class PaperTradeExecutionService(
         return paperFillRepository.findByFillDateAndSide(today, "SKIP")
             .groupBy { it.stkCd }
             .mapNotNull { (_, rows) -> rows.maxByOrNull { it.id } }
+            // 발행 우선순위: STRONG_BUY 신규 → BUY 신규 → 보유 추가매수.
+            // 동급 내에서는 id 순 — 1차(⑧-b)가 등급 → 연기금 K 큰 순으로 정렬해 저장하므로 id 순 = K 순.
+            .sortedWith(compareBy({ it.newEntry != true }, { if (it.grade == "STRONG_BUY") 0 else 1 }, { it.id }))
             .mapNotNull { s ->
                 val remaining = s.quantity - (issued[s.stkCd] ?: 0L)
                 if (remaining < 1L || s.price <= 0L) null
@@ -382,8 +396,6 @@ class PaperTradeExecutionService(
                     cycleIndex = s.cycleIndex ?: 1,
                 )
             }
-            // 발행 우선순위: STRONG_BUY 신규 → BUY 신규 → 보유 추가매수
-            .sortedWith(compareBy({ !it.newEntry }, { if (it.grade == "STRONG_BUY") 0 else 1 }))
     }
 
     private fun doSecondPhaseBuys(today: LocalDate) {
@@ -396,10 +408,23 @@ class PaperTradeExecutionService(
             if (attempt > 1) Thread.sleep(SECOND_PHASE_RETRY_MS)
             val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
             var cash = parseAmt(dep.ord_alow_amt)
+            // 보유 수 재조회 — 슬롯대기 신규진입은 1차 전량 매도가 실제 체결되어 슬롯이 열렸을 때만 발행
+            // (매도 미체결이면 만석 그대로 → 발행 안 함 → 캡 초과 없음. 조회 실패 시 보수적으로 슬롯 0)
+            val heldNow = mockAccountClient.holdingList(KiwoomHoldingReq(qry_tp = "1", dmst_stex_tp = "KRX"))
+                ?.acnt_evlt_remn_indv_tot.orEmpty()
+                .filter { parseAmt(it.rmnd_qty) > 0L }
+                .mapNotNull { normCd(it.stk_cd) }
+                .toSet()
+            var slots = (MAX_CONCURRENT_HOLDINGS - heldNow.size).coerceAtLeast(0)
             // 회차별 주문가능금액 = 시가 매도 대금 반영 추적 — 모의서버 재사용금 지원 여부의 실측 근거
-            log.info { "PaperTradeSecondBuyScheduler ${attempt}회차 — 주문가능금액=$cash, 잔여후보 ${items.size}건" }
+            log.info { "PaperTradeSecondBuyScheduler ${attempt}회차 — 주문가능금액=$cash, 보유=${heldNow.size}종목(슬롯 $slots), 잔여후보 ${items.size}건" }
             val unfilled = mutableListOf<SkipCandidate>()
             for (s in items) {
+                val needsSlot = s.newEntry && s.stkCd !in heldNow
+                if (needsSlot && slots < 1) {
+                    unfilled += s   // 슬롯 미개방(매도 미체결 등) — 다음 회차 재확인
+                    continue
+                }
                 val affordable = if (s.price > 0L) minOf(s.qty, cash / s.price) else 0L
                 if (affordable < 1L) {
                     unfilled += s
@@ -419,6 +444,7 @@ class PaperTradeExecutionService(
                         )
                     )
                     cash -= affordable * s.price
+                    if (needsSlot) slots--
                     val rest = s.qty - affordable
                     if (rest >= 1L) unfilled += s.copy(qty = rest)
                 } catch (e: Exception) {
@@ -457,13 +483,14 @@ class PaperTradeExecutionService(
      * ④ 종목별 희망 주문 산출 (TrancheCalculator).
      * - 보유 종목: grades 등급(없으면 HOLD=동결)으로 평가, 가격=조회 현재가.
      * - 비보유 종목: stock_pick STRONG_BUY/BUY 만 신규 진입 후보(HOLD/SELL 등은 무행동 — 없는 걸 못 팖).
-     *   가격=ma5(없으면 스킵). 동시 보유 ≤20 캡(신규 진입 한정), STRONG_BUY 우선.
+     *   가격=ma5(없으면 스킵). 동시 보유 ≤20 캡(신규 진입 한정), 우선순위 = 등급 → 동급 내 연기금 K 큰 순.
+     * - 만석 시 이번 사이클 전량 매도 발행 수만큼 슬롯대기 SKIP 반환(second = 2차 09:01 인계분).
      * 현금 STRONG우선 배분·거래정지/상하한 사전필터·실제 발행은 서브스텝 4.
      *
      * 동시 보유 캡은 모의투자 수익률 검증 단계에서 표본 확보를 위해 10→20 으로 확장(2026-05-28).
      * 실투자 단계에서는 현금 비중 정책과 함께 재검토 예정.
      */
-    private fun buildOrderCandidates(ctx: ExecContext): List<OrderCandidate> {
+    private fun buildOrderCandidates(ctx: ExecContext): Pair<List<OrderCandidate>, List<SkipCandidate>> {
         val candidates = mutableListOf<OrderCandidate>()
 
         // 보유 종목 — 등급대로(HOLD/SELL/STRONG_SELL 등 전부). 목표비중(holding_grade volCap×block)도 전달.
@@ -477,25 +504,41 @@ class PaperTradeExecutionService(
             }
         }
 
-        // 신규 진입 — 비보유 + STRONG_BUY/BUY 만, 성향필터(정리매매·투자위험) 통과, 동시보유 ≤20 캡, STRONG 우선
+        // 신규 진입 — 비보유 + STRONG_BUY/BUY 만, 성향필터(정리매매·투자위험) 통과, 동시보유 ≤20 캡.
+        // 우선순위: 등급(STRONG_BUY 먼저) → 동급 내 연기금 K 큰 순.
+        // 만석이어도 이번 사이클 전량 매도 발행 수만큼은 슬롯이 열릴 예정 — 그만큼의 픽은 즉시 매수 대신
+        // 슬롯대기 SKIP 으로 기록해 2차(09:01)에 넘긴다(2차가 보유 수 재조회로 실제 개방 확인 후 발행 —
+        // 매도 미체결이면 자동 무산되어 캡 초과 없음).
         val newSlots = (MAX_CONCURRENT_HOLDINGS - ctx.holdings.size).coerceAtLeast(0)
+        val pendingExitSlots = candidates.count {
+            it.side == TrancheSide.SELL && it.qty == ctx.holdings[it.stkCd]?.qty
+        }
         val newEntryCds = ctx.grades.keys
             .filter { it !in ctx.holdings && (ctx.grades[it] == "STRONG_BUY" || ctx.grades[it] == "BUY") }
-            .sortedBy { if (ctx.grades[it] == "STRONG_BUY") 0 else 1 }
+            .sortedWith(
+                compareBy({ if (ctx.grades[it] == "STRONG_BUY") 0 else 1 }, { -(ctx.pickK[it] ?: 0.0) })
+            )
+        val slotWaitSkips = mutableListOf<SkipCandidate>()
         var used = 0
         for (cd in newEntryCds) {
-            if (used >= newSlots) break
+            if (used >= newSlots + pendingExitSlots) break
             if (cd in ctx.riskBlocked) continue              // ⑤-a 정리매매/투자위험 → 신규 진입 차단
             val price = ctx.seedPrices[cd] ?: continue       // ma5 없으면 사이징 불가 → 스킵
             if (price <= 0L) continue
             val grade = ctx.grades.getValue(cd)
             val o = trancheCalculator.calculate(grade, 0L, price, ctx.nav, ctx.targetRatios[cd])
             if (o.side == TrancheSide.BUY && o.qty > 0L) {
-                candidates += OrderCandidate(cd, o.side, o.qty, grade, price, cycleIndex = 1)
+                if (used < newSlots) {
+                    candidates += OrderCandidate(cd, o.side, o.qty, grade, price, cycleIndex = 1)
+                } else {
+                    slotWaitSkips += SkipCandidate(
+                        cd, o.qty, price, grade, newEntry = true, cycleIndex = 1, slotWait = true,
+                    )
+                }
                 used++
             }
         }
-        return candidates
+        return candidates to slotWaitSkips
     }
 
     /**

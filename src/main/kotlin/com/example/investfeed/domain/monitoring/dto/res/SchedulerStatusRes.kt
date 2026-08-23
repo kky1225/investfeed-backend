@@ -8,7 +8,7 @@ data class SchedulerStatusRes(
     val schedulerType: String,
     val timeoutSec: Int,
     val state: String,              // SUCCESS / WARNING / FAILED / STUCK / PENDING
-    val fireStatus: String,         // FIRED / MISSED / NONE — 이번 사이클(직전 22:00~) 발화 여부
+    val fireStatus: String,         // FIRED / MISSED / NONE — 이번 사이클(직전 22:00~) 완주 여부
     val lastFiredAt: LocalDateTime?,
     val lastStartedAt: LocalDateTime?,
     val lastFinishedAt: LocalDateTime?,

@@ -23,7 +23,7 @@ object SchedulerCron {
 
     // ─────────── SLOW (일/월 단위) ───────────
     const val HOLDING_SYNC = "0 0 0 * * *"
-    const val HOLIDAY_REFRESH = "0 5 0 1 * *"
+    const val HOLIDAY_REFRESH = "0 5 0 * * *"
     const val INDEX_DAILY_CLOSE = "0 10 0 * * *"
     const val SCHEDULER_LOG_CLEANUP = "0 0 4 * * *"
     const val STOCK_MASTER_SYNC = "0 0 5 * * *"

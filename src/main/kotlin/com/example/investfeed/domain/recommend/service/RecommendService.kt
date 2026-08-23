@@ -656,7 +656,8 @@ class RecommendService(
      *
      * @param frgnrOppositeK 외국인 추천 반대 방향 K. 강반대(≥3.0) 판정용 (매매 freeze 와 동일 지표·임계).
      * @param foreignerAligned [isForeignerDirectionallyAligned] 결과. 호출부에서 미리 계산해서 전달.
-     * @param holdingMode true=BLOCK 시 preBlockType 유지(3티어는 호출부). false(추천)=강반대 HOLD/중간반대 방향 유지.
+     * @param holdingMode true=BLOCK 시 preBlockType 유지(3티어는 호출부) + 매도 K≥[K_TREND_OVERRIDE] 시 B′ 무시 STRONG_SELL.
+     *                    false(추천)=강반대 HOLD/중간반대 방향 유지, 폭발 오버라이드 미적용.
      */
     internal fun classify(
         penfndK: Double,
@@ -673,6 +674,8 @@ class RecommendService(
 
         // BLOCK 아닐 때의 분류 (BLOCK 격하 매핑에도 재사용)
         val preBlockType = when {
+            // 보유평가 매도 한정: 폭발 강도(K≥5.0)는 B′ 미달이어도 STRONG_SELL.
+            holdingMode && position == Position.SELL && penfndK >= K_TREND_OVERRIDE -> "STRONG_$sideName"
             penfndK >= K_STRONG_OVERRIDE && !priorTrendUnclear -> "STRONG_$sideName"
             foreignerEffectiveRatio >= MCAP_RATIO_STRONG && !priorTrendUnclear -> "STRONG_$sideName"
             foreignerEffectiveRatio >= MCAP_RATIO_BUY -> sideName
@@ -974,6 +977,7 @@ class RecommendService(
         private const val K_BLOCK = 1.5           // 외국인 차단 임계 (평균/평균)
         private const val K_STRONG_OVERRIDE = 3.0 // 연기금 STRONG 격상 임계 (평균/평균)
         private const val K_FOREIGNER_STRONG = 3.0  // 외국인 강한 반대 임계 — 보유평가 BLOCK 시 HOLD 동결
+        private const val K_TREND_OVERRIDE = 5.0  // 보유평가 매도 한정: B′ 미달이어도 STRONG_SELL 강제하는 폭발 임계 (평균/평균)
         private const val BLOCK_PARTIAL_FACTOR = 0.5 // 외국인 중간반대(1.5~3.0) 시 변동성 캡에 곱하는 배수(절반)
         private const val TREND_CLARITY_THRESHOLD = 0.7 // prior 강도 비율 임계 (미만이면 STRONG 격하)
         private const val MCAP_RATIO_BUY = 0.0005    // 0.05%
@@ -1057,6 +1061,7 @@ class RecommendService(
             frgnrBlocked: Boolean?,
             frgnrOppositeK: Double?,
             conflict: Boolean = false,
+            holdingMode: Boolean = false,
         ): String {
             val signalBar = fmtX(K_SIGNAL)
             val strongKBar = fmtX(K_STRONG_OVERRIDE)
@@ -1106,6 +1111,16 @@ class RecommendService(
             val alignedPhrase = "외국인이 12일 내내 같은 방향을 유지했습니다"
 
             when {
+                // 보유평가 매도 폭발 오버라이드(K≥5.0): B′ 미달인데도 STRONG_SELL 이 된 경우 — 꾸준함 충족 문구가 아닌 전용 사유
+                type.startsWith("STRONG") && holdingMode && !isBuy && k >= K_TREND_OVERRIDE
+                    && (priorTrendRatio ?: 1.0) < TREND_CLARITY_THRESHOLD -> {
+                    parts += strengthPhrase + "."
+                    parts += if (bpPct != null)
+                        "최근 매매가 ${bpPct}만 한 방향이라 꾸준함 기준(${trendBar})에는 미달하지만, " +
+                            "매도 강도가 폭발 기준(${fmtX(K_TREND_OVERRIDE)}배)을 넘어 강한 매도로 판단했습니다."
+                    else "꾸준함 기준(${trendBar})에는 미달하지만, " +
+                        "매도 강도가 폭발 기준(${fmtX(K_TREND_OVERRIDE)}배)을 넘어 강한 매도로 판단했습니다(당시 수치는 미저장)."
+                }
                 type.startsWith("STRONG") -> {
                     parts += strengthPhrase + "."
                     parts += if (bpPct != null)
@@ -1351,7 +1366,8 @@ class RecommendService(
             marketType = chosen.marketType
         } else {
             // 양방향 컷/충돌 → HOLD. 모듈이 HOLD 를 움직일 수 있도록 지표 확보.
-            marketType = buy?.marketType ?: sell?.marketType
+            // 시장 구분은 수급 판정과 무관한 정적 정보 — 양쪽 다 컷돼도 메타 맵으로 채운다(없으면 화면 "-").
+            marketType = buy?.marketType ?: sell?.marketType ?: marketTypeMap[stkCd.substringBefore("_")]
             originSide = null
             penfndK = null
             frgnrMcapRatio = null
@@ -1436,6 +1452,7 @@ class RecommendService(
             frgnrBlocked = chosen?.frgnrBlocked,
             frgnrOppositeK = chosen?.frgnrK,
             conflict = conflict,
+            holdingMode = true,
         )
 
         return HoldingEvalResult(

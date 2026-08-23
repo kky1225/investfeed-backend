@@ -56,7 +56,7 @@ class MonitoringService(
 
     private fun computeFireStatus(s: SchedulerStatus, now: LocalDateTime, isHoliday: Boolean): String {
         val scheduler = SchedulerName.entries.firstOrNull { it.name == s.schedulerName } ?: return "NONE"
-        return schedulerCycleEvaluator.evaluate(scheduler, s.lastFiredAt, s.lastStartedAt, now, isHoliday).name
+        return schedulerCycleEvaluator.evaluate(scheduler, s, now, isHoliday).name
     }
 
     fun getCatalog(): List<SchedulerCatalogRes> =

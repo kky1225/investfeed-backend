@@ -123,15 +123,48 @@ class EconomicCalendarService(
             cacheIndicators("${CACHE_PREFIX}indicators", indicators.copy(lastUpdated = updatedAt))
         }.onFailure { log.error { "일정 동기화 - 지표 카드 갱신 실패: ${it.message}" } }
 
-        // 5개월분 이벤트 갱신 (현재 -2 ~ +2)
+        // 이벤트 갱신 (현재 -FREEZE_GRACE_MONTHS ~ +2)
+        // release_dates 는 월별 반복 조회 대신 전 구간을 릴리즈당 1회로 통합 조회해 재사용한다.
+        val prefetchedReleaseDates = prefetchReleaseDates(now.minusMonths(FREEZE_GRACE_MONTHS), now.plusMonths(2))
+
         for (offset in -FREEZE_GRACE_MONTHS..2L) {
             val target = now.plusMonths(offset)
             runCatching {
-                val events = fetchApiEvents(target.year, target.monthValue)
+                val events = fetchApiEvents(target.year, target.monthValue, prefetchedReleaseDates)
                 val result = CalendarEventsRes(events = events.sortedBy { it.date }, lastUpdated = updatedAt)
                 cacheEvents("${CACHE_PREFIX}events:${target.year}:${target.monthValue}", result)
             }.onFailure { log.error { "일정 동기화 - ${target.year}-${target.monthValue} 이벤트 갱신 실패: ${it.message}" } }
         }
+    }
+
+    /**
+     * 동기화 대상 전 구간(from ~ to)의 release 발표일을 릴리즈당 1회 통합 조회한다.
+     *
+     * FRED /fred/release/dates 는 realtime range 를 넓혀도 결과가 월별 조회 결과의 합집합과
+     * 일치하므로, 월 단위 반복 호출(릴리즈수 x 개월수)을 릴리즈수 만큼으로 줄일 수 있다.
+     * 실제 사용은 fetchFredEvents 가 월 구간으로 잘라서 한다.
+     *
+     * 반환 map 에 없는 releaseId 는 fetchFredEvents 가 기존 월 단위 조회로 폴백하므로,
+     * 통합 조회가 실패해도 결과와 실패 시 거동이 기존과 동일하게 유지된다.
+     */
+    private fun prefetchReleaseDates(from: YearMonth, to: YearMonth): Map<Int, List<String>> {
+        val start = from.atDay(1).format(DATE_FMT)
+        val end = to.atEndOfMonth().format(DATE_FMT)
+
+        return FRED_RELEASE_SERIES.keys.mapNotNull { releaseId ->
+            runCatching {
+                val dates = fredClient.getReleaseDatesByReleaseId(
+                    releaseId = releaseId,
+                    realtimeStart = start,
+                    realtimeEnd = end,
+                    sortOrder = "asc",
+                    includeReleaseDatesWithNoData = true,
+                ).release_dates?.mapNotNull { it.date } ?: return@runCatching null
+                releaseId to dates
+            }.onFailure {
+                log.warn { "release_dates 통합 조회 실패 - 월 단위 조회로 폴백 (releaseId=$releaseId): ${it.message}" }
+            }.getOrNull()
+        }.toMap()
     }
 
     // ==================================================================================
@@ -654,10 +687,14 @@ class EconomicCalendarService(
     private fun isManualEnrichable(entity: CalendarEventEntity): Boolean =
         entity.type in setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION")
 
-    private fun fetchApiEvents(year: Int, month: Int): List<CalendarEvent> {
+    private fun fetchApiEvents(
+        year: Int,
+        month: Int,
+        prefetchedReleaseDates: Map<Int, List<String>>? = null,
+    ): List<CalendarEvent> {
         val events = mutableListOf<CalendarEvent>()
         events.addAll(fetchKrMonthlyEvents(year, month))
-        events.addAll(fetchFredEvents(year, month))
+        events.addAll(fetchFredEvents(year, month, prefetchedReleaseDates))
         events.addAll(fetchHolidayEvents(year, month))
         return events
     }
@@ -710,7 +747,11 @@ class EconomicCalendarService(
      *  - 최초 vintage가 타깃월에 있는 obs만 이벤트화 (= "이 달에 처음 발표된 관측월")
      *  - pc1/chg 값은 first vintage 지수로 자체 계산 (FRED realtime + units 조합 제약 우회)
      */
-    private fun fetchFredEvents(year: Int, month: Int): List<CalendarEvent> {
+    private fun fetchFredEvents(
+        year: Int,
+        month: Int,
+        prefetchedReleaseDates: Map<Int, List<String>>? = null,
+    ): List<CalendarEvent> {
         val result = mutableListOf<CalendarEvent>()
         val today = LocalDate.now()
         val monthStart = LocalDate.of(year, month, 1)
@@ -730,17 +771,23 @@ class EconomicCalendarService(
             val isWeekly = releaseId in FRED_WEEKLY_RELEASES
 
             // 1) 미래 예정일 조회 (release calendar): obs vintage 가 아직 없는 발표 예정 이벤트 생성용
-            val futureReleaseDates = runCatching {
-                fredClient.getReleaseDatesByReleaseId(
-                    releaseId = releaseId,
-                    realtimeStart = monthStartStr,
-                    realtimeEnd = monthEndFullStr,
-                    sortOrder = "asc",
-                    includeReleaseDatesWithNoData = true,
-                )?.release_dates?.mapNotNull { it.date }?.distinct()
-                    ?.filter { LocalDate.parse(it).isAfter(today) }
-                    ?: emptyList()
-            }.getOrElse { emptyList() }
+            //    prefetch 된 통합 조회 결과가 있으면 해당 월 구간만 잘라 재사용하고,
+            //    없으면(= 단건 호출 경로이거나 통합 조회 실패) 기존대로 월 단위로 조회한다.
+            val futureReleaseDates = prefetchedReleaseDates?.get(releaseId)
+                ?.filter { it in monthStartStr..monthEndFullStr }
+                ?.distinct()
+                ?.filter { LocalDate.parse(it).isAfter(today) }
+                ?: runCatching {
+                    fredClient.getReleaseDatesByReleaseId(
+                        releaseId = releaseId,
+                        realtimeStart = monthStartStr,
+                        realtimeEnd = monthEndFullStr,
+                        sortOrder = "asc",
+                        includeReleaseDatesWithNoData = true,
+                    )?.release_dates?.mapNotNull { it.date }?.distinct()
+                        ?.filter { LocalDate.parse(it).isAfter(today) }
+                        ?: emptyList()
+                }.getOrElse { emptyList() }
 
             // 2) 과거/현재 발표 이벤트: obs vintage 기반
             for (series in seriesList) {
