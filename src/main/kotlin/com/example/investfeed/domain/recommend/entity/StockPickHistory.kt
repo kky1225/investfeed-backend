@@ -86,6 +86,10 @@ class StockPickHistory(
     @Column(name = "ma20")
     val ma20: Double? = null,
 
+    // MA5/MA20 교차 나이(거래일, 교차 당일=1). null=교차 미관측(낡음 취급) — MovingAverageModule 신선도 게이트(≤5)
+    @Column(name = "ma_cross_age")
+    val maCrossAge: Int? = null,
+
     @Column(name = "realized_vol")
     val realizedVol: Double? = null,
 
@@ -123,6 +127,7 @@ class StockPickHistory(
     val closeAboveMa20: Boolean? = null,
 
     // 백테스트/디버깅용 — 각 후행 모듈 트리거 결과 ('PROMOTE' / 'DEMOTE' / 'NONE').
+    // 2026-08-24 이후 절대 기준(PROMOTE=매수쪽 표, DEMOTE=매도쪽 표) — 이전 행은 진영 상대 기록.
     // 매크로 트리거는 저장 X — 동행지표라 시간 lag 시 의미 변질 (운영 시 실시간만 적용).
     @Column(name = "pv_trigger")
     val pvTrigger: String? = null,

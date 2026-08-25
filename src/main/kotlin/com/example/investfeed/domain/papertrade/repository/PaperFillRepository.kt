@@ -10,6 +10,11 @@ interface PaperFillRepository : JpaRepository<PaperFill, Long> {
         sides: Collection<String>,
     ): PaperFill?
 
+    fun findByStkCdAndSideInOrderByFillDateAscIdAsc(
+        stkCd: String,
+        sides: Collection<String>,
+    ): List<PaperFill>
+
     fun findByFillDateAndSide(fillDate: LocalDate, side: String): List<PaperFill>
     fun findByFillDate(fillDate: LocalDate): List<PaperFill>
 }

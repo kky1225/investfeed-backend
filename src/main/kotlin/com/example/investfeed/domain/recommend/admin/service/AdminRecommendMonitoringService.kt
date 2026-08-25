@@ -368,7 +368,7 @@ class AdminRecommendMonitoringService(
 
     private fun StockPickHistory.toModulePick(): StockPick = StockPick(
         type = type, stkCd = stkCd, stkNm = stkNm, marketType = marketType, originSide = originSide,
-        ma5 = ma5, ma20 = ma20,
+        ma5 = ma5, ma20 = ma20, maCrossAge = maCrossAge,  // 누락 시 MA 사건화 게이트가 전부 낡음 처리됨
         todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
         rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
         high52w = high52w, low52w = low52w,
@@ -392,7 +392,7 @@ class AdminRecommendMonitoringService(
             vpTrigger = trig["VolumePrice"], rsiTrigger = trig["Rsi"],
             hl52wTrigger = trig["HighLow52w"], breakoutTrigger = trig["Breakout"],
             rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
-            ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
+            ma5 = ma5, ma20 = ma20, maCrossAge = maCrossAge, flu5Pct = flu5Pct,
             todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
             high52w = high52w, low52w = low52w,
             distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,
@@ -427,7 +427,7 @@ class AdminRecommendMonitoringService(
             vpTrigger = trig["VolumePrice"], rsiTrigger = trig["Rsi"],
             hl52wTrigger = trig["HighLow52w"], breakoutTrigger = trig["Breakout"],
             rsi14 = rsi14, rsi14Breakdown70 = rsi14Breakdown70,
-            ma5 = ma5, ma20 = ma20, flu5Pct = flu5Pct,
+            ma5 = ma5, ma20 = ma20, maCrossAge = maCrossAge, flu5Pct = flu5Pct,
             todayChangeRate = todayChangeRate, todayVolume = todayVolume, avg20dVolume = avg20dVolume,
             high52w = high52w, low52w = low52w,
             distFromHigh52w = distFromHigh52w, distFromLow52w = distFromLow52w,

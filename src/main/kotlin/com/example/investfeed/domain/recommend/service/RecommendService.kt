@@ -43,6 +43,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.sqrt
@@ -247,38 +248,14 @@ class RecommendService(
         riskMap: Map<String, RiskFlags> = emptyMap(),
         marketTypeMap: Map<String, String> = emptyMap(),
         holdingMode: Boolean = false,
+        prefetched: List<KiwoomStockInvestor>? = null,
     ): ProcessedPick? {
-        Thread.sleep(API_PACING_MS)
-
-        val investorRes = try {
-            stockClient.stockInvestor(
-                req = KiwoomStockInvestorReq(
-                    dt = DateUtil.today("yyyyMMdd"),
-                    stk_cd = stkCd,
-                    amt_qty_tp = "2",
-                    trde_tp = "0",
-                    unit_tp = "1"
-                )
-            )
-        } catch (e: Exception) {
-            log.warn(e) { "stockInvestor 호출 실패 stkCd=$stkCd position=$position" }
-            return null
-        }
-
-        if (investorRes.return_code != 0) {
-            log.info { "[$stkNm($stkCd) $position] return_code=${investorRes.return_code} 컷" }
-            return null
-        }
-        val items = investorRes.stk_invsr_orgn ?: run {
-            log.info { "[$stkNm($stkCd) $position] stk_invsr_orgn null 컷" }
-            return null
-        }
+        val items = prefetched ?: fetchInvestorSeries(stkCd, "$stkNm($stkCd) $position") ?: return null
 
         val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
         val penfndValues = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
         val frgnrValues = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
 
-        // 연기금 시그널 통과 못 하면 추천 풀에서 제외.
         if (!evaluateSignal(items, position)) {
             log.info {
                 "[$stkNm($stkCd) $position] 시그널 미달 컷 — 연기금 시계열=$penfndValues"
@@ -340,6 +317,7 @@ class RecommendService(
             flu5Pct = priceMetrics.flu5Pct,
             ma5 = priceMetrics.ma5,
             ma20 = priceMetrics.ma20,
+            maCrossAge = priceMetrics.maCrossAge,
             avg20dVolume = priceMetrics.avg20dVolume,
             todayChangeRate = priceMetrics.todayChangeRate,
             todayVolume = priceMetrics.todayVolume,
@@ -395,6 +373,7 @@ class RecommendService(
 
             val ma5 = if (closes.size >= 5) closes.take(5).map { it.toDouble() }.average() else null
             val ma20 = if (closes.size >= 20) closes.take(20).map { it.toDouble() }.average() else null
+            val maCrossAge = computeMaCrossAge(closes)
 
             // 20일 실현변동성 (인접일 log수익률 std × √252, 연율화) — 변동성 스케일 캡 사이징용.
             val realizedVol = if (closes.size >= 21 && closes.take(21).all { it > 0L }) {
@@ -452,6 +431,7 @@ class RecommendService(
                 flu5Pct = flu5Pct,
                 ma5 = ma5,
                 ma20 = ma20,
+                maCrossAge = maCrossAge,
                 realizedVol = realizedVol,
                 todayChangeRate = todayChangeRate,
                 todayVolume = todayVolume,
@@ -502,6 +482,7 @@ class RecommendService(
         val flu5Pct: Double?,
         val ma5: Double?,
         val ma20: Double?,
+        val maCrossAge: Int? = null,
         val realizedVol: Double? = null,
         val todayChangeRate: Double? = null,
         val todayVolume: Long? = null,
@@ -690,6 +671,122 @@ class RecommendService(
     }
 
     /**
+     * ka10059 종목별 투자자 시계열 조회 (최신일 우선 정렬). 실패/빈 응답은 null — 호출부가 컷 처리.
+     * 요청 파라미터는 추천·보유평가 공통(수량 / 순매수 / 단주).
+     */
+    private fun fetchInvestorSeries(stkCd: String, logTag: String): List<KiwoomStockInvestor>? {
+        Thread.sleep(API_PACING_MS)
+        val investorRes = try {
+            stockClient.stockInvestor(
+                req = KiwoomStockInvestorReq(
+                    dt = DateUtil.today("yyyyMMdd"),
+                    stk_cd = stkCd,
+                    amt_qty_tp = "2",
+                    trde_tp = "0",
+                    unit_tp = "1"
+                )
+            )
+        } catch (e: Exception) {
+            log.warn(e) { "stockInvestor 호출 실패 stkCd=$stkCd ($logTag)" }
+            return null
+        }
+        if (investorRes.return_code != 0) {
+            log.info { "[$logTag] return_code=${investorRes.return_code} 컷" }
+            return null
+        }
+        return investorRes.stk_invsr_orgn ?: run {
+            log.info { "[$logTag] stk_invsr_orgn null 컷" }
+            null
+        }
+    }
+
+    /** 보유평가 수급 지속 판정 결과 — 양방향 반전 K 미달 종목에만 적용. */
+    internal data class FlowEval(
+        val verdict: FlowVerdict,
+        val days: Int,              // 매집 창 일수 (진입 이후, 최대 PRIOR_WINDOW)
+        val windowSum: Long,        // 매집 창 순매수 금액 합 (원)
+        val windowAvg: Double,      // 매집 창 일평균 순매수 금액 (원)
+        val todayAmt: Long,         // 창 첫 행(평가일) 순매수 금액 (원)
+        val entryPace: Double?,     // 진입 신호 2일 일평균 순매수 금액 (원). 산출 불가 시 null
+        val paceRatio: Double?,     // 매집 배율 = windowAvg / entryPace
+        val signalSum: Double?,     // 진입 신호 2일 순매수 총량 (원)
+        val cumSinceEntry: Long,    // 진입 이후 전체 누적 순매수 (원)
+        val distRatio: Double?,     // 분배 배율 = −cumSinceEntry / signalSum (되판 비율)
+    )
+
+    internal enum class FlowVerdict {
+        STRONG_BUY, BUY, SELL, STRONG_SELL,
+        HOLD_TODAY_SELL, HOLD_BELOW_PACE, HOLD_NOT_ACCUM, HOLD_STALE, HOLD_NO_BASELINE
+    }
+
+    /**
+     * 수급 지속 판정 — 반전 K 로는 보이지 않는 "진입 후 같은 방향의 지속"을 같은 시계열에서 읽는다.
+     *
+     * K 는 직전 10일이 반대 방향일 때만 정의되는 전환 지표라, 연기금이 같은 방향으로 계속 사면(팔면)
+     * 직전 10일 평균의 부호가 바뀌는 순간 K=0 → 양방향 컷 → HOLD 가 된다. 매집 지속 구간의 보유 종목이
+     * 시장 대비 +9~16%/20일, 분배 지속 구간이 −18.7%/10일(2026-08 실측)이므로 진입 이후 데이터로 별도 판정한다.
+     * 두 판정의 기준값은 모두 **진입 신호 그 자체**(신호 2일의 연기금 매수) — "들어온 이유가 아직 참인가"를
+     * 논제 자신으로 검증하므로 외부 임계값이 없다. 반전 K 가 한쪽이라도 통과하면 이 판정은 돌지 않는다
+     * (전환은 K 의 영역, 지속은 이 판정의 영역 — 서로의 사각지대를 나눠 가진다).
+     *
+     * 분배(SELL, 선행 판정): 진입 이후 **누적** 순매도 ÷ 신호 2일 매수 총량 ≥ 1 → SELL, ≥ 2 → STRONG_SELL.
+     *   "들어올 때 산 만큼 되팔았다 = 진입 근거 소거". 누적이므로 대량 매집 뒤의 소폭 매도는 걸리지 않는다
+     *   (아직 순매집 상태). 실례: POSCO홀딩스 12일 −689억 — 기존 로직은 매일 HOLD, 이 판정은 2.7배로 STRONG_SELL.
+     * 매집(BUY): 창(진입 이후 최근 10일) 순매수 합 > 0 / 평가일 순매수 ≥ 0 (파는 날엔 안 산다) /
+     *   창 일평균 ÷ 신호 2일 일평균 ≥ 1 → BUY, ≥ 2 → STRONG_BUY. "들어올 때 속도가 유지되는 의미 있는 매집".
+     *   소액 매수(진입 속도 미달)는 HOLD. 매수는 속도(지금 살아 있나), 매도는 총량(되돌아갔나) — 질문이 달라 측정값이 다르다.
+     * - 등급 단계(1배/2배)는 양방향 대칭. 매수 신중/매도 빠름의 비대칭은 트랜치 사이클 층에만 둔다.
+     * - 금액 = 부호 있는 수량 × abs(현재가) — [computeForeignerSignedMcapRatio] 와 같은 산식.
+     * - 첫 행이 평가일이 아니면(응답 지연) HOLD_STALE. entryDate 없거나 신호 매수 총량 ≤ 0 이면 HOLD_NO_BASELINE.
+     *
+     * @param items ka10059 시계열 (최신일 우선). 누적은 이 시계열 범위(~100 거래일) 안에서 계산된다.
+     * @param entryDate 체결 이력상 순보유량 0→양수 최근 시점 (재진입 대응)
+     * @param evalDate 평가일 (휴일이면 직전 거래일)
+     */
+    internal fun evaluateFlow(
+        items: List<KiwoomStockInvestor>,
+        entryDate: LocalDate?,
+        evalDate: LocalDate,
+    ): FlowEval? {
+        fun amountOf(r: KiwoomStockInvestor): Long =
+            (r.penfnd_etc?.toLongOrNull() ?: 0L) * abs(r.cur_prc?.toLongOrNull() ?: 0L)
+
+        val entry8 = entryDate?.format(DateTimeFormatter.BASIC_ISO_DATE)
+        val eval8 = evalDate.format(DateTimeFormatter.BASIC_ISO_DATE)
+        val dated = items.filter { !it.dt.isNullOrBlank() }
+        if (dated.isEmpty()) return null
+
+        val sinceEntry = if (entry8 != null) dated.filter { it.dt!! >= entry8 } else dated
+        val window = sinceEntry.take(PRIOR_WINDOW)
+        if (window.isEmpty()) return null
+        val amounts = window.map(::amountOf)
+        val sum = amounts.sum()
+        val avg = sum.toDouble() / amounts.size
+        val today = amounts.first()
+        val cum = sinceEntry.sumOf(::amountOf)
+
+        val signalRows = entry8?.let { e -> dated.filter { it.dt!! < e }.take(RECENT_WINDOW) }
+            ?.takeIf { it.size == RECENT_WINDOW }
+        val signalSum = signalRows?.sumOf(::amountOf)?.toDouble()
+        val entryPace = signalSum?.let { it / RECENT_WINDOW }
+        val paceRatio = entryPace?.takeIf { it > 0 }?.let { avg / it }
+        val distRatio = signalSum?.takeIf { it > 0 }?.let { -cum / it }
+
+        val verdict = when {
+            window.first().dt != eval8 -> FlowVerdict.HOLD_STALE
+            signalSum == null || signalSum <= 0 -> FlowVerdict.HOLD_NO_BASELINE
+            distRatio!! >= 2.0 -> FlowVerdict.STRONG_SELL
+            distRatio >= 1.0 -> FlowVerdict.SELL
+            sum <= 0L -> FlowVerdict.HOLD_NOT_ACCUM
+            today < 0L -> FlowVerdict.HOLD_TODAY_SELL
+            paceRatio!! < 1.0 -> FlowVerdict.HOLD_BELOW_PACE
+            paceRatio >= 2.0 -> FlowVerdict.STRONG_BUY
+            else -> FlowVerdict.BUY
+        }
+        return FlowEval(verdict, window.size, sum, avg, today, entryPace, paceRatio, signalSum, cum, distRatio)
+    }
+
+    /**
      * 연기금 K값 계산 (평균/평균 비교).
      * BUY: recent 일평균 매수 / prior 일평균 매도
      * SELL: recent 일평균 매도 / prior 일평균 매수
@@ -779,6 +876,7 @@ class RecommendService(
             flu5Pct = priceMetrics.flu5Pct,
             ma5 = priceMetrics.ma5,
             ma20 = priceMetrics.ma20,
+            maCrossAge = priceMetrics.maCrossAge,
             avg20dVolume = priceMetrics.avg20dVolume,
             todayChangeRate = priceMetrics.todayChangeRate,
             todayVolume = priceMetrics.todayVolume,
@@ -823,6 +921,7 @@ class RecommendService(
             flu5Pct = priceMetrics.flu5Pct,
             ma5 = priceMetrics.ma5,
             ma20 = priceMetrics.ma20,
+            maCrossAge = priceMetrics.maCrossAge,
             avg20dVolume = priceMetrics.avg20dVolume,
             todayChangeRate = priceMetrics.todayChangeRate,
             todayVolume = priceMetrics.todayVolume,
@@ -863,11 +962,7 @@ class RecommendService(
         val rsiTrigger: String?,
         val hl52wTrigger: String?,
         val breakoutTrigger: String?,
-    ) {
-        companion object {
-            val EMPTY = BacktestMeta("NONE", "NONE", "NONE", "NONE", "NONE", "NONE")
-        }
-    }
+    )
 
     private fun extractIntersection(
         items: List<KiwoomInvestorTradeCloseMarketItemList>,
@@ -1048,8 +1143,35 @@ class RecommendService(
             return GRADE_LADDER[moved.coerceIn(loIdx, hiIdx)]
         }
 
+        internal fun computeMaCrossAge(closes: List<Long>): Int? {
+            if (closes.size < 21) return null
+            fun goldenAt(i: Int): Boolean? {
+                if (i + 20 > closes.size) return null
+                val ma5 = closes.subList(i, i + 5).sumOf { it.toDouble() } / 5
+                val ma20 = closes.subList(i, i + 20).sumOf { it.toDouble() } / 20
+                return ma5 > ma20
+            }
+            val today = goldenAt(0) ?: return null
+            var age = 1
+            while (true) {
+                val past = goldenAt(age) ?: return null  // 끝까지 교차 없음 → 미상(낡음 취급)
+                if (past != today) return age
+                age++
+            }
+        }
+
         private fun fmtX(v: Double): String =
             if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+
+        internal fun fmtAmount(won: Double): String {
+            val a = abs(won)
+            val sign = if (won < 0) "-" else ""
+            return when {
+                a >= 1_0000_0000 -> "$sign${"%.1f".format(a / 1_0000_0000)}억"
+                a >= 1_0000 -> "$sign${"%,d".format((a / 1_0000).toLong())}만원"
+                else -> "$sign${"%,d".format(a.toLong())}원"
+            }
+        }
 
         internal fun backboneReason(
             type: String,
@@ -1062,12 +1184,51 @@ class RecommendService(
             frgnrOppositeK: Double?,
             conflict: Boolean = false,
             holdingMode: Boolean = false,
+            flow: FlowEval? = null,
         ): String {
             val signalBar = fmtX(K_SIGNAL)
             val strongKBar = fmtX(K_STRONG_OVERRIDE)
             val trendBar = "%.0f%%".format(TREND_CLARITY_THRESHOLD * 100)
             val strongBar = "%.2f%%".format(MCAP_RATIO_STRONG * 100)
             val buyBar = "%.2f%%".format(MCAP_RATIO_BUY * 100)
+
+            // 보유평가 수급 지속 판정 — 양방향 반전 K 미달 종목. 방향 미확정 가드보다 먼저 (FLOW 등급은 originSide 가 있지만 K 가 없음).
+            if (flow != null) {
+                val f = flow
+                val days = "${f.days}일"
+                val avg = fmtAmount(f.windowAvg)
+                val pace = f.entryPace?.let { fmtAmount(it) } ?: "-"
+                val paceRatio = f.paceRatio?.let { "%.1f".format(it) } ?: "-"
+                val signal = f.signalSum?.let { fmtAmount(it) } ?: "-"
+                val sold = fmtAmount(-f.cumSinceEntry.toDouble())
+                val distRatio = f.distRatio?.let { "%.1f".format(it) } ?: "-"
+                return when (f.verdict) {
+                    FlowVerdict.STRONG_BUY ->
+                        "반전 신호는 없지만 진입 후 ${days}간 연기금이 일평균 ${avg}을 순매수해 진입 때 속도(${pace})의 ${paceRatio}배로 " +
+                            "매집을 키우고 있고, 오늘도 샀습니다. 강한 매집 지속으로 보고 강력매수(STRONG_BUY)합니다."
+                    FlowVerdict.BUY ->
+                        "반전 신호는 없지만 진입 후 ${days}간 연기금이 일평균 ${avg}을 순매수해 진입 때 속도(${pace})의 ${paceRatio}배를 유지하고, " +
+                            "오늘도 샀습니다. 매집 지속으로 보고 추가 매수(BUY)합니다."
+                    FlowVerdict.STRONG_SELL ->
+                        "반전 신호는 없지만 진입 후 연기금이 ${sold}을 되팔아 진입 때 산 총량(${signal})의 ${distRatio}배를 넘었습니다. " +
+                            "진입 근거가 크게 소거된 분배로 보고 강력매도(STRONG_SELL)합니다."
+                    FlowVerdict.SELL ->
+                        "반전 신호는 없지만 진입 후 연기금이 ${sold}을 되팔아 진입 때 산 총량(${signal})의 ${distRatio}배에 달했습니다. " +
+                            "진입 근거가 소거된 분배로 보고 매도(SELL)합니다."
+                    FlowVerdict.HOLD_TODAY_SELL ->
+                        "진입 후 ${days}간 순매수(일평균 ${avg})는 이어지지만 오늘은 팔았습니다. 파는 날에는 추가 매수하지 않아 보류(HOLD)입니다."
+                    FlowVerdict.HOLD_BELOW_PACE ->
+                        "진입 후 ${days}간 순매수이긴 하나 일평균 ${avg}으로 진입 때 속도(${pace})의 ${paceRatio}배에 그쳤습니다. " +
+                            "의미 있는 매집으로 보지 않아 보류(HOLD)입니다."
+                    FlowVerdict.HOLD_NOT_ACCUM ->
+                        "진입 후 ${days}간 연기금 순매수가 이어지지 않았습니다(창 합 ${fmtAmount(f.windowSum.toDouble())}, " +
+                            "진입 후 누적 ${fmtAmount(f.cumSinceEntry.toDouble())}). 되판 양이 진입 때 산 총량(${signal})에는 못 미쳐 보류(HOLD)입니다."
+                    FlowVerdict.HOLD_STALE ->
+                        "오늘 연기금 수급 데이터가 아직 반영되지 않아 보류(HOLD)입니다."
+                    FlowVerdict.HOLD_NO_BASELINE ->
+                        "진입 시점의 연기금 매수 기준을 구할 수 없어 보류(HOLD)입니다."
+                }
+            }
 
             // 방향 미확정 — 백본 지표가 아예 없는 케이스. 이유가 둘이라 구분해서 적는다(과거엔 "-" 로만 남아 원인 추적 불가).
             if (originSide != Position.BUY.name && originSide != Position.SELL.name) {
@@ -1302,6 +1463,7 @@ class RecommendService(
         val rsiTrigger: String? = null,
         val hl52wTrigger: String? = null,
         val breakoutTrigger: String? = null,
+        val maCrossAge: Int? = null,
     )
 
     private fun applyAdjustmentsForTrading(
@@ -1335,11 +1497,15 @@ class RecommendService(
         stkCd: String,
         stkNm: String,
         meta: Pair<Map<String, RiskFlags>, Map<String, String>>? = null,
+        entryDate: LocalDate? = null,
+        evalDate: LocalDate = LocalDate.now(),
     ): HoldingEvalResult {
         val setting = RecommendSetting(memberId = 0L)
         val (riskMap, marketTypeMap) = meta ?: buildStockMetadataMaps()
-        val buy = processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap, holdingMode = true)
-        val sell = processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap, holdingMode = true)
+        // 시계열 1회 조회 → BUY/SELL 양방향 + 지속 매집 판정이 공유 (양방향 컷 시에도 시계열을 잃지 않는다)
+        val series = fetchInvestorSeries(stkCd, "$stkNm($stkCd) HOLDING")
+        val buy = series?.let { processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap, holdingMode = true, prefetched = it) }
+        val sell = series?.let { processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap, holdingMode = true, prefetched = it) }
 
         val conflict = buy != null && sell != null && buy.type != "HOLD" && sell.type != "HOLD"
         val chosen: ProcessedPick? = when {
@@ -1358,6 +1524,22 @@ class RecommendService(
         val marketType: String?
 
         val pm = buy?.priceMetrics ?: sell?.priceMetrics ?: computePriceMetrics(stkCd)
+        // 수급 지속 판정 — 양방향 컷(충돌 제외)일 때만. 반전 K 가 통과했다가 HOLD 로 끝난 경우는 의도된 보류라 적용 안 함.
+        val flow: FlowEval? =
+            if (chosen == null && !conflict && series != null) evaluateFlow(series, entryDate, evalDate) else null
+        if (flow?.verdict == FlowVerdict.HOLD_STALE) {
+            log.warn { "[$stkNm($stkCd)] 수급 지속 판정 보류 — 시계열 첫 행이 평가일($evalDate)이 아님" }
+        }
+        // 수급이 준 백본 등급 (FLOW_BUY / FLOW_SELL). HOLD 계열은 null → 기존 HOLD 경로.
+        val flowType: String? = when (flow?.verdict) {
+            FlowVerdict.STRONG_BUY -> "STRONG_BUY"
+            FlowVerdict.BUY -> "BUY"
+            FlowVerdict.SELL -> "SELL"
+            FlowVerdict.STRONG_SELL -> "STRONG_SELL"
+            else -> null
+        }
+        val flowBuy = flowType == "BUY" || flowType == "STRONG_BUY"
+        val flowSell = flowType == "SELL" || flowType == "STRONG_SELL"
         if (chosen != null) {
             stockPick = chosen.toCurrentEntity()
             originSide = chosen.originSide
@@ -1365,20 +1547,26 @@ class RecommendService(
             frgnrMcapRatio = chosen.frgnrMcapRatio
             marketType = chosen.marketType
         } else {
-            // 양방향 컷/충돌 → HOLD. 모듈이 HOLD 를 움직일 수 있도록 지표 확보.
+            // 양방향 컷/충돌 → 기본 HOLD. 단 수급 지속 판정이 매집(BUY/STRONG_BUY)·분배(SELL/STRONG_SELL)를 주면 그 등급.
+            // 모듈이 등급을 움직일 수 있도록 지표 확보.
             // 시장 구분은 수급 판정과 무관한 정적 정보 — 양쪽 다 컷돼도 메타 맵으로 채운다(없으면 화면 "-").
             marketType = buy?.marketType ?: sell?.marketType ?: marketTypeMap[stkCd.substringBefore("_")]
-            originSide = null
+            originSide = when {
+                flowBuy -> Position.BUY.name
+                flowSell -> Position.SELL.name
+                else -> null
+            }
             penfndK = null
             frgnrMcapRatio = null
             stockPick = StockPick(
-                type = "HOLD",
+                type = flowType ?: "HOLD",
                 stkCd = stkCd,
                 stkNm = stkNm,
                 marketType = marketType,
                 flu5Pct = pm.flu5Pct,
                 ma5 = pm.ma5,
                 ma20 = pm.ma20,
+                maCrossAge = pm.maCrossAge,
                 realizedVol = pm.realizedVol,
                 avg20dVolume = pm.avg20dVolume,
                 todayChangeRate = pm.todayChangeRate,
@@ -1424,18 +1612,25 @@ class RecommendService(
                 tier = "BLOCK_PARTIAL"
             }
             else -> {
+                // 수급 지속 등급(FLOW_*) 위에서도 모듈은 기존대로 ±1칸 (비대칭은 트랜치 사이클 층에만 둔다).
                 finalType = applyAdjustmentsForTrading(stockPick, setting)  // 기본 풀 클램프 [0..4]
                 val buyGrade = finalType == "BUY" || finalType == "STRONG_BUY"
                 // 비중은 수급(백본)이, 속도는 최종 등급이 정한다 — 백본 HOLD 에서 모듈 승급만으로
                 // 만들어진 매수 등급은 반 비중(순추세 모듈의 매수 방향 발산 제한. 매도 방향 권한은 무제한 유지
                 // — 매도는 보유량 소진으로 자기제한). VOL_FLOOR 재클램프 없음: floor 고착(5%) 종목에서
                 // 클램프하면 반 비중이 무효화됨(×0.5 결과 2.5% 가 의도).
+                // 수급 지속(FLOW_BUY) 매수는 수급이 준 백본 BUY 이므로 전체 volCap.
                 targetWeightRatio = when {
                     !buyGrade -> null
                     stockPick.type == "HOLD" -> volCap * BLOCK_PARTIAL_FACTOR
                     else -> volCap
                 }
-                tier = if (buyGrade && stockPick.type == "HOLD") "MODULE_HALF" else null
+                tier = when {
+                    buyGrade && stockPick.type == "HOLD" -> "MODULE_HALF"
+                    flowBuy -> "FLOW_BUY"    // 모듈이 움직여도 태그 유지 — 수급 지속 경로 추적용
+                    flowSell -> "FLOW_SELL"
+                    else -> null
+                }
             }
         }
         val evaluationReason = listOfNotNull(tier, if (conflict) "CONFLICT" else null)
@@ -1453,6 +1648,7 @@ class RecommendService(
             frgnrOppositeK = chosen?.frgnrK,
             conflict = conflict,
             holdingMode = true,
+            flow = flow,
         )
 
         return HoldingEvalResult(
@@ -1470,25 +1666,17 @@ class RecommendService(
             rsiTrigger = triggers["Rsi"],
             hl52wTrigger = triggers["HighLow52w"],
             breakoutTrigger = triggers["Breakout"],
+            maCrossAge = pm.maCrossAge,
         )
     }
 
+    /**
+     * 2026-08-24 이후 **절대 기준** 기록 (holding_grade 와 동일 규약): PROMOTE=매수쪽 표, DEMOTE=매도쪽 표.
+     * 이전 행은 진영 상대 기록이라 SELL 픽의 매수표가 NONE 으로 남아 있음 — 백테스트 시 날짜로 구분할 것.
+     * (구 방식은 격상 원인 추적 불가: SELL 픽을 SELL 로 끌어올린 매수표가 기록에서 사라졌다.)
+     */
     private fun evaluateBacktestMeta(pick: StockPick): BacktestMeta {
-        val side = when (pick.type) {
-            "STRONG_BUY", "BUY" -> Position.BUY
-            "STRONG_SELL", "SELL" -> Position.SELL
-            else -> return BacktestMeta.EMPTY
-        }
-
-        val triggers = adjustmentModules.associate { module ->
-            val result = when {
-                module.shouldPromote(pick, side) -> "PROMOTE"
-                module.shouldDemote(pick, side) -> "DEMOTE"
-                else -> "NONE"
-            }
-            module.name to result
-        }
-
+        val triggers = moduleAbsoluteTriggers(pick)
         return BacktestMeta(
             pvTrigger = triggers["PriceVolatility"] ?: "NONE",
             maTrigger = triggers["MovingAverage"] ?: "NONE",

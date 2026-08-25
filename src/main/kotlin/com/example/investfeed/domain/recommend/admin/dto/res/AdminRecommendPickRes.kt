@@ -48,6 +48,7 @@ data class AdminRecommendPickRes(
     val rsi14Breakdown70: Boolean?,
     val ma5: Double?,
     val ma20: Double?,
+    val maCrossAge: Int?,              // MA5/MA20 교차 나이(거래일, 당일=1). null=교차 미관측 — ≤5일만 MA 표 유효
     val flu5Pct: Double?,              // 5거래일 (T-4영업일 대비) 등락 %
     val todayChangeRate: Double?,
     val todayVolume: Long?,

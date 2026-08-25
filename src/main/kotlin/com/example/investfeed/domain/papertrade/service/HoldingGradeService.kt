@@ -3,7 +3,9 @@ package com.example.investfeed.domain.papertrade.service
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.entity.HoldingGrade
+import com.example.investfeed.domain.papertrade.entity.PaperFill
 import com.example.investfeed.domain.papertrade.repository.HoldingGradeRepository
+import com.example.investfeed.domain.papertrade.repository.PaperFillRepository
 import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -14,13 +16,13 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @Service
 class HoldingGradeService(
     private val recommendService: RecommendService,
     private val holdingGradeRepository: HoldingGradeRepository,
+    private val paperFillRepository: PaperFillRepository,
     private val mockAccountClient: MockAccountClient,
     private val schedulerLogService: SchedulerLogService,
     private val authClient: AuthClient,
@@ -32,7 +34,35 @@ class HoldingGradeService(
 
     private data class HeldStock(val stkCd: String, val stkNm: String)
 
-    @Transactional
+    companion object {
+        private val FILL_SIDES = listOf("BUY", "SELL")
+
+        /**
+         * 현재 포지션의 진입일 — 체결 이력(시간순)을 누적해 순보유량이 0 → 양수로 바뀐 **가장 최근** 시점.
+         * 최초 BUY 일자를 쓰면 전량 매도 후 재매수한 종목의 이전 보유 기간이 섞이므로(실례 000500) 재진입을 따라간다.
+         * paper_fill 은 주문 제출 기록이라 미체결분이 섞일 수 있으나, 미체결은 익일 취소돼 실제 순보유와 수렴한다.
+         */
+        internal fun currentEntryDate(fills: List<PaperFill>): LocalDate? {
+            var qty = 0L
+            var entry: LocalDate? = null
+            for (f in fills) {
+                val before = qty
+                qty += when (f.side) {
+                    "BUY" -> f.quantity
+                    "SELL" -> -f.quantity
+                    else -> 0L
+                }
+                if (before <= 0L && qty > 0L) entry = f.fillDate
+                if (qty <= 0L) { qty = 0L; entry = null }
+            }
+            return entry
+        }
+    }
+
+    // 메서드 단위 @Transactional 금지: 종목당 외부 API 호출(수 초)을 DB 트랜잭션 하나에 묶으면
+    // ① delete 가 flush 까지 지연되어 같은 (stk_cd, eval_date) 재평가 시 INSERT 가 DELETE 보다 먼저 실행돼 유니크 위반
+    // ② 한 종목의 예외가 세션을 오염시켜 나머지 종목까지 전부 실패(per-stock try/catch 무효화).
+    // repository 호출이 각각 커밋되어야 delete→save 순서와 종목별 격리가 보장된다.
     fun runHoldingGrade() {
         schedulerLogService.execute(SchedulerName.HoldingGradeScheduler) {
             setSchedulerSecurityContext()
@@ -65,7 +95,11 @@ class HoldingGradeService(
         var saved = 0
         for (h in targets) {
             try {
-                val r = recommendService.evaluateHoldingGrade(h.stkCd, h.stkNm, meta)
+                // 지속 매집 판정의 창 시작점 — 현재 포지션의 진입일(전량 매도 후 재매수면 재진입일)
+                val entryDate = currentEntryDate(
+                    paperFillRepository.findByStkCdAndSideInOrderByFillDateAscIdAsc(h.stkCd, FILL_SIDES)
+                )
+                val r = recommendService.evaluateHoldingGrade(h.stkCd, h.stkNm, meta, entryDate, evalDate)
                 holdingGradeRepository.findByStkCdAndEvalDate(h.stkCd, evalDate)
                     ?.let { holdingGradeRepository.delete(it) }
                 holdingGradeRepository.save(
@@ -92,6 +126,7 @@ class HoldingGradeService(
                         rsiTrigger = r.rsiTrigger,
                         hl52wTrigger = r.hl52wTrigger,
                         breakoutTrigger = r.breakoutTrigger,
+                        maCrossAge = r.maCrossAge,
                     )
                 )
                 saved++

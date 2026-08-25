@@ -33,10 +33,23 @@ class StockDividendService(
             .findExistingKeysByTypeAndMinDvdnBasDt(TYPE_STOCK, minDvdnBasDt)
             .toMutableSet()
 
-        val (items, _) = stockDividendClient.getDividendInfo(pageNo = 1, numOfRows = NUM_OF_ROWS)
-        val recentItems = items.filter { (it.dvdnBasDt ?: "") >= minDvdnBasDt }
-        val saved = saveStockItems(recentItems, today, existingKeys)
-        log.info { "배당 정보 일별 수집: $saved 건 저장" }
+        var pageNo = 1
+        var totalPages = 1
+        var saved = 0
+
+        while (pageNo <= totalPages) {
+            val (items, totalCount) = stockDividendClient.getDividendInfo(pageNo = pageNo, numOfRows = NUM_OF_ROWS)
+            if (pageNo == 1) {
+                totalPages = (totalCount + NUM_OF_ROWS - 1) / NUM_OF_ROWS
+            }
+            if (items.isEmpty()) break
+
+            val recentItems = items.filter { (it.dvdnBasDt ?: "") >= minDvdnBasDt }
+            saved += saveStockItems(recentItems, today, existingKeys)
+            pageNo++
+        }
+
+        log.info { "배당 정보 일별 수집: ${totalPages}페이지 조회, $saved 건 저장" }
     }
 
     fun collectEtfDividends(stkCd: String): Int {

@@ -58,7 +58,7 @@ class HoldingGrade(
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
-    // HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / MODULE_HALF / CONFLICT (복수면 '|' 결합), 없으면 NULL.
+    // HARD_SELL / BLOCK_FREEZE / BLOCK_PARTIAL / MODULE_HALF / FLOW_BUY/FLOW_SELL(수급 지속 매집/분배) / CONFLICT (복수면 '|' 결합), 없으면 NULL.
     @Column(name = "evaluation_reason")
     val evaluationReason: String? = null,
 
@@ -89,4 +89,8 @@ class HoldingGrade(
 
     @Column(name = "breakout_trigger")
     val breakoutTrigger: String? = null,
+
+    // MA5/MA20 교차 나이(거래일, 교차 당일=1). null=교차 미관측(낡음 취급) — MovingAverageModule 신선도 게이트(≤5)
+    @Column(name = "ma_cross_age")
+    val maCrossAge: Int? = null,
 )

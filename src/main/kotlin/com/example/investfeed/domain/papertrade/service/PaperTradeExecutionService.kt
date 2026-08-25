@@ -69,7 +69,12 @@ class PaperTradeExecutionService(
         val explicitHolds: Map<String, String?>, // holding_grade 명시 type=HOLD 보유 (코드 → origin_side, 회수 1~3티어용)
         val moduleHalfCodes: Set<String>,        // MODULE_HALF 라벨 보유 (모듈 승급 BUY — 회수 4티어: 목표 초과분 회수용)
         val pickK: Map<String, Double>,          // 정규화 stkCd → 당일 픽 연기금 K (신규진입 동급 내 우선순위용)
-    )
+        val gradeTags: Map<String, String>,      // 정규화 stkCd → holding_grade.evaluation_reason (거래 기록 note 에 등급 출처 표기)
+    ) {
+        /** note 용 등급 라벨 — "BUY·ACCUM" / "BUY·MODULE_HALF" 처럼 등급 출처를 붙여 거래내역에서 경로를 구분한다. */
+        fun gradeLabel(stkCd: String, grade: String): String =
+            gradeTags[stkCd]?.let { "$grade·$it" } ?: grade
+    }
 
     private data class OrderCandidate(
         val stkCd: String,
@@ -178,7 +183,7 @@ class PaperTradeExecutionService(
                         phase = PHASE_FIRST,
                         note = c.recoveryOrigin
                             ?.let { "현금회수 매도($it, 사이징가=${c.price}, ${c.cycleIndex}회차)" }
-                            ?: "시장가 동시호가 제출(등급=${c.grade}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
+                            ?: "시장가 동시호가 제출(등급=${ctx.gradeLabel(c.stkCd, c.grade)}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
                     )
                 )
                 ok++
@@ -202,7 +207,7 @@ class PaperTradeExecutionService(
                     quantity = s.qty, price = s.price, cycleIndex = s.cycleIndex,
                     grade = s.grade, newEntry = s.newEntry, phase = PHASE_FIRST,
                     note = if (s.slotWait) "슬롯대기 스킵(등급=${s.grade}, 전량매도 발행분 슬롯 개방 대기)"
-                    else "현금부족 스킵(등급=${s.grade}, ${if (s.newEntry) "신규진입" else "보유추가"})",
+                    else "현금부족 스킵(등급=${ctx.gradeLabel(s.stkCd, s.grade)}, ${if (s.newEntry) "신규진입" else "보유추가"})",
                 )
             )
         }
@@ -252,6 +257,7 @@ class PaperTradeExecutionService(
         }
         val explicitHolds = mutableMapOf<String, String?>()
         val moduleHalfCodes = mutableSetOf<String>()
+        val gradeTags = mutableMapOf<String, String>()
         holdingGradeRepository.findByEvalDate(priorTradingDay).forEach { g ->
             val cd = normCd(g.stkCd) ?: return@forEach
             if (cd in holdings) {
@@ -261,6 +267,7 @@ class PaperTradeExecutionService(
                 if (g.type == "HOLD") explicitHolds[cd] = g.originSide
                 // 모듈 승급 BUY(반 비중) — 등급 계층이 붙인 라벨을 소비 (회수 4티어 대상 식별).
                 if (g.evaluationReason?.contains("MODULE_HALF") == true) moduleHalfCodes += cd
+                g.evaluationReason?.takeIf { it.isNotBlank() }?.let { gradeTags[cd] = it }
             }
         }
         val lastCycles = holdings.keys.mapNotNull { cd ->
@@ -274,6 +281,7 @@ class PaperTradeExecutionService(
             holdings = holdings, grades = grades, targetRatios = targetRatios,
             seedPrices = seedPrices, riskBlocked = riskBlocked, lastCycles = lastCycles,
             explicitHolds = explicitHolds, moduleHalfCodes = moduleHalfCodes, pickK = pickK,
+            gradeTags = gradeTags,
         )
     }
 

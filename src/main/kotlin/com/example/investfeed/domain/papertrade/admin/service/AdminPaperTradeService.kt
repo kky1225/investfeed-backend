@@ -174,6 +174,7 @@ class AdminPaperTradeService(
                 rsiTrigger = g.rsiTrigger,
                 hl52wTrigger = g.hl52wTrigger,
                 breakoutTrigger = g.breakoutTrigger,
+                maCrossAge = g.maCrossAge,
             )
         }
         return AdminHoldingGradeRes(evalDate = target, items = items)
