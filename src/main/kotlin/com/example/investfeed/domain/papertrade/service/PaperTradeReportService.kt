@@ -51,12 +51,12 @@ class PaperTradeReportService(
             )
         }
 
-        // 키움 모의계좌 NAV (잔고 진실 소스).
+        // 키움 모의계좌 NAV
         val currentNav = try {
             val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
             val hold = mockAccountClient.holdingList(KiwoomHoldingReq(qry_tp = "1", dmst_stex_tp = "KRX"))
-            parseAmt(hold?.prsm_dpst_aset_amt).takeIf { it > 0 }
-                ?: (parseAmt(dep.entr) + parseAmt(hold?.tot_evlt_amt))
+            val cash = parseAmt(dep.ord_alow_amt).takeIf { it > 0 } ?: parseAmt(dep.entr)
+            (cash + parseAmt(hold?.tot_evlt_amt)).takeIf { it > 0 } ?: START_NAV
         } catch (e: Exception) {
             log.error(e) { "모의계좌 NAV 조회 실패 — startNav 로 대체(수익 0 표기)" }
             START_NAV

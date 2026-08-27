@@ -232,7 +232,7 @@ class PaperTradeExecutionService(
             cd to HeldPos(qty = qty, price = parseAmt(h.cur_prc))
         }.toMap()
         val totEvlt = parseAmt(holdingRes?.tot_evlt_amt)
-        val nav = parseAmt(holdingRes?.prsm_dpst_aset_amt).takeIf { it > 0 } ?: (availableCash + totEvlt)
+        val nav = availableCash + totEvlt
 
         // ③ 등급: 직전 거래일 holding_grade + 당일 stock_pick(추천) 병합.
         val priorTradingDay = holidayService.lastTradingDay(LocalDate.now().minusDays(1))

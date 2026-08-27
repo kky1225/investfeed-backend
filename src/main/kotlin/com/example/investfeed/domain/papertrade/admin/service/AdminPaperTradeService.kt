@@ -41,7 +41,7 @@ class AdminPaperTradeService(
         val totalEvlt = parseAmt(hold?.tot_evlt_amt)
         val totalPl = parseSignedLong(hold?.tot_evlt_pl)
         val totalPrftRt = parseRate(hold?.tot_prft_rt)
-        val nav = parseAmt(hold?.prsm_dpst_aset_amt).takeIf { it > 0 } ?: (deposit + totalEvlt)
+        val nav = orderable + totalEvlt
 
         val holdings = (hold?.acnt_evlt_remn_indv_tot.orEmpty()).map { h ->
             AdminPaperAccountRes.HoldingItem(

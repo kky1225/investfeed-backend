@@ -11,7 +11,7 @@ data class AdminPaperAccountRes(
         val totalEvltAmt: Long,       // 총평가금액
         val totalEvltPl: Long,        // 총평가손익
         val totalPrftRt: Double?,     // 총수익률(%)
-        val nav: Long,                // 추정예탁자산 (prsm_dpst_aset_amt; 없으면 deposit+totalEvltAmt)
+        val nav: Long,                // 총 자산 (orderableAmt + totalEvltAmt)
     )
 
     data class HoldingItem(
