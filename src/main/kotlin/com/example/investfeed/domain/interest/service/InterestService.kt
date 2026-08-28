@@ -41,6 +41,10 @@ class InterestService(
 ) {
     private val log = KotlinLogging.logger {}
 
+    companion object {
+        private const val US_QUOTE_INTERVAL_MS = 150L
+    }
+
     @Transactional(readOnly = true)
     fun getGroups(memberId: Long): List<InterestGroupRes> {
         return groupRepository.findByMemberIdOrderByDisplayOrderAsc(memberId)
@@ -123,7 +127,9 @@ class InterestService(
             }
         }
 
-        usItems.forEach { interest ->
+        usItems.forEachIndexed { index, interest ->
+            if (index > 0) Thread.sleep(US_QUOTE_INTERVAL_MS)
+
             val quote = getUsQuote(stexTp = interest.stexTp!!, stkCd = interest.stkCd)
             interest.curPrc = quote?.cur_prc
             interest.fluRt = quote?.flu_rt
