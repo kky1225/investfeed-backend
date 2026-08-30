@@ -756,10 +756,7 @@ class EconomicCalendarService(
         val today = LocalDate.now()
         val monthStart = LocalDate.of(year, month, 1)
         val monthEnd = monthStart.plusMonths(1).minusDays(1)
-        // obs range: GDP revision 90일 window × 안전 여유 + 셧다운 지연 대비
-        // (이 함수에선 YoY 계산을 하지 않음. FRED pc1 units 로 이미 YoY % 직접 수신)
-        // 문제 생기면 24로 되돌리면 됨.
-        val obsStartStr = monthStart.minusMonths(12).format(DATE_FMT)
+        val obsStartStr = monthStart.minusMonths(15).format(DATE_FMT)
         // realtime_end: monthEnd 가 today 이후이면 생략(FRED 기본값=CT 오늘). KST/CT 시차로 today 넘기면 0건 반환되는 이슈 회피
         val monthEndRealtimeStr: String? = if (monthEnd.isBefore(today)) monthEnd.format(DATE_FMT) else null
 
