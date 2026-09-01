@@ -7,7 +7,6 @@ import mu.KotlinLogging
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * 앱 기동 시 scheduler_status 테이블에 누락된 스케줄러 row 를 자동 등록한다.
@@ -38,7 +37,6 @@ class SchedulerStatusSeeder(
         }
     }
 
-    @Transactional
     internal fun seed() {
         var inserted = 0
         SchedulerName.entries.forEach { scheduler ->

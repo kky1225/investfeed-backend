@@ -30,6 +30,7 @@ class EconomicCalendarService(
     private val calendarEventRepository: CalendarEventRepository,
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
+    private val calendarFreezeWriter: CalendarFreezeWriter,
 ) {
     private val log = KotlinLogging.logger {}
     private val CACHE_PREFIX = RedisKeyPrefix.ECONOMIC_CALENDAR.prefix
@@ -1067,11 +1068,14 @@ class EconomicCalendarService(
     // Freeze / Refresh (과거 월 DB 저장)
     // ==================================================================================
 
-    @Transactional
+    /**
+     * 트랜잭션을 걸지 않는다. `apiEvents` 가 없으면 외부 API 조회(fetchApiEvents)가 선행되는데
+     * 그 구간까지 트랜잭션에 넣을 이유가 없다. delete + insert 의 원자성은 [CalendarFreezeWriter] 가 보장한다.
+     * (이 메서드는 같은 클래스 안에서 호출되므로 @Transactional 을 붙여도 프록시를 우회해 적용되지 않는다.)
+     */
     fun freezeMonth(year: Int, month: Int, apiEvents: List<CalendarEvent>? = null) {
         val events = apiEvents ?: fetchApiEvents(year, month)
 
-        calendarEventRepository.deleteApiEventsByYearAndMonth(year, month)
         val entities = events.map { event ->
             CalendarEventEntity(
                 eventDate = LocalDate.parse(event.date),
@@ -1084,11 +1088,10 @@ class EconomicCalendarService(
                 month = month,
             )
         }
-        calendarEventRepository.saveAll(entities)
+        calendarFreezeWriter.replaceApiEvents(year, month, entities)
         log.info { "캘린더 이벤트 freeze 완료: $year-$month (${entities.size}건)" }
     }
 
-    @Transactional
     fun refreshEvents(year: Int, month: Int) {
         freezeMonth(year, month)
         runCatching { redisTemplate.delete("${CACHE_PREFIX}events:$year:$month") }

@@ -30,7 +30,7 @@ class ApiKeyRegistrationLockedException : InvestFeedException(code = "AUTH_4023"
 
 // TOTP
 class TotpNotSetupException : InvestFeedException(code = "AUTH_4030", message = "TOTP가 설정되지 않았습니다. 먼저 TOTP 설정을 진행하세요.")
-class InvalidTotpCodeException : AuthenticationException("TOTP 인증 코드가 올바르지 않습니다.")
+class InvalidTotpCodeException(val remainingAttempts: Int? = null) : AuthenticationException("TOTP 인증 코드가 올바르지 않습니다.")
 class PreAuthTokenMissingException : AuthenticationException("사전 인증 토큰이 없습니다.")
 class PreAuthTokenInvalidException : AuthenticationException("유효하지 않은 사전 인증 토큰입니다.")
 

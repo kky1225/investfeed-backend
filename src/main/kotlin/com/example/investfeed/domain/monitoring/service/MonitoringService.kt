@@ -48,15 +48,14 @@ class MonitoringService(
 
     fun getStatuses(): List<SchedulerStatusRes> {
         val now = LocalDateTime.now()
-        val isHoliday = holidayService.isHoliday(now.toLocalDate())
         return schedulerStatusRepository.findAllByOrderBySchedulerNameAsc().map {
-            SchedulerStatusRes.from(it, computeState(it), computeFireStatus(it, now, isHoliday))
+            SchedulerStatusRes.from(it, computeState(it), computeFireStatus(it, now))
         }
     }
 
-    private fun computeFireStatus(s: SchedulerStatus, now: LocalDateTime, isHoliday: Boolean): String {
+    private fun computeFireStatus(s: SchedulerStatus, now: LocalDateTime): String {
         val scheduler = SchedulerName.entries.firstOrNull { it.name == s.schedulerName } ?: return "NONE"
-        return schedulerCycleEvaluator.evaluate(scheduler, s, now, isHoliday).name
+        return schedulerCycleEvaluator.evaluate(scheduler, s, now).name
     }
 
     fun getCatalog(): List<SchedulerCatalogRes> =
@@ -181,7 +180,7 @@ class MonitoringService(
         }
         val now = LocalDateTime.now()
         return SchedulerStatusRes.from(
-            status, computeState(status), computeFireStatus(status, now, holidayService.isHoliday(now.toLocalDate()))
+            status, computeState(status), computeFireStatus(status, now)
         )
     }
 

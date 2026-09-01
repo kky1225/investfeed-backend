@@ -15,7 +15,6 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -42,10 +41,14 @@ class BacktestBackfillService(
     @Scheduled(cron = SchedulerCron.BACKTEST_BACKFILL, scheduler = "slowScheduler")
     fun scheduledBackfill() {
         log.info { "BacktestBackfillScheduler cron fired" }
+        schedulerLogService.markFired(SchedulerName.BacktestBackfillScheduler)
+        if (holidayService.isHoliday()) {
+            log.info { "BacktestBackfillScheduler skipped: today is holiday" }
+            return
+        }
         runBackfill()
     }
 
-    @Transactional
     fun runBackfill() {
         schedulerLogService.execute(SchedulerName.BacktestBackfillScheduler) {
             setSchedulerSecurityContext()

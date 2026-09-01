@@ -11,6 +11,7 @@ data class MemberRes(
     val phone: String,
     val role: String,
     val failedLoginAttempts: Int,
+    val failedTotpAttempts: Int = 0,
     val lockedAt: LocalDateTime?,
     val lockExpiresAt: LocalDateTime?,
     val permanentLock: Boolean = false,

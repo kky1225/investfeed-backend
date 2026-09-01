@@ -7,6 +7,7 @@ enum class SchedulerName(
     val defaultTimeoutSec: Int,
     val label: String,
     val blockedOnHoliday: Boolean = false,
+    val holidayOffsetDays: Long = 0,
     val crons: List<String> = emptyList(),
 ) {
     // FAST
@@ -30,14 +31,17 @@ enum class SchedulerName(
     // SLOW
     RecommendScheduler(SchedulerType.SLOW, 300, "매일 22:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.RECOMMEND)),
     HoldingGradeScheduler(SchedulerType.SLOW, 600, "거래일 22:10", blockedOnHoliday = true, crons = listOf(SchedulerCron.HOLDING_GRADE)),
-    BacktestBackfillScheduler(SchedulerType.SLOW, 600, "매일 22:30", crons = listOf(SchedulerCron.BACKTEST_BACKFILL)),
-    HoldingSyncScheduler(SchedulerType.SLOW, 600, "매일 00:00", crons = listOf(SchedulerCron.HOLDING_SYNC)),
+    BacktestBackfillScheduler(SchedulerType.SLOW, 600, "매일 22:30", blockedOnHoliday = true, crons = listOf(SchedulerCron.BACKTEST_BACKFILL)),
+    HoldingSyncScheduler(SchedulerType.SLOW, 600, "매일 00:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.HOLDING_SYNC)),
     HolidayRefreshScheduler(SchedulerType.SLOW, 300, "매일 00:05", crons = listOf(SchedulerCron.HOLIDAY_REFRESH)),
-    IndexDailyCloseScheduler(SchedulerType.SLOW, 120, "매일 00:10", crons = listOf(SchedulerCron.INDEX_DAILY_CLOSE)),
+    IndexDailyCloseScheduler(
+        SchedulerType.SLOW, 120, "매일 00:10", blockedOnHoliday = true, holidayOffsetDays = -1,
+        crons = listOf(SchedulerCron.INDEX_DAILY_CLOSE),
+    ),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00", crons = listOf(SchedulerCron.SCHEDULER_LOG_CLEANUP)),
     StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00", crons = listOf(SchedulerCron.STOCK_MASTER_SYNC)),
     InterestSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15", crons = listOf(SchedulerCron.INTEREST_SYNC)),
-    IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00", crons = listOf(SchedulerCron.INDEX_INVESTOR_DAILY)),
+    IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.INDEX_INVESTOR_DAILY)),
     PaperTradeExecScheduler(
         SchedulerType.SLOW, 600, "거래일 08:50(장전)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.PAPER_TRADE_EXEC),

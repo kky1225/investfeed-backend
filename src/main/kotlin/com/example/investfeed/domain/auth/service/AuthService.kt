@@ -48,6 +48,7 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
     private val totpService: TotpService,
+    private val totpAttemptService: TotpAttemptService,
     private val redisTemplate: StringRedisTemplate,
 ) {
     private val log = KotlinLogging.logger {}
@@ -140,13 +141,23 @@ class AuthService(
             ?: throw TotpNotSetupException()
 
         if (!totpService.verifyCode(secret, code)) {
-            throw InvalidTotpCodeException()
+            val result = totpAttemptService.handleFailedTotp(loginId)
+            if (result.locked) {
+                redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
+                redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
+                if (result.lockDurationSeconds == null) {
+                    throw AccountPermanentlyLockedException()
+                }
+                throw AccountLockedByFailureException(result.lockDurationSeconds)
+            }
+            throw InvalidTotpCodeException(result.remainingAttempts)
         }
 
         if (member.totpSecret == null) {
             member.totpSecret = secret
         }
 
+        totpAttemptService.resetOnSuccess(loginId)
         redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
         redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
 
@@ -260,6 +271,7 @@ class AuthService(
             phone = phone,
             role = role.code,
             failedLoginAttempts = failedLoginAttempts,
+            failedTotpAttempts = failedTotpAttempts,
             lockedAt = lockedAt,
             lockExpiresAt = lockExpiresAt,
             permanentLock = lockedAt != null && lockExpiresAt == null,
@@ -309,6 +321,7 @@ class AuthService(
         assertHierarchyAllowed(member)
 
         member.failedLoginAttempts = 0
+        member.failedTotpAttempts = 0
         member.lockedAt = null
         member.lockExpiresAt = null
     }

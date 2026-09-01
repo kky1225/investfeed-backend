@@ -49,6 +49,9 @@ class Member(
     @Convert(converter = AesEncryptor::class)
     var totpSecret: String? = null,
 
+    @Column(nullable = false)
+    var failedTotpAttempts: Int = 0,
+
     var secondaryPassword: String? = null,
 
     @Column(nullable = false)

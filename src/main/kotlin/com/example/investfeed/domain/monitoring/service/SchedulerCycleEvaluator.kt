@@ -3,6 +3,7 @@ package com.example.investfeed.domain.monitoring.service
 import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerFireStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
+import com.example.investfeed.global.holiday.HolidayService
 import mu.KotlinLogging
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Component
@@ -11,7 +12,9 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 @Component
-class SchedulerCycleEvaluator {
+class SchedulerCycleEvaluator(
+    private val holidayService: HolidayService,
+) {
     private val log = KotlinLogging.logger {}
 
     companion object {
@@ -31,10 +34,7 @@ class SchedulerCycleEvaluator {
         scheduler: SchedulerName,
         status: SchedulerStatus,
         now: LocalDateTime,
-        isHoliday: Boolean,
     ): SchedulerFireStatus {
-        if (scheduler.blockedOnHoliday && isHoliday) return SchedulerFireStatus.NONE
-
         val expressions = scheduler.crons.mapNotNull { expr ->
             runCatching { CronExpression.parse(expr) }
                 .onFailure { log.error { "cron 파싱 실패 (${scheduler.name}): $expr — ${it.message}" } }
@@ -57,6 +57,11 @@ class SchedulerCycleEvaluator {
         ) return SchedulerFireStatus.NONE
 
         val nextDue = nextAfter(expressions, cycleStart.minusNanos(1)) ?: return SchedulerFireStatus.NONE
+
+        if (scheduler.blockedOnHoliday &&
+            holidayService.isHoliday(nextDue.toLocalDate().plusDays(scheduler.holidayOffsetDays))
+        ) return SchedulerFireStatus.NONE
+
         if (nextDue.plus(graceOf(expressions, nextDue)).isBefore(now)) return SchedulerFireStatus.MISSED
 
         return SchedulerFireStatus.NONE

@@ -3,12 +3,16 @@ package com.example.investfeed.common.exception
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.auth.dto.res.LoginErrorRes
 import com.example.investfeed.domain.auth.dto.res.SecondaryPasswordLockStatusRes
+import com.example.investfeed.domain.auth.dto.res.TotpErrorRes
 import com.example.investfeed.domain.auth.exception.AccountLockedByFailureException
 import com.example.investfeed.domain.auth.exception.AccountLockedException
 import com.example.investfeed.domain.auth.exception.AccountPermanentlyLockedException
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import com.example.investfeed.domain.auth.exception.ApiKeyRegistrationLockedException
 import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
+import com.example.investfeed.domain.auth.exception.InvalidTotpCodeException
+import com.example.investfeed.domain.auth.exception.PreAuthTokenInvalidException
+import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
 import com.example.investfeed.domain.auth.exception.RefreshTokenReuseDetectedException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordLockedException
 import mu.KotlinLogging
@@ -52,6 +56,8 @@ class ExceptionAdviceController {
             is AccountLockedException -> "AUTH_4013" to LoginErrorRes(e.lockRemainingSeconds)
             is AccountPermanentlyLockedException -> "AUTH_4014" to null
             is RefreshTokenReuseDetectedException -> "AUTH_4017" to null
+            is InvalidTotpCodeException -> "AUTH_4031" to e.remainingAttempts?.let { TotpErrorRes(it) }
+            is PreAuthTokenInvalidException, is PreAuthTokenMissingException -> "AUTH_4032" to null
             else -> "AUTH_4011" to null
         }
 

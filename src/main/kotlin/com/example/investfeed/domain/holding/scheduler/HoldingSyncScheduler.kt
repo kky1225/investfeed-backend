@@ -7,6 +7,7 @@ import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
@@ -31,6 +32,7 @@ class HoldingSyncScheduler(
     private val tossAccountClient: TossAccountClient,
     private val tossHoldingClient: TossHoldingClient,
     private val schedulerLogService: SchedulerLogService,
+    private val holidayService: HolidayService,
     private val notificationService: NotificationService,
     private val notificationSettingService: NotificationSettingService,
 ) {
@@ -42,6 +44,11 @@ class HoldingSyncScheduler(
 
     @Scheduled(cron = SchedulerCron.HOLDING_SYNC, scheduler = "slowScheduler")
     fun syncAllHoldings() {
+        schedulerLogService.markFired(SchedulerName.HoldingSyncScheduler)
+        if (holidayService.isHoliday()) {
+            log.info { "HoldingSyncScheduler skipped: today is holiday" }
+            return
+        }
         schedulerLogService.execute(SchedulerName.HoldingSyncScheduler) {
             log.info { "보유종목 동기화 스케줄러 시작" }
             val start = System.currentTimeMillis()

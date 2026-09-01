@@ -38,6 +38,11 @@ class IndexInvestorDailyScheduler(
     @Scheduled(cron = SchedulerCron.INDEX_INVESTOR_DAILY, scheduler = "slowScheduler")
     fun collectDaily() {
         log.info { "IndexInvestorDailyScheduler cron fired" }
+        schedulerLogService.markFired(SchedulerName.IndexInvestorDailyScheduler)
+        if (holidayService.isHoliday()) {
+            log.info { "IndexInvestorDailyScheduler skipped: today is holiday" }
+            return
+        }
         schedulerLogService.execute(SchedulerName.IndexInvestorDailyScheduler) {
             setSchedulerSecurityContext()
             try {
