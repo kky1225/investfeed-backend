@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query
 
 interface CalendarEventRepository : JpaRepository<CalendarEventEntity, Long> {
     fun findByYearAndMonth(year: Int, month: Int): List<CalendarEventEntity>
-    fun findByTypeAndYearBetween(type: String, startYear: Int, endYear: Int): List<CalendarEventEntity>
     fun findByYearAndSource(year: Int, source: String): List<CalendarEventEntity>
 
     @Query("SELECT COUNT(e) FROM CalendarEventEntity e WHERE e.year = :year AND e.month = :month AND e.source IN ('FRED', 'HOLIDAY') AND e.type IN ('INDICATOR', 'HOLIDAY')")

@@ -23,4 +23,6 @@ data class HoldingItem(
     val possRt: String, // 보유비중(%)
     val predClosePric: String, // 전일종가
     val dayPl: String = "0", // 당일 손익(원). 증권사 API가 직접 제공하는 경우 사용(예: 토스), 미제공 시 0
+    val stexTp: String? = null, // 거래소구분 NA:AMEX, ND:NASDAQ, NY:NYSE. 미국 종목만 값 존재(국내는 null)
+    val usStkCd: String? = null, // 미국 상세 조회용 티커(stkCd 의 _US 접미사 제외). 미국 종목만 값 존재
 )

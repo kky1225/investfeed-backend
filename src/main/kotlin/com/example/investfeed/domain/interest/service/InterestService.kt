@@ -7,6 +7,7 @@ import com.example.investfeed.domain.interest.dto.req.ReorderItemsReq
 import com.example.investfeed.domain.interest.dto.req.UpdateGroupReq
 import com.example.investfeed.domain.interest.dto.res.InterestGroupRes
 import com.example.investfeed.domain.interest.dto.res.InterestItemRes
+import com.example.investfeed.domain.us.stock.service.UsEtfLookup
 import com.example.investfeed.domain.interest.entity.InterestGroup
 import com.example.investfeed.domain.interest.entity.InterestItem
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
@@ -38,6 +39,7 @@ class InterestService(
     private val usStockClient: UsStockClient,
     private val usStockSocketClient: UsStockSocketClient,
     private val stockMasterRepository: StockMasterRepository,
+    private val usEtfLookup: UsEtfLookup,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -92,7 +94,11 @@ class InterestService(
         val group = groupRepository.findById(groupId).orElseThrow { IllegalArgumentException("그룹을 찾을 수 없습니다.") }
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
-        val interestItemRes =  itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId).map { InterestItemRes(it.id, it.stkCd, it.stkNm, it.stexTp) }
+        val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
+        val etfTickers = usEtfLookup.etfTickers(items.filter { it.stexTp != null }.map { it.stkCd })
+        val interestItemRes = items.map {
+            InterestItemRes(it.id, it.stkCd, usEtfLookup.displayName(it.stkCd, it.stkNm, etfTickers) ?: it.stkNm, it.stexTp)
+        }
 
         if (interestItemRes.isEmpty()) {
             return emptyList()
@@ -163,7 +169,8 @@ class InterestService(
                 displayOrder = nextOrder
             )
         )
-        return InterestItemRes(item.id, item.stkCd, item.stkNm, item.stexTp)
+        val displayNm = if (item.stexTp != null && usEtfLookup.isEtf(item.stkCd)) item.stkCd else item.stkNm
+        return InterestItemRes(item.id, item.stkCd, displayNm, item.stexTp)
     }
 
     fun removeItem(memberId: Long, groupId: Long, itemId: Long) {

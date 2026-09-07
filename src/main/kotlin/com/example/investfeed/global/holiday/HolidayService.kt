@@ -104,7 +104,7 @@ class HolidayService(
         val years = now.year - 1..now.year + 1
 
         val fetched: Map<Int, Set<Pair<String, String>>> = years.associateWith { year ->
-            (1..12).flatMap { month -> holidayClient.getHolidayInfos(year, month) }
+            holidayClient.getHolidayInfos(year)
                 .map { it.date to it.name }
                 .toSet()
         }

@@ -19,4 +19,6 @@ interface UsStockMasterRepository : JpaRepository<UsStockMaster, Long> {
     fun search(@Param("keyword") keyword: String, pageable: Pageable): List<UsStockMaster>
 
     fun findByStexTpAndStkCd(stexTp: String, stkCd: String): UsStockMaster?
+
+    fun findByStkCdIn(stkCds: Collection<String>): List<UsStockMaster>
 }

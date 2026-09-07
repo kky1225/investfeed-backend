@@ -40,9 +40,11 @@ class UsStockInfoService(
     ): List<UsStockSearchItem> {
         return usStockMasterRepository.search(keyword, PageRequest.of(0, 20))
             .map {
+                // ETF 는 표시명 자리에 티커를 담는다(일반주는 종목명 그대로)
+                val stkNm = if (it.isEtf == "Y") it.stkCd else (it.stkNm ?: it.stkEnm ?: it.stkCd)
                 UsStockSearchItem(
                     stkCd = it.stkCd,
-                    stkNm = it.stkNm ?: it.stkEnm ?: it.stkCd,
+                    stkNm = stkNm,
                     stexTp = it.stexTp,
                     marketName = it.mkgb ?: it.stexTp,
                 )
@@ -97,7 +99,7 @@ class UsStockInfoService(
         val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
 
         return UsStockChartRes(
-            usStockInfo = mapUsStockInfo(info),
+            usStockInfo = mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)),
             chartList = mapChartList(fetchChartRes(stkCd, req)),
         )
     }
@@ -141,18 +143,23 @@ class UsStockInfoService(
         }
 
         return UsStockDetailRes(
-            usStockInfo = mapUsStockInfo(info),
+            usStockInfo = mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)),
             chartList = chartList,
             dailyPriceList = dailyPriceList,
         )
     }
 
-    private fun mapUsStockInfo(info: KiwoomUsStockInfoRes): UsStockInfo =
+    /** 키움 상세 응답에는 ETF 여부가 없어 마스터에서 조회한다. */
+    private fun resolveIsEtf(stexTp: String, stkCd: String): Boolean =
+        usStockMasterRepository.findByStexTpAndStkCd(stexTp, stkCd)?.isEtf == "Y"
+
+    private fun mapUsStockInfo(info: KiwoomUsStockInfoRes, isEtf: Boolean): UsStockInfo =
         UsStockInfo(
             stexTp = info.stex_tp,
             stkCd = info.stk_cd,
             stkNm = info.stk_nm,
             stkEnm = info.stk_enm,
+            isEtf = isEtf,
             curPrc = info.cur_prc,
             predPreSig = info.pred_pre_sig,
             predPre = info.pred_pre,

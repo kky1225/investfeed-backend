@@ -28,6 +28,8 @@ class HolidayClient(
 
     private val HOLIDAY_PATH = "/B090041/openapi/service/SpcdeInfoService/getRestDeInfo"
 
+    private val NUM_OF_ROWS = 100
+
     private val objectMapper: ObjectMapper = jacksonObjectMapper().apply {
         configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true)
         configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
@@ -36,18 +38,12 @@ class HolidayClient(
 
     data class HolidayInfo(val date: String, val name: String)
 
-    fun getHolidays(year: Int, month: Int): List<String> {
-        return getHolidayInfos(year, month).map { it.date }
-    }
-
-    fun getHolidayInfos(year: Int, month: Int): List<HolidayInfo> {
-        val solMonth = String.format("%02d", month)
-
+    fun getHolidayInfos(year: Int): List<HolidayInfo> {
         try {
             apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_HOLIDAY)
 
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
-            val urlStr = "$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&solMonth=$solMonth&numOfRows=30&_type=json"
+            val urlStr = "$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&numOfRows=$NUM_OF_ROWS&_type=json"
             val connection = URI(urlStr).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000
@@ -69,6 +65,12 @@ class HolidayClient(
             }
 
             val items = response.response.body?.items?.item ?: emptyList()
+
+            val totalCount = response.response.body?.totalCount
+            if (totalCount != null && totalCount > items.size) {
+                throw IllegalStateException("공휴일 API 응답 누락: ${year}년 totalCount=$totalCount, 수신=${items.size} (numOfRows=$NUM_OF_ROWS)")
+            }
+
             return items
                 .filter { it.isHoliday == "Y" && it.locdate != null }
                 .map { HolidayInfo(date = it.locdate.toString(), name = it.dateName ?: "공휴일") }

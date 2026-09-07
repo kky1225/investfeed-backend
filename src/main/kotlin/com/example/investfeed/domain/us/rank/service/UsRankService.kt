@@ -4,6 +4,7 @@ import com.example.investfeed.domain.us.rank.dto.req.UsRankListReq
 import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamReq
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListItem
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListRes
+import com.example.investfeed.domain.us.stock.service.UsEtfLookup
 import com.example.investfeed.kiwoom.us.rank.client.UsRankClient
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeValueListReq
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeVolumeListReq
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service
 class UsRankService(
     private val usRankClient: UsRankClient,
     private val usStockSocketClient: UsStockSocketClient,
+    private val usEtfLookup: UsEtfLookup,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -39,20 +41,23 @@ class UsRankService(
                     )
                 )
 
+                val rows = kiwoomUsStockTradeValueListRes.result_list.orEmpty()
+                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+
                 return UsRankListRes(
                     return_code = kiwoomUsStockTradeValueListRes.return_code,
                     return_msg = kiwoomUsStockTradeValueListRes.return_msg,
-                    rankList = kiwoomUsStockTradeValueListRes.result_list?.map {
+                    rankList = rows.map {
                         UsRankListItem(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = it.stk_nm,
+                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.trde_prica,
                         )
-                    } ?: emptyList()
+                    }
                 )
             }
             "1" -> {
@@ -69,20 +74,23 @@ class UsRankService(
                     )
                 )
 
+                val rows = kiwoomUsStockTradeVolumeListRes.result_list.orEmpty()
+                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+
                 return UsRankListRes(
                     return_code = kiwoomUsStockTradeVolumeListRes.return_code,
                     return_msg = kiwoomUsStockTradeVolumeListRes.return_msg,
-                    rankList = kiwoomUsStockTradeVolumeListRes.result_list?.map {
+                    rankList = rows.map {
                         UsRankListItem(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = it.stk_nm,
+                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.acc_trde_qty,
                         )
-                    } ?: emptyList()
+                    }
                 )
             }
             else -> {
@@ -99,20 +107,23 @@ class UsRankService(
                     )
                 )
 
+                val rows = kiwoomUsSurgeTradeVolumeListRes.result_list.orEmpty()
+                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+
                 return UsRankListRes(
                     return_code = kiwoomUsSurgeTradeVolumeListRes.return_code,
                     return_msg = kiwoomUsSurgeTradeVolumeListRes.return_msg,
-                    rankList = kiwoomUsSurgeTradeVolumeListRes.result_list?.map {
+                    rankList = rows.map {
                         UsRankListItem(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = it.stk_nm,
+                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.sdnin_rt,
                         )
-                    } ?: emptyList()
+                    }
                 )
             }
         }

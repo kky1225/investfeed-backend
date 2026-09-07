@@ -11,6 +11,7 @@ data class UsStockInfo(
     val stkCd: String?, // 종목코드 (티커)
     val stkNm: String?, // 종목명
     val stkEnm: String?, // 종목영문명
+    val isEtf: Boolean = false, // ETF 여부. 미국 ETF 는 종목명 대신 티커를 표기하고, 일반주는 종목명을 그대로 쓴다
     val curPrc: String?, // 현재가 (USD)
     val predPreSig: String?, // 전일대비기호
     val predPre: String?, // 전일대비

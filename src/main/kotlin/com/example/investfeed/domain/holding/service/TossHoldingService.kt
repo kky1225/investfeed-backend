@@ -8,6 +8,7 @@ import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.toss.account.client.TossAccountClient
 import com.example.investfeed.toss.exchangerate.client.TossExchangeRateClient
 import com.example.investfeed.toss.holding.TossSymbolMapper
@@ -27,6 +28,7 @@ class TossHoldingService(
     private val memberHoldingRepository: MemberHoldingRepository,
     private val memberBrokerRepository: MemberBrokerRepository,
     private val memberApiKeyRepository: MemberApiKeyRepository,
+    private val usStockMasterRepository: UsStockMasterRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -58,6 +60,8 @@ class TossHoldingService(
 
         // 평가값은 토스 응답 그대로 사용(토스 앱과 동일). 미국분만 USD→KRW 환율 환산.
         val usdKrwRate = if (items.any { TossSymbolMapper.isUs(it.marketCountry) }) fetchUsdKrwRate() else 0.0
+        // 토스 응답에는 국가(marketCountry)만 있고 거래소가 없다. 미국 상세 조회는 거래소구분이 필수라 마스터에서 채운다.
+        val stexTpBySymbol = resolveStexTps(items)
 
         var totEvltAmt = 0L
         var totPurAmt = 0L
@@ -66,6 +70,7 @@ class TossHoldingService(
         val holdingList = items.mapNotNull { item ->
             val symbol = item.symbol ?: return@mapNotNull null
             val stkCd = TossSymbolMapper.toStkCd(symbol, item.marketCountry)
+            val isUs = TossSymbolMapper.isUs(item.marketCountry)
             val v = evaluate(item, usdKrwRate)
 
             totEvltAmt += v.evltAmt
@@ -85,6 +90,8 @@ class TossHoldingService(
                 possRt = "0",
                 predClosePric = "0",
                 dayPl = v.dayPl.toString(),
+                stexTp = if (isUs) stexTpBySymbol[symbol] else null,
+                usStkCd = if (isUs) symbol else null,
             )
         }
 
@@ -117,6 +124,22 @@ class TossHoldingService(
             balance = balance.toString(),
             holdingList = sortedHoldingList
         )
+    }
+
+    private fun resolveStexTps(items: List<TossHoldingItem>): Map<String, String> {
+        val usSymbols = items.filter { TossSymbolMapper.isUs(it.marketCountry) }
+            .mapNotNull { it.symbol }
+            .distinct()
+        if (usSymbols.isEmpty()) return emptyMap()
+
+        val stexTpBySymbol = usStockMasterRepository.findByStkCdIn(usSymbols)
+            .associate { it.stkCd to it.stexTp }
+
+        val missing = usSymbols - stexTpBySymbol.keys
+        if (missing.isNotEmpty()) {
+            log.warn { "미국 종목 마스터 미등록으로 거래소구분을 채우지 못했습니다: $missing" }
+        }
+        return stexTpBySymbol
     }
 
     private fun evaluate(

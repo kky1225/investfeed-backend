@@ -357,14 +357,10 @@ class EconomicCalendarService(
             }
         }
 
-        // 한국 기준금리: 금통위 회의일 기준 샘플링 + stepAfter
         if (code == "722Y001") {
-            val meetings = listRateDecisions(fiveYearsAgo.year, today.year, "RATE_DECISION")
-                .map { it.format(DateTimeFormatter.ofPattern("yyyyMMdd")) }.toSet()
-            if (meetings.isNotEmpty()) {
-                val dataMap = dataPoints.associateBy { it.date }
-                val sampled = meetings.sorted().mapNotNull { dataMap[it] }
-                return IndicatorHistoryRes(code, def.name, def.unit, "stepAfter", def.frequency, sampled)
+            val changePoints = extractChangePoints(dataPoints)
+            if (changePoints.isNotEmpty()) {
+                return IndicatorHistoryRes(code, def.name, def.unit, "stepAfter", def.frequency, changePoints)
             }
         }
 
@@ -392,15 +388,8 @@ class EconomicCalendarService(
         )
     }
 
-    /**
-     * DFEDTARU (미국 기준금리) 히스토리 - FOMC 회의일 기준 샘플링
-     * FOMC 일정은 DB에 KST 기준으로 저장되어 있음 (미국 결정일 + 1일)
-     * FRED DFEDTARU도 회의 다음 영업일부터 새 rate 반영 → KST 회의일 = DFEDTARU 새 rate 날짜
-     */
     private fun fetchDfedtaruHistory(def: UsIndicatorDef): IndicatorHistoryRes? {
-        val today = LocalDate.now()
-        val fiveYearsAgo = today.minusYears(5)
-        val fiveYearsAgoStr = fiveYearsAgo.format(DATE_FMT)
+        val fiveYearsAgoStr = LocalDate.now().minusYears(5).format(DATE_FMT)
 
         val obs = fredClient.getSeriesObservations(def.seriesId, observationStart = fiveYearsAgoStr)
             ?.observations?.filter { it.value != "." }
@@ -408,25 +397,21 @@ class EconomicCalendarService(
         val dataPoints = obs.mapNotNull { if (it.date != null && it.value != null) IndicatorDataPoint(it.date, it.value) else null }
         if (dataPoints.isEmpty()) throw IllegalStateException("FRED DFEDTARU 데이터가 없습니다")
 
-        val meetings = listRateDecisions(fiveYearsAgo.year, today.year, "US_RATE_DECISION")
-        val dataMap = dataPoints.associateBy { it.date }
-
-        // KST 회의일 = DFEDTARU 새 rate 시작일. 주말/휴일이면 가장 가까운 이전 영업일 값 사용
-        val sampled = meetings.sorted().mapNotNull { meet ->
-            val point = dataMap[meet.format(DATE_FMT)] ?: (0..3).firstNotNullOfOrNull { off ->
-                dataMap[meet.minusDays(off.toLong()).format(DATE_FMT)]
-            }
-            point?.let { IndicatorDataPoint(meet.format(DATE_FMT), it.value) }
-        }
-
-        return IndicatorHistoryRes(def.seriesId, def.name, def.unit, "stepAfter", def.frequency, sampled)
+        return IndicatorHistoryRes(def.seriesId, def.name, def.unit, "stepAfter", def.frequency, extractChangePoints(dataPoints))
     }
 
-    /**
-     * FRED realtime 범위 조회로 모든 vintage 수신 → 실제 발표일 기준 차트 데이터 생성
-     * 각 관측값의 realtime_start = FRED 수신 날짜 = 발표일
-     * GDP는 advance/second/third estimate(90일 내 revision) 포함, 나머지는 최초 발표만
-     */
+    private fun extractChangePoints(dataPoints: List<IndicatorDataPoint>): List<IndicatorDataPoint> {
+        val points = dataPoints.sortedBy { it.date }
+            .mapNotNull { point -> point.value.toDoubleOrNull()?.let { point to it } }
+        if (points.isEmpty()) return emptyList()
+
+        val changed = points.zipWithNext()
+            .filter { (prev, curr) -> prev.second != curr.second }
+            .map { (_, curr) -> curr.first }
+
+        return (listOf(points.first().first) + changed + points.last().first).distinctBy { it.date }
+    }
+
     private fun fetchUsHistoryByRealtime(def: UsIndicatorDef): IndicatorHistoryRes? {
         // pc1/chg 시리즈는 realtime 범위 조회 불가(FRED 제약) → 6년 index 조회 후 자체 계산
         val needYoY = def.seriesId in FRED_PC1_SERIES
@@ -532,11 +517,6 @@ class EconomicCalendarService(
         val d = LocalDate.parse(obsDate)
         d.minusMonths(1).format(DATE_FMT)
     }.getOrNull()
-
-    private fun listRateDecisions(startYear: Int, endYear: Int, type: String): List<LocalDate> {
-        return calendarEventRepository.findByTypeAndYearBetween(type, startYear, endYear)
-            .map { it.eventDate }.distinct()
-    }
 
     // ==================================================================================
     // 캘린더 이벤트

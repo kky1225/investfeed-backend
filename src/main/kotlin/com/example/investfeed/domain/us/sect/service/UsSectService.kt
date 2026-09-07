@@ -6,6 +6,7 @@ import com.example.investfeed.domain.us.sect.dto.res.UsSectListItem
 import com.example.investfeed.domain.us.sect.dto.res.UsSectListRes
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListItem
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListRes
+import com.example.investfeed.domain.us.stock.service.UsEtfLookup
 import com.example.investfeed.kiwoom.us.sect.client.UsSectClient
 import com.example.investfeed.kiwoom.us.sect.dto.req.KiwoomUsSectPerformanceListReq
 import com.example.investfeed.kiwoom.us.sect.dto.req.KiwoomUsSectStockListReq
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service
 class UsSectService(
     private val usSectClient: UsSectClient,
     private val usStockSocketClient: UsStockSocketClient,
+    private val usEtfLookup: UsEtfLookup,
 ) {
     fun listUsSects(): UsSectListRes {
         val kiwoomUsSectPerformanceListRes = usSectClient.usSectPerformanceList(
@@ -57,18 +59,21 @@ class UsSectService(
             )
         )
 
+        val rows = kiwoomUsSectStockListRes.result_list ?: emptyList()
+        val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+
         return UsSectStockListRes(
-            sectStockList = kiwoomUsSectStockListRes.result_list?.map {
+            sectStockList = rows.map {
                 UsSectStockListItem(
                     stkCd = it.stk_cd,
                     stexTp = it.stex_tp,
-                    stkNm = it.stk_nm,
+                    stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
                     fluRt = it.flu_rt,
                     curPrc = it.cur_prc,
                     predPreSig = it.pred_pre_sig,
                     accTrdeQty = it.acc_trde_qty,
                 )
-            } ?: emptyList()
+            }
         )
     }
 
