@@ -4,43 +4,28 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
-import org.springframework.stereotype.Component
 import java.net.URI
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-@Component
-class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api/dostk/websocket")) {
+class KiwoomWebSocketClient(
+    private val accessToken: String,
+    private val onRealTime: (String) -> Unit,
+) : WebSocketClient(URI(URL)) {
     private val log = KotlinLogging.logger {}
 
-    private var accessToken: String? = null
-    private var request: String? = null
-    private var trnm: String? = null
-
-    fun setAccessToken(accessToken: String) {
-        this.accessToken = accessToken
+    companion object {
+        private const val URL = "wss://api.kiwoom.com:10000/api/dostk/websocket"
     }
 
-    private val handlerMap: MutableMap<String, (String) -> Unit> = mutableMapOf()
+    private val loginLatch = CountDownLatch(1)
 
-    override fun onOpen(p0: ServerHandshake?) {
-        log.info { "WebSocket onOpen" }
+    @Volatile
+    var loginSucceeded = false
+        private set
 
-        accessToken?.let {
-            handlerMap["LOGIN"] = {
-                log.info { "로그인 응답: $it" }
-
-                if (request != null) {
-                    send(request)
-                }
-            }
-
-            send(
-                jacksonObjectMapper().writeValueAsString(
-                    LoginStreamReq(
-                        token = it,
-                    )
-                )
-            )
-        }
+    override fun onOpen(handshake: ServerHandshake?) {
+        send(jacksonObjectMapper().writeValueAsString(LoginStreamReq(token = accessToken)))
     }
 
     override fun onMessage(message: String?) {
@@ -48,51 +33,42 @@ class KiwoomWebSocketClient: WebSocketClient(URI("wss://api.kiwoom.com:10000/api
 
         try {
             val rootNode = jacksonObjectMapper().readTree(message)
-            val trnm = rootNode.get("trnm")?.asText() ?: return
 
-            if(trnm == "PING") {
-                send(message)
-            }
+            when (rootNode.get("trnm")?.asText()) {
+                "PING" -> send(message)
 
-            if(rootNode.has("return_code")) {
-                if(rootNode.get("return_code")?.asInt() != 0) {
-                    val return_msg = rootNode.get("return_msg")?.asText() ?: "Socket error"
-                    log.error { "WebSocket onMessage : $return_msg" }
-                    handlerMap.remove(trnm)
-                    return
+                "LOGIN" -> {
+                    loginSucceeded = rootNode.get("return_code")?.asInt() == 0
+                    if (!loginSucceeded) {
+                        log.error { "소켓 로그인 실패 : ${rootNode.get("return_msg")?.asText()}" }
+                    }
+                    loginLatch.countDown()
+                }
+
+                "REAL" -> onRealTime(message)
+
+                else -> {
+                    if ((rootNode.get("return_code")?.asInt() ?: 0) != 0) {
+                        log.error { "소켓 응답 오류 : ${rootNode.get("return_msg")?.asText()}" }
+                    }
                 }
             }
-
-            handlerMap[trnm]?.invoke(message)
-
-            if (trnm != "REAL") {
-                handlerMap.remove(trnm)
-            }
         } catch (e: Exception) {
-
+            log.error { "소켓 메시지 처리 실패 : ${e.message}" }
         }
     }
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        log.info { "WebSocket onClose : $reason" }
+        // 키움은 같은 계정으로 새 연결이 열리면 기존 연결을 "Bye"로 끊는다. 원인 추적에 필요해 WARN 으로 남긴다.
+        log.warn { "소켓 종료 : code=$code, reason=$reason, remote=$remote" }
+        loginLatch.countDown()
     }
 
     override fun onError(e: Exception?) {
-        log.error { "WebSocket onError : $e" }
+        log.error { "소켓 오류 : $e" }
     }
 
-    fun setRequest(
-        request: String,
-        trnm: String,
-    ) {
-        this.request = request
-        this.trnm = trnm
-    }
-
-    fun sendRealTimeHandler(
-        trnm: String,
-        handler: (String) -> Unit
-    ) {
-        handlerMap[trnm] = handler
-    }
+    /** 로그인 응답까지 대기. 성공해야 등록 전문을 보낼 수 있다. */
+    fun awaitLogin(timeout: Long, unit: TimeUnit): Boolean =
+        loginLatch.await(timeout, unit) && loginSucceeded
 }
