@@ -1,5 +1,8 @@
 package com.example.investfeed.domain.index.controller
 
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.req.IndexStreamReq
 import com.example.investfeed.domain.index.dto.res.IndexDetailRes
@@ -7,9 +10,6 @@ import com.example.investfeed.domain.index.dto.res.IndexListRes
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
-import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -22,8 +22,8 @@ import com.example.investfeed.common.security.RequiresAction
 @RestController
 @RequestMapping("/api/stock/indexes")
 class IndexController(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val indexService: IndexService,
-    private val realTimeClient: RealTimeClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -48,17 +48,11 @@ class IndexController(
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "streamIndexes: $req" }
 
-        realTimeClient.sectIndexListStream(
-            req = SectIndexListStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    SectIndexListStream(
-                        item = req.items,
-                        type = listOf("0J")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.KRX,
+                items = req.items,
+                types = listOf("0J")
             )
         )
 

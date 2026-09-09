@@ -10,8 +10,11 @@ import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.toss.account.client.TossAccountClient
+import com.example.investfeed.toss.exception.TossBuyingPowerException
+import com.example.investfeed.toss.exception.TossExchangeRateException
 import com.example.investfeed.toss.exchangerate.client.TossExchangeRateClient
 import com.example.investfeed.toss.holding.TossSymbolMapper
+import com.example.investfeed.toss.holding.client.TossBuyingPowerClient
 import com.example.investfeed.toss.holding.client.TossHoldingClient
 import com.example.investfeed.toss.holding.dto.res.TossHoldingItem
 import mu.KotlinLogging
@@ -23,6 +26,7 @@ class TossHoldingService(
     private val tossAccountClient: TossAccountClient,
     private val tossHoldingClient: TossHoldingClient,
     private val tossExchangeRateClient: TossExchangeRateClient,
+    private val tossBuyingPowerClient: TossBuyingPowerClient,
     private val memberHoldingSyncService: MemberHoldingSyncService,
     private val brokerRepository: BrokerRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
@@ -34,6 +38,8 @@ class TossHoldingService(
 
     companion object {
         private const val BROKER_NAME = "토스증권"
+        private const val CURRENCY_USD = "USD"
+        private const val CURRENCY_KRW = "KRW"
     }
 
     private data class Valuation(val curPrc: Long, val purPric: Long, val evltAmt: Long, val purAmt: Long, val dayPl: Long, val evltPl: Long, val prftRt: Double)
@@ -48,19 +54,30 @@ class TossHoldingService(
         memberApiKeyRepository.findByMemberLoginIdAndBrokerId(loginId, tossBroker.id)
             ?: throw ApiKeyNotFoundException()
 
-        val balance = memberBrokerRepository.findByMemberIdAndBrokerId(memberId, tossBroker.id)?.balance ?: 0L
-
         val accountSeq = resolveAccountSeq()
+
+        val balance = accountSeq?.let { fetchKrwBuyingPower(it) } ?: 0L
+        val balanceUsd = accountSeq?.let { fetchUsdBuyingPower(it) }
         val items = accountSeq?.let { tossHoldingClient.getHoldings(it)?.items } ?: emptyList()
+
+        val needsFx = items.any { TossSymbolMapper.isUs(it.marketCountry) } || (balanceUsd?.toDoubleOrNull() ?: 0.0) > 0.0
+        val usdKrwRate = if (needsFx) fetchUsdKrwRate() else 0.0
+        val balanceUsdKrw = balanceUsd?.toDoubleOrNull()?.let { (it * usdKrwRate).toLong().toString() }
 
         if (items.isEmpty()) {
             memberHoldingSyncService.sync(memberId, emptyList(), tossBroker)
-            return HoldingListRes("0", "0", "0", "0", balance.toString(), emptyList())
+            return HoldingListRes(
+                totPurAmt = "0",
+                totEvltAmt = "0",
+                totEvltPl = "0",
+                totPrftRt = "0",
+                balance = balance.toString(),
+                balanceUsd = balanceUsd,
+                balanceUsdKrw = balanceUsdKrw,
+                holdingList = emptyList()
+            )
         }
 
-        // 평가값은 토스 응답 그대로 사용(토스 앱과 동일). 미국분만 USD→KRW 환율 환산.
-        val usdKrwRate = if (items.any { TossSymbolMapper.isUs(it.marketCountry) }) fetchUsdKrwRate() else 0.0
-        // 토스 응답에는 국가(marketCountry)만 있고 거래소가 없다. 미국 상세 조회는 거래소구분이 필수라 마스터에서 채운다.
         val stexTpBySymbol = resolveStexTps(items)
 
         var totEvltAmt = 0L
@@ -92,6 +109,10 @@ class TossHoldingService(
                 dayPl = v.dayPl.toString(),
                 stexTp = if (isUs) stexTpBySymbol[symbol] else null,
                 usStkCd = if (isUs) symbol else null,
+                curPrcUsd = if (isUs) item.lastPrice else null,
+                purPricUsd = if (isUs) item.averagePurchasePrice else null,
+                evltAmtUsd = if (isUs) item.marketValue?.amount else null,
+                evltvPrftUsd = if (isUs) item.profitLoss?.amount else null,
             )
         }
 
@@ -101,7 +122,6 @@ class TossHoldingService(
             hi.copy(possRt = String.format("%.2f", possRt))
         }
 
-        // 계좌 합계 손익은 종목별 토스 평가손익의 합. 토스는 계좌 단위 합계/수익률을 안 주므로 수익률만 합계로 산출.
         val totPrftRt = if (totPurAmt > 0) totEvltPl.toDouble() / totPurAmt * 100 else 0.0
 
         memberHoldingSyncService.sync(
@@ -122,6 +142,8 @@ class TossHoldingService(
             totEvltPl = totEvltPl.toString(),
             totPrftRt = String.format("%.2f", totPrftRt),
             balance = balance.toString(),
+            balanceUsd = balanceUsd,
+            balanceUsdKrw = balanceUsdKrw,
             holdingList = sortedHoldingList
         )
     }
@@ -152,7 +174,6 @@ class TossHoldingService(
         val lastPrice = item.lastPrice?.toDoubleOrNull() ?: 0.0
         val itemDayPl = item.dailyProfitLoss?.amount?.toDoubleOrNull() ?: 0.0
         val itemEvltPl = item.profitLoss?.amount?.toDoubleOrNull() ?: 0.0
-        // 토스 rate는 비율(0.1077 = 10.77%) → ×100으로 % 변환
         val itemPrftRt = (item.profitLoss?.rate?.toDoubleOrNull() ?: 0.0) * 100
 
         val rate = if (TossSymbolMapper.isUs(item.marketCountry)) usdKrwRate else 1.0
@@ -172,13 +193,32 @@ class TossHoldingService(
         return (accounts.firstOrNull { it.accountType == "BROKERAGE" } ?: accounts.firstOrNull())?.accountSeq
     }
 
-    private fun fetchUsdKrwRate(): Double {
-        return try {
-            tossExchangeRateClient.getRate("USD", "KRW")?.result?.rate?.toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) {
-            log.warn { "토스 USD/KRW 환율 조회 실패: ${e.message}" }
-            0.0
+    private fun fetchKrwBuyingPower(accountSeq: Long): Long {
+        val amount = tossBuyingPowerClient.getBuyingPower(accountSeq, CURRENCY_KRW)?.result?.cashBuyingPower
+        val parsed = amount?.toDoubleOrNull()
+        if (parsed == null) {
+            log.warn { "토스 원화 주문가능금액 조회 실패 — 현금 금액을 확정할 수 없어 조회를 중단합니다." }
+            throw TossBuyingPowerException()
         }
+        return parsed.toLong()
+    }
+
+    private fun fetchUsdBuyingPower(accountSeq: Long): String? {
+        return runCatching {
+            tossBuyingPowerClient.getBuyingPower(accountSeq, CURRENCY_USD)?.result?.cashBuyingPower
+        }.onFailure {
+            log.warn { "토스 달러 주문가능금액 조회 실패 — 표시를 생략합니다: ${it.message}" }
+        }.getOrNull()
+    }
+
+    private fun fetchUsdKrwRate(): Double {
+        val result = tossExchangeRateClient.getRate("USD", "KRW")?.result
+        val rate = result?.midRate?.toDoubleOrNull() ?: result?.rate?.toDoubleOrNull()
+        if (rate == null || rate <= 0.0) {
+            log.warn { "토스 USD/KRW 환율 조회 실패 — 원화 환산 불가로 보유종목 조회를 중단합니다." }
+            throw TossExchangeRateException()
+        }
+        return rate
     }
 
     private fun getLoginId(): String? {

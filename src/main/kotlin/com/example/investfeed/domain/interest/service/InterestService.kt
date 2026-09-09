@@ -7,23 +7,20 @@ import com.example.investfeed.domain.interest.dto.req.ReorderItemsReq
 import com.example.investfeed.domain.interest.dto.req.UpdateGroupReq
 import com.example.investfeed.domain.interest.dto.res.InterestGroupRes
 import com.example.investfeed.domain.interest.dto.res.InterestItemRes
-import com.example.investfeed.domain.us.stock.service.UsEtfLookup
 import com.example.investfeed.domain.interest.entity.InterestGroup
 import com.example.investfeed.domain.interest.entity.InterestItem
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
+import com.example.investfeed.domain.us.stock.service.UsEtfService
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.stock.client.StockClient
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
-import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStream
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamItem
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamReq
 import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -32,14 +29,13 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class InterestService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val groupRepository: InterestGroupRepository,
     private val itemRepository: InterestItemRepository,
     private val stockClient: StockClient,
-    private val stockSocketClient: StockSocketClient,
     private val usStockClient: UsStockClient,
-    private val usStockSocketClient: UsStockSocketClient,
     private val stockMasterRepository: StockMasterRepository,
-    private val usEtfLookup: UsEtfLookup,
+    private val usEtfService: UsEtfService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -95,9 +91,9 @@ class InterestService(
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
         val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
-        val etfTickers = usEtfLookup.etfTickers(items.filter { it.stexTp != null }.map { it.stkCd })
+        val etfTickers = usEtfService.etfTickers(items.filter { it.stexTp != null }.map { it.stkCd })
         val interestItemRes = items.map {
-            InterestItemRes(it.id, it.stkCd, usEtfLookup.displayName(it.stkCd, it.stkNm, etfTickers) ?: it.stkNm, it.stexTp)
+            InterestItemRes(it.id, it.stkCd, usEtfService.displayName(it.stkCd, it.stkNm, etfTickers) ?: it.stkNm, it.stexTp)
         }
 
         if (interestItemRes.isEmpty()) {
@@ -169,7 +165,7 @@ class InterestService(
                 displayOrder = nextOrder
             )
         )
-        val displayNm = if (item.stexTp != null && usEtfLookup.isEtf(item.stkCd)) item.stkCd else item.stkNm
+        val displayNm = if (item.stexTp != null && usEtfService.isEtf(item.stkCd)) item.stkCd else item.stkNm
         return InterestItemRes(item.id, item.stkCd, displayNm, item.stexTp)
     }
 
@@ -197,41 +193,17 @@ class InterestService(
         val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
         val (usItems, krItems) = items.partition { it.stexTp != null }
 
-        if (krItems.isNotEmpty()) {
-            stockSocketClient.stockListStream(
-                req = KiwoomStockStreamReq(
-                    trnm = "REG",
-                    grp_no = "0001",
-                    refresh = "0",
-                    data = listOf(
-                        KiwoomStockStream(
-                            item = krItems.map { it.stkCd },
-                            type = listOf("0B")
-                        )
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = krItems.map { it.stkCd },
+                types = listOf("0B")
+            ),
+            StreamEntry(
+                market = StreamMarket.US,
+                items = usItems.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp!!) },
+                types = listOf("FE")
             )
-        }
-
-        if (usItems.isNotEmpty()) {
-            usStockSocketClient.usStockListStream(
-                req = KiwoomUsStockStreamReq(
-                    trnm = "REG",
-                    grp_no = "0001",
-                    refresh = "0",
-                    data = listOf(
-                        KiwoomUsStockStream(
-                            item = usItems.map {
-                                KiwoomUsStockStreamItem(
-                                    jmcode = it.stkCd,
-                                    stex_tp = it.stexTp!!
-                                )
-                            },
-                            type = listOf("FE")
-                        )
-                    )
-                )
-            )
-        }
+        )
     }
 }

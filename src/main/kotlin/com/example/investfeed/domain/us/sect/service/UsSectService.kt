@@ -6,21 +6,21 @@ import com.example.investfeed.domain.us.sect.dto.res.UsSectListItem
 import com.example.investfeed.domain.us.sect.dto.res.UsSectListRes
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListItem
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListRes
-import com.example.investfeed.domain.us.stock.service.UsEtfLookup
+import com.example.investfeed.domain.us.stock.service.UsEtfService
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.us.sect.client.UsSectClient
 import com.example.investfeed.kiwoom.us.sect.dto.req.KiwoomUsSectPerformanceListReq
 import com.example.investfeed.kiwoom.us.sect.dto.req.KiwoomUsSectStockListReq
-import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStream
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamItem
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamReq
 import org.springframework.stereotype.Service
 
 @Service
 class UsSectService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val usSectClient: UsSectClient,
-    private val usStockSocketClient: UsStockSocketClient,
-    private val usEtfLookup: UsEtfLookup,
+    private val usEtfService: UsEtfService,
 ) {
     fun listUsSects(): UsSectListRes {
         val kiwoomUsSectPerformanceListRes = usSectClient.usSectPerformanceList(
@@ -60,14 +60,14 @@ class UsSectService(
         )
 
         val rows = kiwoomUsSectStockListRes.result_list ?: emptyList()
-        val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+        val etfTickers = usEtfService.etfTickers(rows.mapNotNull { it.stk_cd })
 
         return UsSectStockListRes(
             sectStockList = rows.map {
                 UsSectStockListItem(
                     stkCd = it.stk_cd,
                     stexTp = it.stex_tp,
-                    stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
+                    stkNm = usEtfService.displayName(it.stk_cd, it.stk_nm, etfTickers),
                     fluRt = it.flu_rt,
                     curPrc = it.cur_prc,
                     predPreSig = it.pred_pre_sig,
@@ -80,22 +80,11 @@ class UsSectService(
     fun streamUsStocks(
         req: UsSectStockStreamReq
     ) {
-        usStockSocketClient.usStockListStream(
-            req = KiwoomUsStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomUsStockStream(
-                        item = req.items.map {
-                            KiwoomUsStockStreamItem(
-                                jmcode = it.stkCd,
-                                stex_tp = it.stexTp
-                            )
-                        },
-                        type = listOf("FE")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.US,
+                items = req.items.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
+                types = listOf("FE")
             )
         )
     }

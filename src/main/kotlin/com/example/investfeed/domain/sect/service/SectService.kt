@@ -7,18 +7,18 @@ import com.example.investfeed.domain.sect.dto.res.SectListItem
 import com.example.investfeed.domain.sect.dto.res.SectListRes
 import com.example.investfeed.domain.sect.dto.res.SectStockListItem
 import com.example.investfeed.domain.sect.dto.res.SectStockListRes
-import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import org.springframework.stereotype.Service
 
 @Service
 class SectService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val sectClient: SectClient,
-    private val realTimeClient: RealTimeClient
 ) {
     fun listSects(
         req: SectListReq
@@ -54,17 +54,11 @@ class SectService(
     fun streamSects(
         req: SectListStreamReq
     ) {
-        realTimeClient.sectIndexListStream(
-            req = SectIndexListStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    SectIndexListStream(
-                        item = req.items,
-                        type = listOf("0J")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.KRX,
+                items = req.items,
+                types = listOf("0J")
             )
         )
     }

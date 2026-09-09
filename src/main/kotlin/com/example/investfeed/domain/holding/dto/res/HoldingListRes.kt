@@ -6,6 +6,8 @@ data class HoldingListRes(
     val totEvltPl: String, // 총평가손익금액
     val totPrftRt: String, // 총수익률(%)
     val balance: String = "0", // 계좌 잔액(예수금)
+    val balanceUsd: String? = null,
+    val balanceUsdKrw: String? = null,
     val holdingList: List<HoldingItem>
 )
 
@@ -25,4 +27,8 @@ data class HoldingItem(
     val dayPl: String = "0", // 당일 손익(원). 증권사 API가 직접 제공하는 경우 사용(예: 토스), 미제공 시 0
     val stexTp: String? = null, // 거래소구분 NA:AMEX, ND:NASDAQ, NY:NYSE. 미국 종목만 값 존재(국내는 null)
     val usStkCd: String? = null, // 미국 상세 조회용 티커(stkCd 의 _US 접미사 제외). 미국 종목만 값 존재
+    val curPrcUsd: String? = null, // 현재가 (USD)
+    val purPricUsd: String? = null, // 매입단가 (USD)
+    val evltAmtUsd: String? = null, // 평가금액 (USD)
+    val evltvPrftUsd: String? = null, // 평가손익 (USD)
 )

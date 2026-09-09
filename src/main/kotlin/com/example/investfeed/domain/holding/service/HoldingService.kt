@@ -1,5 +1,9 @@
 package com.example.investfeed.domain.holding.service
 
+import com.example.investfeed.kiwoom.exception.UsHoldingListException
+import com.example.investfeed.kiwoom.exception.UsDepositException
+import com.example.investfeed.kiwoom.exception.HoldingListException
+import com.example.investfeed.kiwoom.exception.DepositException
 import com.example.investfeed.common.util.MarketTimeUtil.isKrxHoldingClose
 import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
@@ -7,22 +11,44 @@ import com.example.investfeed.domain.holding.dto.res.HoldingListRes
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
+import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
+import com.example.investfeed.domain.us.stock.service.UsEtfService
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
-import com.example.investfeed.kiwoom.holding.client.HoldingSocketClient
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
-import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingStreamReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.kiwoom.stock.client.StockClient
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.kiwoom.us.holding.client.UsHoldingClient
+import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsDepositReq
+import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsHoldingReq
+import com.example.investfeed.kiwoom.us.holding.dto.res.KiwoomUsHoldingRes
+import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 
 @Service
 class HoldingService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val holdingClient: HoldingClient,
-    private val holdingSocketClient: HoldingSocketClient,
+    private val usHoldingClient: UsHoldingClient,
     private val memberHoldingSyncService: MemberHoldingSyncService,
     private val brokerRepository: BrokerRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
+    private val usStockMasterRepository: UsStockMasterRepository,
+    private val usEtfService: UsEtfService,
+    private val stockClient: StockClient,
 ) {
+    private val log = KotlinLogging.logger {}
+
+    companion object {
+        private const val US_SUFFIX = "_US"
+        private const val CURRENCY_USD = "USD"
+    }
+
     fun listHoldings(): HoldingListRes {
         val res = holdingClient.holdingList(
             req = KiwoomHoldingReq(
@@ -31,9 +57,13 @@ class HoldingService(
             )
         )
 
-        val holdingList = res?.acnt_evlt_remn_indv_tot?.map { stock ->
+        val rows = res.acnt_evlt_remn_indv_tot ?: emptyList()
+        val basePricByStkCd = fetchBasePrics(rows.mapNotNull { it.stk_cd })
+
+        val holdingList = rows.map { stock ->
+            val rawCd = stock.stk_cd?.removePrefix("A") ?: ""
             HoldingItem(
-                stkCd = (stock.stk_cd?.removePrefix("A") ?: "") + "_AL",
+                stkCd = rawCd + "_AL",
                 stkNm = stock.stk_nm ?: "",
                 curPrc = stock.cur_prc?.replace("^[+-]".toRegex(), "") ?: "0",
                 purPric = stock.pur_pric ?: "0",
@@ -43,9 +73,10 @@ class HoldingService(
                 prftRt = stock.prft_rt ?: "0",
                 rmndQty = stock.rmnd_qty ?: "0",
                 possRt = stock.poss_rt ?: "0",
-                predClosePric = stock.pred_close_pric?.replace("^[+-]".toRegex(), "") ?: "0",
+                predClosePric = basePricByStkCd[rawCd]
+                    ?: stock.pred_close_pric?.replace("^[+-]".toRegex(), "") ?: "0",
             )
-        } ?: emptyList()
+        }
 
         val memberId = getMemberId()
         var sortedHoldingList = holdingList
@@ -68,20 +99,151 @@ class HoldingService(
 
         val depositRes = holdingClient.deposit(KiwoomDepositReq(qry_tp = "3"))
 
+        val balance = depositRes.d2_entra ?: throw DepositException()
+        val usRes = usHoldingClient.usHoldingList(KiwoomUsHoldingReq())
+        val usHoldingList = toUsHoldingItems(usRes)
+        val usdDeposit = fetchUsdDeposit()
+
+        val totPurAmt = res.tot_pur_amt.toAmount("tot_pur_amt") { HoldingListException() } +
+                usRes.tot_prch_amt_krw.toAmount("tot_prch_amt_krw") { UsHoldingListException() }
+        val totEvltAmt = res.tot_evlt_amt.toAmount("tot_evlt_amt") { HoldingListException() } +
+                usRes.tot_evlt_amt_krw.toAmount("tot_evlt_amt_krw") { UsHoldingListException() }
+        val totEvltPl = res.tot_evlt_pl.toAmount("tot_evlt_pl") { HoldingListException() } +
+                usRes.tot_pl_amt_krw.toAmount("tot_pl_amt_krw") { UsHoldingListException() }
+
         return HoldingListRes(
-            totPurAmt = res?.tot_pur_amt ?: "0",
-            totEvltAmt = res?.tot_evlt_amt ?: "0",
-            totEvltPl = res?.tot_evlt_pl ?: "0",
-            totPrftRt = res?.tot_prft_rt ?: "0",
-            balance = depositRes?.entr ?: "0",
-            holdingList = sortedHoldingList
+            totPurAmt = totPurAmt.toString(),
+            totEvltAmt = totEvltAmt.toString(),
+            totEvltPl = totEvltPl.toString(),
+            totPrftRt = if (totPurAmt != 0L) String.format("%.2f", totEvltPl.toDouble() / totPurAmt * 100) else "0",
+            balance = balance,
+            balanceUsd = usdDeposit?.first,
+            balanceUsdKrw = usdDeposit?.second,
+            holdingList = withPossRt(sortedHoldingList + usHoldingList, totEvltAmt),
         )
     }
 
+    private fun withPossRt(holdings: List<HoldingItem>, totEvltAmt: Long): List<HoldingItem> {
+        if (holdings.none { it.stkCd.endsWith(US_SUFFIX) } || totEvltAmt <= 0L) return holdings
+
+        return holdings.map {
+            it.copy(possRt = String.format("%.2f", it.evltAmt.toAmount("evltAmt") { HoldingListException() }.toDouble() / totEvltAmt * 100))
+        }
+    }
+
+    private fun fetchUsdDeposit(): Pair<String, String>? {
+        return runCatching {
+            val usd = usHoldingClient.usDeposit(KiwoomUsDepositReq())
+                .result_list
+                ?.firstOrNull { it.crnc_code == CURRENCY_USD }
+            (usd?.fc_entra ?: "0") to (usd?.let { it.fc_booka.toAmount("fc_booka") { UsDepositException() } } ?: 0L).toString()
+        }.onFailure {
+            log.warn { "해외 외화예수금 조회 실패 — 달러 표시를 생략합니다: ${it.message}" }
+        }.getOrNull()
+    }
+
+    private fun toUsHoldingItems(usRes: KiwoomUsHoldingRes?): List<HoldingItem> {
+        val rows = usRes?.result_list?.filter { !it.stk_cd.isNullOrBlank() } ?: return emptyList()
+        if (rows.isEmpty()) return emptyList()
+
+        val tickers = rows.mapNotNull { it.stk_cd }.distinct()
+        val stexTpByTicker = usStockMasterRepository.findByStkCdIn(tickers).associate { it.stkCd to it.stexTp }
+        val etfTickers = usEtfService.etfTickers(tickers)
+
+        val missing = tickers - stexTpByTicker.keys
+        if (missing.isNotEmpty()) {
+            log.warn { "미국 종목 마스터 미등록으로 거래소구분을 채우지 못했습니다: $missing" }
+        }
+
+        return rows.map { row ->
+            val ticker = row.stk_cd!!
+            HoldingItem(
+                stkCd = "${ticker}_US",
+                stkNm = usEtfService.displayName(ticker, row.frgn_stk_nm, etfTickers) ?: ticker,
+                curPrc = row.now_pric_krw.toAmount("now_pric_krw") { UsHoldingListException() }.toString(),
+                purPric = row.frgn_stk_book_uv_krw.toAmount("frgn_stk_book_uv_krw") { UsHoldingListException() }.toString(),
+                purAmt = row.frgn_stk_book_amt_krw.toAmount("frgn_stk_book_amt_krw") { UsHoldingListException() }.toString(),
+                evltAmt = row.evlt_amt_krw.toAmount("evlt_amt_krw") { UsHoldingListException() }.toString(),
+                evltvPrft = row.pl_amt_krw.toAmount("pl_amt_krw") { UsHoldingListException() }.toString(),
+                prftRt = row.pl_rt ?: "0",
+                rmndQty = row.poss_qty.toAmount("poss_qty") { UsHoldingListException() }.toString(),
+                possRt = "0",
+                predClosePric = "0",
+                stexTp = stexTpByTicker[ticker],
+                usStkCd = ticker,
+                curPrcUsd = row.now_pric,
+                purPricUsd = row.frgn_stk_book_uv,
+                evltAmtUsd = row.evlt_amt,
+                evltvPrftUsd = row.pl_amt,
+            )
+        }
+    }
+
+    private fun fetchBasePrics(stkCds: List<String>): Map<String, String> {
+        val codes = stkCds.map { it.removePrefix("A") }.filter { it.isNotBlank() }.distinct()
+        if (codes.isEmpty()) return emptyMap()
+
+        return runCatching {
+            stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = codes.joinToString("|")))
+                .atn_stk_infr
+                ?.mapNotNull { info ->
+                    val cd = info.stk_cd?.removePrefix("A") ?: return@mapNotNull null
+                    val base = info.base_pric?.replace("^[+-]".toRegex(), "")?.takeIf { it.isNotBlank() }
+                        ?: return@mapNotNull null
+                    cd to base
+                }
+                ?.toMap()
+                ?: emptyMap()
+        }.onFailure {
+            log.warn { "보유종목 기준가 조회 실패 — 일간수익이 부정확할 수 있습니다: ${it.message}" }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun String?.toAmount(field: String, onError: () -> RuntimeException): Long {
+        return this?.trim()?.toLongOrNull() ?: run {
+            log.error { "키움 금액 필드 파싱 실패 : $field=$this" }
+            throw onError()
+        }
+    }
+
     fun streamHoldings(req: HoldingStreamReq) {
-        holdingSocketClient.holdingStream(
-            req = KiwoomHoldingStreamReq(items = req.items)
+        val (usCodes, krCodes) = req.items.partition { it.endsWith(US_SUFFIX) }
+
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = listOf(""), // 주문체결은 계좌 단위라 종목코드가 필요 없음
+                types = listOf("04")
+            ),
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = krCodes,
+                types = listOf("0B")
+            ),
+            StreamEntry(
+                market = StreamMarket.US,
+                items = usStreamItems(usCodes),
+                types = listOf("FE")
+            )
         )
+    }
+
+    private fun usStreamItems(usCodes: List<String>): List<KiwoomUsStreamItem> {
+        if (usCodes.isEmpty()) return emptyList()
+
+        val tickers = usCodes.map { it.removeSuffix(US_SUFFIX) }.distinct()
+        val stexTpByTicker = usStockMasterRepository.findByStkCdIn(tickers).associate { it.stkCd to it.stexTp }
+
+        val items = tickers.mapNotNull { ticker ->
+            val stexTp = stexTpByTicker[ticker] ?: return@mapNotNull null
+            KiwoomUsStreamItem(jmcode = ticker, stex_tp = stexTp)
+        }
+
+        if (items.isEmpty()) {
+            log.warn { "미국 보유종목 실시간 등록 실패 — 마스터에 거래소구분이 없습니다: $tickers" }
+        }
+
+        return items
     }
 
     private fun getMemberId(): Long? {

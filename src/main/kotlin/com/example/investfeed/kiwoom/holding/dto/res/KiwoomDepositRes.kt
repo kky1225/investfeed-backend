@@ -6,6 +6,7 @@ data class KiwoomDepositRes(
     override var return_code: Int,
     override var return_msg: String,
     var entr: String? = null, // 예수금
+    var d2_entra: String? = null, // d+2 추정예수금
     var ord_alow_amt: String? = null, // 주문가능금액
     var pymn_alow_amt: String? = null, // 출금가능금액
 ): KiwoomRes(return_code, return_msg)

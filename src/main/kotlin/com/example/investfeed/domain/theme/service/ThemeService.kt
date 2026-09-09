@@ -7,9 +7,9 @@ import com.example.investfeed.domain.theme.dto.res.ThemeListItem
 import com.example.investfeed.domain.theme.dto.res.ThemeListRes
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListItem
 import com.example.investfeed.domain.theme.dto.res.ThemeStockListRes
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.theme.client.ThemeClient
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupReq
 import com.example.investfeed.kiwoom.theme.dto.req.KiwoomThemeGroupStockReq
@@ -17,8 +17,8 @@ import org.springframework.stereotype.Service
 
 @Service
 class ThemeService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val themeClient: ThemeClient,
-    private val stockSocketClient: StockSocketClient
 ) {
     fun listThemes(
         req: ThemeListReq
@@ -93,17 +93,11 @@ class ThemeService(
     fun streamThemeStocks(
         req: ThemeStockListStreamReq
     ) {
-        stockSocketClient.stockListStream(
-            req = KiwoomStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomStockStream(
-                        item = req.items,
-                        type = listOf("0B")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = req.items,
+                types = listOf("0B")
             )
         )
     }

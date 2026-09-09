@@ -10,17 +10,17 @@ import com.example.investfeed.domain.us.stock.dto.res.UsStockInfo
 import com.example.investfeed.domain.us.stock.dto.res.UsStockSearchItem
 import com.example.investfeed.domain.us.stock.entity.UsStockMaster
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
 import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
 import com.example.investfeed.kiwoom.us.chart.dto.res.KiwoomUsStockChartRes
-import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
-import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoListReq
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStream
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamItem
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamReq
+import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import mu.KotlinLogging
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -28,9 +28,9 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class UsStockInfoService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val usStockClient: UsStockClient,
     private val usStockChartClient: UsStockChartClient,
-    private val usStockSocketClient: UsStockSocketClient,
     private val usStockMasterRepository: UsStockMasterRepository,
 ) {
     private val log = KotlinLogging.logger {}
@@ -188,22 +188,11 @@ class UsStockInfoService(
         )
 
     fun streamUsStock(stkCd: String, stexTp: String) {
-        usStockSocketClient.usStockListStream(
-            req = KiwoomUsStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomUsStockStream(
-                        item = listOf(
-                            KiwoomUsStockStreamItem(
-                                jmcode = stkCd,
-                                stex_tp = stexTp
-                            )
-                        ),
-                        type = listOf("FE")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.US,
+                items = listOf(KiwoomUsStreamItem(jmcode = stkCd, stex_tp = stexTp)),
+                types = listOf("FE")
             )
         )
     }

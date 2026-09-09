@@ -18,18 +18,20 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.shortselling.client.ShortSellingClient
 import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.stock.client.StockClient
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
 @Service
 class StockService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val stockClient: StockClient,
     private val priceClient: PriceClient,
     private val stockChartClient: StockChartClient,
-    private val stockSocketClient: StockSocketClient,
     private val shortSellingClient: ShortSellingClient,
     private val stockDividendService: StockDividendService,
     private val stockMasterRepository: StockMasterRepository,
@@ -548,17 +550,11 @@ class StockService(
     fun streamStocks(
         req: StockStreamReq
     ) {
-        stockSocketClient.stockListStream(
-            req = KiwoomStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomStockStream(
-                        item = req.items,
-                        type = listOf("0B", "0H", "1h")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = req.items,
+                types = listOf("0B", "0H", "1h")
             )
         )
     }

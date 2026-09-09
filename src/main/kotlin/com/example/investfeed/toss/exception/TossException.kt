@@ -8,3 +8,4 @@ class TossApiException(): InvestFeedException(code = "TOSS_9999", message = "토
 class TossAccountListException(): InvestFeedException(code = "TOSS_ACCOUNT_0001", message = "토스 계좌 조회에 실패하였습니다.")
 class TossHoldingListException(): InvestFeedException(code = "TOSS_HOLDING_0001", message = "토스 보유 주식 조회에 실패하였습니다.")
 class TossExchangeRateException(): InvestFeedException(code = "TOSS_FX_0001", message = "토스 환율 조회에 실패하였습니다.")
+class TossBuyingPowerException(): InvestFeedException(code = "TOSS_BP_0001", message = "토스 주문가능금액 조회에 실패하였습니다.")

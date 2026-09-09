@@ -1,15 +1,15 @@
 package com.example.investfeed.domain.dashboard.controller
 
-import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
-import com.example.investfeed.domain.dashboard.service.DashboardService
-import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
 import com.example.investfeed.common.security.Actions
 import com.example.investfeed.common.security.Permissions
 import com.example.investfeed.common.security.RequiresAction
-import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStream
-import com.example.investfeed.kiwoom.realtime.dto.SectIndexListStreamReq
+import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.dashboard.dto.res.DashboardRes
+import com.example.investfeed.domain.dashboard.service.DashboardService
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/stock")
 class DashboardController(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val dashboardService: DashboardService,
-    private val realTimeClient: RealTimeClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -45,17 +45,11 @@ class DashboardController(
     fun streamDashboard(): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "streamDashboard" }
 
-        realTimeClient.sectIndexListStream(
-            req = SectIndexListStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    SectIndexListStream(
-                        item = listOf("001", "101", "201", "150"),
-                        type = listOf("0J")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.KRX,
+                items = listOf("001", "101", "201", "150"),
+                types = listOf("0J")
             )
         )
 

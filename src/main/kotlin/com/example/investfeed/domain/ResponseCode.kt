@@ -10,7 +10,6 @@ enum class ResponseCode(
     ASSET_STOCK_STREAM(message = "실시간 통합자산 주식 조회에 성공하셨습니다."),
     ASSET_CRYPTO_STREAM(message = "실시간 통합자산 코인 조회에 성공하셨습니다."),
     MULTI_VIEW_STOCK_STREAM(message = "실시간 멀티뷰 주식 조회에 성공하셨습니다."),
-    MULTI_VIEW_US_STOCK_STREAM(message = "실시간 멀티뷰 미국 주식 조회에 성공하셨습니다."),
     MULTI_VIEW_CRYPTO_STREAM(message = "실시간 멀티뷰 코인 조회에 성공하셨습니다."),
     RANK_STREAM(message = "실시간 주식 순위 조회에 성공하셨습니다."),
     US_RANK_STREAM(message = "실시간 미국 주식 순위 조회에 성공하셨습니다."),

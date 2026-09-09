@@ -1,24 +1,24 @@
-package com.example.investfeed.kiwoom.holding.client
+package com.example.investfeed.kiwoom.us.holding.client
 
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
-import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
-import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
-import com.example.investfeed.kiwoom.holding.dto.res.KiwoomDepositRes
-import com.example.investfeed.kiwoom.holding.dto.res.KiwoomHoldingRes
 import com.example.investfeed.kiwoom.auth.service.AuthClient
-import com.example.investfeed.kiwoom.exception.DepositException
-import com.example.investfeed.kiwoom.exception.HoldingListException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.exception.UsDepositException
+import com.example.investfeed.kiwoom.exception.UsHoldingListException
+import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsDepositReq
+import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsHoldingReq
+import com.example.investfeed.kiwoom.us.holding.dto.res.KiwoomUsDepositRes
+import com.example.investfeed.kiwoom.us.holding.dto.res.KiwoomUsHoldingRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 
-@Service
-class HoldingClient(
+@Component
+class UsHoldingClient(
     @param:Value("\${kiwoom.default-url}")
     private val DEFAULT_URL: String,
     @Qualifier("kiwoomWebClient")
@@ -26,68 +26,70 @@ class HoldingClient(
     private val authClient: AuthClient,
 ) {
     private val log = KotlinLogging.logger {}
+    private final val ACNT_URL = "/api/us/acnt"
 
     @KiwoomToken
-    fun holdingList(
-        req: KiwoomHoldingReq
-    ): KiwoomHoldingRes {
+    fun usHoldingList(
+        req: KiwoomUsHoldingReq
+    ): KiwoomUsHoldingRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val res = kiwoomWebClient.post()
-                .uri("$DEFAULT_URL/api/dostk/acnt")
+                .uri(DEFAULT_URL + ACNT_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "kt00018")
+                .header("api-id", "ust21070")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono<KiwoomHoldingRes>()
-                .block()
-
-            if (res == null || res.return_code != 0) {
-                throw HoldingListException()
-            }
-
-            return res
-        }catch (e: KiwoomApiException) {
-            throw e
-        }catch (e: HoldingListException) {
-            throw e
-        }catch (e: Exception) {
-            log.warn { "holdingList Error: ${e.message}" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
-    fun deposit(
-        req: KiwoomDepositReq
-    ): KiwoomDepositRes {
-        val accessToken = authClient.getCurrentAccessToken()
-
-        try {
-            val res = kiwoomWebClient.post()
-                .uri("$DEFAULT_URL/api/dostk/acnt")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "kt00001")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
-                .bodyToMono<KiwoomDepositRes>()
+                .bodyToMono<KiwoomUsHoldingRes>()
                 .block()
 
             if (res?.return_code != 0) {
-                throw DepositException()
+                throw UsHoldingListException()
             }
 
             return res
         } catch (e: KiwoomApiException) {
             throw e
-        } catch (e: DepositException) {
+        } catch (e: UsHoldingListException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "deposit Error" }
+            log.warn { "usHoldingList Error: ${e.message}" }
+
+            throw RuntimeException(e.message)
+        }
+    }
+
+    /** 해외주식 예수금(ust21110). 통화별 외화예수금·주문가능금액을 내려준다. */
+    @KiwoomToken
+    fun usDeposit(
+        req: KiwoomUsDepositReq
+    ): KiwoomUsDepositRes {
+        val accessToken = authClient.getCurrentAccessToken()
+
+        try {
+            val res = kiwoomWebClient.post()
+                .uri(DEFAULT_URL + ACNT_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", "ust21110")
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .bodyToMono<KiwoomUsDepositRes>()
+                .block()
+
+            if (res?.return_code != 0) {
+                throw UsDepositException()
+            }
+
+            return res
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: UsDepositException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "usDeposit Error: ${e.message}" }
 
             throw RuntimeException(e.message)
         }

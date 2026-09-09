@@ -4,23 +4,23 @@ import com.example.investfeed.domain.us.rank.dto.req.UsRankListReq
 import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamReq
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListItem
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListRes
-import com.example.investfeed.domain.us.stock.service.UsEtfLookup
+import com.example.investfeed.domain.us.stock.service.UsEtfService
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.us.rank.client.UsRankClient
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeValueListReq
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsSurgeTradeVolumeListReq
-import com.example.investfeed.kiwoom.us.stock.client.UsStockSocketClient
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStream
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamItem
-import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockStreamReq
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
 @Service
 class UsRankService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val usRankClient: UsRankClient,
-    private val usStockSocketClient: UsStockSocketClient,
-    private val usEtfLookup: UsEtfLookup,
+    private val usEtfService: UsEtfService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -42,7 +42,7 @@ class UsRankService(
                 )
 
                 val rows = kiwoomUsStockTradeValueListRes.result_list.orEmpty()
-                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+                val etfTickers = usEtfService.etfTickers(rows.mapNotNull { it.stk_cd })
 
                 return UsRankListRes(
                     return_code = kiwoomUsStockTradeValueListRes.return_code,
@@ -52,7 +52,7 @@ class UsRankService(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
+                            stkNm = usEtfService.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.trde_prica,
@@ -75,7 +75,7 @@ class UsRankService(
                 )
 
                 val rows = kiwoomUsStockTradeVolumeListRes.result_list.orEmpty()
-                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+                val etfTickers = usEtfService.etfTickers(rows.mapNotNull { it.stk_cd })
 
                 return UsRankListRes(
                     return_code = kiwoomUsStockTradeVolumeListRes.return_code,
@@ -85,7 +85,7 @@ class UsRankService(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
+                            stkNm = usEtfService.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.acc_trde_qty,
@@ -108,7 +108,7 @@ class UsRankService(
                 )
 
                 val rows = kiwoomUsSurgeTradeVolumeListRes.result_list.orEmpty()
-                val etfTickers = usEtfLookup.etfTickers(rows.mapNotNull { it.stk_cd })
+                val etfTickers = usEtfService.etfTickers(rows.mapNotNull { it.stk_cd })
 
                 return UsRankListRes(
                     return_code = kiwoomUsSurgeTradeVolumeListRes.return_code,
@@ -118,7 +118,7 @@ class UsRankService(
                             stkCd = it.stk_cd,
                             stexTp = it.stex_tp,
                             rank = it.rank,
-                            stkNm = usEtfLookup.displayName(it.stk_cd, it.stk_nm, etfTickers),
+                            stkNm = usEtfService.displayName(it.stk_cd, it.stk_nm, etfTickers),
                             fluRt = it.flu_rt,
                             curPrc = it.cur_prc,
                             trdePrica = it.sdnin_rt,
@@ -132,22 +132,11 @@ class UsRankService(
     fun streamUsStocks(
         req: UsStockStreamReq
     ) {
-        usStockSocketClient.usStockListStream(
-            req = KiwoomUsStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomUsStockStream(
-                        item = req.items.map {
-                            KiwoomUsStockStreamItem(
-                                jmcode = it.stkCd,
-                                stex_tp = it.stexTp
-                            )
-                        },
-                        type = listOf("FE")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.US,
+                items = req.items.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
+                types = listOf("FE")
             )
         )
     }

@@ -76,7 +76,7 @@ class HoldingSyncScheduler(
                         req = KiwoomHoldingReq(qry_tp = "2", dmst_stex_tp = "NXT")
                     )
 
-                    val holdings = res?.acnt_evlt_remn_indv_tot?.map { stock ->
+                    val holdings = res.acnt_evlt_remn_indv_tot?.map { stock ->
                         val stkCd = (stock.stk_cd?.removePrefix("A") ?: "") + "_AL"
                         val stkNm = stock.stk_nm ?: ""
                         stkCd to stkNm

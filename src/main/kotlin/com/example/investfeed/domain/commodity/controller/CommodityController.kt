@@ -1,5 +1,8 @@
 package com.example.investfeed.domain.commodity.controller
 
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.domain.commodity.dto.req.CommodityDetailReq
 import com.example.investfeed.domain.commodity.dto.req.CommodityStreamReq
 import com.example.investfeed.domain.commodity.dto.res.CommodityDetailRes
@@ -7,9 +10,6 @@ import com.example.investfeed.domain.commodity.dto.res.CommodityListRes
 import com.example.investfeed.domain.commodity.service.CommodityService
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.common.exception.ApiResponse
-import com.example.investfeed.kiwoom.realtime.client.RealTimeClient
-import com.example.investfeed.kiwoom.realtime.dto.KiwoomGoldPriceStream
-import com.example.investfeed.kiwoom.realtime.dto.KiwoomGoldPriceStreamReq
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,8 +27,8 @@ import com.example.investfeed.common.security.RequiresAction
 @RestController
 @RequestMapping("/api/commodities")
 class CommodityController(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val commodityService: CommodityService,
-    private val realTimeClient: RealTimeClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -53,17 +53,11 @@ class CommodityController(
     ): ResponseEntity<ApiResponse<Nothing?>> {
         log.info { "streamCommodities: $req" }
 
-        realTimeClient.goldPriceListStream(
-            req = KiwoomGoldPriceStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomGoldPriceStream(
-                        item = req.items,
-                        type = listOf("0B")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.KRX,
+                items = req.items,
+                types = listOf("0B")
             )
         )
 

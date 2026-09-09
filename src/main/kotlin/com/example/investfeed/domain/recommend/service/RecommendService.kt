@@ -1,5 +1,8 @@
 package com.example.investfeed.domain.recommend.service
 
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
@@ -29,12 +32,9 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarke
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestor
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -51,10 +51,10 @@ import com.example.investfeed.domain.papertrade.service.TrancheCalculator
 
 @Service
 class RecommendService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val priceClient: PriceClient,
     private val stockClient: StockClient,
     private val stockChartClient: StockChartClient,
-    private val stockSocketClient: StockSocketClient,
     private val stockPickRepository: StockPickRepository,
     private val stockPickHistoryRepository: StockPickHistoryRepository,
     private val memberRepository: MemberRepository,
@@ -1755,17 +1755,11 @@ class RecommendService(
     fun streamRecommendations(
         req: RecommendListStreamReq
     ) {
-        stockSocketClient.stockListStream(
-            req = KiwoomStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomStockStream(
-                        item = req.items,
-                        type = listOf("0B")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = req.items,
+                types = listOf("0B")
             )
         )
     }

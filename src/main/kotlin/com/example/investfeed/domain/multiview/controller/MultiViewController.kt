@@ -12,14 +12,14 @@ import com.example.investfeed.domain.crypto.dto.req.CryptoDetailReq
 import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.multiview.dto.req.MultiViewStreamReq
-import com.example.investfeed.domain.multiview.dto.req.MultiViewUsStreamReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.domain.multiview.dto.req.MultiViewStockStreamReq
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
-import com.example.investfeed.domain.stock.dto.req.StockStreamReq
-import com.example.investfeed.domain.stock.dto.res.StockChartRes
 import com.example.investfeed.domain.stock.service.StockService
-import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamItem
-import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamReq
-import com.example.investfeed.domain.us.rank.service.UsRankService
+import com.example.investfeed.domain.stock.dto.res.StockChartRes
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChartRes
 import com.example.investfeed.domain.us.stock.service.UsStockInfoService
@@ -36,11 +36,11 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/multi-view")
 class MultiViewController(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val stockService: StockService,
     private val cryptoService: CryptoService,
     private val commodityService: CommodityService,
     private val usStockInfoService: UsStockInfoService,
-    private val usRankService: UsRankService,
 ) {
 
     @GetMapping("/charts/stock/{stkCd}")
@@ -109,39 +109,25 @@ class MultiViewController(
     @PostMapping("/stocks/stream")
     @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamMultiViewStocks(
-        @RequestBody req: MultiViewStreamReq
+        @RequestBody req: MultiViewStockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        stockService.streamStocks(StockStreamReq(items = req.items))
-
-        return ResponseEntity(
-            ApiResponse(
-                code = ResponseCode.MULTI_VIEW_STOCK_STREAM.code,
-                message = ResponseCode.MULTI_VIEW_STOCK_STREAM.message,
-                result = null
-            ), HttpStatus.OK
-        )
-    }
-
-    @PostMapping("/us-stocks/stream")
-    @RequiresAction(action = Actions.SUBSCRIBE)
-    fun streamMultiViewUsStocks(
-        @RequestBody req: MultiViewUsStreamReq
-    ): ResponseEntity<ApiResponse<Nothing?>> {
-        usRankService.streamUsStocks(
-            UsStockStreamReq(
-                items = req.items.map {
-                    UsStockStreamItem(
-                        stkCd = it.stkCd,
-                        stexTp = it.stexTp
-                    )
-                }
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = req.items,
+                types = listOf("0B", "0H", "1h")
+            ),
+            StreamEntry(
+                market = StreamMarket.US,
+                items = req.usItems.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
+                types = listOf("FE")
             )
         )
 
         return ResponseEntity(
             ApiResponse(
-                code = ResponseCode.MULTI_VIEW_US_STOCK_STREAM.code,
-                message = ResponseCode.MULTI_VIEW_US_STOCK_STREAM.message,
+                code = ResponseCode.MULTI_VIEW_STOCK_STREAM.code,
+                message = ResponseCode.MULTI_VIEW_STOCK_STREAM.message,
                 result = null
             ), HttpStatus.OK
         )

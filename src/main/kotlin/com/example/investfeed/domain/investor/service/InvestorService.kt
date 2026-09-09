@@ -13,9 +13,9 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeOpenMarket
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketRes
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeOpenMarketItemList
-import com.example.investfeed.kiwoom.stock.client.StockSocketClient
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStream
-import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockStreamReq
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -28,8 +28,8 @@ import java.util.Collections.emptyList
 
 @Service
 class InvestorService(
+    private val kiwoomStreamClient: KiwoomStreamClient,
     private val priceClient: PriceClient,
-    private val stockSocketClient: StockSocketClient,
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
     private val holidayService: HolidayService,
@@ -288,17 +288,11 @@ class InvestorService(
     fun streamInvestors(
         req: InvestorStreamReq
     ) {
-        stockSocketClient.stockListStream(
-            req = KiwoomStockStreamReq(
-                trnm = "REG",
-                grp_no = "0001",
-                refresh = "0",
-                data = listOf(
-                    KiwoomStockStream(
-                        item = req.items,
-                        type = listOf("0B")
-                    )
-                )
+        kiwoomStreamClient.register(
+            StreamEntry(
+                market = StreamMarket.NXT,
+                items = req.items,
+                types = listOf("0B")
             )
         )
     }
