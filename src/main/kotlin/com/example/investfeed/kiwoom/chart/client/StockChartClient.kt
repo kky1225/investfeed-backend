@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.*
@@ -36,11 +37,12 @@ class StockChartClient(
                 .header("api-id", "ka10080")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomStockChartMinuteRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=chartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartMinuteListException()
             }
 
@@ -69,11 +71,12 @@ class StockChartClient(
                 .header("api-id", "ka10081")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomStockChartDayRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=chartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartDayListException()
             }
 
@@ -102,11 +105,12 @@ class StockChartClient(
                 .header("api-id", "ka10082")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomStockChartWeekRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=chartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartWeekListException()
             }
 
@@ -135,11 +139,12 @@ class StockChartClient(
                 .header("api-id", "ka10083")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomStockChartMonthRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=chartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartMonthListException()
             }
 
@@ -168,11 +173,12 @@ class StockChartClient(
                 .header("api-id", "ka10094")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomStockChartYearRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=chartYearList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartYearListException()
             }
 
@@ -201,11 +207,12 @@ class StockChartClient(
                 .header("api-id", "ka10064")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockChartInvestorRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=stockChartInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockChartInvestorException()
             }
 

@@ -1,5 +1,6 @@
 package com.example.investfeed.naver.news.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.global.config.WebClientHttpClientFactory
@@ -47,7 +48,7 @@ class NaverNewsClient(
                 .header("X-Naver-Client-Id", clientId)
                 .header("X-Naver-Client-Secret", clientSecret)
                 .retrieve()
-                .onStatus({ it.isError }, { throw NaverNewsApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 뉴스"); throw NaverNewsApiException() })
                 .bodyToMono<NaverNewsRes>()
                 .block()
 

@@ -1,5 +1,6 @@
 package com.example.investfeed.toss.account.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.account.dto.res.TossAccount
 import com.example.investfeed.toss.account.dto.res.TossAccountListRes
 import com.example.investfeed.toss.annotation.TossToken
@@ -33,7 +34,7 @@ class TossAccountClient(
                 .uri("$DEFAULT_URL/api/v1/accounts")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
-                .onStatus({ it.isError }, { throw TossApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
                 .bodyToMono<TossAccountListRes>()
                 .block()
 

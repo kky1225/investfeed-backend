@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartMinuteListReq
@@ -48,11 +49,12 @@ class SectChartClient(
                 .header("api-id", "ka20005")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomSectChartMinuteRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectChartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectChartMinuteListException()
             }
 
@@ -85,11 +87,12 @@ class SectChartClient(
                 .header("api-id", "ka20006")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomSectChartDayRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectChartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectChartDayListException()
             }
 
@@ -118,11 +121,12 @@ class SectChartClient(
                 .header("api-id", "ka20007")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomSectChartWeekRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectChartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectChartWeekListException()
             }
 
@@ -151,11 +155,12 @@ class SectChartClient(
                 .header("api-id", "ka20008")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomSectChartMonthRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectChartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectChartMonthListException()
             }
 
@@ -184,11 +189,12 @@ class SectChartClient(
                 .header("api-id", "ka20019")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomSectChartYearRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectChartYearList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectChartYearListException()
             }
 

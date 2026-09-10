@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.auth.service
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.kiwoom.auth.dto.req.AccessTokenReq
@@ -111,12 +112,12 @@ class AuthClient(
                     )
                 )
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<AccessTokenRes>()
                 .block()
 
             if (accessTokenRes?.return_code != 0) {
-                log.warn { "accessToken failed: return_code=${accessTokenRes?.return_code}, return_msg=${accessTokenRes?.return_msg}, loginId=$loginId" }
+                log.error { "키움 API 응답 오류: api=refreshToken, return_code=${accessTokenRes?.return_code}, return_msg=${accessTokenRes?.return_msg}, loginId=$loginId" }
                 throw AccessTokenException()
             }
 
@@ -186,12 +187,12 @@ class AuthClient(
                 .uri("$MOCK_URL/oauth2/token")
                 .bodyValue(AccessTokenReq(appkey = appKey, secretkey = secretKey))
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<AccessTokenRes>()
                 .block()
 
             if (accessTokenRes?.return_code != 0) {
-                log.warn { "accessTokenMock failed: return_code=${accessTokenRes?.return_code}, return_msg=${accessTokenRes?.return_msg}, loginId=$loginId" }
+                log.error { "키움 API 응답 오류: api=refreshTokenMock, return_code=${accessTokenRes?.return_code}, return_msg=${accessTokenRes?.return_msg}, loginId=$loginId" }
                 throw AccessTokenException()
             }
 
@@ -222,6 +223,7 @@ class AuthClient(
             .block()
 
         if (res?.return_code != 0) {
+            log.error { "키움 API 응답 오류: api=validateApiKey, return_code=${res?.return_code}, return_msg=${res?.return_msg}" }
             throw InvalidApiKeyException()
         }
     }

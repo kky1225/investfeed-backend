@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.order.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomMockToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.BuyOrderException
@@ -21,14 +22,6 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 
-/**
- * 키움 모의투자 주문 클라이언트 — 매수/매도/취소/미체결.
- *
- * 실거래와 API 구조 동일, **base URL 은 모의 도메인(`kiwoom.mock-url`)으로 스왑**.
- * 모의투자 도메인은 KRX 만 지원 → dmst_stex_tp/stex_tp 는 KRX 기준.
- * 토큰은 **모의 전용 토큰(@KiwoomMockToken / kiwoom.mock-appkey)** 사용 — 실거래 토큰과
- * redis 키·자격증명 분리. 실거래 클라이언트(HoldingClient 등)는 무수정.
- */
 @Service
 class KiwoomOrderClient(
     @param:Value("\${kiwoom.mock-url}")
@@ -49,11 +42,12 @@ class KiwoomOrderClient(
                 .header("api-id", "kt10000")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomOrderRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=placeBuyOrder, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw BuyOrderException()
             }
             return res
@@ -77,11 +71,12 @@ class KiwoomOrderClient(
                 .header("api-id", "kt10001")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomOrderRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=placeSellOrder, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SellOrderException()
             }
             return res
@@ -105,11 +100,12 @@ class KiwoomOrderClient(
                 .header("api-id", "kt10003")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomCancelOrderRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=cancelOrder, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw CancelOrderException()
             }
             return res
@@ -133,11 +129,12 @@ class KiwoomOrderClient(
                 .header("api-id", "ka10075")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomPendingOrderRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=pendingOrders, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw PendingOrderException()
             }
             return res

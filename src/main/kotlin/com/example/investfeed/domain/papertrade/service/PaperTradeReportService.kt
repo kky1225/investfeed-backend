@@ -51,17 +51,20 @@ class PaperTradeReportService(
             )
         }
 
-        // 키움 모의계좌 NAV
-        val currentNav = try {
+        val currentNav: Long? = try {
             val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
             val hold = mockAccountClient.holdingList(KiwoomHoldingReq(qry_tp = "1", dmst_stex_tp = "KRX"))
             val cash = parseAmt(dep.ord_alow_amt).takeIf { it > 0 } ?: parseAmt(dep.entr)
-            (cash + parseAmt(hold?.tot_evlt_amt)).takeIf { it > 0 } ?: START_NAV
+            (cash + parseAmt(hold?.tot_evlt_amt)).takeIf { it > 0 }
+                ?: run {
+                    log.error { "모의계좌 NAV 가 0 이하 — 응답 이상 (cash=$cash, tot_evlt_amt=${hold?.tot_evlt_amt})" }
+                    null
+                }
         } catch (e: Exception) {
-            log.error(e) { "모의계좌 NAV 조회 실패 — startNav 로 대체(수익 0 표기)" }
-            START_NAV
+            log.error(e) { "모의계좌 NAV 조회 실패" }
+            null
         }
-        val totalReturnPct = calc.pctReturn(START_NAV.toDouble(), currentNav.toDouble())
+        val totalReturnPct = currentNav?.let { calc.pctReturn(START_NAV.toDouble(), it.toDouble()) }
 
         val kospi = indexReturnPct(KOSPI, startDate)
         val kosdaq = indexReturnPct(KOSDAQ, startDate)
@@ -79,23 +82,7 @@ class PaperTradeReportService(
         )
     }
 
-    /**
-     * 누적 등락률(%) — (최신가 − 시작시가) / 시작시가 × 100.
-     *
-     * **시작점은 startDate 의 시가(open) 사용** — 모의매매가 09:00 시초가 매수로 시작하므로
-     * 시가 기준이 NAV 시작 시점(1억 보유 직전)과 정합. close 를 쓰면 startDate 당일 등락이
-     * startClose 에 흡수되어 비교에서 누락됨.
-     *
-     * **단위·부호 정규화 확인됨(2026-05-20)**:
-     *  - DB `index_daily_close.open_price`/`close_price` = sectChartDayList 응답 그대로 = **×100 정수**(예: 727166 = 7271.66)
-     *  - 실시간 `sectPriceNow.cur_prc` = **소수**(예: "-7137.56") + **전일대비 부호 prefix**(절댓값 사용)
-     *  - 부호는 pred_pre_sig(키움 코드 1상한/2상승/3보합/4하한/5하락)가 별도 제공하므로 cur_prc 부호 prefix 는 무시.
-     *  → DB ÷ 100 으로 실제 지수값(소수) 단위로 통일, cur_prc 는 절댓값.
-     *
-     * @KiwoomToken(실거래) 사용 위해 컨텍스트 임시 전환(super 키).
-     */
     private fun indexReturnPct(indsCd: String, startDate: LocalDate): Double? {
-        // 시작 시가(open) 기준 — 없으면 close 폴백(예전 row 호환). DB ×100 정수 → 실제 지수값(소수)로 단위 통일.
         val startRow = indexDailyCloseRepository
             .findFirstByIndsCdAndDtGreaterThanEqualOrderByDtAsc(indsCd, startDate.format(YYYYMMDD))
             ?: return null
@@ -116,7 +103,6 @@ class PaperTradeReportService(
             log.warn(it) { "sectPriceNow 호출 실패 inds_cd=$indsCd — DB 최신값으로 폴백" }
         }.getOrNull()
 
-        // cur_prc 부호 prefix(+/-) 제거 후 절댓값 — 지수는 음수일 수 없음(전일대비 부호 표기일 뿐).
         val latest = rawCurPrc?.replace(Regex("[^0-9.]"), "")?.toBigDecimalOrNull()?.toDouble()
             ?: indexDailyCloseRepository.findFirstByIndsCdOrderByDtDesc(indsCd)?.closePrice?.toDouble()?.let { it / 100.0 }
             ?: return null

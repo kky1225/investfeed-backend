@@ -119,6 +119,7 @@ class RecommendService(
                     )
                 )
                 if (res.return_code != 0) {
+                    log.error { "외부 API 응답 오류: return_code=${res.return_code}, return_msg=${res.return_msg}" }
                     pick.todayDirection = null
                     nullCount++
                     return@forEach
@@ -188,6 +189,7 @@ class RecommendService(
         )
 
         if (kiwoomInvestorTradeCloseMarketRes.return_code != 0) {
+            log.error { "키움 API 응답 오류: api=doRecommendStock, return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, return_msg=${kiwoomInvestorTradeCloseMarketRes.return_msg}" }
             throw IllegalStateException(
                 "RecommendScheduler 핵심 API(investorTradeCloseMarket) 실패 — " +
                     "return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, " +

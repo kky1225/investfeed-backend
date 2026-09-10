@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.gold.req.KiwoomGoldChartDayReq
 import com.example.investfeed.kiwoom.chart.dto.gold.req.KiwoomGoldChartMinuteReq
@@ -48,11 +49,12 @@ class GoldChartClient(
                 .header("api-id", "ka50092")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomGoldChartMinuteRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=goldChartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw GoldChartMinuteListException()
             }
 
@@ -81,11 +83,12 @@ class GoldChartClient(
                 .header("api-id", "ka50081")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomGoldChartDayRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=goldChartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw GoldChartDayListException()
             }
 
@@ -114,11 +117,12 @@ class GoldChartClient(
                 .header("api-id", "ka50082")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomGoldChartWeekRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=goldChartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw GoldChartWeekListException()
             }
 
@@ -147,11 +151,12 @@ class GoldChartClient(
                 .header("api-id", "ka50083")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomGoldChartMonthRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=goldChartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw GoldChartMonthListException()
             }
 

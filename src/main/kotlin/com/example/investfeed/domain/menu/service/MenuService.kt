@@ -10,6 +10,7 @@ import com.example.investfeed.domain.menu.dto.res.MenuRes
 import com.example.investfeed.domain.menu.entity.Menu
 import com.example.investfeed.domain.menu.entity.MenuBrokerPermission
 import com.example.investfeed.domain.menu.exception.InvalidBrokerForMenuException
+import com.example.investfeed.domain.menu.exception.MenuCycleException
 import com.example.investfeed.domain.menu.exception.MenuHasChildrenException
 import com.example.investfeed.domain.menu.exception.MenuNotFoundException
 import com.example.investfeed.domain.menu.repository.MenuBrokerPermissionRepository
@@ -83,11 +84,14 @@ class MenuService(
     fun updateMenu(id: Long, req: UpdateMenuReq): MenuRes {
         val menu = menuRepository.findById(id).orElseThrow { MenuNotFoundException() }
 
+        val newParent = req.parentId?.let { menuRepository.findById(it).orElseThrow { MenuNotFoundException() } }
+        validateNotDescendant(menu.id, newParent)
+
         menu.apply {
             name = req.name
             url = req.url
             icon = req.icon
-            parent = req.parentId?.let { menuRepository.findById(it).orElseThrow { MenuNotFoundException() } }
+            parent = newParent
             requiredPermission = req.requiredPermissionId?.let {
                 permissionRepository.findById(it).orElseThrow { IllegalArgumentException("권한을 찾을 수 없습니다: $it") }
             }
@@ -114,6 +118,8 @@ class MenuService(
 
     @Transactional
     fun updateStructure(req: UpdateMenuStructureReq) {
+        validateStructureNoCycle(req)
+
         val menuMap = menuRepository.findAllById(req.structures.map { it.id }).associateBy { it.id }
 
         req.structures.forEach { item ->
@@ -122,6 +128,33 @@ class MenuService(
                 menuMap[parentId] ?: menuRepository.findById(parentId).orElseThrow { MenuNotFoundException() }
             }
             menu.orderIndex = item.orderIndex
+        }
+    }
+
+    private fun validateNotDescendant(movingId: Long, newParent: Menu?) {
+        var cursor = newParent
+        val visited = mutableSetOf<Long>()
+
+        while (cursor != null && visited.add(cursor.id)) {
+            if (cursor.id == movingId) throw MenuCycleException()
+            cursor = cursor.parent
+        }
+    }
+
+    private fun validateStructureNoCycle(req: UpdateMenuStructureReq) {
+        val parentIds = menuRepository.findAll()
+            .associate { it.id to it.parent?.id }
+            .toMutableMap()
+        req.structures.forEach { parentIds[it.id] = it.parentId }
+
+        req.structures.forEach { item ->
+            val visited = mutableSetOf(item.id)
+            var cursor = item.parentId
+
+            while (cursor != null) {
+                if (!visited.add(cursor)) throw MenuCycleException()
+                cursor = parentIds[cursor]
+            }
         }
     }
 

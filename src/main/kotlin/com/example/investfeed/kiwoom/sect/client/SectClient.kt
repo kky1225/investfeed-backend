@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.sect.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
@@ -38,11 +39,12 @@ class SectClient(
                 .header("api-id", "ka10051")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomSectInvestorRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectInvestorException()
             }
 
@@ -82,6 +84,7 @@ class SectClient(
             log.info { "sectNowPriceRes $res" }
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectPriceNow, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectPriceNowException()
             }
 
@@ -119,11 +122,12 @@ class SectClient(
                     .header("next-key", nextKey)
                     .bodyValue(req)
                     .retrieve()
-                    .onStatus({ t -> t.isError }, { throw KiwoomApiException() })
+                    .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                     .toEntity<KiwoomSectPriceRes>()
                     .block()
 
                 if (entity?.body?.return_code != 0) {
+                    log.error { "키움 API 응답 오류: api=sectPrice, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
                     throw SectPriceException()
                 }
 
@@ -171,11 +175,12 @@ class SectClient(
                 .header("api-id", "ka20003")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomSectIndexRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectIndexList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectIndexListException()
             }
 
@@ -204,11 +209,12 @@ class SectClient(
                 .header("api-id", "ka20009")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomSectIndexDailyRes>()
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=sectIndexDailyList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectIndexDailyListException()
             }
 

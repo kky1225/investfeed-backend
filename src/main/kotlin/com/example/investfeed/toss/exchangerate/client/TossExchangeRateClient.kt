@@ -1,5 +1,6 @@
 package com.example.investfeed.toss.exchangerate.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.annotation.TossToken
 import com.example.investfeed.toss.auth.service.TossAuthClient
 import com.example.investfeed.toss.exception.TossApiException
@@ -32,7 +33,7 @@ class TossExchangeRateClient(
                 .uri("$DEFAULT_URL/api/v1/exchange-rate?baseCurrency=$baseCurrency&quoteCurrency=$quoteCurrency")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
-                .onStatus({ it.isError }, { throw TossApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
                 .bodyToMono<TossExchangeRateRes>()
                 .block()
 

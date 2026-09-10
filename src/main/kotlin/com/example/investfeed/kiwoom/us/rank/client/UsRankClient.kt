@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.us.rank.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
@@ -51,11 +52,12 @@ class UsRankClient(
                     .header("next-key", nextKey)
                     .bodyValue(req)
                     .retrieve()
-                    .onStatus( { it.isError }, { throw KiwoomApiException() })
+                    .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                     .toEntity<KiwoomUsStockTradeValueListRes>()
                     .block()
 
                 if (entity?.body?.return_code != 0) {
+                    log.error { "키움 API 응답 오류: api=usStockTradeValueList, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
                     throw UsStockTradeValueListException()
                 }
 
@@ -110,11 +112,12 @@ class UsRankClient(
                     .header("next-key", nextKey)
                     .bodyValue(req)
                     .retrieve()
-                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                     .toEntity<KiwoomUsStockTradeVolumeListRes>()
                     .block()
 
                 if (entity?.body?.return_code != 0) {
+                    log.error { "키움 API 응답 오류: api=usStockTradeVolumeList, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
                     throw UsStockTradeVolumeListException()
                 }
 
@@ -169,11 +172,12 @@ class UsRankClient(
                     .header("next-key", nextKey)
                     .bodyValue(req)
                     .retrieve()
-                    .onStatus({ it.isError }, { throw KiwoomApiException() })
+                    .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                     .toEntity<KiwoomUsSurgeTradeVolumeListRes>()
                     .block()
 
                 if (entity?.body?.return_code != 0) {
+                    log.error { "키움 API 응답 오류: api=usStockSurgeTradeVolumeList, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
                     throw UsSurgeTradeVolumeListException()
                 }
 

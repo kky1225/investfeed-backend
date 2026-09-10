@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.order.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomMockToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.DepositException
@@ -51,11 +52,12 @@ class MockAccountClient(
                 .header("api-id", "kt00001")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomDepositRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=deposit, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw DepositException()
             }
             return res
@@ -79,11 +81,12 @@ class MockAccountClient(
                 .header("api-id", "kt00018")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomHoldingRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=holdingList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw HoldingListException()
             }
             return res
@@ -107,11 +110,12 @@ class MockAccountClient(
                 .header("api-id", "ka10074")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomRealizedPnlRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=realizedPnl, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw RealizedPnlException()
             }
             return res
@@ -139,11 +143,12 @@ class MockAccountClient(
                 .header("api-id", "kt00007")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomTradeFillsRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=tradeFills, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw TradeFillsException()
             }
 

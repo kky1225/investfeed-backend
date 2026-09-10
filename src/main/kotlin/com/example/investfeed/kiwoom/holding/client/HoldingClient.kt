@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.holding.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
@@ -40,11 +41,12 @@ class HoldingClient(
                 .header("api-id", "kt00018")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomHoldingRes>()
                 .block()
 
             if (res == null || res.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=holdingList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw HoldingListException()
             }
 
@@ -73,11 +75,12 @@ class HoldingClient(
                 .header("api-id", "kt00001")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomDepositRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=deposit, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw DepositException()
             }
 

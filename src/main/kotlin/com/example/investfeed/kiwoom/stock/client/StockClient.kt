@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.stock.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.dto.req.StockJumpListReq
 import com.example.investfeed.domain.stock.dto.req.StockNewPriceListReq
@@ -57,12 +58,12 @@ class StockClient(
                 .header("api-id", "ka10099")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<StockInfoListRes>()
                 .block()
 
             if (res?.return_code != 0) {
-                log.warn { "stockInfoList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockInfoList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInfoListException()
             }
 
@@ -91,12 +92,12 @@ class StockClient(
                 .header("api-id", "ka10001")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockDefaultInfoRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockDefaultInfo failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockDefaultInfo, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockDefaultInfoException()
             }
 
@@ -125,12 +126,12 @@ class StockClient(
                 .header("api-id", "ka10054")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockViListRes>()
                 .block()
 
             if (res?.return_code != 0) {
-                log.warn { "viList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=viList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockViListException()
             }
 
@@ -159,12 +160,12 @@ class StockClient(
                 .header("api-id", "ka10100")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockInfoRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockInfo failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockInfo, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInfoException()
             }
 
@@ -193,12 +194,12 @@ class StockClient(
                 .header("api-id", "ka10059")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockInvestorRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockInvestor failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInvestorException()
             }
 
@@ -227,12 +228,12 @@ class StockClient(
                 .header("api-id", "ka10015")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockTradeDailyRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockTradeDailyList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockTradeDailyList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockTradeDailyListException()
             }
 
@@ -261,12 +262,12 @@ class StockClient(
                 .header("api-id", "ka10019")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<StockJumpListRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockJumpList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockJumpList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockJumpListException()
             }
 
@@ -295,12 +296,12 @@ class StockClient(
                 .header("api-id", "ka10016")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus( { it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<StockNewPriceListRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockNewPriceList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockNewPriceList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockNewPriceListException()
             }
 
@@ -329,12 +330,12 @@ class StockClient(
                 .header("api-id", "ka10101")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomSectCodeListRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "sectCodeList failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=sectCodeList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectCodeListException()
             }
 
@@ -363,12 +364,12 @@ class StockClient(
                 .header("api-id", "ka10095")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomStockInterestRes>()
                 .block()
 
             if(res?.return_code != 0) {
-                log.warn { "stockInterest failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=stockInterest, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw StockInterestException()
             }
 
@@ -397,12 +398,12 @@ class StockClient(
                 .header("api-id", "ka10016")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomNewHighLowRes>()
                 .block()
 
             if (res?.return_code != 0) {
-                log.warn { "newHighLow failed: return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
+                log.error { "키움 API 응답 오류: api=newHighLow, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw NewHighLowException()
             }
 

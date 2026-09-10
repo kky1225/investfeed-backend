@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.us.exchange.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
@@ -37,11 +38,12 @@ class UsExchangeClient(
                 .header("api-id", "ust31301")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono<KiwoomUsExchangeRateRes>()
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=usExchangeRate, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw UsExchangeRateException()
             }
 

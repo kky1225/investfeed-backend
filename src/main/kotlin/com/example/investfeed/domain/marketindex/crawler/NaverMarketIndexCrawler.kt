@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.marketindex.crawler
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.example.investfeed.domain.marketindex.exception.MarketIndexApiException
@@ -113,7 +114,7 @@ class NaverMarketIndexCrawler(
         return webClient.get()
             .uri(url)
             .retrieve()
-            .onStatus({ it.isError }, { Mono.error(MarketIndexApiException()) })
+            .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
             .bodyToMono<String>()
             .map { body -> parseJsonIndex(type, body, now) }
             .onErrorResume { e ->
@@ -128,7 +129,7 @@ class NaverMarketIndexCrawler(
             webClient.get()
                 .uri(url)
                 .retrieve()
-                .onStatus({ it.isError }, { Mono.error(MarketIndexApiException()) })
+                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
                 .bodyToMono<String>()
                 .map { body -> parseExchangeDetail(type, body, now) }
                 .onErrorResume { e ->
@@ -196,7 +197,7 @@ class NaverMarketIndexCrawler(
             webClient.get()
                 .uri(url)
                 .retrieve()
-                .onStatus({ it.isError }, { Mono.error(MarketIndexApiException()) })
+                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
                 .bodyToMono<String>()
                 .map { body -> parsePollingIndex(type, body, now) }
                 .onErrorResume { e ->

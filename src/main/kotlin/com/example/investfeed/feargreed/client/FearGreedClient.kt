@@ -1,5 +1,6 @@
 package com.example.investfeed.feargreed.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.feargreed.dto.res.FearGreedApiRes
 import com.example.investfeed.feargreed.exception.FearGreedApiException
 import com.example.investfeed.feargreed.exception.FearGreedResponseException
@@ -21,7 +22,7 @@ class FearGreedClient(
             val res = fearGreedWebClient.get()
                 .uri { it.path("/fng/").queryParam("limit", limit).build() }
                 .retrieve()
-                .onStatus({ it.isError }, { throw FearGreedApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("Fear&Greed"); throw FearGreedApiException() })
                 .bodyToMono<FearGreedApiRes>()
                 .block()
 

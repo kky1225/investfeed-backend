@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.investor.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.*
@@ -40,11 +41,12 @@ class InvestorClient(
                 .header("api-id", "ka10058")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomInvestorTradeDayRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=investorTradeDay, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw InvestorTradeDayException()
             }
 
@@ -73,11 +75,12 @@ class InvestorClient(
                 .header("api-id", "ka10061")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(InvestorTradeOrganizeRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=investorTradeOrganize, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw InvestorTradeOrganizeException()
             }
 
@@ -106,11 +109,12 @@ class InvestorClient(
                 .header("api-id", "ka10131")
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(InvestorTradeRankListRes::class.java)
                 .block()
 
             if(res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=investorTradeRankList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw InvestorTradeRankListException()
             }
 
@@ -137,11 +141,12 @@ class InvestorClient(
                 .header("api-id", "ka52301")
                 .bodyValue("{}")
                 .retrieve()
-                .onStatus( { t -> t.isError }, { throw KiwoomApiException() })
+                .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomGoldInvestorRes::class.java)
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=goldInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}" }
                 throw GoldInvestorException()
             }
 

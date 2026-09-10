@@ -1,5 +1,6 @@
 package com.example.investfeed.toss.holding.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.annotation.TossToken
 import com.example.investfeed.toss.auth.service.TossAuthClient
 import com.example.investfeed.toss.exception.TossApiException
@@ -32,7 +33,7 @@ class TossBuyingPowerClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("X-Tossinvest-Account", accountSeq.toString())
                 .retrieve()
-                .onStatus({ it.isError }, { throw TossApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
                 .bodyToMono<TossBuyingPowerRes>()
                 .block()
         } catch (e: TossApiException) {

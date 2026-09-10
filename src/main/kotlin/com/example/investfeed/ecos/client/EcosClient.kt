@@ -1,5 +1,6 @@
 package com.example.investfeed.ecos.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.ecos.dto.res.EcosStatRes
 import com.example.investfeed.ecos.exception.EcosApiException
 import com.example.investfeed.ecos.exception.EcosStatisticsException
@@ -40,7 +41,7 @@ class EcosClient(
             val res = ecosWebClient.get()
                 .uri(uri)
                 .retrieve()
-                .onStatus({ it.isError }, { throw EcosApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("ECOS"); throw EcosApiException() })
                 .bodyToMono<EcosStatRes>()
                 .block()
 

@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.us.chart.client
 
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
@@ -49,11 +50,12 @@ class UsStockChartClient(
                 .header("api-id", apiId)
                 .bodyValue(req)
                 .retrieve()
-                .onStatus({ it.isError }, { throw KiwoomApiException() })
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
                 .bodyToMono(KiwoomUsStockChartRes::class.java)
                 .block()
 
             if (res?.return_code != 0) {
+                log.error { "키움 API 응답 오류: api=usStockChart, return_code=${res?.return_code}, return_msg=${res?.return_msg}, apiId=$apiId, req=$req" }
                 throw UsStockChartException()
             }
 
