@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import kotlinx.coroutines.runBlocking
 
 @Component
 class HoldingSyncScheduler(
@@ -72,9 +73,9 @@ class HoldingSyncScheduler(
         kiwoomApiKeys.forEach { apiKey ->
             try {
                 withMemberContext(apiKey.member.loginId) {
-                    val res = holdingClient.holdingList(
+                    val res = runBlocking { holdingClient.holdingList(
                         req = KiwoomHoldingReq(qry_tp = "2", dmst_stex_tp = "NXT")
-                    )
+                    ) }
 
                     val holdings = res.acnt_evlt_remn_indv_tot?.map { stock ->
                         val stkCd = (stock.stk_cd?.removePrefix("A") ?: "") + "_AL"
@@ -125,9 +126,9 @@ class HoldingSyncScheduler(
         tossApiKeys.forEach { apiKey ->
             try {
                 withMemberContext(apiKey.member.loginId) {
-                    val accounts = tossAccountClient.getAccounts()
+                    val accounts = runBlocking { tossAccountClient.getAccounts() }
                     val accountSeq = (accounts.firstOrNull { it.accountType == "BROKERAGE" } ?: accounts.firstOrNull())?.accountSeq
-                    val items = accountSeq?.let { tossHoldingClient.getHoldings(it)?.items } ?: emptyList()
+                    val items = accountSeq?.let { runBlocking { tossHoldingClient.getHoldings(it) }?.items } ?: emptyList()
 
                     val holdings = items.mapNotNull { item ->
                         val symbol = item.symbol ?: return@mapNotNull null

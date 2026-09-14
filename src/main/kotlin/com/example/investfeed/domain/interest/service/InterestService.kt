@@ -25,6 +25,7 @@ import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import kotlinx.coroutines.runBlocking
 
 @Service
 @Transactional
@@ -39,9 +40,6 @@ class InterestService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    companion object {
-        private const val US_QUOTE_INTERVAL_MS = 150L
-    }
 
     @Transactional(readOnly = true)
     fun getGroups(memberId: Long): List<InterestGroupRes> {
@@ -110,11 +108,11 @@ class InterestService(
 
         if (krItems.isNotEmpty()) {
             try {
-                val kiwoomStockInterestRes = stockClient.stockInterest(
+                val kiwoomStockInterestRes = runBlocking { stockClient.stockInterest(
                     req = KiwoomStockInterestReq(
                         stk_cd = krItems.joinToString("|") { it.stkCd }
                     )
-                )
+                ) }
 
                 if (kiwoomStockInterestRes.return_code == 0) {
                     krItems.forEach { interest ->
@@ -129,8 +127,7 @@ class InterestService(
             }
         }
 
-        usItems.forEachIndexed { index, interest ->
-            if (index > 0) Thread.sleep(US_QUOTE_INTERVAL_MS)
+        usItems.forEach { interest ->
 
             val quote = getUsQuote(stexTp = interest.stexTp!!, stkCd = interest.stkCd)
             interest.curPrc = quote?.cur_prc

@@ -11,7 +11,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class TossBuyingPowerClient(
@@ -24,7 +25,7 @@ class TossBuyingPowerClient(
     private val log = KotlinLogging.logger {}
 
     @TossToken
-    fun getBuyingPower(accountSeq: Long, currency: String): TossBuyingPowerRes? {
+    suspend fun getBuyingPower(accountSeq: Long, currency: String): TossBuyingPowerRes? {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -34,9 +35,10 @@ class TossBuyingPowerClient(
                 .header("X-Tossinvest-Account", accountSeq.toString())
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossBuyingPowerRes>()
-                .block()
+                .awaitBodyOrNull<TossBuyingPowerRes>()
         } catch (e: TossApiException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "toss getBuyingPower Error: currency=$currency, ${e.message}" }

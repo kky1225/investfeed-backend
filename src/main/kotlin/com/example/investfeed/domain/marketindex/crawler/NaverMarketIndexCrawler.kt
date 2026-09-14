@@ -16,8 +16,13 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import org.springframework.web.reactive.function.client.awaitBody
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import reactor.core.publisher.Mono
+import kotlin.coroutines.cancellation.CancellationException
 import java.time.LocalDateTime
 
 @Component
@@ -70,77 +75,56 @@ class NaverMarketIndexCrawler(
     /**
      * 여러 외부 API를 병렬 호출하여 주요 시장 지수를 수집한다.
      * 개별 엔드포인트 실패는 로깅만 하고 부분 결과를 반환한다(crawler 특성상 partial-fail 허용).
+     * 코루틴 경계: 스케줄러(동기)에서 호출되므로 여기서 runBlocking 으로 감싼다.
      */
-    fun crawl(): List<MarketIndexRes> {
+    fun crawl(): List<MarketIndexRes> = runBlocking { crawlSuspend() }
+
+    private suspend fun crawlSuspend(): List<MarketIndexRes> {
         val result = mutableListOf<MarketIndexRes>()
         val now = LocalDateTime.now()
 
         val worldApis = WORLD_INDEX_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }
         val domesticApis = DOMESTIC_INDEX_PATHS.map { (type, path) -> type to "$naverMobileUrl$path" }
-        val monos = (worldApis + domesticApis).map { (type, url) ->
-            fetchJsonIndexMono(type, url, now)
-        }
 
-        val jsonResults = Mono.zip(monos) { results ->
-            results.filterIsInstance<MarketIndexRes>()
-        }.block() ?: emptyList()
-
-        result.addAll(jsonResults)
-
-        try {
-            result.addAll(fetchFromExchangeDetail(now))
-        } catch (e: MarketIndexApiException) {
-            log.error { "fetchFromExchangeDetail Error (API): ${e.message}" }
-        } catch (e: MarketIndexResponseException) {
-            log.error { "fetchFromExchangeDetail Error (Response): ${e.message}" }
-        } catch (e: Exception) {
-            log.error { "fetchFromExchangeDetail Error: ${e.message}" }
-        }
-
-        try {
-            result.addAll(fetchFromPollingApi(now))
-        } catch (e: MarketIndexApiException) {
-            log.error { "fetchFromPollingApi Error (API): ${e.message}" }
-        } catch (e: MarketIndexResponseException) {
-            log.error { "fetchFromPollingApi Error (Response): ${e.message}" }
-        } catch (e: Exception) {
-            log.error { "fetchFromPollingApi Error: ${e.message}" }
-        }
+        result.addAll(fetchAll(worldApis + domesticApis) { type, body -> parseJsonIndex(type, body, now) })
+        result.addAll(fetchAll(EXCHANGE_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseExchangeDetail(type, body, now) })
+        result.addAll(fetchAll(POLLING_PATHS.map { (type, path) -> type to "$naverPcUrl$path" }) { type, body -> parsePollingIndex(type, body, now) })
 
         return result
     }
 
-    private fun fetchJsonIndexMono(type: MarketIndexType, url: String, now: LocalDateTime): Mono<MarketIndexRes> {
-        return webClient.get()
-            .uri(url)
-            .retrieve()
-            .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
-            .bodyToMono<String>()
-            .map { body -> parseJsonIndex(type, body, now) }
-            .onErrorResume { e ->
-                log.error { "[${type.displayName}] fetchJsonIndex Error: ${e.message}" }
-                Mono.empty()
-            }
+    /** 각 URL 을 동시에 조회해 파싱한다. 실패한 항목만 로그 후 제외하고 나머지는 그대로 반환한다. */
+    private suspend fun fetchAll(
+        targets: List<Pair<MarketIndexType, String>>,
+        parse: (MarketIndexType, String) -> MarketIndexRes,
+    ): List<MarketIndexRes> = coroutineScope {
+        targets.map { (type, url) -> async { fetchOne(type, url, parse) } }.awaitAll().filterNotNull()
     }
 
-    private fun fetchFromExchangeDetail(now: LocalDateTime): List<MarketIndexRes> {
-        val monos = EXCHANGE_PATHS.map { (type, path) ->
-            val url = "$naverApiUrl$path"
-            webClient.get()
+    private suspend fun fetchOne(
+        type: MarketIndexType,
+        url: String,
+        parse: (MarketIndexType, String) -> MarketIndexRes,
+    ): MarketIndexRes? {
+        return try {
+            val body = webClient.get()
                 .uri(url)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
-                .bodyToMono<String>()
-                .map { body -> parseExchangeDetail(type, body, now) }
-                .onErrorResume { e ->
-                    log.error { "[${type.displayName}] exchange detail fetch Error: ${e.message}" }
-                    Mono.empty()
-                }
+                .awaitBody<String>()
+            parse(type, body)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: MarketIndexApiException) {
+            log.error { "[${type.displayName}] fetch Error (API): ${e.message}" }
+            null
+        } catch (e: MarketIndexResponseException) {
+            log.error { "[${type.displayName}] fetch Error (Response): ${e.message}" }
+            null
+        } catch (e: Exception) {
+            log.error { "[${type.displayName}] fetch Error: ${e.message}" }
+            null
         }
-
-        return Mono.zip(monos) { results ->
-            results.filterIsInstance<MarketIndexRes>()
-        }.block() ?: emptyList()
     }
 
     private fun parseExchangeDetail(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
@@ -189,26 +173,6 @@ class NaverMarketIndexCrawler(
             delayStatus = delayStatus,
             updatedAt = now,
         )
-    }
-
-    private fun fetchFromPollingApi(now: LocalDateTime): List<MarketIndexRes> {
-        val monos = POLLING_PATHS.map { (type, path) ->
-            val url = "$naverPcUrl$path"
-            webClient.get()
-                .uri(url)
-                .retrieve()
-                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
-                .bodyToMono<String>()
-                .map { body -> parsePollingIndex(type, body, now) }
-                .onErrorResume { e ->
-                    log.error { "[${type.displayName}] polling fetch Error: ${e.message}" }
-                    Mono.empty()
-                }
-        }
-
-        return Mono.zip(monos) { results ->
-            results.filterIsInstance<MarketIndexRes>()
-        }.block() ?: emptyList()
     }
 
     private fun parsePollingIndex(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {

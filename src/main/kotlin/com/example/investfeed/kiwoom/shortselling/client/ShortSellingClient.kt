@@ -13,7 +13,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Component
 class ShortSellingClient(
@@ -27,7 +28,7 @@ class ShortSellingClient(
     private final val SHORT_SELLING_URL = "/api/dostk/shsa"
 
     @KiwoomToken
-    fun stockShortSelling(
+    suspend fun stockShortSelling(
         req: KiwoomStockShortSellingReq
     ): KiwoomStockShortSellingRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -40,8 +41,7 @@ class ShortSellingClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockShortSellingRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockShortSellingRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockShortSelling, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -52,6 +52,8 @@ class ShortSellingClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: ShortSellingException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "stockShortSelling Error" }

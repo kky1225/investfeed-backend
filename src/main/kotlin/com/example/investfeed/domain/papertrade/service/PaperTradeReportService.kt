@@ -16,11 +16,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
 
-/**
- * 모의 성과 리포트 — 키움 모의계좌 NAV vs 운용기간 지수수익.
- * 순수 계산은 [PaperTradeReportCalculator].
- */
 @Service
 class PaperTradeReportService(
     private val mockAccountClient: MockAccountClient,
@@ -95,7 +92,7 @@ class PaperTradeReportService(
             try {
                 SecurityContextHolder.getContext().authentication =
                     UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
-                sectClient.sectPriceNow(KiwoomSectPriceNowReq(mrkt_tp = mrktTp, inds_cd = indsCd)).cur_prc
+                runBlocking { sectClient.sectPriceNow(KiwoomSectPriceNowReq(mrkt_tp = mrktTp, inds_cd = indsCd)) }.cur_prc
             } finally {
                 SecurityContextHolder.getContext().authentication = orig
             }

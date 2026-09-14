@@ -12,7 +12,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import com.example.investfeed.kiwoom.support.withQuotaRetry
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class StockChartClient(
@@ -25,7 +27,7 @@ class StockChartClient(
     private val log = KotlinLogging.logger {}
 
     @KiwoomToken
-    fun chartMinuteList(
+    suspend fun chartMinuteList(
         req: KiwoomStockChartMinuteReq
     ): KiwoomStockChartMinuteRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -38,8 +40,7 @@ class StockChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockChartMinuteRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartMinuteRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=chartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -51,6 +52,8 @@ class StockChartClient(
             throw e
         }catch(e: StockChartMinuteListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "chartMinuteList Error" }
 
@@ -59,21 +62,20 @@ class StockChartClient(
     }
 
     @KiwoomToken
-    fun chartDayList(
+    suspend fun chartDayList(
         req: KiwoomStockChartDayReq
     ): KiwoomStockChartDayRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10081", { it.return_code }) { kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10081")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockChartDayRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartDayRes>() }
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=chartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -85,6 +87,8 @@ class StockChartClient(
             throw e
         }catch(e: StockChartDayListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "chartDayList Error" }
 
@@ -93,7 +97,7 @@ class StockChartClient(
     }
 
     @KiwoomToken
-    fun chartWeekList(
+    suspend fun chartWeekList(
         req: KiwoomStockChartWeekReq
     ): KiwoomStockChartWeekRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -106,8 +110,7 @@ class StockChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockChartWeekRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartWeekRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=chartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -119,6 +122,8 @@ class StockChartClient(
             throw e
         }catch(e: StockChartWeekListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "chartWeekList Error" }
 
@@ -127,7 +132,7 @@ class StockChartClient(
     }
 
     @KiwoomToken
-    fun chartMonthList(
+    suspend fun chartMonthList(
         req: KiwoomStockChartMonthReq
     ): KiwoomStockChartMonthRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -140,8 +145,7 @@ class StockChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockChartMonthRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartMonthRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=chartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -153,6 +157,8 @@ class StockChartClient(
             throw e
         }catch(e: StockChartMonthListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "chartMonthList Error" }
 
@@ -161,7 +167,7 @@ class StockChartClient(
     }
 
     @KiwoomToken
-    fun chartYearList(
+    suspend fun chartYearList(
         req: KiwoomStockChartYearReq
     ): KiwoomStockChartYearRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -174,8 +180,7 @@ class StockChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomStockChartYearRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartYearRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=chartYearList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -187,6 +192,8 @@ class StockChartClient(
             throw e
         }catch(e: StockChartYearListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "chartYearList Error" }
 
@@ -195,7 +202,7 @@ class StockChartClient(
     }
 
     @KiwoomToken
-    fun stockChartInvestor(
+    suspend fun stockChartInvestor(
         req: KiwoomStockChartInvestorReq
     ): KiwoomStockChartInvestorRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -208,8 +215,7 @@ class StockChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockChartInvestorRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockChartInvestorRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockChartInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -220,6 +226,8 @@ class StockChartClient(
         }catch(e: KiwoomApiException) {
             throw e
         }catch(e: StockChartInvestorException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
             log.warn { "stockChartInvestor Error" }

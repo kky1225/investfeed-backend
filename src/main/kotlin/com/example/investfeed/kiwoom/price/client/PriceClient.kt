@@ -12,8 +12,10 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 import org.springframework.web.reactive.function.client.toEntity
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Component
 class PriceClient(
@@ -28,7 +30,7 @@ class PriceClient(
     private val PRICE_URL = "/api/dostk/mrkcond";
 
     @KiwoomToken
-    fun stockTradeInfo(
+    suspend fun stockTradeInfo(
         req: KiwoomStockTradeInfoReq
     ): KiwoomStockTradeInfoRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -41,8 +43,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockTradeInfoRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockTradeInfoRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockTradeInfo, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -54,6 +55,8 @@ class PriceClient(
             throw e
         } catch (e: StockTradeInfoException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "stockTradeInfo Error" }
 
@@ -62,7 +65,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun stockSinglePriceList(
+    suspend fun stockSinglePriceList(
         req: KiwoomStockSinglePriceReq
     ): KiwoomStockSinglePriceRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -75,8 +78,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockSinglePriceRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockSinglePriceRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockSinglePriceList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -88,6 +90,8 @@ class PriceClient(
             throw e
         }catch (e: StockSinglePriceListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockSinglePriceList Error" }
 
@@ -96,7 +100,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun goldPriceNow(
+    suspend fun goldPriceNow(
         req: KiwoomGoldPriceNowReq
     ): KiwoomGoldPriceNowRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -109,8 +113,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldPriceNowRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldPriceNowRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldPriceNow, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -122,6 +125,8 @@ class PriceClient(
             throw e
         } catch (e: GoldPriceNowException) {
             throw e;
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldPriceNow Error: ${e.message}" }
 
@@ -130,7 +135,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun goldPriceNowMinute(
+    suspend fun goldPriceNowMinute(
         req: KiwoomGoldPriceNowMinuteReq
     ): KiwoomGoldPriceNowMinuteRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -143,8 +148,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldPriceNowMinuteRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldPriceNowMinuteRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldPriceNowMinute, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -156,6 +160,8 @@ class PriceClient(
             throw e
         } catch (e: GoldPriceNowMinuteException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldPriceNowMinute Error" }
 
@@ -164,7 +170,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun investorTradeOpenMarket(
+    suspend fun investorTradeOpenMarket(
         req: KiwoomInvestorTradeOpenMarketReq
     ): KiwoomInvestorTradeOpenMarketRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -186,8 +192,7 @@ class PriceClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomInvestorTradeOpenMarketRes>()
-                    .block()
+                    .toEntity<KiwoomInvestorTradeOpenMarketRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=investorTradeOpenMarket, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -216,6 +221,8 @@ class PriceClient(
             throw e
         } catch (e: InvestorTradeOpenMarketException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "investorTradeOpenMarket Error" }
 
@@ -224,7 +231,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun investorTradeCloseMarket(
+    suspend fun investorTradeCloseMarket(
         req: KiwoomInvestorTradeCloseMarketReq
     ): KiwoomInvestorTradeCloseMarketRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -246,8 +253,7 @@ class PriceClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomInvestorTradeCloseMarketRes>()
-                    .block()
+                    .toEntity<KiwoomInvestorTradeCloseMarketRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=investorTradeCloseMarket, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -266,7 +272,6 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(300)
             }
 
             return KiwoomInvestorTradeCloseMarketRes(
@@ -278,6 +283,8 @@ class PriceClient(
             throw e
         } catch (e: InvestorTradeCloseMarketException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "investorTradeOpenMarket Error" }
 
@@ -286,7 +293,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun programTrade(
+    suspend fun programTrade(
         req: KiwoomProgramTradeReq
     ): KiwoomProgramTradeRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -299,8 +306,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomProgramTradeRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomProgramTradeRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=programTrade, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -312,6 +318,8 @@ class PriceClient(
             throw e
         } catch (e: ProgramTradeException) {
           throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "programTrade Error" }
 
@@ -319,7 +327,7 @@ class PriceClient(
         }
     }
 
-    fun stockProgramTradeDay(
+    suspend fun stockProgramTradeDay(
         req: KiwoomStockProgramTradeDayReq
     ): KiwoomStockProgramTradeDayRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -341,8 +349,7 @@ class PriceClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomStockProgramTradeDayRes>()
-                    .block()
+                    .toEntity<KiwoomStockProgramTradeDayRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=stockProgramTradeDay, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -361,7 +368,6 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(100)
 
                 if (stk_daly_prm_trde_trnsn.size >= 100) {
                     break
@@ -377,6 +383,8 @@ class PriceClient(
             throw e
         } catch (e: StockProgramTradeDayException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "stockProgramTradeDay Error" }
 
@@ -384,7 +392,7 @@ class PriceClient(
         }
     }
 
-    fun indexProgramTradeDay(
+    suspend fun indexProgramTradeDay(
         req: KiwoomIndexProgramTradeDayReq
     ): KiwoomIndexProgramTradeDayRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -397,8 +405,7 @@ class PriceClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomIndexProgramTradeDayRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomIndexProgramTradeDayRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=indexProgramTradeDay, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -410,6 +417,8 @@ class PriceClient(
             throw e
         } catch (e: IndexProgramTradeDayException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "indexProgramTradeDay Error" }
 
@@ -418,7 +427,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun stockProgramTradeMinute(
+    suspend fun stockProgramTradeMinute(
         req: KiwoomStockProgramTradeMinuteReq
     ): KiwoomStockProgramTradeMinuteRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -440,8 +449,7 @@ class PriceClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomStockProgramTradeMinuteRes>()
-                    .block()
+                    .toEntity<KiwoomStockProgramTradeMinuteRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=stockProgramTradeMinute, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -460,7 +468,6 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(100)
             }
 
             return KiwoomStockProgramTradeMinuteRes(
@@ -472,6 +479,8 @@ class PriceClient(
             throw e
         } catch (e: StockProgramTradeMinuteException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "stockProgramTradeMinute Error" }
 
@@ -480,7 +489,7 @@ class PriceClient(
     }
 
     @KiwoomToken
-    fun indexProgramTradeMinute(
+    suspend fun indexProgramTradeMinute(
         req: KiwoomIndexProgramTradeMinuteReq
     ): KiwoomIndexProgramTradeMinuteRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -502,8 +511,7 @@ class PriceClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomIndexProgramTradeMinuteRes>()
-                    .block()
+                    .toEntity<KiwoomIndexProgramTradeMinuteRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=indexProgramTradeMinute, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -522,7 +530,6 @@ class PriceClient(
                     break
                 }
 
-                Thread.sleep(100)
             }
 
             return KiwoomIndexProgramTradeMinuteRes(
@@ -533,6 +540,8 @@ class PriceClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: IndexProgramTradeMinuteException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "indexProgramTradeMinute Error" }

@@ -6,6 +6,9 @@ import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import org.springframework.security.core.context.SecurityContextHolder
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Service
 
 @Service
@@ -24,6 +27,20 @@ class AssetDashboardService(
 
         val stockBrokers = allBrokers.filter { it.broker.market == MarketType.STOCK }
         val cryptoBrokers = allBrokers.filter { it.broker.market == MarketType.CRYPTO }
+
+        val apiResponses: Map<Long, HoldingListRes> = runBlocking {
+            stockBrokers.filter { it.broker.type == BrokerType.API }
+                .map { broker ->
+                    async {
+                        broker.id to when (broker.broker.name) {
+                            "토스증권" -> tossHoldingService.listTossHoldingsSuspend()
+                            else -> holdingService.listHoldingsSuspend()
+                        }
+                    }
+                }
+                .awaitAll()
+                .toMap()
+        }
 
         val stockHoldings = mutableListOf<UnifiedHoldingItem>()
         var stockEvltAmt = 0L
@@ -45,10 +62,7 @@ class AssetDashboardService(
             val bHoldings = mutableListOf<BrokerHoldingItem>()
 
             if (broker.broker.type == BrokerType.API) {
-                val responses = when (broker.broker.name) {
-                    "토스증권" -> listOf(tossHoldingService.listTossHoldings())
-                    else -> listOf(holdingService.listHoldings())
-                }
+                val responses = listOf(apiResponses.getValue(broker.id))
 
                 bEvltAmt = responses.sumOf { it.totEvltAmt.toLongOrNull() ?: 0 }
                 bPurAmt = responses.sumOf { it.totPurAmt.toLongOrNull() ?: 0 }

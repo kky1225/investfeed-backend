@@ -22,10 +22,12 @@ object WebClientHttpClientFactory {
     private val RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(60)
 
     private val connectionProvider: ConnectionProvider = ConnectionProvider.builder("investfeed-shared")
-        .maxIdleTime(Duration.ofSeconds(20))          // 20초 유휴 → 자동 종료 (대부분 서버 keep-alive 이내)
+        .maxIdleTime(Duration.ofSeconds(20))          // 20초 유휴 → 자동 종료
         .maxLifeTime(Duration.ofMinutes(10))          // 10분 넘은 연결은 재활용 안 함
         .evictInBackground(Duration.ofSeconds(30))    // 30초마다 유휴 연결 청소
-        .pendingAcquireTimeout(Duration.ofSeconds(5)) // 풀 고갈 시 5초 대기 후 실패
+        .maxConnections(64)                           // 연결 최대 수
+        .pendingAcquireMaxCount(256)                  // 요청 최대 수
+        .pendingAcquireTimeout(Duration.ofSeconds(5)) // 연결 대기 5초
         .build()
 
     fun createDefaultHttpClient(): HttpClient {

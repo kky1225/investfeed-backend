@@ -22,7 +22,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class GoldChartClient(
@@ -37,7 +38,7 @@ class GoldChartClient(
     private val CHART_URL = "/api/dostk/chart"
 
     @KiwoomToken
-    fun goldChartMinuteList (
+    suspend fun goldChartMinuteList (
         req: KiwoomGoldChartMinuteReq
     ): KiwoomGoldChartMinuteRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -50,8 +51,7 @@ class GoldChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldChartMinuteRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldChartMinuteRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldChartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -63,6 +63,8 @@ class GoldChartClient(
             throw e
         } catch (e: GoldChartMinuteListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldChartMinuteList Error" }
 
@@ -71,7 +73,7 @@ class GoldChartClient(
     }
 
     @KiwoomToken
-    fun goldChartDayList (
+    suspend fun goldChartDayList (
         req: KiwoomGoldChartDayReq
     ): KiwoomGoldChartDayRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -84,8 +86,7 @@ class GoldChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldChartDayRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldChartDayRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldChartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -97,6 +98,8 @@ class GoldChartClient(
             throw e
         } catch (e: GoldChartDayListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldChartDayList Error" }
 
@@ -105,7 +108,7 @@ class GoldChartClient(
     }
 
     @KiwoomToken
-    fun goldChartWeekList (
+    suspend fun goldChartWeekList (
         req: KiwoomGoldChartWeekReq
     ): KiwoomGoldChartWeekRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -118,8 +121,7 @@ class GoldChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldChartWeekRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldChartWeekRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldChartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -131,6 +133,8 @@ class GoldChartClient(
             throw e
         } catch (e: GoldChartWeekListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldChartWeekList Error" }
 
@@ -139,7 +143,7 @@ class GoldChartClient(
     }
 
     @KiwoomToken
-    fun goldChartMonthList (
+    suspend fun goldChartMonthList (
         req: KiwoomGoldChartMonthReq
     ): KiwoomGoldChartMonthRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -152,8 +156,7 @@ class GoldChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomGoldChartMonthRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomGoldChartMonthRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldChartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -164,6 +167,8 @@ class GoldChartClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: GoldChartMonthListException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "goldChartMonthList Error" }

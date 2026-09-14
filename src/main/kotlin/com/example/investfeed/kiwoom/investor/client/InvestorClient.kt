@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class InvestorClient(
@@ -29,7 +31,7 @@ class InvestorClient(
     private val log = KotlinLogging.logger {}
 
     @KiwoomToken
-    fun investorTradeDay(
+    suspend fun investorTradeDay(
         req: KiwoomInvestorTradeDayReq
     ): KiwoomInvestorTradeDayRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -42,8 +44,7 @@ class InvestorClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomInvestorTradeDayRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomInvestorTradeDayRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=investorTradeDay, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -55,6 +56,8 @@ class InvestorClient(
             throw e
         }catch (e: InvestorTradeDayException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "investorTradeDaily Error" }
 
@@ -63,7 +66,7 @@ class InvestorClient(
     }
 
     @KiwoomToken
-    fun investorTradeOrganize(
+    suspend fun investorTradeOrganize(
         req: KiwoomInvestorTradeOrganizeReq
     ): InvestorTradeOrganizeRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -76,8 +79,7 @@ class InvestorClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(InvestorTradeOrganizeRes::class.java)
-                .block()
+                .awaitBodyOrNull<InvestorTradeOrganizeRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=investorTradeOrganize, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -89,6 +91,8 @@ class InvestorClient(
             throw e
         }catch (e: InvestorTradeOrganizeException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "investorTradeOrganize Error" }
 
@@ -97,7 +101,7 @@ class InvestorClient(
     }
 
     @KiwoomToken
-    fun investorTradeRankList(
+    suspend fun investorTradeRankList(
         req: KiwoomInvestorTradeRankListReq
     ): InvestorTradeRankListRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -110,8 +114,7 @@ class InvestorClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(InvestorTradeRankListRes::class.java)
-                .block()
+                .awaitBodyOrNull<InvestorTradeRankListRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=investorTradeRankList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -123,6 +126,8 @@ class InvestorClient(
             throw e
         }catch (e: InvestorTradeRankListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "investorTradeRankList Error" }
 
@@ -131,7 +136,7 @@ class InvestorClient(
     }
 
     @KiwoomToken
-    fun goldInvestor(): KiwoomGoldInvestorRes {
+    suspend fun goldInvestor(): KiwoomGoldInvestorRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
@@ -142,8 +147,7 @@ class InvestorClient(
                 .bodyValue("{}")
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomGoldInvestorRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomGoldInvestorRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=goldInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}" }
@@ -155,6 +159,8 @@ class InvestorClient(
             throw e
         } catch (e: GoldInvestorException) {
             throw e;
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "goldInvestor Error" }
 

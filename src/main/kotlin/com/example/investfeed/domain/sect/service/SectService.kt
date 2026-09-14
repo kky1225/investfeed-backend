@@ -14,6 +14,7 @@ import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import org.springframework.stereotype.Service
+import kotlinx.coroutines.runBlocking
 
 @Service
 class SectService(
@@ -23,11 +24,11 @@ class SectService(
     fun listSects(
         req: SectListReq
     ): SectListRes {
-        val kiwoomSectIndexRes = sectClient.sectIndexList(
+        val kiwoomSectIndexRes = runBlocking { sectClient.sectIndexList(
             KiwoomSectIndexReq(
                 inds_cd = req.indsCd,
             )
-        )
+        ) }
 
         val sectList = mutableListOf<SectListItem>()
         if (kiwoomSectIndexRes.return_code == 0) {
@@ -67,13 +68,13 @@ class SectService(
         indsCd: String,
         req: SectStockListReq
     ): SectStockListRes {
-        val kiwoomSectPriceRes = sectClient.sectPrice(
+        val kiwoomSectPriceRes = runBlocking { sectClient.sectPrice(
             req = KiwoomSectPriceReq(
                 mrkt_tp = req.mrktTp,
                 inds_cd = indsCd,
                 stex_tp = "3"
             )
-        )
+        ) }
 
         val sectStockList = mutableListOf<SectStockListItem>()
         if (kiwoomSectPriceRes.return_code == 0) {

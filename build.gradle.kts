@@ -27,10 +27,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     implementation("org.springframework.boot:spring-boot-starter-web")
-    //validation (jakarta.validation)
+    //validation
     implementation("org.springframework.boot:spring-boot-starter-validation")
     //webClient
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    //coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     //redis
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

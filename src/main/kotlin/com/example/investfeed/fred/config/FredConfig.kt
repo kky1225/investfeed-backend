@@ -3,6 +3,7 @@ package com.example.investfeed.fred.config
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.global.config.WebClientHttpClientFactory
+import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
@@ -16,6 +17,7 @@ class FredConfig(
     @param:Value("\${fred.default-url}")
     private val defaultUrl: String,
     private val apiCallCounterService: ApiCallCounterService,
+    private val rateLimitExchangeFilter: RateLimitExchangeFilter,
 ) {
 
     @Bean
@@ -30,6 +32,7 @@ class FredConfig(
                 apiCallCounterService.increment(ApiProvider.FRED)
                 Mono.just(req)
             })
+            .filter(rateLimitExchangeFilter)
             .build()
     }
 }

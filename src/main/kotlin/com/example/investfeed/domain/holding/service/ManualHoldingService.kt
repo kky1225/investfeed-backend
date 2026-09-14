@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import kotlinx.coroutines.runBlocking
 
 @Service
 class ManualHoldingService(
@@ -166,7 +167,7 @@ class ManualHoldingService(
         if (stkCds.isEmpty()) return emptyMap()
 
         val stkCdParam = stkCds.joinToString("|")
-        val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+        val res = runBlocking { stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam)) }
 
         return res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
     }

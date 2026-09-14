@@ -25,6 +25,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class SectChartClient(
@@ -37,7 +39,7 @@ class SectChartClient(
     private val log = KotlinLogging.logger {}
 
     @KiwoomToken
-    fun sectChartMinuteList(
+    suspend fun sectChartMinuteList(
         req: SectChartMinuteListReq
     ): KiwoomSectChartMinuteRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -50,8 +52,7 @@ class SectChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectChartMinuteRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomSectChartMinuteRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectChartMinuteList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -67,6 +68,8 @@ class SectChartClient(
             throw e
         }catch(e: SectChartMinuteListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectChartMinuteList Error" }
 
@@ -75,7 +78,7 @@ class SectChartClient(
     }
 
     @KiwoomToken
-    fun sectChartDayList(
+    suspend fun sectChartDayList(
         req: SectChartDayListReq
     ): KiwoomSectChartDayRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -88,8 +91,7 @@ class SectChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectChartDayRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomSectChartDayRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectChartDayList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -101,6 +103,8 @@ class SectChartClient(
             throw e
         }catch(e: SectChartDayListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectChartDayList Error" }
 
@@ -109,7 +113,7 @@ class SectChartClient(
     }
 
     @KiwoomToken
-    fun sectChartWeekList(
+    suspend fun sectChartWeekList(
         req: SectChartWeekListReq
     ): KiwoomSectChartWeekRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -122,8 +126,7 @@ class SectChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectChartWeekRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomSectChartWeekRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectChartWeekList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -135,6 +138,8 @@ class SectChartClient(
             throw e
         }catch(e: SectChartWeekListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectChartWeekList Error" }
 
@@ -143,7 +148,7 @@ class SectChartClient(
     }
 
     @KiwoomToken
-    fun sectChartMonthList(
+    suspend fun sectChartMonthList(
         req: SectChartMonthListReq
     ): KiwoomSectChartMonthRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -156,8 +161,7 @@ class SectChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectChartMonthRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomSectChartMonthRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectChartMonthList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -169,6 +173,8 @@ class SectChartClient(
             throw e
         }catch(e: SectChartMonthListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectChartMonthList Error" }
 
@@ -177,7 +183,7 @@ class SectChartClient(
     }
 
     @KiwoomToken
-    fun sectChartYearList(
+    suspend fun sectChartYearList(
         req: SectChartYearListReq
     ): KiwoomSectChartYearRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -190,8 +196,7 @@ class SectChartClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono(KiwoomSectChartYearRes::class.java)
-                .block()
+                .awaitBodyOrNull<KiwoomSectChartYearRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectChartYearList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -202,6 +207,8 @@ class SectChartClient(
         }catch(e: KiwoomApiException) {
             throw e
         }catch(e: SectChartYearListException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
             log.warn { "sectChartYearList Error" }

@@ -13,7 +13,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class TossHoldingClient(
@@ -26,7 +27,7 @@ class TossHoldingClient(
     private val log = KotlinLogging.logger {}
 
     @TossToken
-    fun getHoldings(accountSeq: Long): TossHoldingResult? {
+    suspend fun getHoldings(accountSeq: Long): TossHoldingResult? {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -36,13 +37,14 @@ class TossHoldingClient(
                 .header("X-Tossinvest-Account", accountSeq.toString())
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossHoldingRes>()
-                .block()
+                .awaitBodyOrNull<TossHoldingRes>()
 
             return res?.result ?: throw TossHoldingListException()
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossHoldingListException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "toss getHoldings Error: ${e.message}" }

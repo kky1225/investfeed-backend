@@ -13,7 +13,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class TossAccountClient(
@@ -26,7 +27,7 @@ class TossAccountClient(
     private val log = KotlinLogging.logger {}
 
     @TossToken
-    fun getAccounts(): List<TossAccount> {
+    suspend fun getAccounts(): List<TossAccount> {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -35,13 +36,14 @@ class TossAccountClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossAccountListRes>()
-                .block()
+                .awaitBodyOrNull<TossAccountListRes>()
 
             return res?.result ?: throw TossAccountListException()
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossAccountListException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "toss getAccounts Error: ${e.message}" }

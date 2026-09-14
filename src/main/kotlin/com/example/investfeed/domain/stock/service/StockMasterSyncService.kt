@@ -7,6 +7,7 @@ import com.example.investfeed.kiwoom.stock.client.StockClient
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import kotlinx.coroutines.runBlocking
 
 @Service
 class StockMasterSyncService(
@@ -24,7 +25,7 @@ class StockMasterSyncService(
     fun syncAll(): Int {
         val masters = MARKET_TYPES
             .flatMap { mrktTp ->
-                (stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp)).list ?: emptyList())
+                (runBlocking { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = mrktTp)) }.list ?: emptyList())
                     .map { mrktTp to it }
             }
             .distinctBy { (_, item) -> item.code }

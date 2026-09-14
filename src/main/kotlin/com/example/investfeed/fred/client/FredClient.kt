@@ -21,9 +21,6 @@ class FredClient(
 ) {
     private val log = KotlinLogging.logger {}
 
-    companion object {
-        private const val THROTTLE_MS = 500L
-    }
 
     /**
      * FRED 시리즈 관측값 조회
@@ -72,7 +69,6 @@ class FredClient(
                     throw FredSeriesObservationsException()
                 }
 
-                Thread.sleep(THROTTLE_MS)
                 return res
             } catch (e: FredApiException) {
                 lastError = e
@@ -131,7 +127,6 @@ class FredClient(
                     throw FredReleaseDatesException()
                 }
 
-                Thread.sleep(THROTTLE_MS)
                 return res
             } catch (e: FredApiException) {
                 lastError = e

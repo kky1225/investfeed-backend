@@ -12,7 +12,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class TossExchangeRateClient(
@@ -25,7 +26,7 @@ class TossExchangeRateClient(
     private val log = KotlinLogging.logger {}
 
     @TossToken
-    fun getRate(baseCurrency: String, quoteCurrency: String): TossExchangeRateRes? {
+    suspend fun getRate(baseCurrency: String, quoteCurrency: String): TossExchangeRateRes? {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -34,8 +35,7 @@ class TossExchangeRateClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossExchangeRateRes>()
-                .block()
+                .awaitBodyOrNull<TossExchangeRateRes>()
 
             if (res?.result == null) {
                 throw TossExchangeRateException()
@@ -44,6 +44,8 @@ class TossExchangeRateClient(
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossExchangeRateException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "toss getRate Error: ${e.message}" }

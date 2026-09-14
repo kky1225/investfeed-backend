@@ -25,6 +25,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import java.util.Collections.emptyList
+import kotlinx.coroutines.runBlocking
 
 @Service
 class InvestorService(
@@ -115,14 +116,14 @@ class InvestorService(
     }
 
     private fun fetchRawCloseMarket(now: LocalTime): KiwoomInvestorTradeCloseMarketRes {
-        return priceClient.investorTradeCloseMarket(
+        return runBlocking { priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
                 amt_qty_tp = "1",
                 trde_tp = "0",
                 stex_tp = if (MarketTimeUtil.isNxtTradeClose(now)) "3" else "1",
             )
-        )
+        ) }
     }
 
     private fun buildFromRaw(
@@ -170,7 +171,7 @@ class InvestorService(
 
         when (req.orgnTp) {
             "6" -> {
-                val kiwoomInvestorTradeDailyRes1 = priceClient.investorTradeOpenMarket(
+                val kiwoomInvestorTradeDailyRes1 = runBlocking { priceClient.investorTradeOpenMarket(
                     req = KiwoomInvestorTradeOpenMarketReq(
                         mrkt_tp = "000",
                         amt_qty_tp = "1",
@@ -179,9 +180,9 @@ class InvestorService(
                         smtm_netprps_tp = "1",
                         stex_tp = "1",
                     )
-                )
+                ) }
 
-                val kiwoomInvestorTradeDailyRes2 = priceClient.investorTradeOpenMarket(
+                val kiwoomInvestorTradeDailyRes2 = runBlocking { priceClient.investorTradeOpenMarket(
                     req = KiwoomInvestorTradeOpenMarketReq(
                         mrkt_tp = "000",
                         amt_qty_tp = "1",
@@ -190,7 +191,7 @@ class InvestorService(
                         smtm_netprps_tp = "1",
                         stex_tp = "1",
                     )
-                )
+                ) }
 
                 val combinedList =
                     (kiwoomInvestorTradeDailyRes1.opmr_invsr_trde ?: emptyList()) +
@@ -233,7 +234,7 @@ class InvestorService(
                 }
             }
             "7" -> {
-                val kiwoomInvestorTradeDailyRes = priceClient.investorTradeOpenMarket(
+                val kiwoomInvestorTradeDailyRes = runBlocking { priceClient.investorTradeOpenMarket(
                     req = KiwoomInvestorTradeOpenMarketReq(
                         mrkt_tp = "000",
                         amt_qty_tp = "1",
@@ -242,7 +243,7 @@ class InvestorService(
                         smtm_netprps_tp = "1",
                         stex_tp = "3",
                     )
-                )
+                ) }
 
                 if (kiwoomInvestorTradeDailyRes.return_code == 0) {
                     openResult = kiwoomInvestorTradeDailyRes.opmr_invsr_trde?.map {

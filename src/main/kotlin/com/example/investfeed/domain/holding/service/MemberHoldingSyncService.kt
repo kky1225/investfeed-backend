@@ -11,6 +11,7 @@ import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import kotlinx.coroutines.runBlocking
 
 @Service
 class MemberHoldingSyncService(
@@ -78,9 +79,9 @@ class MemberHoldingSyncService(
 
         distinctStkCds.chunked(CHUNK_SIZE).forEach { chunk ->
             try {
-                val res = stockClient.stockInterest(
+                val res = runBlocking { stockClient.stockInterest(
                     req = KiwoomStockInterestReq(stk_cd = chunk.joinToString("|"))
-                )
+                ) }
 
                 val responseMap = res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
 

@@ -16,7 +16,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Component
 class UsHoldingClient(
@@ -30,7 +31,7 @@ class UsHoldingClient(
     private final val ACNT_URL = "/api/us/acnt"
 
     @KiwoomToken
-    fun usHoldingList(
+    suspend fun usHoldingList(
         req: KiwoomUsHoldingReq
     ): KiwoomUsHoldingRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -43,8 +44,7 @@ class UsHoldingClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomUsHoldingRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomUsHoldingRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=usHoldingList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -56,6 +56,8 @@ class UsHoldingClient(
             throw e
         } catch (e: UsHoldingListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "usHoldingList Error: ${e.message}" }
 
@@ -65,7 +67,7 @@ class UsHoldingClient(
 
     /** 해외주식 예수금(ust21110). 통화별 외화예수금·주문가능금액을 내려준다. */
     @KiwoomToken
-    fun usDeposit(
+    suspend fun usDeposit(
         req: KiwoomUsDepositReq
     ): KiwoomUsDepositRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -78,8 +80,7 @@ class UsHoldingClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomUsDepositRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomUsDepositRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=usDeposit, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -90,6 +91,8 @@ class UsHoldingClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: UsDepositException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "usDeposit Error: ${e.message}" }

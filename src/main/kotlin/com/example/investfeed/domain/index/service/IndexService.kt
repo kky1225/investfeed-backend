@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.index.service
 
+import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.index.IndexType
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
@@ -34,6 +35,11 @@ import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Collections.emptyList
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class IndexService(
@@ -51,7 +57,6 @@ class IndexService(
         private const val KOSPI_CD = "001"   // 종합(KOSPI)
         private const val KOSDAQ_CD = "101"  // 종합(KOSDAQ)
         private const val INDEX_HISTORY_LIMIT = 100  // 최근 N평일치만 upsert (벤치마크 lookback)
-        private const val INDEX_PACING_MS = 100L     // 호출 페이싱
         private val INDEX_DAILY_CLOSE_YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")
     }
 
@@ -61,22 +66,22 @@ class IndexService(
         val indexList: MutableList<IndexListItem> = mutableListOf()
 
         indexTypeList.forEach { it ->
-            val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
+            val kiwoomSectPriceNowRes = runBlocking { sectClient.sectPriceNow(
                 req = KiwoomSectPriceNowReq(
                     mrkt_tp = "0",
                     inds_cd = it.indsCd
                 )
-            )
+            ) }
 
             if (kiwoomSectPriceNowRes.return_code == 0) {
                 var chartMinuteList: List<ChartMinute> = mutableListOf()
 
-                val kiwoomSectChartMinuteRes = sectChartClient.sectChartMinuteList(
+                val kiwoomSectChartMinuteRes = runBlocking { sectChartClient.sectChartMinuteList(
                     req = SectChartMinuteListReq(
                         inds_cd = it.indsCd,
                         tic_scope = "1"
                     )
-                )
+                ) }
 
                 if (kiwoomSectChartMinuteRes.return_code == 0) {
                     chartMinuteList = kiwoomSectChartMinuteRes.inds_min_pole_qry?.map { it ->
@@ -113,10 +118,124 @@ class IndexService(
     fun getIndex(
         indsCd: String,
         req: IndexDetailReq
-    ): IndexDetailRes {
+    ): IndexDetailRes = runBlocking {
+        val chartDeferred = async { fetchIndexChartList(indsCd, req.chart_type) }
+        val priceNowDeferred = async { sectClient.sectPriceNow(req = KiwoomSectPriceNowReq(mrkt_tp = "0", inds_cd = indsCd)) }
+        val investorDeferred = async {
+            sectClient.sectInvestor(
+                req = KiwoomSectInvestorReq(mrkt_tp = if (indsCd == "101" || indsCd == "150") "1" else "0", amt_qty_tp = "0", stex_tp = "3")
+            )
+        }
+        val programTradeDeferred = async {
+            priceClient.programTrade(
+                req = KiwoomProgramTradeReq(
+                    date = DateUtil.today("yyyyMMdd"),
+                    amt_qty_tp = "1",
+                    mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
+                    min_tic_tp = "1",
+                    stex_tp = "3",
+                )
+            )
+        }
+        val programMinuteDeferred = async {
+            priceClient.indexProgramTradeMinute(
+                req = KiwoomIndexProgramTradeMinuteReq(
+                    date = DateUtil.today("yyyyMMdd"),
+                    amt_qty_tp = "1",
+                    mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
+                    min_tic_tp = "1",
+                    stex_tp = "3",
+                )
+            )
+        }
+
+        val chartList = chartDeferred.await()
+        val kiwoomSectPriceNowRes = priceNowDeferred.await()
+        val kiwoomSectInvestorRes = investorDeferred.await()
+        val kiwoomProgramTradeRes = programTradeDeferred.await()
+
+        val programList = mutableListOf<ProgramListItem>()
+
+        var index = 99
+        if (chartList.size < 100) {
+            index = chartList.size - 1
+        }
+
+        if (index > 0) {
+            val kiwoomIndexProgramTradeDayRes = priceClient.indexProgramTradeDay(
+                req = KiwoomIndexProgramTradeDayReq(
+                    date = chartList[index].dt,
+                    amt_qty_tp = "1",
+                    mrkt_tp = if (indsCd == "001" || indsCd == "201") "0" else "1",
+                    stex_tp = "3",
+                )
+            )
+
+            if (kiwoomIndexProgramTradeDayRes.return_code == 0) {
+                kiwoomIndexProgramTradeDayRes.prm_trde_acc_trnsn?.forEach {
+                    programList.add(
+                        ProgramListItem(
+                            dt = it.dt,
+                            dfrtTrdeTdy = it.dfrt_trde_tdy?.replace("--", "-"),
+                            ndiffproTrdeTdy = it.ndiffpro_trde_tdy?.replace("--", "-"),
+                            allTdy = it.all_tdy?.replace("--", "-"),
+                        )
+                    )
+                }
+            }
+        }
+
+        val kiwoomIndexProgramTradeMinuteRes = programMinuteDeferred.await()
+
+        val programChartList: MutableList<ProgramChart> = mutableListOf()
+        if (kiwoomIndexProgramTradeMinuteRes.return_code == 0) {
+            kiwoomIndexProgramTradeMinuteRes.prm_trde_trnsn?.forEach {
+                programChartList.add(
+                    ProgramChart(
+                        cntrTm = it.cntr_tm,
+                        dfrtTrdeNetprps = it.dfrt_trde_netprps?.replace("--", "-"),
+                        ndiffproTrdeNetprps = it.ndiffpro_trde_netprps?.replace("--", "-"),
+                        allNetprps = it.all_netprps?.replace("--", "-"),
+                    )
+                )
+            }
+        }
+
+        IndexDetailRes(
+            indexInfo = IndexInfo(
+                indsCd = indsCd,
+                indsNm = IndexType.entries.find { it.indsCd == indsCd }?.indsNm,
+                curPrc = kiwoomSectPriceNowRes.cur_prc,
+                predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
+                predPre = kiwoomSectPriceNowRes.pred_pre,
+                fluRt = kiwoomSectPriceNowRes.flu_rt,
+                trdeQty = kiwoomSectPriceNowRes.trde_qty,
+                trdePrica = kiwoomSectPriceNowRes.trde_prica,
+                highPric = kiwoomSectPriceNowRes.high_pric,
+                openPric = kiwoomSectPriceNowRes.open_pric,
+                lowPric = kiwoomSectPriceNowRes.low_pric,
+                _250hgst = kiwoomSectPriceNowRes._52wk_hgst_pric,
+                _250lwst = kiwoomSectPriceNowRes._52wk_lwst_pric,
+                tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
+                indNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.ind_netprps,
+                frgnrNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.frgnr_netprps,
+                orgnNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.orgn_netprps,
+                dfrtTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.dfrt_trde_netprps,
+                ndiffproTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.ndiffpro_trde_netprps,
+                allNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.all_netprps,
+            ),
+            chartList = chartList,
+            programChartList = programChartList.reversed(),
+            programList = programList,
+            investorDailyList = getIndexInvestorDailyList(indsCd),
+        )
+    }
+
+    /** 차트 종류별 업종 차트 TR 1건 조회 후 공통 응답으로 변환. */
+    private suspend fun fetchIndexChartList(indsCd: String, chartType: IndexChartType): List<IndexChart> {
         val chartList: MutableList<IndexChart> = mutableListOf()
 
-        when(req.chart_type) {
+        when(chartType) {
             IndexChartType.DAY -> {
                 val kiwoomSectChartDayRes = sectChartClient.sectChartDayList(
                     req = SectChartDayListReq(
@@ -214,7 +333,7 @@ class IndexService(
                 }
             }
             else -> {
-                req.chart_type.value?.let {
+                chartType.value?.let {
                     val kiwoomSectChartMinuteRes = sectChartClient.sectChartMinuteList(
                         req = SectChartMinuteListReq(
                             inds_cd = indsCd,
@@ -240,115 +359,7 @@ class IndexService(
                 }
             }
         }
-
-        val kiwoomSectPriceNowRes = sectClient.sectPriceNow(
-            req = KiwoomSectPriceNowReq(
-                mrkt_tp = "0",
-                inds_cd = indsCd
-            )
-        )
-
-        val kiwoomSectInvestorRes = sectClient.sectInvestor(
-            req = KiwoomSectInvestorReq(
-                mrkt_tp = if (indsCd == "101" || indsCd == "150") "1" else "0",
-                amt_qty_tp = "0",
-                stex_tp = "3"
-            )
-        )
-
-        val kiwoomProgramTradeRes = priceClient.programTrade(
-            req = KiwoomProgramTradeReq(
-                date = DateUtil.today("yyyyMMdd"),
-                amt_qty_tp = "1",
-                mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
-                min_tic_tp = "1",
-                stex_tp = "3",
-            )
-        )
-
-        val programList = mutableListOf<ProgramListItem>()
-
-        var index = 99
-        if (chartList.size < 100) {
-            index = chartList.size - 1
-        }
-
-        if (index > 0) {
-            val kiwoomIndexProgramTradeDayRes = priceClient.indexProgramTradeDay(
-                req = KiwoomIndexProgramTradeDayReq(
-                    date = chartList[index].dt,
-                    amt_qty_tp = "1",
-                    mrkt_tp = if (indsCd == "001" || indsCd == "201") "0" else "1",
-                    stex_tp = "3",
-                )
-            )
-
-            if (kiwoomIndexProgramTradeDayRes.return_code == 0) {
-                kiwoomIndexProgramTradeDayRes.prm_trde_acc_trnsn?.forEach {
-                    programList.add(
-                        ProgramListItem(
-                            dt = it.dt,
-                            dfrtTrdeTdy = it.dfrt_trde_tdy?.replace("--", "-"),
-                            ndiffproTrdeTdy = it.ndiffpro_trde_tdy?.replace("--", "-"),
-                            allTdy = it.all_tdy?.replace("--", "-"),
-                        )
-                    )
-                }
-            }
-        }
-
-        val kiwoomIndexProgramTradeMinuteRes = priceClient.indexProgramTradeMinute(
-            req = KiwoomIndexProgramTradeMinuteReq(
-                date = DateUtil.today("yyyyMMdd"),
-                amt_qty_tp = "1",
-                mrkt_tp = if (indsCd == "001" || indsCd == "201") "P001_AL01" else "P101_AL02",
-                min_tic_tp = "1",
-                stex_tp = "3",
-            )
-        )
-
-        val programChartList: MutableList<ProgramChart> = mutableListOf()
-        if (kiwoomIndexProgramTradeMinuteRes.return_code == 0) {
-            kiwoomIndexProgramTradeMinuteRes.prm_trde_trnsn?.forEach {
-                programChartList.add(
-                    ProgramChart(
-                        cntrTm = it.cntr_tm,
-                        dfrtTrdeNetprps = it.dfrt_trde_netprps?.replace("--", "-"),
-                        ndiffproTrdeNetprps = it.ndiffpro_trde_netprps?.replace("--", "-"),
-                        allNetprps = it.all_netprps?.replace("--", "-"),
-                    )
-                )
-            }
-        }
-
-        return IndexDetailRes(
-            indexInfo = IndexInfo(
-                indsCd = indsCd,
-                indsNm = IndexType.entries.find { it.indsCd == indsCd }?.indsNm,
-                curPrc = kiwoomSectPriceNowRes.cur_prc,
-                predPreSig = kiwoomSectPriceNowRes.pred_pre_sig,
-                predPre = kiwoomSectPriceNowRes.pred_pre,
-                fluRt = kiwoomSectPriceNowRes.flu_rt,
-                trdeQty = kiwoomSectPriceNowRes.trde_qty,
-                trdePrica = kiwoomSectPriceNowRes.trde_prica,
-                highPric = kiwoomSectPriceNowRes.high_pric,
-                openPric = kiwoomSectPriceNowRes.open_pric,
-                lowPric = kiwoomSectPriceNowRes.low_pric,
-                _250hgst = kiwoomSectPriceNowRes._52wk_hgst_pric,
-                _250lwst = kiwoomSectPriceNowRes._52wk_lwst_pric,
-                tmN = kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
-                indNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.ind_netprps,
-                frgnrNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.frgnr_netprps,
-                orgnNetprps = kiwoomSectInvestorRes.inds_netprps?.get(0)?.orgn_netprps,
-                dfrtTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.dfrt_trde_netprps,
-                ndiffproTrdeNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.ndiffpro_trde_netprps,
-                allNetprps = kiwoomProgramTradeRes.prm_trde_trnsn?.get(0)?.all_netprps,
-            ),
-            chartList = chartList,
-            programChartList = programChartList.reversed(),
-            programList = programList,
-            investorDailyList = getIndexInvestorDailyList(indsCd),
-        )
+        return chartList
     }
 
     fun getIndexInvestorDailyList(indsCd: String): List<IndexInvestorDailyItem> {
@@ -361,13 +372,13 @@ class IndexService(
         }
 
         val mrktTp = if (mappedIndsCd == "101") "1" else "0"
-        val res = sectClient.sectInvestor(
+        val res = runBlocking { sectClient.sectInvestor(
             req = KiwoomSectInvestorReq(
                 mrkt_tp = mrktTp,
                 amt_qty_tp = "0",
                 stex_tp = "3"
             )
-        )
+        ) }
 
         val investor = res.inds_netprps?.find {
             it.inds_cd.replace("_AL", "") == mappedIndsCd
@@ -434,21 +445,37 @@ class IndexService(
         val targetIndexes = listOf(IndexType.KOSPI, IndexType.KOSDAQ)
         val failures = mutableListOf<String>()
 
-        targetIndexes.forEach { indexType ->
-            try {
-                if (indexInvestorDailyRepository.existsByIndsCdAndDt(indexType.indsCd, date)) {
-                    return@forEach
-                }
+        val toFetch = targetIndexes.filter { !indexInvestorDailyRepository.existsByIndsCdAndDt(it.indsCd, date) }
+        // 코스피/코스닥 ka10051 두 건은 독립 — 동시 조회 후 DB 처리는 순차(같은 스레드). 실패는 지수별로 격리.
+        val responses: List<Result<KiwoomSectInvestorRes>> = runBlocking {
+            coroutineScope {
+                toFetch.map { indexType ->
+                    async {
+                        try {
+                            val mrktTp = if (indexType.indsCd == "101") "1" else "0"
+                            Result.success(
+                                sectClient.sectInvestor(
+                                    req = KiwoomSectInvestorReq(
+                                        mrkt_tp = mrktTp,
+                                        amt_qty_tp = "0",
+                                        base_dt = date,
+                                        stex_tp = "3"
+                                    )
+                                )
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Result.failure(e)
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
 
-                val mrktTp = if (indexType.indsCd == "101") "1" else "0"
-                val res = sectClient.sectInvestor(
-                    req = KiwoomSectInvestorReq(
-                        mrkt_tp = mrktTp,
-                        amt_qty_tp = "0",
-                        base_dt = date,
-                        stex_tp = "3"
-                    )
-                )
+        toFetch.zip(responses).forEach { (indexType, result) ->
+            try {
+                val res = result.getOrThrow()
 
                 val investor = res.inds_netprps?.find {
                     it.inds_cd.replace("_AL", "") == indexType.indsCd
@@ -500,7 +527,6 @@ class IndexService(
                     )
                 }
 
-                Thread.sleep(100)
             } catch (e: Exception) {
                 log.warn { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
                 failures += "${indexType.indsCd}(${e.message})"
@@ -539,10 +565,9 @@ class IndexService(
     private fun collectIndexClose() {
         val baseDt = LocalDate.now().format(INDEX_DAILY_CLOSE_YYYYMMDD)
         var inserted = 0
-        for ((idx, indsCd) in listOf(KOSPI_CD, KOSDAQ_CD).withIndex()) {
-            if (idx > 0) Thread.sleep(INDEX_PACING_MS)
+        for (indsCd in listOf(KOSPI_CD, KOSDAQ_CD)) {
             try {
-                val res = sectChartClient.sectChartDayList(SectChartDayListReq(inds_cd = indsCd, base_dt = baseDt))
+                val res = runBlocking { sectChartClient.sectChartDayList(SectChartDayListReq(inds_cd = indsCd, base_dt = baseDt)) }
                 val rows = res.inds_dt_pole_qry ?: continue
                 for (row in rows.take(INDEX_HISTORY_LIMIT)) {
                     val dt = row.dt ?: continue

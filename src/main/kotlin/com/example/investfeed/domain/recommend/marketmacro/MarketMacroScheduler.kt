@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import kotlinx.coroutines.runBlocking
 
 @Component
 class MarketMacroScheduler(
@@ -58,13 +59,13 @@ class MarketMacroScheduler(
     private fun doPoll() {
         listOf(DashboardIndexType.KOSPI, DashboardIndexType.KOSDAQ).forEach { type ->
             runCatching {
-                val res = sectClient.sectInvestor(
+                val res = runBlocking { sectClient.sectInvestor(
                     req = KiwoomSectInvestorReq(
                         mrkt_tp = type.marketType,
                         amt_qty_tp = "0",
                         stex_tp = "3",
                     )
-                )
+                ) }
                 val first = res.inds_netprps?.firstOrNull() ?: return@runCatching
                 val snapshot = MarketMacroSnapshot.from(type.name, first)
                 marketMacroCacheService.saveSnapshot(snapshot)

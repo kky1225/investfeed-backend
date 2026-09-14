@@ -16,7 +16,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class HoldingClient(
@@ -29,7 +30,7 @@ class HoldingClient(
     private val log = KotlinLogging.logger {}
 
     @KiwoomToken
-    fun holdingList(
+    suspend fun holdingList(
         req: KiwoomHoldingReq
     ): KiwoomHoldingRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -42,8 +43,7 @@ class HoldingClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomHoldingRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomHoldingRes>()
 
             if (res == null || res.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=holdingList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -55,6 +55,8 @@ class HoldingClient(
             throw e
         }catch (e: HoldingListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "holdingList Error: ${e.message}" }
 
@@ -63,7 +65,7 @@ class HoldingClient(
     }
 
     @KiwoomToken
-    fun deposit(
+    suspend fun deposit(
         req: KiwoomDepositReq
     ): KiwoomDepositRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -76,8 +78,7 @@ class HoldingClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomDepositRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomDepositRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=deposit, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -88,6 +89,8 @@ class HoldingClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: DepositException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "deposit Error" }

@@ -31,9 +31,6 @@ class IndexInvestorDailyScheduler(
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
-    companion object {
-        private const val API_PACING_MS = 200L
-    }
 
     @Scheduled(cron = SchedulerCron.INDEX_INVESTOR_DAILY, scheduler = "slowScheduler")
     fun collectDaily() {
@@ -104,7 +101,6 @@ class IndexInvestorDailyScheduler(
                 val kosdaqMissing = !indexInvestorDailyRepository.existsByIndsCdAndDt("101", dt)
                 if (kospiMissing || kosdaqMissing) {
                     try {
-                        if (filled > 0) Thread.sleep(API_PACING_MS)
                         indexService.collectIndexInvestorDaily(dt)
                         filled++
                     } catch (e: Exception) {

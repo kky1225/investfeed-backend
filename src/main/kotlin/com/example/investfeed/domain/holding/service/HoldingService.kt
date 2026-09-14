@@ -29,6 +29,10 @@ import com.example.investfeed.kiwoom.us.holding.dto.res.KiwoomUsHoldingRes
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class HoldingService(
@@ -49,16 +53,27 @@ class HoldingService(
         private const val CURRENCY_USD = "USD"
     }
 
-    fun listHoldings(): HoldingListRes {
-        val res = holdingClient.holdingList(
-            req = KiwoomHoldingReq(
-                qry_tp = "1",
-                dmst_stex_tp = if(isKrxHoldingClose()) "NXT" else "KRX"
-            )
-        )
+    fun listHoldings(): HoldingListRes = runBlocking { listHoldingsSuspend() }
 
+    suspend fun listHoldingsSuspend(): HoldingListRes = coroutineScope {
+        val holdingDeferred = async {
+            holdingClient.holdingList(
+                req = KiwoomHoldingReq(
+                    qry_tp = "1",
+                    dmst_stex_tp = if(isKrxHoldingClose()) "NXT" else "KRX"
+                )
+            )
+        }
+        val depositDeferred = async { holdingClient.deposit(KiwoomDepositReq(qry_tp = "3")) }
+        val usHoldingDeferred = async { usHoldingClient.usHoldingList(KiwoomUsHoldingReq()) }
+        val usdDepositDeferred = async { fetchUsdDeposit() }
+        val basePricDeferred = async {
+            fetchBasePrics(holdingDeferred.await().acnt_evlt_remn_indv_tot?.mapNotNull { it.stk_cd } ?: emptyList())
+        }
+
+        val res = holdingDeferred.await()
         val rows = res.acnt_evlt_remn_indv_tot ?: emptyList()
-        val basePricByStkCd = fetchBasePrics(rows.mapNotNull { it.stk_cd })
+        val basePricByStkCd = basePricDeferred.await()
 
         val holdingList = rows.map { stock ->
             val rawCd = stock.stk_cd?.removePrefix("A") ?: ""
@@ -97,12 +112,12 @@ class HoldingService(
             }
         }
 
-        val depositRes = holdingClient.deposit(KiwoomDepositReq(qry_tp = "3"))
+        val depositRes = depositDeferred.await()
 
         val balance = depositRes.d2_entra ?: throw DepositException()
-        val usRes = usHoldingClient.usHoldingList(KiwoomUsHoldingReq())
+        val usRes = usHoldingDeferred.await()
         val usHoldingList = toUsHoldingItems(usRes)
-        val usdDeposit = fetchUsdDeposit()
+        val usdDeposit = usdDepositDeferred.await()
 
         val totPurAmt = res.tot_pur_amt.toAmount("tot_pur_amt") { HoldingListException() } +
                 usRes.tot_prch_amt_krw.toAmount("tot_prch_amt_krw") { UsHoldingListException() }
@@ -111,7 +126,7 @@ class HoldingService(
         val totEvltPl = res.tot_evlt_pl.toAmount("tot_evlt_pl") { HoldingListException() } +
                 usRes.tot_pl_amt_krw.toAmount("tot_pl_amt_krw") { UsHoldingListException() }
 
-        return HoldingListRes(
+        HoldingListRes(
             totPurAmt = totPurAmt.toString(),
             totEvltAmt = totEvltAmt.toString(),
             totEvltPl = totEvltPl.toString(),
@@ -131,15 +146,18 @@ class HoldingService(
         }
     }
 
-    private fun fetchUsdDeposit(): Pair<String, String>? {
-        return runCatching {
+    private suspend fun fetchUsdDeposit(): Pair<String, String>? {
+        return try {
             val usd = usHoldingClient.usDeposit(KiwoomUsDepositReq())
                 .result_list
                 ?.firstOrNull { it.crnc_code == CURRENCY_USD }
             (usd?.fc_entra ?: "0") to (usd?.let { it.fc_booka.toAmount("fc_booka") { UsDepositException() } } ?: 0L).toString()
-        }.onFailure {
-            log.warn { "해외 외화예수금 조회 실패 — 달러 표시를 생략합니다: ${it.message}" }
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "해외 외화예수금 조회 실패 — 달러 표시를 생략합니다: ${e.message}" }
+            null
+        }
     }
 
     private fun toUsHoldingItems(usRes: KiwoomUsHoldingRes?): List<HoldingItem> {
@@ -179,11 +197,11 @@ class HoldingService(
         }
     }
 
-    private fun fetchBasePrics(stkCds: List<String>): Map<String, String> {
+    private suspend fun fetchBasePrics(stkCds: List<String>): Map<String, String> {
         val codes = stkCds.map { it.removePrefix("A") }.filter { it.isNotBlank() }.distinct()
         if (codes.isEmpty()) return emptyMap()
 
-        return runCatching {
+        return try {
             stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = codes.joinToString("|")))
                 .atn_stk_infr
                 ?.mapNotNull { info ->
@@ -194,9 +212,12 @@ class HoldingService(
                 }
                 ?.toMap()
                 ?: emptyMap()
-        }.onFailure {
-            log.warn { "보유종목 기준가 조회 실패 — 일간수익이 부정확할 수 있습니다: ${it.message}" }
-        }.getOrDefault(emptyMap())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "보유종목 기준가 조회 실패 — 일간수익이 부정확할 수 있습니다: ${e.message}" }
+            emptyMap()
+        }
     }
 
     private fun String?.toAmount(field: String, onError: () -> RuntimeException): Long {

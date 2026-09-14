@@ -105,8 +105,6 @@ class UsStockClient(
                 if (contYn == "N") {
                     break
                 }
-
-                Thread.sleep(1000)
             }
 
             return KiwoomUsStockInfoListRes(

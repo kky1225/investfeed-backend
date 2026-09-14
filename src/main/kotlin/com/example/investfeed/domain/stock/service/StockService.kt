@@ -10,6 +10,7 @@ import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.kiwoom.chart.client.StockChartClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartDay
+import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
@@ -25,6 +26,10 @@ import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.*
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class StockService(
@@ -41,34 +46,39 @@ class StockService(
     private fun normalizeMarketName(marketName: String?): String? =
         if (marketName == "거래소") "코스피" else marketName
 
+    /**
+     * 종목 상세. 서로 다른 TR 8건(기본정보·종목정보·거래정보·투자자·차트·투자자차트·프로그램매매·VI)은 독립이라 동시에 요청하고,
+     * 다른 응답에 의존하는 호출(시간외 단일가=종목정보, 공매도=프로그램매매 날짜, 배당=시장구분)만 뒤에서 순차로 부른다.
+     * 코루틴 경계: 요청 스레드에서 runBlocking — SecurityContext·JPA 세션이 그대로 보인다.
+     */
     fun getStock(
         stkCd: String,
         req: StockDetailReq
-    ): StockDetailRes {
-        val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
-            req = KiwoomDefaultStockInfoReq(
-                stk_cd = stkCd
+    ): StockDetailRes = runBlocking {
+        val defaultInfoDeferred = async { stockClient.stockDefaultInfo(req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)) }
+        val infoDeferred = async {
+            stockClient.stockInfo(req = KiwoomStockInfoReq(stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")))
+        }
+        val tradeInfoDeferred = async { priceClient.stockTradeInfo(req = KiwoomStockTradeInfoReq(stk_cd = stkCd)) }
+        val investorDeferred = async {
+            stockClient.stockInvestor(
+                req = KiwoomStockInvestorReq(dt = DateUtil.today("yyyyMMdd"), stk_cd = stkCd, amt_qty_tp = "2", trde_tp = "0", unit_tp = "1")
             )
-        )
-        val kiwoomStockInfoRes = stockClient.stockInfo(
-            req = KiwoomStockInfoReq(
-                stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""),
-            )
-        )
-        val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
-            req = KiwoomStockTradeInfoReq(
-                stk_cd = stkCd,
-            )
-        )
-        val kiwoomStockInvestor = stockClient.stockInvestor(
-            req = KiwoomStockInvestorReq(
-                dt = DateUtil.today("yyyyMMdd"),
-                stk_cd = stkCd,
-                amt_qty_tp = "2",
-                trde_tp = "0",
-                unit_tp = "1"
-            )
-        )
+        }
+        val chartDeferred = async { fetchChartList(stkCd, req.chartType, tradeInfoDeferred) }
+        val chartInvestorDeferred = async {
+            stockChartClient.stockChartInvestor(req = KiwoomStockChartInvestorReq(mrkt_tp = "000", amt_qty_tp = "2", trde_tp = "0", stk_cd = stkCd))
+        }
+        val programTradeDeferred = async {
+            priceClient.stockProgramTradeDay(req = KiwoomStockProgramTradeDayReq(amt_qty_tp = "2", stk_cd = stkCd, date = DateUtil.today("yyyyMMdd")))
+        }
+        val viListDeferred = async { fetchViList(stkCd) }
+        val dailyChartDeferred = if (req.chartType == StockChartType.DAY) null else async { fetchDayChartRowsOrNull(stkCd) }
+
+        val kiwoomStockDefaultInfoRes = defaultInfoDeferred.await()
+        val kiwoomStockInfoRes = infoDeferred.await()
+        val kiwoomStockTradeInfoRes = tradeInfoDeferred.await()
+        val kiwoomStockInvestor = investorDeferred.await()
 
         var stockInfo: StockInfo? = null
         if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
@@ -152,148 +162,9 @@ class StockService(
             }
         }
 
-        val chartListRes: MutableList<StockChart> = mutableListOf()
-        var kiwoomDayChartList: List<KiwoomStockChartDay>? = null
-        when(req.chartType) {
-            StockChartType.DAY -> {
-                val kiwoomStockChartDayRes = stockChartClient.chartDayList(
-                    req = KiwoomStockChartDayReq(
-                        stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
-                        upd_stkpc_tp = "1"
-                    )
-                )
+        val (chartListRes, kiwoomDayChartList) = chartDeferred.await()
 
-                if (kiwoomStockChartDayRes.return_code == 0) {
-                    kiwoomDayChartList = kiwoomStockChartDayRes.stk_dt_pole_chart_qry
-                    kiwoomStockChartDayRes.stk_dt_pole_chart_qry?.forEach {
-                        chartListRes.add(
-                            StockChart(
-                                dt = it.dt,
-                                curPrc = it.cur_prc,
-                                openPric = it.open_pric,
-                                highPric = it.high_pric,
-                                lowPric = it.low_pric,
-                                trdeQty = it.trde_qty,
-                                trdePrica = it.trde_prica,
-                            )
-                        )
-                    }
-                }
-            }
-            StockChartType.WEEK -> {
-                val kiwoomStockChartWeekRes = stockChartClient.chartWeekList(
-                    req = KiwoomStockChartWeekReq(
-                        stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
-                        upd_stkpc_tp = "1"
-                    )
-                )
-
-                if (kiwoomStockChartWeekRes.return_code == 0) {
-                    kiwoomStockChartWeekRes.stk_stk_pole_chart_qry?.stream()?.forEach {
-                        chartListRes.add(
-                            StockChart(
-                                dt = it.dt,
-                                curPrc = it.cur_prc,
-                                openPric = it.open_pric,
-                                highPric = it.high_pric,
-                                lowPric = it.low_pric,
-                                trdeQty = it.trde_qty,
-                                trdePrica = it.trde_prica,
-                            )
-                        )
-                    }
-                }
-            }
-            StockChartType.MONTH -> {
-                val kiwoomStockChartMonthRes = stockChartClient.chartMonthList(
-                    req = KiwoomStockChartMonthReq(
-                        stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
-                        upd_stkpc_tp = "1"
-                    )
-                )
-
-                if (kiwoomStockChartMonthRes.return_code == 0) {
-                    kiwoomStockChartMonthRes.stk_mth_pole_chart_qry?.stream()?.forEach {
-                        chartListRes.add(
-                            StockChart(
-                                dt = it.dt,
-                                curPrc = it.cur_prc,
-                                openPric = it.open_pric,
-                                highPric = it.high_pric,
-                                lowPric = it.low_pric,
-                                trdeQty = it.trde_qty,
-                                trdePrica = it.trde_prica,
-                            )
-                        )
-                    }
-                }
-            }
-            StockChartType.YEAR -> {
-                val kiwoomStockChartYearRes = stockChartClient.chartYearList(
-                    req = KiwoomStockChartYearReq(
-                        stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
-                        upd_stkpc_tp = "1"
-                    )
-                )
-
-                if (kiwoomStockChartYearRes.return_code == 0) {
-                    kiwoomStockChartYearRes.stk_yr_pole_chart_qry?.stream()?.forEach {
-                        chartListRes.add(
-                            StockChart(
-                                dt = it.dt,
-                                curPrc = it.cur_prc,
-                                openPric = it.open_pric,
-                                highPric = it.high_pric,
-                                lowPric = it.low_pric,
-                                trdeQty = it.trde_qty,
-                                trdePrica = it.trde_prica,
-                            )
-                        )
-                    }
-                }
-            }
-            else -> {
-                val kiwoomStockChartMinuteRes = req.chartType.value?.let {
-                    stockChartClient.chartMinuteList(
-                        req = KiwoomStockChartMinuteReq(
-                            stk_cd = stkCd,
-                            tic_scope = it,
-                            upd_stkpc_tp = "1"
-                        )
-                    )
-                }
-
-                kiwoomStockChartMinuteRes?.let {
-                    if (it.return_code == 0) {
-                        kiwoomStockChartMinuteRes.stk_min_pole_chart_qry?.stream()?.filter { kiwoomStockTradeInfoRes.date?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
-                            chartListRes.add(
-                                StockChart(
-                                    dt = it.cntr_tm,
-                                    curPrc = it.cur_prc,
-                                    openPric = it.open_pric,
-                                    highPric = it.high_pric,
-                                    lowPric = it.low_pric,
-                                    trdeQty = it.trde_qty,
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        val kiwoomIndexInvestorRes = stockChartClient.stockChartInvestor(
-            req = KiwoomStockChartInvestorReq(
-                mrkt_tp = "000",
-                amt_qty_tp = "2",
-                trde_tp = "0",
-                stk_cd = stkCd,
-            )
-        )
+        val kiwoomIndexInvestorRes = chartInvestorDeferred.await()
 
         val stockInvestorChartList: MutableList<StockInvestorChart> = mutableListOf()
         if (kiwoomIndexInvestorRes.return_code == 0) {
@@ -309,13 +180,7 @@ class StockService(
             }
         }
 
-        val kiwoomStockProgramTradeDayRes = priceClient.stockProgramTradeDay(
-            req = KiwoomStockProgramTradeDayReq(
-                amt_qty_tp = "2",
-                stk_cd = stkCd,
-                date = DateUtil.today("yyyyMMdd")
-            )
-        )
+        val kiwoomStockProgramTradeDayRes = programTradeDeferred.await()
 
         val stockProgramList: MutableList<StockProgram> = mutableListOf()
         if(kiwoomStockProgramTradeDayRes.return_code == 0) {
@@ -332,6 +197,7 @@ class StockService(
             }
         }
 
+        // 공매도 조회 기간은 프로그램매매 응답의 날짜 범위에 의존 — 순차
         val kiwoomStockShortSellingRes = shortSellingClient.stockShortSelling(
             req = KiwoomStockShortSellingReq(
                 stk_cd = stkCd,
@@ -359,42 +225,11 @@ class StockService(
 
         val dividendList = stockDividendService.getDividendList(stkCd, kiwoomStockInfoRes.marketCode)
 
-        val viList: List<StockVi> = try {
-            stockClient.viList(req = KiwoomStockViListReq(stk_cd = stkCd))
-                .motn_stk
-                ?.map { item ->
-                    val direction = listOf(item.dynm_dispty_rt, item.static_dispty_rt, item.open_pric_pre_flu_rt)
-                        .firstOrNull { rate -> ((rate?.trim()?.removePrefix("+")?.toDoubleOrNull()) ?: 0.0) != 0.0 }
-                        ?.let { rate -> if (rate.trim().startsWith("-")) "하락" else "상승" }
-                        ?: ""
-
-                    StockVi(
-                        motnPric = item.motn_pric,
-                        motnTime = item.trde_cntr_proc_time,
-                        relisTime = item.virelis_time,
-                        viType = item.viaplc_tp,
-                        dynmDisptyRt = item.dynm_dispty_rt,
-                        staticDisptyRt = item.static_dispty_rt,
-                        openPricPreFluRt = item.open_pric_pre_flu_rt,
-                        vimotnCnt = item.vimotn_cnt,
-                        direction = direction,
-                        active = item.virelis_time.isNullOrBlank() || item.virelis_time == "000000",
-                    )
-                } ?: emptyList()
-        } catch (e: Exception) {
-            log.warn { "getStock viList Error: stkCd=$stkCd, ${e.message}" }
-            emptyList()
-        }
+        val viList: List<StockVi> = viListDeferred.await()
 
         val dailyPriceList = try {
             val dayList = kiwoomDayChartList
-                ?: stockChartClient.chartDayList(
-                    req = KiwoomStockChartDayReq(
-                        stk_cd = stkCd,
-                        base_dt = DateUtil.today("yyyyMMdd"),
-                        upd_stkpc_tp = "1"
-                    )
-                ).stk_dt_pole_chart_qry
+                ?: dailyChartDeferred?.await()
                 ?: emptyList()
 
             dayList.mapIndexed { index, it ->
@@ -418,7 +253,7 @@ class StockService(
             emptyList()
         }
 
-        return StockDetailRes(
+        StockDetailRes(
             stockInfo = stockInfo,
             stockChartList = chartListRes,
             stockInvestorChartList = stockInvestorChartList,
@@ -432,16 +267,18 @@ class StockService(
     }
 
 
-    fun getStockChart(stkCd: String, req: StockDetailReq): StockChartRes {
-        val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
-            req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)
-        )
-        val kiwoomStockInfoRes = stockClient.stockInfo(
-            req = KiwoomStockInfoReq(stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", ""))
-        )
-        val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
-            req = KiwoomStockTradeInfoReq(stk_cd = stkCd)
-        )
+    /** 종목 차트(차트 갱신용 경량 응답). 기본정보·종목정보·거래정보·차트 4건 동시 요청. */
+    fun getStockChart(stkCd: String, req: StockDetailReq): StockChartRes = runBlocking {
+        val defaultInfoDeferred = async { stockClient.stockDefaultInfo(req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)) }
+        val infoDeferred = async {
+            stockClient.stockInfo(req = KiwoomStockInfoReq(stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")))
+        }
+        val tradeInfoDeferred = async { priceClient.stockTradeInfo(req = KiwoomStockTradeInfoReq(stk_cd = stkCd)) }
+        val chartDeferred = async { fetchChartList(stkCd, req.chartType, tradeInfoDeferred) }
+
+        val kiwoomStockDefaultInfoRes = defaultInfoDeferred.await()
+        val kiwoomStockInfoRes = infoDeferred.await()
+        val kiwoomStockTradeInfoRes = tradeInfoDeferred.await()
 
         var stockInfo: StockInfo? = null
         if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0) {
@@ -477,11 +314,29 @@ class StockService(
             )
         }
 
+        val (chartListRes, _) = chartDeferred.await()
+
+        StockChartRes(stockInfo = stockInfo, stockChartList = chartListRes)
+    }
+
+    /**
+     * 차트 종류별 TR 1건 조회 후 공통 응답으로 변환. DAY 면 원본 일봉 행도 함께 돌려줘 일별시세가 재사용한다.
+     * 분봉만 거래정보의 날짜로 당일 데이터를 거르므로 그 Deferred 를 받아 필요할 때만 기다린다.
+     */
+    private suspend fun fetchChartList(
+        stkCd: String,
+        chartType: StockChartType,
+        tradeInfoDeferred: Deferred<KiwoomStockTradeInfoRes>,
+    ): Pair<List<StockChart>, List<KiwoomStockChartDay>?> {
         val chartListRes: MutableList<StockChart> = mutableListOf()
-        when (req.chartType) {
+        var kiwoomDayChartList: List<KiwoomStockChartDay>? = null
+        when (chartType) {
             StockChartType.DAY -> {
                 val res = stockChartClient.chartDayList(KiwoomStockChartDayReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
-                if (res.return_code == 0) res.stk_dt_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+                if (res.return_code == 0) {
+                    kiwoomDayChartList = res.stk_dt_pole_chart_qry
+                    res.stk_dt_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
+                }
             }
             StockChartType.WEEK -> {
                 val res = stockChartClient.chartWeekList(KiwoomStockChartWeekReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1"))
@@ -496,16 +351,62 @@ class StockService(
                 if (res.return_code == 0) res.stk_yr_pole_chart_qry?.forEach { chartListRes.add(StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)) }
             }
             else -> {
-                req.chartType.value?.let { tic ->
+                chartType.value?.let { tic ->
                     val res = stockChartClient.chartMinuteList(KiwoomStockChartMinuteReq(stk_cd = stkCd, tic_scope = tic, upd_stkpc_tp = "1"))
-                    if (res.return_code == 0) res.stk_min_pole_chart_qry?.filter { kiwoomStockTradeInfoRes.date?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
-                        chartListRes.add(StockChart(dt = it.cntr_tm, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty))
+                    if (res.return_code == 0) {
+                        val tradeDate = tradeInfoDeferred.await().date
+                        res.stk_min_pole_chart_qry?.filter { tradeDate?.let { date -> it.cntr_tm?.contains(date) == true } == true }?.forEach {
+                            chartListRes.add(StockChart(dt = it.cntr_tm, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty))
+                        }
                     }
                 }
             }
         }
+        return chartListRes to kiwoomDayChartList
+    }
 
-        return StockChartRes(stockInfo = stockInfo, stockChartList = chartListRes)
+    private suspend fun fetchViList(stkCd: String): List<StockVi> {
+        return try {
+            stockClient.viList(req = KiwoomStockViListReq(stk_cd = stkCd))
+                .motn_stk
+                ?.map { item ->
+                    val direction = listOf(item.dynm_dispty_rt, item.static_dispty_rt, item.open_pric_pre_flu_rt)
+                        .firstOrNull { rate -> ((rate?.trim()?.removePrefix("+")?.toDoubleOrNull()) ?: 0.0) != 0.0 }
+                        ?.let { rate -> if (rate.trim().startsWith("-")) "하락" else "상승" }
+                        ?: ""
+
+                    StockVi(
+                        motnPric = item.motn_pric,
+                        motnTime = item.trde_cntr_proc_time,
+                        relisTime = item.virelis_time,
+                        viType = item.viaplc_tp,
+                        dynmDisptyRt = item.dynm_dispty_rt,
+                        staticDisptyRt = item.static_dispty_rt,
+                        openPricPreFluRt = item.open_pric_pre_flu_rt,
+                        vimotnCnt = item.vimotn_cnt,
+                        direction = direction,
+                        active = item.virelis_time.isNullOrBlank() || item.virelis_time == "000000",
+                    )
+                } ?: emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "getStock viList Error: stkCd=$stkCd, ${e.message}" }
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchDayChartRowsOrNull(stkCd: String): List<KiwoomStockChartDay>? {
+        return try {
+            stockChartClient.chartDayList(
+                req = KiwoomStockChartDayReq(stk_cd = stkCd, base_dt = DateUtil.today("yyyyMMdd"), upd_stkpc_tp = "1")
+            ).stk_dt_pole_chart_qry
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            null
+        }
     }
 
     fun getStockProgramChart(
@@ -513,13 +414,13 @@ class StockService(
     ): List<StockProgramChart> {
         val stockProgramChartList: MutableList<StockProgramChart> = mutableListOf()
 
-        val kiwoomStockProgramTradeMinuteRes = priceClient.stockProgramTradeMinute(
+        val kiwoomStockProgramTradeMinuteRes = runBlocking { priceClient.stockProgramTradeMinute(
             req = KiwoomStockProgramTradeMinuteReq(
                 amt_qty_tp = "2",
                 stk_cd = stkCd,
                 date = DateUtil.today("yyyyMMdd")
             )
-        )
+        ) }
 
         if (kiwoomStockProgramTradeMinuteRes.return_code == 0) {
             kiwoomStockProgramTradeMinuteRes.stk_tm_prm_trde_trnsn

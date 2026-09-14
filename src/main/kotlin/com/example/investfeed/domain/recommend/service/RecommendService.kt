@@ -32,6 +32,8 @@ import com.example.investfeed.kiwoom.price.dto.req.KiwoomInvestorTradeCloseMarke
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomInvestorTradeCloseMarketItemList
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInvestor
+import com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockDefaultInfoRes
+import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartDay
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
@@ -48,6 +50,11 @@ import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.sqrt
 import com.example.investfeed.domain.papertrade.service.TrancheCalculator
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlin.coroutines.cancellation.CancellationException
+import com.example.investfeed.global.coroutine.mapConcurrently
 
 @Service
 class RecommendService(
@@ -77,7 +84,7 @@ class RecommendService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doRecommendStock()
+                runBlocking { doRecommendStock() }   // 코루틴 경계: 트랜잭션·SecurityContext 가 묶인 이 스레드에서만 실행
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -90,69 +97,63 @@ class RecommendService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doRefreshTodayDirection()
+                runBlocking { doRefreshTodayDirection() }
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private fun doRefreshTodayDirection() {
+    private suspend fun doRefreshTodayDirection() {
         val today = DateUtil.today("yyyyMMdd")
         val picks = stockPickRepository.findAll()
         if (picks.isEmpty()) return
 
-        var matchCount = 0
-        var mismatchCount = 0
-        var nullCount = 0
+        val directions = picks.mapConcurrently(RECOMMEND_CONCURRENCY) { pick -> refreshTodayDirection(pick, today) }
+        val matchCount = directions.count { it == "MATCH" }
+        val mismatchCount = directions.count { it == "MISMATCH" }
+        val nullCount = directions.size - matchCount - mismatchCount
 
-        picks.forEach { pick ->
-            try {
-                Thread.sleep(API_PACING_MS)
-                val res = stockClient.stockInvestor(
-                    req = KiwoomStockInvestorReq(
-                        dt = today,
-                        stk_cd = pick.stkCd,
-                        amt_qty_tp = "2",
-                        trde_tp = "0",
-                        unit_tp = "1"
-                    )
-                )
-                if (res.return_code != 0) {
-                    log.error { "외부 API 응답 오류: return_code=${res.return_code}, return_msg=${res.return_msg}" }
-                    pick.todayDirection = null
-                    nullCount++
-                    return@forEach
-                }
-                val firstItem = res.stk_invsr_orgn?.firstOrNull()
-                if (firstItem?.dt != today) {
-                    pick.todayDirection = null
-                    nullCount++
-                    return@forEach
-                }
-                val frgnr = firstItem.frgnr_invsr?.toLongOrNull() ?: 0L
-                val penfnd = firstItem.penfnd_etc?.toLongOrNull() ?: 0L
-                val direction = computeTodayDirection(frgnr, penfnd, pick.originSide)
-                pick.todayDirection = direction
-                when (direction) {
-                    "MATCH" -> matchCount++
-                    "MISMATCH" -> mismatchCount++
-                    else -> nullCount++
-                }
-            } catch (e: Exception) {
-                log.warn(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
-                pick.todayDirection = null
-                nullCount++
-            }
-        }
         stockPickRepository.saveAll(picks)
         log.info { "당일 매매 동향 갱신: MATCH=$matchCount, MISMATCH=$mismatchCount, NULL=$nullCount" }
     }
 
+    private suspend fun refreshTodayDirection(pick: StockPick, today: String): String? {
+        return try {
+            val res = stockClient.stockInvestor(
+                req = KiwoomStockInvestorReq(
+                    dt = today,
+                    stk_cd = pick.stkCd,
+                    amt_qty_tp = "2",
+                    trde_tp = "0",
+                    unit_tp = "1"
+                )
+            )
+            if (res.return_code != 0) {
+                log.error { "외부 API 응답 오류: return_code=${res.return_code}, return_msg=${res.return_msg}" }
+                pick.todayDirection = null
+                return null
+            }
+            val firstItem = res.stk_invsr_orgn?.firstOrNull()
+            if (firstItem?.dt != today) {
+                pick.todayDirection = null
+                return null
+            }
+            val frgnr = firstItem.frgnr_invsr?.toLongOrNull() ?: 0L
+            val penfnd = firstItem.penfnd_etc?.toLongOrNull() ?: 0L
+            val direction = computeTodayDirection(frgnr, penfnd, pick.originSide)
+            pick.todayDirection = direction
+            direction
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
+            pick.todayDirection = null
+            null
+        }
+    }
+
     private fun computeTodayDirection(frgnr: Long, penfnd: Long, originSide: String?): String? {
-        // MATCH: 외인+연기금 둘 다 추천 방향
-        // MISMATCH: 외인+연기금 둘 다 추천 반대 방향 (강한 추세 전환 신호)
-        // null: 한쪽만 반대거나 데이터 부족 (단기 노이즈 가능성 — 표시 안 함)
         return when (originSide) {
             "BUY" -> when {
                 frgnr > 0 && penfnd > 0 -> "MATCH"
@@ -168,7 +169,7 @@ class RecommendService(
         }
     }
 
-    private fun doRecommendStock() {
+    private suspend fun doRecommendStock() {
         val isHoliday = holidayService.isHoliday()
 
         val now = if (isHoliday) {
@@ -177,8 +178,9 @@ class RecommendService(
             LocalDateTime.now()
         }
 
-        val (riskMap, marketTypeMap) = buildStockMetadataMaps()
+        val (riskMap, marketTypeMap) = fetchStockMetadataMaps()
 
+        // ka10066 은 연속조회(next-key) 체인이라 순차. 32페이지 안팎.
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
@@ -211,15 +213,14 @@ class RecommendService(
                 sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
         }
 
-        val processed: List<ProcessedPick> = buyCandidates.mapNotNull {
-            val stkCd = it.stk_cd ?: return@mapNotNull null
-            val stkNm = it.stk_nm ?: return@mapNotNull null
-            processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap)
-        } + sellCandidates.mapNotNull {
-            val stkCd = it.stk_cd ?: return@mapNotNull null
-            val stkNm = it.stk_nm ?: return@mapNotNull null
-            processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap)
-        }
+        val targets = buyCandidates.mapNotNull { c -> c.stk_cd?.let { cd -> c.stk_nm?.let { nm -> Triple(cd, nm, Position.BUY) } } } +
+            sellCandidates.mapNotNull { c -> c.stk_cd?.let { cd -> c.stk_nm?.let { nm -> Triple(cd, nm, Position.SELL) } } }
+
+        val processed: List<ProcessedPick> = targets
+            .mapConcurrently(RECOMMEND_CONCURRENCY) { (stkCd, stkNm, position) ->
+                processCandidate(stkCd, stkNm, position, riskMap, marketTypeMap)
+            }
+            .filterNotNull()
 
         // 현재용 테이블 갱신
         stockPickRepository.deleteAll()
@@ -243,7 +244,7 @@ class RecommendService(
         }
     }
 
-    private fun processCandidate(
+    private suspend fun processCandidate(
         stkCd: String,
         stkNm: String,
         position: Position,
@@ -251,6 +252,8 @@ class RecommendService(
         marketTypeMap: Map<String, String> = emptyMap(),
         holdingMode: Boolean = false,
         prefetched: List<KiwoomStockInvestor>? = null,
+        prefetchedDefaultInfo: KiwoomStockDefaultInfoRes? = null,
+        prefetchedPriceMetrics: PriceMetrics? = null,
     ): ProcessedPick? {
         val items = prefetched ?: fetchInvestorSeries(stkCd, "$stkNm($stkCd) $position") ?: return null
 
@@ -277,12 +280,9 @@ class RecommendService(
         }
         val pickPrice = abs(items[0].cur_prc?.toLongOrNull() ?: 0L)
 
-        val marketCap = try {
-            stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd)).mac?.toLongOrNull()
-        } catch (e: Exception) {
-            log.warn(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
-            null
-        }
+        // ka10001 은 시총(컷 판정)과 52주 고저(가격 지표) 둘 다에 쓰이므로 한 번만 조회해 공유한다.
+        val defaultInfo = prefetchedDefaultInfo ?: fetchDefaultInfo(stkCd)
+        val marketCap = defaultInfo?.mac?.toLongOrNull()
 
         if (marketCap == null || marketCap == 0L) {
             log.warn {
@@ -308,7 +308,7 @@ class RecommendService(
 
         val baseStkCd = stkCd.substringBefore("_")
         val riskFlags = riskMap[baseStkCd] ?: RiskFlags.UNKNOWN
-        val priceMetrics = computePriceMetrics(stkCd)
+        val priceMetrics = prefetchedPriceMetrics ?: computePriceMetrics(stkCd, defaultInfo)
         val marketType = marketTypeMap[baseStkCd]
 
         // 백테스트/디버깅용 — 모든 모듈 ON 가정의 trigger 결과 + 매크로 반영 최종 등급.
@@ -354,9 +354,20 @@ class RecommendService(
         )
     }
 
-    private fun computePriceMetrics(stkCd: String): PriceMetrics {
+    private suspend fun fetchDefaultInfo(stkCd: String): KiwoomStockDefaultInfoRes? {
         return try {
-            Thread.sleep(API_PACING_MS)
+            stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
+            null
+        }
+    }
+
+    /** ka10081 일봉 시계열(최신일 우선). 실패/응답 오류/빈 응답은 null. */
+    private suspend fun fetchDayChartRows(stkCd: String): List<KiwoomStockChartDay>? {
+        return try {
             val res = stockChartClient.chartDayList(
                 req = KiwoomStockChartDayReq(
                     stk_cd = stkCd,
@@ -364,8 +375,26 @@ class RecommendService(
                     upd_stkpc_tp = "1",
                 )
             )
-            if (res.return_code != 0) return PriceMetrics.UNKNOWN
-            val rows = res.stk_dt_pole_chart_qry ?: return PriceMetrics.UNKNOWN
+            if (res.return_code != 0) null else res.stk_dt_pole_chart_qry
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
+            null
+        }
+    }
+
+    private suspend fun computePriceMetrics(stkCd: String, defaultInfo: KiwoomStockDefaultInfoRes?): PriceMetrics =
+        buildPriceMetrics(fetchDayChartRows(stkCd), defaultInfo, stkCd)
+
+    /** 일봉 + 기본정보로 가격 지표 계산(순수 계산, I/O 없음). */
+    private fun buildPriceMetrics(
+        rows: List<KiwoomStockChartDay>?,
+        defaultInfo: KiwoomStockDefaultInfoRes?,
+        stkCd: String,
+    ): PriceMetrics {
+        return try {
+            if (rows == null) return PriceMetrics.UNKNOWN
             val closes = rows.mapNotNull { it.cur_prc?.toLongOrNull() }.map { abs(it) }
             if (closes.isEmpty()) return PriceMetrics.UNKNOWN
 
@@ -415,14 +444,6 @@ class RecommendService(
 
             val today = closes[0]
 
-            val defaultInfo = try {
-                Thread.sleep(API_PACING_MS)
-                stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = stkCd))
-                    .takeIf { it.return_code == 0 }
-            } catch (e: Exception) {
-                log.warn(e) { "ka10001 조회 실패 stkCd=$stkCd" }
-                null
-            }
             val high52w = defaultInfo?._250hgst?.toLongOrNull()?.let { abs(it) }
             val low52w = defaultInfo?._250lwst?.toLongOrNull()?.let { abs(it) }
             val distFromHigh52w = defaultInfo?._250hgst_pric_pre_rt?.toDoubleOrNull()
@@ -504,28 +525,16 @@ class RecommendService(
         }
     }
 
-    private fun buildRiskCategoryMap(): Map<String, RiskFlags> {
-        return try {
-            val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList()
-            Thread.sleep(API_PACING_MS)
-            val kosdaq = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList()
-            val combined = kospi + kosdaq
-            val map = combined
-                .filter { !it.code.isNullOrBlank() }
-                .associate { it.code!! to RiskFlags.from(it) }
-            log.info { "위험 카테고리 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, distinct=${map.size}" }
-            map
-        } catch (e: Exception) {
-            log.error(e) { "위험 카테고리 맵 구축 실패 - 빈 맵 반환" }
-            emptyMap()
-        }
-    }
+    internal fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> =
+        runBlocking { fetchStockMetadataMaps() }
 
-    internal fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
+    private suspend fun fetchStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
         return try {
-            val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList()
-            Thread.sleep(API_PACING_MS)
-            val kosdaq = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList()
+            val (kospi, kosdaq) = coroutineScope {
+                val kospiDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList() }
+                val kosdaqDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList() }
+                kospiDeferred.await() to kosdaqDeferred.await()
+            }
             val combined = kospi + kosdaq
             val riskMap = combined
                 .filter { !it.code.isNullOrBlank() }
@@ -538,6 +547,8 @@ class RecommendService(
                     "riskDistinct=${riskMap.size}, marketTypeDistinct=${marketTypeMap.size}"
             }
             riskMap to marketTypeMap
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.error(e) { "종목 메타데이터 맵 구축 실패 - 빈 맵 반환" }
             emptyMap<String, RiskFlags>() to emptyMap()
@@ -554,7 +565,6 @@ class RecommendService(
         val isTradingHalted: Boolean?,
     ) {
         companion object {
-            /** 위험 카테고리 정보 미확보 — 모든 플래그 null. */
             val UNKNOWN = RiskFlags(null, null, null, null, null, null, null)
 
             fun from(item: StockInfoList): RiskFlags {
@@ -676,8 +686,7 @@ class RecommendService(
      * ka10059 종목별 투자자 시계열 조회 (최신일 우선 정렬). 실패/빈 응답은 null — 호출부가 컷 처리.
      * 요청 파라미터는 추천·보유평가 공통(수량 / 순매수 / 단주).
      */
-    private fun fetchInvestorSeries(stkCd: String, logTag: String): List<KiwoomStockInvestor>? {
-        Thread.sleep(API_PACING_MS)
+    private suspend fun fetchInvestorSeries(stkCd: String, logTag: String): List<KiwoomStockInvestor>? {
         val investorRes = try {
             stockClient.stockInvestor(
                 req = KiwoomStockInvestorReq(
@@ -688,6 +697,8 @@ class RecommendService(
                     unit_tp = "1"
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn(e) { "stockInvestor 호출 실패 stkCd=$stkCd ($logTag)" }
             return null
@@ -1068,6 +1079,8 @@ class RecommendService(
 
     companion object {
         private const val TOP_N = 100
+        /** 후보/종목 단위 동시 처리 상한 — TR 간격은 제한기가 보장하므로 큐를 채울 만큼만 */
+        private const val RECOMMEND_CONCURRENCY = 8
         private const val RECENT_WINDOW = 2  // idx 0+1 = 당일+전일
         private const val PRIOR_WINDOW = 10  // idx 2~11
         private const val K_SIGNAL = 1.5          // 연기금 시그널 통과 임계 (평균/평균)
@@ -1080,7 +1093,6 @@ class RecommendService(
         private const val MCAP_RATIO_BUY = 0.0005    // 0.05%
         private const val MCAP_RATIO_STRONG = 0.001  // 0.1%
         private const val MARKET_CAP_UNIT_WON = 100_000_000L  // 키움 ka10001 mac 필드: 억원 단위
-        private const val API_PACING_MS = 500L
         private const val KIWOOM_BROKER_NAME = "키움증권"
         private const val STREAK_LOOKBACK_DAYS = 45L      // history / 운영 사이클 조회 기간
 
@@ -1359,7 +1371,7 @@ class RecommendService(
         val allItems = recommendList + avoidList + holdList
         val allCodes = allItems.mapNotNull { it.stkCd?.substringBefore("_") }.distinct().joinToString("|")
         if (allCodes.isNotBlank()) {
-            val kiwoomStockInterestRes = stockClient.stockInterest(req = KiwoomStockInterestReq(stk_cd = allCodes))
+            val kiwoomStockInterestRes = runBlocking { stockClient.stockInterest(req = KiwoomStockInterestReq(stk_cd = allCodes)) }
             if (kiwoomStockInterestRes.return_code == 0) {
                 val infoMap = kiwoomStockInterestRes.atn_stk_infr
                     ?.associateBy { it.stk_cd?.substringBefore("_") } ?: emptyMap()
@@ -1495,19 +1507,41 @@ class RecommendService(
             }
         }
 
+    /** 동기 진입점(HoldingGradeService 종목 루프용). 종목당 코루틴 경계를 여기 두어 루프의 종목별 auto-commit 격리를 유지한다. */
     internal fun evaluateHoldingGrade(
         stkCd: String,
         stkNm: String,
         meta: Pair<Map<String, RiskFlags>, Map<String, String>>? = null,
         entryDate: LocalDate? = null,
         evalDate: LocalDate = LocalDate.now(),
+    ): HoldingEvalResult = runBlocking { evaluateHoldingGradeSuspend(stkCd, stkNm, meta, entryDate, evalDate) }
+
+    private suspend fun evaluateHoldingGradeSuspend(
+        stkCd: String,
+        stkNm: String,
+        meta: Pair<Map<String, RiskFlags>, Map<String, String>>?,
+        entryDate: LocalDate?,
+        evalDate: LocalDate,
     ): HoldingEvalResult {
         val setting = RecommendSetting(memberId = 0L)
-        val (riskMap, marketTypeMap) = meta ?: buildStockMetadataMaps()
-        // 시계열 1회 조회 → BUY/SELL 양방향 + 지속 매집 판정이 공유 (양방향 컷 시에도 시계열을 잃지 않는다)
-        val series = fetchInvestorSeries(stkCd, "$stkNm($stkCd) HOLDING")
-        val buy = series?.let { processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap, holdingMode = true, prefetched = it) }
-        val sell = series?.let { processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap, holdingMode = true, prefetched = it) }
+        val (riskMap, marketTypeMap) = meta ?: fetchStockMetadataMaps()
+        // 종목당 필요한 TR 3개(ka10059 시계열 · ka10001 기본정보 · ka10081 일봉)는 서로 독립 — 한 번에 조회해
+        // BUY/SELL 양방향 판정과 HOLD 경로의 가격 지표가 공유한다 (양방향 컷 시에도 시계열·지표를 잃지 않는다).
+        val (series, defaultInfo, chartRows) = coroutineScope {
+            val seriesDeferred = async { fetchInvestorSeries(stkCd, "$stkNm($stkCd) HOLDING") }
+            val infoDeferred = async { fetchDefaultInfo(stkCd) }
+            val chartDeferred = async { fetchDayChartRows(stkCd) }
+            Triple(seriesDeferred.await(), infoDeferred.await(), chartDeferred.await())
+        }
+        val pm = buildPriceMetrics(chartRows, defaultInfo, stkCd)
+        val buy = series?.let {
+            processCandidate(stkCd, stkNm, Position.BUY, riskMap, marketTypeMap, holdingMode = true,
+                prefetched = it, prefetchedDefaultInfo = defaultInfo, prefetchedPriceMetrics = pm)
+        }
+        val sell = series?.let {
+            processCandidate(stkCd, stkNm, Position.SELL, riskMap, marketTypeMap, holdingMode = true,
+                prefetched = it, prefetchedDefaultInfo = defaultInfo, prefetchedPriceMetrics = pm)
+        }
 
         val conflict = buy != null && sell != null && buy.type != "HOLD" && sell.type != "HOLD"
         val chosen: ProcessedPick? = when {
@@ -1525,7 +1559,6 @@ class RecommendService(
         val frgnrMcapRatio: Double?
         val marketType: String?
 
-        val pm = buy?.priceMetrics ?: sell?.priceMetrics ?: computePriceMetrics(stkCd)
         // 수급 지속 판정 — 양방향 컷(충돌 제외)일 때만. 반전 K 가 통과했다가 HOLD 로 끝난 경우는 의도된 보류라 적용 안 함.
         val flow: FlowEval? =
             if (chosen == null && !conflict && series != null) evaluateFlow(series, entryDate, evalDate) else null

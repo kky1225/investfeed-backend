@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
 
 @Service
 class PaperTradeExecutionService(
@@ -556,9 +557,8 @@ class PaperTradeExecutionService(
      */
     private fun fetchHaltedCodes(): Set<String> {
         return try {
-            val kospi = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list.orEmpty()
-            Thread.sleep(ORDER_PACING_MS)
-            val kosdaq = stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list.orEmpty()
+            val kospi = runBlocking { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")) }.list.orEmpty()
+            val kosdaq = runBlocking { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")) }.list.orEmpty()
             (kospi + kosdaq)
                 .filter { it.auditInfo == "거래정지" }
                 .mapNotNull { normCd(it.code) }

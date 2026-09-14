@@ -32,7 +32,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import com.example.investfeed.kiwoom.support.withQuotaRetry
+import kotlin.coroutines.cancellation.CancellationException
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Component
 class StockClient(
@@ -46,21 +48,20 @@ class StockClient(
     private final val STOCK_URL = "/api/dostk/stkinfo"
 
     @KiwoomToken
-    fun stockInfoList(
+    suspend fun stockInfoList(
         req: StockInfoListReq
     ): StockInfoListRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10099", { it.return_code }) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10099")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<StockInfoListRes>()
-                .block()
+                .awaitBodyOrNull<StockInfoListRes>() }
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockInfoList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -72,6 +73,8 @@ class StockClient(
             throw e
         } catch (e: StockInfoListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "stockInfoList Error" }
 
@@ -80,21 +83,20 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockDefaultInfo(
+    suspend fun stockDefaultInfo(
         req: KiwoomDefaultStockInfoReq
     ): KiwoomStockDefaultInfoRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10001", { it.return_code }) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10001")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockDefaultInfoRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockDefaultInfoRes>() }
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockDefaultInfo, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -106,6 +108,8 @@ class StockClient(
             throw e
         }catch (e: StockDefaultInfoException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockInfo Error" }
 
@@ -114,7 +118,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun viList(
+    suspend fun viList(
         req: KiwoomStockViListReq
     ): KiwoomStockViListRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -127,8 +131,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockViListRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockViListRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=viList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -140,6 +143,8 @@ class StockClient(
             throw e
         } catch (e: StockViListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "viList Error: ${e.message}" }
 
@@ -148,7 +153,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockInfo(
+    suspend fun stockInfo(
         req: KiwoomStockInfoReq
     ): KiwoomStockInfoRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -161,8 +166,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockInfoRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockInfoRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockInfo, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -174,6 +178,8 @@ class StockClient(
             throw e
         }catch (e: StockInfoException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockInfo Error" }
 
@@ -182,21 +188,20 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockInvestor(
+    suspend fun stockInvestor(
         req: KiwoomStockInvestorReq
     ): KiwoomStockInvestorRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10059", { it.return_code }) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10059")
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockInvestorRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockInvestorRes>() }
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -208,6 +213,8 @@ class StockClient(
             throw e
         }catch (e: StockInvestorException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockInvestor Error" }
 
@@ -216,7 +223,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockTradeDailyList(
+    suspend fun stockTradeDailyList(
         req: KiwoomStockTradeDailyListReq
     ): KiwoomStockTradeDailyRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -229,8 +236,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockTradeDailyRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockTradeDailyRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockTradeDailyList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -242,6 +248,8 @@ class StockClient(
             throw e
         }catch (e: StockTradeDailyListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockTradeDailyList Error" }
 
@@ -250,7 +258,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockJumpList(
+    suspend fun stockJumpList(
         req: StockJumpListReq
     ): StockJumpListRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -263,8 +271,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<StockJumpListRes>()
-                .block()
+                .awaitBodyOrNull<StockJumpListRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockJumpList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -276,6 +283,8 @@ class StockClient(
             throw e
         }catch (e: StockJumpListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockJumpList Error" }
 
@@ -284,7 +293,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockNewPriceList(
+    suspend fun stockNewPriceList(
         req: StockNewPriceListReq
     ): StockNewPriceListRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -297,8 +306,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<StockNewPriceListRes>()
-                .block()
+                .awaitBodyOrNull<StockNewPriceListRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockNewPriceList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -310,6 +318,8 @@ class StockClient(
             throw e
         }catch (e: StockNewPriceListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockNewPriceList Error" }
 
@@ -318,7 +328,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun sectCodeList(
+    suspend fun sectCodeList(
         req: KiwoomSectCodeListReq
     ): KiwoomSectCodeListRes? {
         val accessToken = authClient.getCurrentAccessToken()
@@ -331,8 +341,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomSectCodeListRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomSectCodeListRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectCodeList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -344,6 +353,8 @@ class StockClient(
             throw e
         }catch (e: SectCodeListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectCodeList Error" }
 
@@ -352,7 +363,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun stockInterest(
+    suspend fun stockInterest(
         req: KiwoomStockInterestReq
     ): KiwoomStockInterestRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -365,8 +376,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomStockInterestRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomStockInterestRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=stockInterest, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -378,6 +388,8 @@ class StockClient(
             throw e
         }catch (e: StockInterestException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "stockInterest Error" }
 
@@ -386,7 +398,7 @@ class StockClient(
     }
 
     @KiwoomToken
-    fun newHighLow(
+    suspend fun newHighLow(
         req: KiwoomNewHighLowReq
     ): KiwoomNewHighLowRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -399,8 +411,7 @@ class StockClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomNewHighLowRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomNewHighLowRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=newHighLow, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -411,6 +422,8 @@ class StockClient(
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: NewHighLowException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "newHighLow Error: ${e.message}" }

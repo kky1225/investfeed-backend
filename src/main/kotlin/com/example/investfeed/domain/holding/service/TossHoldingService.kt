@@ -20,6 +20,10 @@ import com.example.investfeed.toss.holding.dto.res.TossHoldingItem
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class TossHoldingService(
@@ -44,7 +48,9 @@ class TossHoldingService(
 
     private data class Valuation(val curPrc: Long, val purPric: Long, val evltAmt: Long, val purAmt: Long, val dayPl: Long, val evltPl: Long, val prftRt: Double)
 
-    fun listTossHoldings(): HoldingListRes {
+    fun listTossHoldings(): HoldingListRes = runBlocking { listTossHoldingsSuspend() }
+
+    suspend fun listTossHoldingsSuspend(): HoldingListRes {
         val loginId = getLoginId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
         val memberId = getMemberId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")
 
@@ -56,9 +62,16 @@ class TossHoldingService(
 
         val accountSeq = resolveAccountSeq()
 
-        val balance = accountSeq?.let { fetchKrwBuyingPower(it) } ?: 0L
-        val balanceUsd = accountSeq?.let { fetchUsdBuyingPower(it) }
-        val items = accountSeq?.let { tossHoldingClient.getHoldings(it)?.items } ?: emptyList()
+        val (balance, balanceUsd, items) = if (accountSeq == null) {
+            Triple(0L, null, emptyList())
+        } else {
+            coroutineScope {
+                val krwDeferred = async { fetchKrwBuyingPower(accountSeq) }
+                val usdDeferred = async { fetchUsdBuyingPower(accountSeq) }
+                val itemsDeferred = async { tossHoldingClient.getHoldings(accountSeq)?.items ?: emptyList() }
+                Triple(krwDeferred.await(), usdDeferred.await(), itemsDeferred.await())
+            }
+        }
 
         val needsFx = items.any { TossSymbolMapper.isUs(it.marketCountry) } || (balanceUsd?.toDoubleOrNull() ?: 0.0) > 0.0
         val usdKrwRate = if (needsFx) fetchUsdKrwRate() else 0.0
@@ -188,12 +201,12 @@ class TossHoldingService(
         )
     }
 
-    private fun resolveAccountSeq(): Long? {
+    private suspend fun resolveAccountSeq(): Long? {
         val accounts = tossAccountClient.getAccounts()
         return (accounts.firstOrNull { it.accountType == "BROKERAGE" } ?: accounts.firstOrNull())?.accountSeq
     }
 
-    private fun fetchKrwBuyingPower(accountSeq: Long): Long {
+    private suspend fun fetchKrwBuyingPower(accountSeq: Long): Long {
         val amount = tossBuyingPowerClient.getBuyingPower(accountSeq, CURRENCY_KRW)?.result?.cashBuyingPower
         val parsed = amount?.toDoubleOrNull()
         if (parsed == null) {
@@ -203,15 +216,18 @@ class TossHoldingService(
         return parsed.toLong()
     }
 
-    private fun fetchUsdBuyingPower(accountSeq: Long): String? {
-        return runCatching {
+    private suspend fun fetchUsdBuyingPower(accountSeq: Long): String? {
+        return try {
             tossBuyingPowerClient.getBuyingPower(accountSeq, CURRENCY_USD)?.result?.cashBuyingPower
-        }.onFailure {
-            log.warn { "토스 달러 주문가능금액 조회 실패 — 표시를 생략합니다: ${it.message}" }
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "토스 달러 주문가능금액 조회 실패 — 표시를 생략합니다: ${e.message}" }
+            null
+        }
     }
 
-    private fun fetchUsdKrwRate(): Double {
+    private suspend fun fetchUsdKrwRate(): Double {
         val result = tossExchangeRateClient.getRate("USD", "KRW")?.result
         val rate = result?.midRate?.toDoubleOrNull() ?: result?.rate?.toDoubleOrNull()
         if (rate == null || rate <= 0.0) {

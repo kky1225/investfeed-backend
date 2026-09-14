@@ -12,8 +12,11 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 import org.springframework.web.reactive.function.client.toEntity
+import org.springframework.web.reactive.function.client.awaitExchangeOrNull
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
 
 @Service
 class SectClient(
@@ -27,7 +30,7 @@ class SectClient(
     private final val SECT_URL = "/api/dostk/sect"
 
     @KiwoomToken
-    fun sectInvestor(
+    suspend fun sectInvestor(
         req: KiwoomSectInvestorReq
     ): KiwoomSectInvestorRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -40,8 +43,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomSectInvestorRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomSectInvestorRes>()
 
             if (res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectInvestor, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -53,6 +55,8 @@ class SectClient(
             throw e
         }catch (e: SectInvestorException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectInvestor Error" }
 
@@ -61,7 +65,7 @@ class SectClient(
     }
 
     @KiwoomToken
-    fun sectPriceNow(
+    suspend fun sectPriceNow(
         req: KiwoomSectPriceNowReq
     ): KiwoomSectPriceNowRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -72,14 +76,13 @@ class SectClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka20001")
                 .bodyValue(req)
-                .exchangeToMono { res ->
+                .awaitExchangeOrNull<KiwoomSectPriceNowRes> { res ->
                     if (res.statusCode().isError) {
                         throw KiwoomApiException()
                     }
 
-                    res.bodyToMono<KiwoomSectPriceNowRes>()
+                    res.awaitBodyOrNull<KiwoomSectPriceNowRes>()
                 }
-                .block()
 
             log.info { "sectNowPriceRes $res" }
 
@@ -93,6 +96,8 @@ class SectClient(
             throw e
         } catch (e: SectPriceNowException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "sectNowPrice Error" }
 
@@ -101,7 +106,7 @@ class SectClient(
     }
 
     @KiwoomToken
-    fun sectPrice(
+    suspend fun sectPrice(
         req: KiwoomSectPriceReq
     ): KiwoomSectPriceRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -123,8 +128,7 @@ class SectClient(
                     .bodyValue(req)
                     .retrieve()
                     .onStatus({ t -> t.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                    .toEntity<KiwoomSectPriceRes>()
-                    .block()
+                    .toEntity<KiwoomSectPriceRes>().awaitSingleOrNull()
 
                 if (entity?.body?.return_code != 0) {
                     log.error { "키움 API 응답 오류: api=sectPrice, return_code=${entity?.body?.return_code}, return_msg=${entity?.body?.return_msg}, req=$req" }
@@ -143,7 +147,6 @@ class SectClient(
                     break;
                 }
 
-                Thread.sleep(100)
             }
 
             return KiwoomSectPriceRes(
@@ -155,6 +158,8 @@ class SectClient(
             throw e
         }catch (e: SectPriceException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectPrice Error" }
 
@@ -163,7 +168,7 @@ class SectClient(
     }
 
     @KiwoomToken
-    fun sectIndexList(
+    suspend fun sectIndexList(
         req: KiwoomSectIndexReq
     ): KiwoomSectIndexRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -176,8 +181,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomSectIndexRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomSectIndexRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectIndexList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -189,6 +193,8 @@ class SectClient(
             throw e
         }catch (e: SectIndexListException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         }catch (e: Exception) {
             log.warn { "sectIndexList Error" }
 
@@ -197,7 +203,7 @@ class SectClient(
     }
 
     @KiwoomToken
-    fun sectIndexDailyList(
+    suspend fun sectIndexDailyList(
         req: KiwoomSectIndexDailyReq
     ): KiwoomSectIndexDailyRes {
         val accessToken = authClient.getCurrentAccessToken()
@@ -210,8 +216,7 @@ class SectClient(
                 .bodyValue(req)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .bodyToMono<KiwoomSectIndexDailyRes>()
-                .block()
+                .awaitBodyOrNull<KiwoomSectIndexDailyRes>()
 
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectIndexDailyList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
@@ -222,6 +227,8 @@ class SectClient(
         }catch (e: KiwoomApiException) {
             throw e
         }catch (e: SectIndexDailyListException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
             log.warn { "sectIndexDailyList Error" }

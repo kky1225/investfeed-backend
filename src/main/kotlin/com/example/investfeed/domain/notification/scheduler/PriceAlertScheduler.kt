@@ -25,6 +25,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import kotlinx.coroutines.runBlocking
 
 @Component
 class PriceAlertScheduler(
@@ -131,7 +132,7 @@ class PriceAlertScheduler(
         val uniqueStkCds = memberStocks.map { it.stkCd }.distinct()
         val stkCdParam = uniqueStkCds.joinToString("|")
 
-        val kiwoomStockInterestRes = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+        val kiwoomStockInterestRes = runBlocking { stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam)) }
         val stockDataMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: return emptyMap()
 
         val memberStockSet = mutableSetOf<Pair<Long, String>>()
@@ -170,13 +171,12 @@ class PriceAlertScheduler(
             }
         }
 
-        // 250일 신고가/신저가 체크 (ka10016)
         try {
-            val newHighRes = stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "1"))
+            val newHighRes = runBlocking { stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "1")) }
             val newHighCodes = newHighRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
             log.info { "250일 신고가 종목 수: ${newHighCodes.size}, 종목: ${newHighCodes.take(10)}" }
 
-            val newLowRes = stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "2"))
+            val newLowRes = runBlocking { stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "2")) }
             val newLowCodes = newLowRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
             log.info { "250일 신저가 종목 수: ${newLowCodes.size}, 종목: ${newLowCodes.take(10)}" }
 
@@ -301,7 +301,7 @@ class PriceAlertScheduler(
         val additionalMap = if (missingCodes.isNotEmpty()) {
             try {
                 val stkCdParam = missingCodes.joinToString("|")
-                val res = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam))
+                val res = runBlocking { stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam)) }
                 res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
             } catch (e: Exception) {
                 log.warn { "목표가 주식 현재가 조회 실패: ${e.message}" }

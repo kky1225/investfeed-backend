@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
 
 @Service
 class CommodityService(
@@ -34,20 +36,20 @@ class CommodityService(
         val commodityList: MutableList<CommodityListItem> = mutableListOf()
 
         commodityTypeList.forEach { it ->
-            val kiwoomGoldPriceNowRes = priceClient.goldPriceNow(
+            val kiwoomGoldPriceNowRes = runBlocking { priceClient.goldPriceNow(
                 req = KiwoomGoldPriceNowReq(
                     stk_cd = it.stkCd
                 )
-            )
+            ) }
 
             if (kiwoomGoldPriceNowRes.return_code == 0) {
                 var chartMinuteList: List<ChartMinute> = mutableListOf()
-                val kiwoomGoldChartMinuteRes = goldChartClient.goldChartMinuteList(
+                val kiwoomGoldChartMinuteRes = runBlocking { goldChartClient.goldChartMinuteList(
                     req = KiwoomGoldChartMinuteReq(
                         stk_cd = it.stkCd,
                         tic_scope = "1"
                     )
-                )
+                ) }
 
                 if (kiwoomGoldChartMinuteRes.return_code == 0) {
                     chartMinuteList = kiwoomGoldChartMinuteRes.gds_min_chart_qry?.map {
@@ -85,23 +87,18 @@ class CommodityService(
     fun getCommodity(
         stkCd: String,
         req: CommodityDetailReq
-    ): CommodityDetailRes {
-        val kiwoomStockDefaultInfoRes = stockClient.stockDefaultInfo(
-            req = KiwoomDefaultStockInfoReq(
-                stk_cd = stkCd
-            )
-        )
-        val kiwoomStockInfoRes = stockClient.stockInfo(
-            req = KiwoomStockInfoReq(
-                stk_cd = stkCd
-            )
-        )
-        val kiwoomStockTradeInfoRes = priceClient.stockTradeInfo(
-            req = KiwoomStockTradeInfoReq(
-                stk_cd = stkCd,
-            )
-        )
-        val kiwoomGoldInvestorRes = investorClient.goldInvestor()
+    ): CommodityDetailRes = runBlocking {
+        val baseDt = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val defaultInfoDeferred = async { stockClient.stockDefaultInfo(req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)) }
+        val infoDeferred = async { stockClient.stockInfo(req = KiwoomStockInfoReq(stk_cd = stkCd)) }
+        val tradeInfoDeferred = async { priceClient.stockTradeInfo(req = KiwoomStockTradeInfoReq(stk_cd = stkCd)) }
+        val goldInvestorDeferred = async { investorClient.goldInvestor() }
+        val chartDeferred = async { fetchCommodityChartList(stkCd, req.chartType, baseDt) }
+
+        val kiwoomStockDefaultInfoRes = defaultInfoDeferred.await()
+        val kiwoomStockInfoRes = infoDeferred.await()
+        val kiwoomStockTradeInfoRes = tradeInfoDeferred.await()
+        val kiwoomGoldInvestorRes = goldInvestorDeferred.await()
 
         var commodityInfo: CommodityInfo? = null
         if (kiwoomStockDefaultInfoRes.return_code == 0 && kiwoomStockTradeInfoRes.return_code == 0 && kiwoomGoldInvestorRes.return_code == 0) {
@@ -130,10 +127,18 @@ class CommodityService(
             )
         }
 
-        val chartListRes: MutableList<CommodityChart> = mutableListOf()
-        val baseDt = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val chartListRes = chartDeferred.await()
 
-        when(req.chartType) {
+        CommodityDetailRes(
+            commodityInfo = commodityInfo,
+            commodityChartList = chartListRes
+        )
+    }
+
+    private suspend fun fetchCommodityChartList(stkCd: String, chartType: CommodityChartType, baseDt: String): List<CommodityChart> {
+        val chartListRes: MutableList<CommodityChart> = mutableListOf()
+
+        when(chartType) {
             CommodityChartType.DAY -> {
                 val kiwoomGoldChartDayRes = goldChartClient.goldChartDayList(
                     req = KiwoomGoldChartDayReq(
@@ -210,7 +215,7 @@ class CommodityService(
                 }
             }
             else -> {
-                val kiwoomGoldChartMinuteRes = req.chartType.value?.let {
+                val kiwoomGoldChartMinuteRes = chartType.value?.let {
                     goldChartClient.goldChartMinuteList(
                         req = KiwoomGoldChartMinuteReq(
                             stk_cd = stkCd,
@@ -238,10 +243,7 @@ class CommodityService(
             }
         }
 
-        return CommodityDetailRes(
-            commodityInfo = commodityInfo,
-            commodityChartList = chartListRes
-        )
+        return chartListRes
     }
 
     fun time(

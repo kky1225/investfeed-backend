@@ -84,3 +84,19 @@ fred:
 
 fear-greed:
   default-url: https://api.alternative.me
+
+# 외부 API 호출 간격 제한 ms
+external-api:
+  rate-limit:
+    kiwoom-interval-ms: 200          # 공식: TR당 토큰별 초당 5건
+    kiwoom-mock-interval-ms: 1000    # 공식: 모의투자 초당 1건
+    kiwoom-per-token-interval-ms: 0  # 1701(전체 한도) 발생 시 조정용 예비
+    fred-interval-ms: 500            # 공식: 분당 120건 (API 키 전체)
+    upbit-interval-ms: 100           # 공식: IP당 그룹별 초당 10회
+    toss-account-interval-ms: 1000   # 공식: ACCOUNT 그룹 초당 1회
+    toss-asset-interval-ms: 200      # 공식: ASSET 그룹 초당 5회
+    toss-market-info-interval-ms: 334 # 공식: MARKET_INFO 그룹 초당 3회
+    toss-auth-interval-ms: 200       # 공식: AUTH 그룹 초당 5회
+    log-delays-over-ms: 0            # 이 값 초과 대기 시 debug 로그 (0=끔)
+    toss-429-max-retry: 3            # 토스 429 수신 시 Retry-After(없으면 1s→2s→4s+jitter) 대기 후 재시도 횟수
+
