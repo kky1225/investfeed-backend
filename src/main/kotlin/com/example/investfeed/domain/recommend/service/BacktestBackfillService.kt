@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.recommend.service
 
+import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartDay
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
@@ -19,6 +20,9 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
+import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.cancellation.CancellationException
+import com.example.investfeed.global.coroutine.mapConcurrently
 
 @Service
 class BacktestBackfillService(
@@ -33,9 +37,9 @@ class BacktestBackfillService(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        private const val API_PACING_MS = 200L
         private val YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val MARKET_CLOSED_AT: LocalTime = LocalTime.of(22, 30)
+        private const val BACKFILL_CONCURRENCY = 8
     }
 
     @Scheduled(cron = SchedulerCron.BACKTEST_BACKFILL, scheduler = "slowScheduler")
@@ -54,14 +58,14 @@ class BacktestBackfillService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doBackfill()
+                runBlocking { doBackfill() }
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private fun doBackfill() {
+    private suspend fun doBackfill() {
         val lastClosed = lastClosedTradingDay()
         val lastClosedKey = lastClosed.format(YYYYMMDD)
 
@@ -96,60 +100,73 @@ class BacktestBackfillService(
         log.info { "BacktestBackfill 시작 — 대상 history=${targets.size} (마지막 마감 거래일=$lastClosed)" }
 
         val byStock = targets.groupBy { it.stkCd }
-        val changed = mutableListOf<StockPickHistory>()
-        var filled = 0
 
-        for ((stkCd, list) in byStock) {
-            try {
-                Thread.sleep(API_PACING_MS)
-                val res = stockChartClient.chartDayList(
-                    req = KiwoomStockChartDayReq(
-                        stk_cd = stkCd,
-                        base_dt = lastClosedKey,
-                        upd_stkpc_tp = "1",
-                    )
-                )
-                if (res.return_code != 0) {
-                    log.warn { "chartDayList 실패 stkCd=$stkCd return_code=${res.return_code}" }
-                    continue
-                }
-                val rowByDt = (res.stk_dt_pole_chart_qry ?: emptyList()).associateBy { it.dt }
-
-                for (history in list) {
-                    val (ref1d, ref5d, ref20d) = refsByPickDay.getValue(history.pickDate.toLocalDate())
-                    var touched = false
-
-                    if ((history.priceOpen1d == null || history.priceClose1d == null) && ref1d <= lastClosed) {
-                        rowByDt[ref1d.format(YYYYMMDD)]?.let { row ->
-                            row.open_pric?.toLongOrNull()?.let { history.priceOpen1d = abs(it) }
-                            row.cur_prc?.toLongOrNull()?.let { history.priceClose1d = abs(it) }
-                            touched = true
-                        }
-                    }
-                    if (history.priceClose5d == null && ref5d <= lastClosed) {
-                        rowByDt[ref5d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
-                            history.priceClose5d = abs(it)
-                            touched = true
-                        }
-                    }
-                    if (history.priceClose20d == null && ref20d <= lastClosed) {
-                        rowByDt[ref20d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
-                            history.priceClose20d = abs(it)
-                            touched = true
-                        }
-                    }
-                    if (touched) {
-                        changed += history
-                        filled++
-                    }
-                }
-            } catch (e: Exception) {
-                log.warn(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
-            }
-        }
+        val changed = byStock.entries.toList()
+            .mapConcurrently(BACKFILL_CONCURRENCY) { (stkCd, list) -> backfillStock(stkCd, list, refsByPickDay, lastClosed, lastClosedKey) }
+            .flatten()
 
         stockPickHistoryRepository.saveAll(changed)
-        log.info { "BacktestBackfill 완료 — 채움=$filled / 대상=${targets.size}" }
+        log.info { "BacktestBackfill 완료 — 채움=${changed.size} / 대상=${targets.size}" }
+    }
+
+    private suspend fun backfillStock(
+        stkCd: String,
+        list: List<StockPickHistory>,
+        refsByPickDay: Map<LocalDate, Triple<LocalDate, LocalDate, LocalDate>>,
+        lastClosed: LocalDate,
+        lastClosedKey: String,
+    ): List<StockPickHistory> {
+        return try {
+            val res = stockChartClient.chartDayList(
+                req = KiwoomStockChartDayReq(
+                    stk_cd = stkCd,
+                    base_dt = lastClosedKey,
+                    upd_stkpc_tp = "1",
+                )
+            )
+            if (res.return_code != 0) {
+                log.warn { "chartDayList 실패 stkCd=$stkCd return_code=${res.return_code}" }
+                return emptyList()
+            }
+            val rowByDt = (res.stk_dt_pole_chart_qry ?: emptyList()).associateBy { it.dt }
+            list.filter { history -> fillHistory(history, rowByDt, refsByPickDay.getValue(history.pickDate.toLocalDate()), lastClosed) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
+            emptyList()
+        }
+    }
+
+    private fun fillHistory(
+        history: StockPickHistory,
+        rowByDt: Map<String?, KiwoomStockChartDay>,
+        refs: Triple<LocalDate, LocalDate, LocalDate>,
+        lastClosed: LocalDate,
+    ): Boolean {
+        val (ref1d, ref5d, ref20d) = refs
+        var touched = false
+
+        if ((history.priceOpen1d == null || history.priceClose1d == null) && ref1d <= lastClosed) {
+            rowByDt[ref1d.format(YYYYMMDD)]?.let { row ->
+                row.open_pric?.toLongOrNull()?.let { history.priceOpen1d = abs(it) }
+                row.cur_prc?.toLongOrNull()?.let { history.priceClose1d = abs(it) }
+                touched = true
+            }
+        }
+        if (history.priceClose5d == null && ref5d <= lastClosed) {
+            rowByDt[ref5d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
+                history.priceClose5d = abs(it)
+                touched = true
+            }
+        }
+        if (history.priceClose20d == null && ref20d <= lastClosed) {
+            rowByDt[ref20d.format(YYYYMMDD)]?.cur_prc?.toLongOrNull()?.let {
+                history.priceClose20d = abs(it)
+                touched = true
+            }
+        }
+        return touched
     }
 
     private fun lastClosedTradingDay(): LocalDate {
