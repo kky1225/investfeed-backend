@@ -39,9 +39,8 @@ interface StockPickHistoryRepository : JpaRepository<StockPickHistory, Long> {
                SUM(CASE WHEN h.priceClose5d IS NOT NULL THEN 1L ELSE 0L END) AS filled5d,
                SUM(CASE WHEN h.priceClose20d IS NOT NULL THEN 1L ELSE 0L END) AS filled20d
         FROM StockPickHistory h
-        WHERE h.pickDate >= :after
         GROUP BY CAST(h.pickDate AS LocalDate)
         ORDER BY CAST(h.pickDate AS LocalDate) DESC
     """)
-    fun aggregateBackfillStatusAfter(after: LocalDateTime): List<Array<Any>>
+    fun aggregateBackfillStatus(): List<Array<Any>>
 }

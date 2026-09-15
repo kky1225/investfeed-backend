@@ -56,14 +56,12 @@ class AdminRecommendMonitoringController(
 
     @GetMapping("/backfill-status")
     @RequiresAction(action = Actions.READ)
-    fun listBackfillStatus(
-        @RequestParam(defaultValue = "25") days: Int,
-    ): ResponseEntity<ApiResponse<List<AdminBackfillStatusRes>>> {
+    fun listBackfillStatus(): ResponseEntity<ApiResponse<List<AdminBackfillStatusRes>>> {
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.ADMIN_RECOMMEND_BACKFILL_STATUS.code,
                 message = ResponseCode.ADMIN_RECOMMEND_BACKFILL_STATUS.message,
-                result = adminRecommendMonitoringService.listBackfillStatus(days),
+                result = adminRecommendMonitoringService.listBackfillStatus(),
             ), HttpStatus.OK
         )
     }
@@ -71,7 +69,7 @@ class AdminRecommendMonitoringController(
     @GetMapping("/metrics")
     @RequiresAction(action = Actions.READ)
     fun computeMetrics(
-        @RequestParam(defaultValue = "30") periodDays: Int,
+        @RequestParam(required = false) periodDays: Int?,
     ): ResponseEntity<ApiResponse<AdminBacktestMetricsRes>> {
         return ResponseEntity(
             ApiResponse(

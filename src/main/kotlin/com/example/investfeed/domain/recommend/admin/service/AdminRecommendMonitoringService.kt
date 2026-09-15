@@ -143,9 +143,8 @@ class AdminRecommendMonitoringService(
 
     // ─── 3. Operational Health (백필 진행도) ──────────────────────────────
 
-    fun listBackfillStatus(days: Int = 25): List<AdminBackfillStatusRes> {
-        val after = LocalDate.now().minusDays(days.toLong()).atStartOfDay()
-        return stockPickHistoryRepository.aggregateBackfillStatusAfter(after).map { row ->
+    fun listBackfillStatus(): List<AdminBackfillStatusRes> {
+        return stockPickHistoryRepository.aggregateBackfillStatus().map { row ->
             AdminBackfillStatusRes(
                 pickDate = row[0] as LocalDate,
                 totalCount = (row[1] as Number).toLong(),
@@ -170,12 +169,14 @@ class AdminRecommendMonitoringService(
      *   - SELL 진영 (originSide="SELL"): ret < 0 비율 (하락 = 매도 성공)
      *   - 진영 정보 없으면 ret > 0 비율 (default BUY 가정)
      */
-    fun computeMetrics(periodDays: Int): AdminBacktestMetricsRes {
-        val after = LocalDate.now().minusDays(periodDays.toLong()).atStartOfDay()
-        val histories = stockPickHistoryRepository.findByPickDateBetween(
-            after,
-            LocalDate.now().atTime(23, 59, 59),
-        )
+    fun computeMetrics(periodDays: Int?): AdminBacktestMetricsRes {
+        // periodDays 미지정 = 전체 기간
+        val histories = periodDays?.let {
+            stockPickHistoryRepository.findByPickDateBetween(
+                LocalDate.now().minusDays(it.toLong()).atStartOfDay(),
+                LocalDate.now().atTime(23, 59, 59),
+            )
+        } ?: stockPickHistoryRepository.findAll()
 
         val total = histories.size
 
@@ -353,7 +354,7 @@ class AdminRecommendMonitoringService(
         return date
     }
 
-    private fun emptyMetrics(periodDays: Int, total: Int, reason: String) = AdminBacktestMetricsRes(
+    private fun emptyMetrics(periodDays: Int?, total: Int, reason: String) = AdminBacktestMetricsRes(
         periodDays = periodDays,
         totalSignals = total,
         insufficientReason = reason,
