@@ -11,6 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
@@ -77,6 +79,11 @@ class HolidayService(
         }
         log.warn { "nextTradingDay: 60일 내 거래일을 찾지 못함 (from=$from) — 마지막 후보 반환: $candidate" }
         return candidate
+    }
+
+    fun lastClosedTradingDay(now: LocalDateTime = LocalDateTime.now(), closedAt: LocalTime = LocalTime.of(16, 0)): LocalDate {
+        val today = now.toLocalDate()
+        return if (!isHoliday(today) && !now.toLocalTime().isBefore(closedAt)) today else lastTradingDay(today.minusDays(1))
     }
 
     fun lastTradingDay(from: LocalDate = LocalDate.now()): LocalDate {

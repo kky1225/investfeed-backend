@@ -152,8 +152,8 @@ class HoldingGradeService(
                     HeldStock(stkCd = stkCd, stkNm = h.stk_nm ?: stkCd)
                 }
         } catch (e: Exception) {
-            log.error(e) { "HoldingGradeScheduler: 모의계좌 보유 조회 실패 — 빈 리스트로 진행" }
-            emptyList()
+            log.error(e) { "HoldingGradeScheduler: 모의계좌 보유 조회 실패 — 평가 중단(FAILED), 익일 매매 보류" }
+            throw e
         }
     }
 

@@ -31,4 +31,11 @@ object SchedulerCron {
     const val INDEX_INVESTOR_DAILY = "0 0 7 * * *"
     const val API_KEY_EXPIRY = "0 0 9 * * *"
     const val STOCK_DIVIDEND = "0 30 13 * * *"
+
+    // ── AI 비서 브리핑 (귀속일은 BriefingService 의 직전 마감 세션 규칙) ──
+    const val BRIEFING_KR_PRE = "0 0 7 * * *"
+    const val BRIEFING_KR_CLOSE = "0 5 16 * * MON-FRI"    // 마감 데이터 정리 여유 + 매크로 수집(16:00)과 분리
+    const val BRIEFING_KR_HOLDINGS = "0 5 20 * * MON-FRI"    // 애프터마켓 종료(20:00) 후 국내 계좌 마감
+    const val BRIEFING_US_CLOSE = "0 * 2-7 * * TUE-SAT"   // 매분 판정, NYSE 마감(KST)+10분에 1회
+    const val BRIEFING_COIN_DAILY = "0 5 9 * * *"           // 업비트 일봉 09:00 마감 후
 }

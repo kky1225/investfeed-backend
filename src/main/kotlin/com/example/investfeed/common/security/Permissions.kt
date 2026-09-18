@@ -120,6 +120,9 @@ object Permissions {
     /** 알림 조회/설정 */
     const val NOTIFICATION = "NOTIFICATION"
 
+    /** AI 비서 타임라인·설정·비서 토큰 */
+    const val ASSISTANT = "ASSISTANT"
+
     // ─── 공용/기타 ────────────────────────────────────────────────────────────
     /** 경제 캘린더 조회 */
     const val CALENDAR_VIEW = "CALENDAR_VIEW"

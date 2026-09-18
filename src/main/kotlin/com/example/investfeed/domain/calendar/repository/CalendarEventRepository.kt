@@ -4,6 +4,7 @@ import com.example.investfeed.domain.calendar.entity.CalendarEventEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import java.time.LocalDate
 
 interface CalendarEventRepository : JpaRepository<CalendarEventEntity, Long> {
     fun findByYearAndMonth(year: Int, month: Int): List<CalendarEventEntity>
@@ -17,4 +18,6 @@ interface CalendarEventRepository : JpaRepository<CalendarEventEntity, Long> {
     fun deleteApiEventsByYearAndMonth(year: Int, month: Int)
 
     fun findByYearAndMonthAndTypeIn(year: Int, month: Int, types: Collection<String>): List<CalendarEventEntity>
+
+    fun findByCountryAndTypeAndEventDateBetween(country: String, type: String, start: LocalDate, end: LocalDate): List<CalendarEventEntity>
 }

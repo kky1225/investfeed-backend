@@ -14,6 +14,7 @@ class WebMvcConfig(
             .addPathPatterns(SecurityPaths.API_PATTERN)
             .excludePathPatterns(
                 SecurityPaths.AUTH_PATTERN,
+                SecurityPaths.ASSISTANT_JWKS_PATTERN,
             )
     }
 }

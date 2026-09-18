@@ -100,3 +100,8 @@ external-api:
     log-delays-over-ms: 0            # 이 값 초과 대기 시 debug 로그 (0=끔)
     toss-429-max-retry: 3            # 토스 429 수신 시 Retry-After(없으면 1s→2s→4s+jitter) 대기 후 재시도 횟수
 
+assistant:
+  jwt:
+    kid: ${ASSISTANT_JWT_KID}
+    private-key: ${ASSISTANT_JWT_PRIVATE_KEY}
+    expiration-seconds: 300

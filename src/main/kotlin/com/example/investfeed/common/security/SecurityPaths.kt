@@ -23,6 +23,13 @@ object SecurityPaths {
     // WebSocket — 권한 검증 대상 외 (Spring Security permitAll 만 적용).
     const val WS_PATTERN = "/ws/**"
 
+    // AI 비서 JWKS (공개키) — 인증·권한 검증 없음. Python 이 비서 토큰 검증용으로 읽는다.
+    const val ASSISTANT_JWKS_PREFIX = "/api/assistant/.well-known/"
+    const val ASSISTANT_JWKS_PATTERN = "/api/assistant/.well-known/**"
+
+    // 서비스 간 내부 API — 쿠키 JWT·2차 인증·PermissionInterceptor 제외. ServiceTokenFilter(비서 토큰 RS256) 가 단독 게이트.
+    const val INTERNAL_PATTERN = "/internal/**"
+
     //
     // 인증 후에만 허용되는 auth sub-path 목록.
     // 비밀번호 변경/프로필/API 키 관리/2차 인증 관리/admin sub-path.
@@ -42,5 +49,6 @@ object SecurityPaths {
     //
     val PERMISSION_EXCLUDED_PREFIXES = listOf(
         AUTH_PREFIX,
+        ASSISTANT_JWKS_PREFIX,
     )
 }

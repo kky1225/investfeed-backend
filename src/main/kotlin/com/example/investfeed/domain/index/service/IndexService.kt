@@ -231,6 +231,40 @@ class IndexService(
         )
     }
 
+    fun getIndexInfo(indsCd: String): IndexInfo = runBlocking {
+        val priceNowDeferred = async { sectClient.sectPriceNow(req = KiwoomSectPriceNowReq(mrkt_tp = "0", inds_cd = indsCd)) }
+        val investorDeferred = async {
+            sectClient.sectInvestor(
+                req = KiwoomSectInvestorReq(mrkt_tp = if (indsCd == "101" || indsCd == "150") "1" else "0", amt_qty_tp = "0", stex_tp = "3")
+            )
+        }
+        val priceNow = priceNowDeferred.await()
+        val investor = investorDeferred.await().inds_netprps?.find { it.inds_cd.replace("_AL", "") == indsCd }
+
+        IndexInfo(
+            indsCd = indsCd,
+            indsNm = IndexType.entries.find { it.indsCd == indsCd }?.indsNm,
+            curPrc = priceNow.cur_prc,
+            predPreSig = priceNow.pred_pre_sig,
+            predPre = priceNow.pred_pre,
+            fluRt = priceNow.flu_rt,
+            trdeQty = priceNow.trde_qty,
+            trdePrica = priceNow.trde_prica,
+            highPric = priceNow.high_pric,
+            openPric = priceNow.open_pric,
+            lowPric = priceNow.low_pric,
+            _250hgst = priceNow._52wk_hgst_pric,
+            _250lwst = priceNow._52wk_lwst_pric,
+            tmN = priceNow.inds_cur_prc_tm?.get(0)?.tm_n,
+            indNetprps = investor?.ind_netprps,
+            frgnrNetprps = investor?.frgnr_netprps,
+            orgnNetprps = investor?.orgn_netprps,
+            dfrtTrdeNetprps = null,
+            ndiffproTrdeNetprps = null,
+            allNetprps = null,
+        )
+    }
+
     /** 차트 종류별 업종 차트 TR 1건 조회 후 공통 응답으로 변환. */
     private suspend fun fetchIndexChartList(indsCd: String, chartType: IndexChartType): List<IndexChart> {
         val chartList: MutableList<IndexChart> = mutableListOf()

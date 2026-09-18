@@ -169,14 +169,7 @@ class BacktestBackfillService(
         return touched
     }
 
-    private fun lastClosedTradingDay(): LocalDate {
-        val today = LocalDate.now()
-        return if (!holidayService.isHoliday(today) && LocalTime.now() >= MARKET_CLOSED_AT) {
-            today
-        } else {
-            holidayService.lastTradingDay(today.minusDays(1))
-        }
-    }
+    private fun lastClosedTradingDay(): LocalDate = holidayService.lastClosedTradingDay(closedAt = MARKET_CLOSED_AT)
 
     private fun nthTradingDayAfter(from: LocalDate, n: Int): LocalDate {
         var date = from

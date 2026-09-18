@@ -10,6 +10,7 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
+import com.example.investfeed.domain.assistant.scheduler.BriefingScheduler
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.papertrade.service.HoldingGradeService
 import com.example.investfeed.domain.papertrade.service.PaperTradeExecutionService
@@ -46,6 +47,7 @@ class ManualTriggerService(
     private val holdingGradeService: HoldingGradeService,
     private val paperTradeExecutionService: PaperTradeExecutionService,
     private val indexService: IndexService,
+    private val briefingScheduler: BriefingScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -69,6 +71,11 @@ class ManualTriggerService(
             "PaperTradeExecScheduler"      to { paperTradeExecutionService.runPaperTradeExec() },
             "PaperTradeSecondBuyScheduler" to { paperTradeExecutionService.runSecondPhaseBuys() },
             "IndexDailyCloseScheduler"     to { indexService.runCollectIndexClose() },
+            "BriefingUsCloseScheduler"     to { briefingScheduler.triggerUsClose() },
+            "BriefingKrPreScheduler"       to { briefingScheduler.triggerKrPre() },
+            "BriefingCoinDailyScheduler"   to { briefingScheduler.triggerCoinDaily() },
+            "BriefingKrCloseScheduler"     to { briefingScheduler.triggerKrClose() },
+            "BriefingKrHoldingsScheduler"  to { briefingScheduler.triggerKrHoldings() },
         )
     }
 

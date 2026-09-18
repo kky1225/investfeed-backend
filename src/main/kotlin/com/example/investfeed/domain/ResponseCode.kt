@@ -238,4 +238,12 @@ enum class ResponseCode(
     MONITORING_ACK_HISTORY(message = "확인 이력 조회에 성공하셨습니다."),
     MONITORING_REDIS_INVALIDATE(message = "Redis 캐시 무효화에 성공하셨습니다."),
 
+    ASSISTANT_TIMELINE_LIST(message = "비서 타임라인 조회에 성공하셨습니다."),
+    ASSISTANT_UNREAD_COUNT(message = "비서 미확인 메시지 수 조회에 성공하셨습니다."),
+    ASSISTANT_READ_MARKER_UPDATE(message = "비서 메시지 확인 처리에 성공하셨습니다."),
+    ASSISTANT_SETTING_GET(message = "비서 설정 조회에 성공하셨습니다."),
+    ASSISTANT_SETTING_UPDATE(message = "비서 설정 저장에 성공하셨습니다."),
+    ASSISTANT_TOKEN_ISSUE(message = "비서 토큰 발급에 성공하셨습니다."),
+    ASSISTANT_TOOL_RESULT(message = "비서 도구 조회에 성공하셨습니다."),
+
 }

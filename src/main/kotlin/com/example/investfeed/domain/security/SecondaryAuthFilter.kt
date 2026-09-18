@@ -31,7 +31,8 @@ class SecondaryAuthFilter(
         "/api/stock/realized-pnl/",     // 주식 실현손익
         "/api/crypto/realized-pnl/",    // 코인 실현손익
         "/api/goals/",                  // 투자 목표
-        "/api/rebalancing/"             // 리밸런싱
+        "/api/rebalancing/",            // 리밸런싱
+        "/api/assistant/secure/"        // AI 비서 개인 파트·비서 토큰 (시장 파트는 로그인만)
     )
 
     override fun doFilterInternal(

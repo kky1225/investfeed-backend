@@ -30,6 +30,7 @@ class SecurityConfig(
     private val allowedOrigins: String,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val secondaryAuthFilter: SecondaryAuthFilter,
+    private val serviceTokenFilter: com.example.investfeed.internal.assistant.ServiceTokenFilter,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -49,6 +50,8 @@ class SecurityConfig(
                     .requestMatchers(*SecurityPaths.AUTH_AUTHENTICATED_PATTERNS).authenticated()
                     .requestMatchers(SecurityPaths.AUTH_PATTERN).permitAll()
                     .requestMatchers(SecurityPaths.WS_PATTERN).permitAll()
+                    .requestMatchers(SecurityPaths.ASSISTANT_JWKS_PATTERN).permitAll()
+                    .requestMatchers(SecurityPaths.INTERNAL_PATTERN).permitAll()   // ServiceTokenFilter 가 401 처리
                     .anyRequest().authenticated()
             }
             .exceptionHandling { ex ->
@@ -73,6 +76,7 @@ class SecurityConfig(
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .addFilterAfter(secondaryAuthFilter, JwtAuthenticationFilter::class.java)
+            .addFilterBefore(serviceTokenFilter, JwtAuthenticationFilter::class.java)
 
         return http.build()
     }

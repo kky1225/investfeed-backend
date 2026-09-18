@@ -54,6 +54,7 @@ class NaverMarketIndexCrawler(
             MarketIndexType.SP500 to "/index/.INX/basic",
             MarketIndexType.VIX to "/index/.VIX/basic",
             MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "/index/.SOX/basic",
+            MarketIndexType.DOW to "/index/.DJI/basic",
         )
 
         private val DOMESTIC_INDEX_PATHS = mapOf(
@@ -63,6 +64,11 @@ class NaverMarketIndexCrawler(
 
         private val EXCHANGE_PATHS = mapOf(
             MarketIndexType.USD_KRW to "/marketindex/exchange/FX_USDKRW",
+        )
+
+        private val BOND_PATHS = mapOf(
+            MarketIndexType.US_TREASURY_2Y to "/marketindex/bond/US2YT=RR",
+            MarketIndexType.US_TREASURY_10Y to "/marketindex/bond/US10YT=RR",
         )
 
         private val POLLING_PATHS = mapOf(
@@ -89,6 +95,7 @@ class NaverMarketIndexCrawler(
         result.addAll(fetchAll(worldApis + domesticApis) { type, body -> parseJsonIndex(type, body, now) })
         result.addAll(fetchAll(EXCHANGE_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseExchangeDetail(type, body, now) })
         result.addAll(fetchAll(POLLING_PATHS.map { (type, path) -> type to "$naverPcUrl$path" }) { type, body -> parsePollingIndex(type, body, now) })
+        result.addAll(fetchAll(BOND_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseBondDetail(type, body, now) })
 
         return result
     }
@@ -130,6 +137,16 @@ class NaverMarketIndexCrawler(
     private fun parseExchangeDetail(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
         val root = objectMapper.readTree(body)
         val data = root.get("exchangeInfo") ?: throw MarketIndexResponseException()
+        return parseExchangeNode(type, data, now)
+    }
+
+    private fun parseBondDetail(type: MarketIndexType, body: String, now: LocalDateTime): MarketIndexRes {
+        val root = objectMapper.readTree(body) ?: throw MarketIndexResponseException()
+        if (root.get("closePrice") == null) throw MarketIndexResponseException()
+        return parseExchangeNode(type, root, now)
+    }
+
+    private fun parseExchangeNode(type: MarketIndexType, data: JsonNode, now: LocalDateTime): MarketIndexRes {
 
         val price = data.textOrNull("closePrice") ?: ""
         val changeAmount = data.textOrNull("fluctuations") ?: ""
