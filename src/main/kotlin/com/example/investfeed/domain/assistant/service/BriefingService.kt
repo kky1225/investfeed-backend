@@ -103,9 +103,9 @@ class BriefingService(
     private fun compose(sheet: MarketFactSheet, personal: PersonalFactSheet?): Pair<Headline, BriefingTemplateRenderer.Rendered> = when (sheet) {
         is KrCloseFactSheet -> HeadlineSelector.selectKrClose(sheet) to BriefingTemplateRenderer.renderKrClose(sheet)
         is KrPreFactSheet -> HeadlineSelector.selectKrPre(sheet) to BriefingTemplateRenderer.renderKrPre(sheet)
-        is UsCloseFactSheet -> HeadlineSelector.selectUsClose(sheet, personal) to BriefingTemplateRenderer.renderUsClose(sheet, personal)
-        is CoinDailyFactSheet -> HeadlineSelector.selectCoinDaily(sheet, personal) to BriefingTemplateRenderer.renderCoinDaily(sheet, personal)
-        is KrHoldingsFactSheet -> HeadlineSelector.selectKrHoldings(personal) to BriefingTemplateRenderer.renderKrHoldings(personal)
+        is UsCloseFactSheet -> HeadlineSelector.selectUsClose(sheet) to BriefingTemplateRenderer.renderUsClose(sheet, personal)
+        is CoinDailyFactSheet -> HeadlineSelector.selectCoinDaily(sheet) to BriefingTemplateRenderer.renderCoinDaily(sheet, personal)
+        is KrHoldingsFactSheet -> HeadlineSelector.selectKrHoldings() to BriefingTemplateRenderer.renderKrHoldings(personal)
     }
 
     private fun generateShared(type: BriefingType, date: LocalDate, asOf: LocalDateTime): AssistantBriefing {
