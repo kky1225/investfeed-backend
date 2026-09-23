@@ -21,6 +21,15 @@ class AssistantSetting(
     @Column(name = "coin_enabled", nullable = false)
     var coinEnabled: Boolean = true,
 
+    @Column(name = "kr_warn_enabled", nullable = false)
+    var krWarnEnabled: Boolean = true,      // 국내 지수 ±3%·±5% 장중 급변 알림
+
+    @Column(name = "us_warn_enabled", nullable = false)
+    var usWarnEnabled: Boolean = true,      // 미국 지수 ±3%·±5% 장중 급변 알림
+
+    @Column(name = "release_alert_enabled", nullable = false)
+    var releaseAlertEnabled: Boolean = true, // 지표 발표 알림. 서킷브레이커는 설정 없이 항상 발송
+
     @Column(name = "last_seen_message_id", nullable = false)
     var lastSeenMessageId: Long = 0,
 

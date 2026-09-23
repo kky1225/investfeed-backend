@@ -8,7 +8,6 @@ import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import kotlin.math.abs
 
 @Service
 class UsIndexDailyService(
@@ -20,19 +19,12 @@ class UsIndexDailyService(
 
     companion object {
         val SERIES_OF = mapOf(
-            MarketIndexType.NASDAQ to "NASDAQ",
-            MarketIndexType.SP500 to "SPX",
-            MarketIndexType.DOW to "DOW",
-            MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "SOX",
-            MarketIndexType.VIX to "VIX",
             MarketIndexType.US_TREASURY_2Y to "US2Y",
             MarketIndexType.US_TREASURY_10Y to "US10Y",
         )
-        val YIELD_SERIES = setOf("US2Y", "US10Y")
         const val SOURCE_NAVER = "NAVER"
         const val SOURCE_FRED = "FRED"
         const val BACKFILL_DAYS = 30L
-        const val STREAK_MIN = 3
     }
 
     data class Daily(val series: String, val tradeDate: LocalDate, val value: Double, val change: Double?, val source: String)
@@ -42,11 +34,7 @@ class UsIndexDailyService(
         val saved = SERIES_OF.mapNotNull { (type, series) ->
             val res = marketIndexService.getMarketIndex(type) ?: return@mapNotNull null
             val value = res.price.replace(",", "").toDoubleOrNull() ?: return@mapNotNull null
-            val change = if (series in YIELD_SERIES) {
-                res.changeAmount.replace(",", "").toDoubleOrNull()?.let { it * 100 }   // %p → bp
-            } else {
-                res.changeRate.removeSuffix("%").replace(",", "").toDoubleOrNull()
-            }
+            val change = res.changeAmount.replace(",", "").toDoubleOrNull()?.let { it * 100 }   // %p → bp
             upsert(series, tradeDate, value, change, SOURCE_NAVER)
             series
         }
@@ -63,7 +51,7 @@ class UsIndexDailyService(
             val obs = fallbackService.observations(series, upTo.minusDays(BACKFILL_DAYS), upTo)
             obs.forEachIndexed { i, (date, value) ->
                 val prev = obs.getOrNull(i - 1)?.second
-                upsert(series, date, value, changeOf(series, value, prev), SOURCE_FRED)
+                upsert(series, date, value, changeBp(value, prev), SOURCE_FRED)
             }
         }
     }
@@ -82,13 +70,10 @@ class UsIndexDailyService(
             log.warn { "FRED $series: $tradeDate 값 없음, 최근 $date 값으로 대체하지 않음" }
             return
         }
-        upsert(series, date, value, changeOf(series, value, obs.getOrNull(idx - 1)?.second), SOURCE_FRED)
+        upsert(series, date, value, changeBp(value, obs.getOrNull(idx - 1)?.second), SOURCE_FRED)
     }
 
-    private fun changeOf(series: String, value: Double, prev: Double?): Double? {
-        prev ?: return null
-        return if (series in YIELD_SERIES) (value - prev) * 100 else if (abs(prev) > 0) (value / prev - 1) * 100 else null
-    }
+    private fun changeBp(value: Double, prev: Double?): Double? = prev?.let { (value - it) * 100 }
 
     private fun upsert(series: String, tradeDate: LocalDate, value: Double, change: Double?, source: String) {
         val existing = repository.findBySeriesAndTradeDate(series, tradeDate)

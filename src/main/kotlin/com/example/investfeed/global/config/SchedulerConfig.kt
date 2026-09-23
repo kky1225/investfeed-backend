@@ -24,7 +24,7 @@ class SchedulerConfig {
     @Bean("fastScheduler")
     fun fastScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = 6
+        scheduler.poolSize = 8
         scheduler.setThreadNamePrefix("fast-scheduler-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
         scheduler.setAwaitTerminationSeconds(30)

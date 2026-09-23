@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.calendar.scheduler
 
+import com.example.investfeed.domain.assistant.service.ReleaseAlertService
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component
 @Component
 class CalendarSyncScheduler(
     private val economicCalendarService: EconomicCalendarService,
+    private val releaseAlertService: ReleaseAlertService,
     private val schedulerLogService: SchedulerLogService,
     @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
@@ -25,6 +27,7 @@ class CalendarSyncScheduler(
         slowScheduler.execute {
             if (economicCalendarService.isCacheWarm()) {
                 log.info { "CalendarSync 초기 warming skip — Redis 캐시 이미 존재" }
+                detectReleases()   // 캐시가 있으면 동기화 없이 발표 감지만 (다운타임 중 발표 확인)
                 return@execute
             }
             syncCalendarData()
@@ -44,5 +47,12 @@ class CalendarSyncScheduler(
                 log.info { "CalendarSyncScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
             }
         }
+        detectReleases()
+    }
+
+    private fun detectReleases() {
+        runCatching { releaseAlertService.run() }
+            .onSuccess { r -> log.info { "발표 알림 감지 완료: scanned=${r.scanned} saved=${r.saved} suppressed=${r.suppressed} posted=${r.posted}${if (r.seed) " (seed)" else ""}" } }
+            .onFailure { log.error(it) { "발표 알림 감지 실패" } }
     }
 }

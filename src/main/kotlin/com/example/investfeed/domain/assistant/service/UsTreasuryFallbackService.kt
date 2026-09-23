@@ -15,10 +15,6 @@ class UsTreasuryFallbackService(
         val FRED_SERIES = mapOf(
             "US2Y" to "DGS2",
             "US10Y" to "DGS10",
-            "NASDAQ" to "NASDAQCOM",
-            "SPX" to "SP500",
-            "DOW" to "DJIA",
-            "VIX" to "VIXCLS",
         )
     }
 

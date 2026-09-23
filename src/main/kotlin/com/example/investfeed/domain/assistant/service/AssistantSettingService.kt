@@ -41,6 +41,9 @@ class AssistantSettingService(
             krEnabled = req.krEnabled
             usEnabled = req.usEnabled
             coinEnabled = req.coinEnabled
+            krWarnEnabled = req.krWarnEnabled
+            usWarnEnabled = req.usWarnEnabled
+            releaseAlertEnabled = req.releaseAlertEnabled
             updatedAt = LocalDateTime.now()
         }
         val saved = assistantSettingRepository.save(setting)
@@ -64,6 +67,9 @@ class AssistantSettingService(
         krEnabled = setting.krEnabled,
         usEnabled = setting.usEnabled,
         coinEnabled = setting.coinEnabled,
+        krWarnEnabled = setting.krWarnEnabled,
+        usWarnEnabled = setting.usWarnEnabled,
+        releaseAlertEnabled = setting.releaseAlertEnabled,
         sectionsOff = off ?: sectionsOff(setting).toList(),
     )
 }

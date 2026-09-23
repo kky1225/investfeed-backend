@@ -65,6 +65,7 @@ naver-stock:
   api-url: https://api.stock.naver.com
   mobile-url: https://m.stock.naver.com
   pc-url: https://stock.naver.com
+  polling-url: https://polling.finance.naver.com
 
 naver-news:
   client-id: ${NAVER_NEWS_CLIENT_ID}
@@ -88,7 +89,7 @@ fear-greed:
 # 외부 API 호출 간격 제한 ms
 external-api:
   rate-limit:
-    kiwoom-interval-ms: 200          # 공식: TR당 토큰별 초당 5건
+    kiwoom-interval-ms: 220          # 공식: TR당 토큰별 초당 5건 (200은 경계값이라 네트워크 지터로 429 발생 → 10% 여유)
     kiwoom-mock-interval-ms: 1000    # 공식: 모의투자 초당 1건
     kiwoom-per-token-interval-ms: 0  # 1701(전체 한도) 발생 시 조정용 예비
     fred-interval-ms: 500            # 공식: 분당 120건 (API 키 전체)

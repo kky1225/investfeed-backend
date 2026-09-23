@@ -10,6 +10,7 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
+import com.example.investfeed.domain.assistant.scheduler.AssistantAlertScheduler
 import com.example.investfeed.domain.assistant.scheduler.BriefingScheduler
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.papertrade.service.HoldingGradeService
@@ -48,6 +49,7 @@ class ManualTriggerService(
     private val paperTradeExecutionService: PaperTradeExecutionService,
     private val indexService: IndexService,
     private val briefingScheduler: BriefingScheduler,
+    private val assistantAlertScheduler: AssistantAlertScheduler,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -76,6 +78,8 @@ class ManualTriggerService(
             "BriefingCoinDailyScheduler"   to { briefingScheduler.triggerCoinDaily() },
             "BriefingKrCloseScheduler"     to { briefingScheduler.triggerKrClose() },
             "BriefingKrHoldingsScheduler"  to { briefingScheduler.triggerKrHoldings() },
+            "AssistantIndexAlertKrScheduler" to { assistantAlertScheduler.triggerKr() },
+            "AssistantIndexAlertUsScheduler" to { assistantAlertScheduler.triggerUs() },
         )
     }
 

@@ -22,6 +22,8 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.security.MessageDigest
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Service
 class AuthClient(
@@ -46,6 +48,9 @@ class AuthClient(
 
     companion object {
         private const val BROKER_NAME = "키움증권"
+        private val EXPIRES_DT_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+        private val TOKEN_TTL_MARGIN: Duration = Duration.ofMinutes(10)   // 만료 직전 사용 방지용 여유분
+        private val FALLBACK_TOKEN_TTL: Duration = Duration.ofMinutes(30) // expires_dt 파싱 실패 시 기존 동작
     }
 
     fun accessToken() {
@@ -122,7 +127,7 @@ class AuthClient(
             }
 
             accessTokenRes.token?.let {
-                redisTemplate.opsForValue().set(redisKey, it, Duration.ofMinutes(30))
+                redisTemplate.opsForValue().set(redisKey, it, resolveTokenTtl(accessTokenRes.expires_dt))
             }
         } catch (e: KiwoomApiException) {
             throw e
@@ -132,6 +137,26 @@ class AuthClient(
             log.warn { "refreshToken 실패 (loginId=$loginId): ${e.message}" }
             throw RuntimeException(e.message)
         }
+    }
+
+    private fun resolveTokenTtl(expiresDt: String?): Duration {
+        val expiresAt = expiresDt?.takeIf { it.isNotBlank() }?.let {
+            runCatching { LocalDateTime.parse(it, EXPIRES_DT_FORMAT) }.getOrNull()
+        }
+
+        if (expiresAt == null) {
+            log.warn { "키움 토큰 만료일시 파싱 실패 — TTL ${FALLBACK_TOKEN_TTL.toMinutes()}분으로 폴백: expires_dt=$expiresDt" }
+            return FALLBACK_TOKEN_TTL
+        }
+
+        val ttl = Duration.between(LocalDateTime.now(), expiresAt).minus(TOKEN_TTL_MARGIN)
+        if (ttl <= Duration.ZERO) {
+            log.warn { "키움 토큰 잔여 수명이 여유분(${TOKEN_TTL_MARGIN.toMinutes()}분) 이하 — TTL ${FALLBACK_TOKEN_TTL.toMinutes()}분으로 폴백: expires_dt=$expiresDt" }
+            return FALLBACK_TOKEN_TTL
+        }
+
+        log.debug { "키움 토큰 TTL=${ttl.toMinutes()}분 (expires_dt=$expiresDt)" }
+        return ttl
     }
 
     // ── 모의투자 전용 토큰 ────────────────────────────────────────────────────
@@ -197,7 +222,7 @@ class AuthClient(
             }
 
             accessTokenRes.token?.let {
-                redisTemplate.opsForValue().set(redisKey, it, Duration.ofMinutes(30))
+                redisTemplate.opsForValue().set(redisKey, it, resolveTokenTtl(accessTokenRes.expires_dt))
             }
         } catch (e: KiwoomApiException) {
             throw e

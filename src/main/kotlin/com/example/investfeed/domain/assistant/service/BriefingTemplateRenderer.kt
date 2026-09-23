@@ -136,7 +136,7 @@ object BriefingTemplateRenderer {
     fun renderUsClose(sheet: UsCloseFactSheet, personal: PersonalFactSheet?): Rendered {
         val sections = mutableListOf<Section>()
         personal?.let { p -> myUsHoldingsSection(p)?.let { sections += it } }
-        usIndexSection(sheet.indexes)?.let { sections += it }
+        usIndexSection(sheet.indexes, sheet.earlyClose)?.let { sections += it }
         sections += treasurySection(sheet.treasury)
         sections += usFxSection(sheet.usdKrw)
         return Rendered(summary = usCloseSummary(sheet), sections = sections)
@@ -148,11 +148,13 @@ object BriefingTemplateRenderer {
             else "${i.name} ${i.changeRate?.let { coloredRate(it, 2) } ?: num(i.close, 2)} (${num(i.close, 2)})"
         }
 
-    private fun usIndexSection(list: List<IndexFact>?): Section? {
+    private fun usIndexSection(list: List<IndexFact>?, earlyClose: Boolean): Section? {
         list ?: return failedSection("U2", "미국 지수")
         val vix = list.firstOrNull { it.name == "VIX" }?.close
         val notes = mutableListOf<String>()
         if (vix != null && vix >= 30) notes += "VIX ${num(vix, 1)} 변동성 고조" else if (vix != null && vix >= 25) notes += "VIX ${num(vix, 1)} 경계"
+        // 카드는 마감+10분(16:10 ET)에 나가지만 VIX 종가는 마감+15분(16:15 ET)에 확정된다 (2026-09-22 결정: 발행 시각은 그대로, 기준 시각만 표기)
+        if (vix != null) notes += if (earlyClose) "_(VIX 13:10 ET 시점 값, 종가 확정 13:15 ET)_" else "_(VIX 16:10 ET 시점 값, 종가 확정 16:15 ET)_"
         list.mapNotNull { it.delayStatus }.distinct().filter { it != "실시간" && it != "장마감" }.forEach { notes += "_(시세 ${it})_" }
         if (notes.isEmpty()) return null
         return okSection("U2", "미국 지수", notes.joinToString(" · "))

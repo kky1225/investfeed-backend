@@ -38,4 +38,8 @@ object SchedulerCron {
     const val BRIEFING_KR_HOLDINGS = "0 5 20 * * MON-FRI"    // 애프터마켓 종료(20:00) 후 국내 계좌 마감
     const val BRIEFING_US_CLOSE = "0 * 2-7 * * TUE-SAT"   // 매분 판정, NYSE 마감(KST)+10분에 1회
     const val BRIEFING_COIN_DAILY = "0 5 9 * * *"           // 업비트 일봉 09:00 마감 후
+
+    // ── AI 비서 장중 알림 (2단계) ──
+    const val ASSISTANT_INDEX_ALERT_KR = "0 * 9-15 * * MON-FRI"   // 매분 판정, 코드에서 09:00~15:30·휴장 제외 (FAST)
+    const val ASSISTANT_INDEX_ALERT_US = "0 * 22,23,0-6 * * *"    // 매분 판정, 코드에서 미국 세션(09:30 ET~폐장)만 (FAST)
 }

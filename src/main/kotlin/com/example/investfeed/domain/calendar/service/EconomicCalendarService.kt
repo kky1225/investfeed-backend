@@ -21,6 +21,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 @Service
 class EconomicCalendarService(
@@ -62,6 +64,9 @@ class EconomicCalendarService(
             UsIndicatorDef("T10Y2Y", "장단기 금리차", "%", "D"),
         )
 
+        // 직전 관측일이 아니라 "값이 마지막으로 바뀐 시점"과 비교해야 인상/인하폭이 유지된다.
+        val STEP_INDICATOR_CODES = setOf("DFEDTARU", "722Y001")
+
         // FRED units=pc1 (전년동월비 %) 적용 대상 시리즈
         val FRED_PC1_SERIES = setOf("CPIAUCSL", "PCEPI")
         // FRED units=chg (전월 대비 증감) 적용 대상 시리즈 — level 대신 MoM 증감 표시
@@ -90,17 +95,21 @@ class EconomicCalendarService(
             "PCEPI" to 54,
             "ICSA" to 180,
         )
+
+        fun formatEventValue(raw: String?, unit: String): String? {
+            if (raw.isNullOrBlank()) return null
+            val num = raw.toDoubleOrNull() ?: return raw
+            val nf = java.text.NumberFormat.getInstance(java.util.Locale.US).apply { maximumFractionDigits = 4 }
+            val localized = nf.format(num)
+            return when (unit) {
+                "%" -> "$localized%"
+                "천 명" -> "${localized}K"
+                "원", "건", "" -> "$localized$unit"
+                else -> "$localized $unit"
+            }
+        }
     }
 
-    // ==================================================================================
-    // 백그라운드 캐시 동기화 (스케줄러에서 호출)
-    // ==================================================================================
-
-    /**
-     * 현재월 이벤트 캐시가 Redis 에 이미 존재하는지 확인한다.
-     * 기동 시 `@PostConstruct` warming 이 불필요한지 판단하는 용도.
-     * TTL 이 길어(24시간) 정상 운영 시 항상 true. 서버 24시간 이상 down 후 재기동일 때만 false.
-     */
     fun isCacheWarm(): Boolean {
         val now = YearMonth.now()
         val key = "${CACHE_PREFIX}events:${now.year}:${now.monthValue}"
@@ -219,8 +228,12 @@ class EconomicCalendarService(
                 )
             } else {
                 val latest = rows.last()
-                val prev = rows.getOrNull(rows.size - 2)
-                val change = computeChange(latest.DATA_VALUE, prev?.DATA_VALUE, def.unit)
+                val prevVal = if (def.tableCode in STEP_INDICATOR_CODES) {
+                    stepPreviousValue(rows.map { it.DATA_VALUE }, latest.DATA_VALUE)
+                } else {
+                    rows.getOrNull(rows.size - 2)?.DATA_VALUE
+                }
+                val change = computeChange(latest.DATA_VALUE, prevVal, def.unit)
                 EconomicIndicator(
                     code = def.tableCode, name = def.name, country = "KR",
                     latestValue = latest.DATA_VALUE ?: "-",
@@ -245,12 +258,17 @@ class EconomicCalendarService(
             if (obs.isEmpty()) throw IllegalStateException("FRED 데이터가 없습니다: ${def.name}")
             val latest = obs.last()
             val prev = obs.getOrNull(obs.size - 2)
-            val latestVal = if (units == "pc1") latest.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
-                            else if (units == "chg") latest.value?.toDoubleOrNull()?.toLong()?.toString()
-                            else latest.value
-            val prevVal = if (units == "pc1") prev?.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
-                          else if (units == "chg") prev?.value?.toDoubleOrNull()?.toLong()?.toString()
-                          else prev?.value
+            val latestVal = when (units) {
+                "pc1" -> latest.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
+                "chg" -> latest.value?.toDoubleOrNull()?.toLong()?.toString()
+                else -> latest.value
+            }
+            val prevVal = when {
+                def.seriesId in STEP_INDICATOR_CODES -> stepPreviousValue(obs.map { it.value }, latestVal)
+                units == "pc1" -> prev?.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
+                units == "chg" -> prev?.value?.toDoubleOrNull()?.toLong()?.toString()
+                else -> prev?.value
+            }
             // chg 시리즈는 latestValue 자체가 증감분 → change 필드는 불필요, 대신 previousValue로 이전값 전달
             val change = if (units == "chg") null else computeChange(latestVal, prevVal, def.unit)
             val previousValue = if (units == "chg") prevVal else null
@@ -264,29 +282,36 @@ class EconomicCalendarService(
     }
 
     /** 지표 값 + 단위 포맷: 숫자는 thousand separator, 단위는 short suffix */
-    private fun formatEventValue(raw: String?, unit: String): String? {
-        if (raw.isNullOrBlank()) return null
-        val num = raw.toDoubleOrNull() ?: return raw
-        val nf = java.text.NumberFormat.getInstance(java.util.Locale.US).apply { maximumFractionDigits = 4 }
-        val localized = nf.format(num)
-        return when (unit) {
-            "%" -> "$localized%"
-            "천 명" -> "${localized}K"
-            "원", "건", "" -> "$localized$unit"
-            else -> "$localized $unit"
-        }
-    }
+    private fun formatEventValue(raw: String?, unit: String): String? = Companion.formatEventValue(raw, unit)
 
     private fun computeChange(latest: String?, prev: String?, unit: String): String? {
         if (latest == null || prev == null) return null
-        return runCatching {
-            val diff = latest.toDouble() - prev.toDouble()
-            if (diff == 0.0) "-"
-            else String.format("%+.2f", diff) + (if (unit == "%") "%" else "")
-        }.getOrNull()
+        return runCatching { formatChange(latest.toDouble() - prev.toDouble(), unit) }.getOrNull()
     }
 
-    /** ECOS 월별 지수 시계열에서 전년동월비(%) 리스트 생성 — 1자리 소수 */
+    private fun formatChange(diff: Double, unit: String): String {
+        val sign = when {
+            diff > 0 -> "+"
+            diff < 0 -> "-"
+            else -> ""
+        }
+        val size = abs(diff)
+        return when (unit) {
+            "%" -> sign + String.format("%,.2f", size) + "%"
+            "천 명" -> sign + String.format("%,d", size.roundToLong()) + "K"
+            "건" -> sign + String.format("%,d", size.roundToLong()) + "건"
+            "원" -> sign + String.format("%,.2f", size) + "원"
+            else -> sign + String.format("%,.2f", size) + (if (unit.isBlank()) "" else " $unit")
+        }
+    }
+
+    private fun stepPreviousValue(values: List<String?>, latest: String?): String? {
+        val latestNum = latest?.toDoubleOrNull() ?: return latest
+        return values.dropLast(1)
+            .lastOrNull { value -> value?.toDoubleOrNull()?.let { it != latestNum } == true }
+            ?: latest
+    }
+
     private fun indexToYoY(rows: List<com.example.investfeed.ecos.dto.res.EcosStatRow>): List<IndicatorDataPoint> {
         val indexMap = rows.mapNotNull { r ->
             val t = r.TIME ?: return@mapNotNull null

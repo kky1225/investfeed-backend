@@ -23,6 +23,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import reactor.core.publisher.Mono
 import kotlin.coroutines.cancellation.CancellationException
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Component
@@ -33,6 +34,8 @@ class NaverMarketIndexCrawler(
     private val naverMobileUrl: String,
     @param:Value("\${naver-stock.pc-url}")
     private val naverPcUrl: String,
+    @param:Value("\${naver-stock.polling-url:https://polling.finance.naver.com}")
+    private val naverPollingUrl: String,
     private val objectMapper: ObjectMapper,
     private val apiCallCounterService: ApiCallCounterService,
 ) {
@@ -76,6 +79,48 @@ class NaverMarketIndexCrawler(
             MarketIndexType.GOLD_INTERNATIONAL to "/api/polling/marketindex/metals/GCcv1",
             MarketIndexType.DOLLAR_INDEX to "/api/polling/marketindex/exchange/.DXY",
         )
+
+        // 장중 시가·고가·저가 실시간 (polling API). basic 에는 고저가가 없고 /index/{code}/price 는 마감 후에만 당일 행이 생긴다 (2026-09-21 확인).
+        // 비서 장중 알림이 미국 세션 동안만 조회
+        private val OHLC_PATHS = mapOf(
+            MarketIndexType.NASDAQ to "/api/realtime/worldstock/index/.IXIC",
+            MarketIndexType.SP500 to "/api/realtime/worldstock/index/.INX",
+        )
+    }
+
+    /** 장중 당일 시가·고가·저가·현재가. prevClose 는 현재가 − 전일 대비(부호 반영) */
+    data class IndexOhlc(
+        val tradeDate: LocalDate,   // 미국 현지 거래일 (localTradedAt 의 날짜부)
+        val open: Double,
+        val high: Double,
+        val low: Double,
+        val close: Double,
+        val prevClose: Double?,
+        val marketStatus: String?,  // OPEN / CLOSE
+    )
+
+    fun fetchIndexOhlc(type: MarketIndexType): IndexOhlc? = runBlocking {
+        val path = OHLC_PATHS[type] ?: return@runBlocking null
+        fetchOne(type, "$naverPollingUrl$path") { _, body -> parseOhlc(body) }
+    }
+
+    private fun parseOhlc(body: String): IndexOhlc {
+        val data = objectMapper.readTree(body)?.get("datas")?.firstOrNull() ?: throw MarketIndexResponseException()
+        fun raw(field: String): Double? = data.textOrNull(field)?.replace(",", "")?.toDoubleOrNull()
+        val tradedAt = data.textOrNull("localTradedAt")?.takeIf { it.length >= 10 } ?: throw MarketIndexResponseException()
+        val close = raw("closePriceRaw") ?: throw MarketIndexResponseException()
+        val change = raw("compareToPreviousClosePriceRaw")?.let { abs ->
+            when (data.path("compareToPreviousPrice").textOrNull("name")) { "FALLING" -> -abs; "RISING" -> abs; else -> 0.0 }
+        }
+        return IndexOhlc(
+            tradeDate = LocalDate.parse(tradedAt.substring(0, 10)),
+            open = raw("openPriceRaw") ?: throw MarketIndexResponseException(),
+            high = raw("highPriceRaw") ?: throw MarketIndexResponseException(),
+            low = raw("lowPriceRaw") ?: throw MarketIndexResponseException(),
+            close = close,
+            prevClose = change?.let { close - it }?.takeIf { it > 0 },
+            marketStatus = data.textOrNull("marketStatus"),
+        )
     }
 
     /**
@@ -108,11 +153,11 @@ class NaverMarketIndexCrawler(
         targets.map { (type, url) -> async { fetchOne(type, url, parse) } }.awaitAll().filterNotNull()
     }
 
-    private suspend fun fetchOne(
+    private suspend fun <T> fetchOne(
         type: MarketIndexType,
         url: String,
-        parse: (MarketIndexType, String) -> MarketIndexRes,
-    ): MarketIndexRes? {
+        parse: (MarketIndexType, String) -> T,
+    ): T? {
         return try {
             val body = webClient.get()
                 .uri(url)

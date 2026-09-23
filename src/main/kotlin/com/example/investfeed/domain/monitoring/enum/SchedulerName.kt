@@ -17,14 +17,19 @@ enum class SchedulerName(
         SchedulerType.FAST, 60, "매분(09:00~16:00)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.MARKET_MACRO_DURING, SchedulerCron.MARKET_MACRO_CLOSE),
     ),
+    AssistantIndexAlertKrScheduler(
+        SchedulerType.FAST, 60, "매분(09:00~15:30)", blockedOnHoliday = true,
+        crons = listOf(SchedulerCron.ASSISTANT_INDEX_ALERT_KR),
+    ),
     InvestorCloseMarketScheduler(SchedulerType.FAST, 60, "매분(15:36~21:00)", crons = listOf(SchedulerCron.INVESTOR_CLOSE_MARKET)),
+    AssistantIndexAlertUsScheduler(SchedulerType.FAST, 60, "매분(22:30~05:00, 미국 세션)", crons = listOf(SchedulerCron.ASSISTANT_INDEX_ALERT_US)),
 
     // SLOW (주기)
     RecommendTodayDirectionScheduler(
         SchedulerType.SLOW, 120, "매 5분(09:00~21:55)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.RECOMMEND_TODAY_DIRECTION),
     ),
-    CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분", crons = listOf(SchedulerCron.CALENDAR_SYNC)),
+    CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분 (+비서 지표 발표 알림)", crons = listOf(SchedulerCron.CALENDAR_SYNC)),
     GoalAlertScheduler(SchedulerType.SLOW, 60, "매시 정각", crons = listOf(SchedulerCron.GOAL_ALERT)),
     RebalancingAlertScheduler(SchedulerType.SLOW, 60, "매시 정각", crons = listOf(SchedulerCron.REBALANCING_ALERT)),
 

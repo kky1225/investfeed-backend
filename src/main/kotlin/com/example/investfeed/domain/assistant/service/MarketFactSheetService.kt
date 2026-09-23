@@ -12,6 +12,8 @@ import com.example.investfeed.domain.sect.service.SectService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
+import com.example.investfeed.kiwoom.sect.client.SectClient
+import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import com.example.investfeed.upbit.candle.client.CandleClient
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
@@ -25,6 +27,7 @@ import kotlin.math.abs
 class MarketFactSheetService(
     private val indexService: IndexService,
     private val sectService: SectService,
+    private val sectClient: SectClient,
     private val sectChartClient: SectChartClient,
     private val marketIndexService: MarketIndexService,
     private val candleClient: CandleClient,
@@ -131,6 +134,33 @@ class MarketFactSheetService(
             indexes = indexes,
             treasury = fetchOrNull("미국 국채") { fetchTreasury(usTradeDate) },
             usdKrw = fetchOrNull("환율") { fetchQuote(MarketIndexType.USD_KRW) },
+        )
+    }
+
+    fun collectKrIndexAlert(indexCode: String): IndexAlertCardFact {
+        val (primaryName, primaryCd, secondaryName, secondaryCd) =
+            if (indexCode == "KOSDAQ") listOf("코스닥", KOSDAQ, "코스닥150", KOSDAQ150) else listOf("코스피", KOSPI, "코스피200", KOSPI200)
+        val info = fetchOrNull("$primaryName 지수") { indexService.getIndexInfo(primaryCd) }
+        return IndexAlertCardFact(
+            primary = info?.let { toIndexFact(primaryName, it) },
+            secondary = fetchOrNull("$secondaryName 현재가") { sectPriceNowFact(secondaryName, secondaryCd) },
+            flow = info?.let { fetchOrNull("$primaryName 수급") { marketFlow(it, null) } },
+        )
+    }
+
+    fun collectUsIndexAlert(): IndexAlertCardFact = IndexAlertCardFact(
+        primary = fetchOrNull("나스닥") { fetchQuote(MarketIndexType.NASDAQ)?.let { q -> IndexFact("나스닥", q.price, q.changeRate, q.changeAmount, delayStatus = q.delayStatus) } },
+        secondary = fetchOrNull("S&P500") { fetchQuote(MarketIndexType.SP500)?.let { q -> IndexFact("S&P500", q.price, q.changeRate, q.changeAmount, delayStatus = q.delayStatus) } },
+        flow = null,
+    )
+
+    private fun sectPriceNowFact(name: String, indsCd: String): IndexFact? = runBlocking {
+        val res = sectClient.sectPriceNow(KiwoomSectPriceNowReq(mrkt_tp = "0", inds_cd = indsCd))
+        val close = TemplateFormat.parse(res.cur_prc)?.let { abs(it) } ?: return@runBlocking null
+        IndexFact(
+            name = name, close = close,
+            changeRate = TemplateFormat.parse(res.flu_rt), changeAmount = TemplateFormat.parse(res.pred_pre),
+            high = TemplateFormat.parse(res.high_pric)?.let { abs(it) }, low = TemplateFormat.parse(res.low_pric)?.let { abs(it) },
         )
     }
 
