@@ -9,7 +9,10 @@ import com.example.investfeed.domain.monitoring.dto.req.ErrorLogsReq
 import com.example.investfeed.domain.monitoring.dto.req.RedisInvalidateReq
 import com.example.investfeed.domain.monitoring.dto.req.SchedulerConfigLogsReq
 import com.example.investfeed.domain.monitoring.dto.req.SchedulerLogsReq
+import com.example.investfeed.domain.monitoring.dto.req.TelegramSendReq
 import com.example.investfeed.domain.monitoring.dto.req.UpdateSchedulerTimeoutReq
+import com.example.investfeed.domain.assistant.service.TelegramNotifier
+import com.example.investfeed.telegram.client.TelegramClient
 import com.example.investfeed.domain.monitoring.dto.res.*
 import com.example.investfeed.domain.monitoring.entity.AckSourceType
 import com.example.investfeed.domain.monitoring.service.ManualTriggerService
@@ -29,7 +32,33 @@ import com.example.investfeed.common.security.RequiresAction
 class MonitoringController(
     private val monitoringService: MonitoringService,
     private val manualTriggerService: ManualTriggerService,
+    private val telegramNotifier: TelegramNotifier,
+    private val telegramClient: TelegramClient,
 ) {
+
+    @GetMapping("/telegram-send")
+    @RequiresAction(action = Actions.READ)
+    fun getTelegramSend(): ResponseEntity<ApiResponse<TelegramSendRes>> =
+        ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_TELEGRAM_SEND_GET.code,
+                message = ResponseCode.MONITORING_TELEGRAM_SEND_GET.message,
+                result = TelegramSendRes(configured = telegramClient.enabled, blocked = telegramNotifier.isSendBlocked()),
+            ), HttpStatus.OK
+        )
+
+    @PatchMapping("/telegram-send")
+    @RequiresAction(action = Actions.UPDATE)
+    fun updateTelegramSend(@RequestBody req: TelegramSendReq): ResponseEntity<ApiResponse<TelegramSendRes>> {
+        telegramNotifier.setSendBlocked(req.blocked)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MONITORING_TELEGRAM_SEND_UPDATE.code,
+                message = ResponseCode.MONITORING_TELEGRAM_SEND_UPDATE.message,
+                result = TelegramSendRes(configured = telegramClient.enabled, blocked = telegramNotifier.isSendBlocked()),
+            ), HttpStatus.OK
+        )
+    }
     @GetMapping("/scheduler")
     @RequiresAction(action = Actions.READ)
     fun getSchedulerOverview(

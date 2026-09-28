@@ -1,8 +1,11 @@
 package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
+import com.example.investfeed.domain.assistant.service.HoldingAlertService
 import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestGroupRepository
 import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestItemRepository
+import com.example.investfeed.domain.holding.entity.MemberHolding
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.interest.repository.InterestGroupRepository
 import com.example.investfeed.domain.interest.repository.InterestItemRepository
@@ -12,7 +15,10 @@ import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.notification.service.AlertTarget
 import com.example.investfeed.domain.notification.service.NotificationService
+import com.example.investfeed.domain.notification.service.PriceAlertJudge
+import com.example.investfeed.domain.notification.service.UsHoldingAlertChecker
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
@@ -26,6 +32,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import kotlinx.coroutines.runBlocking
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 
 @Component
 class PriceAlertScheduler(
@@ -34,12 +45,15 @@ class PriceAlertScheduler(
     private val cryptoInterestGroupRepository: CryptoInterestGroupRepository,
     private val cryptoInterestItemRepository: CryptoInterestItemRepository,
     private val stockClient: StockClient,
+    private val usHoldingAlertChecker: UsHoldingAlertChecker,
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
     private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
+    private val judge: PriceAlertJudge,
     private val priceTargetRepository: com.example.investfeed.domain.notification.repository.PriceTargetRepository,
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
+    private val holdingAlertService: HoldingAlertService,
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
@@ -48,8 +62,19 @@ class PriceAlertScheduler(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        val STOCK_THRESHOLDS = listOf(5.0, 10.0, 15.0, 20.0)
-        val CRYPTO_THRESHOLDS = listOf(5.0, 10.0, 20.0, 30.0)
+        val STOCK_THRESHOLDS = listOf(5.0, 10.0, 15.0, 20.0)                 // 국내: 30% 근처는 상한가·하한가가 맡는다
+        val CRYPTO_THRESHOLDS = listOf(5.0, 10.0, 15.0, 20.0, 30.0)          // 15% 추가 (2026-09-25, 주식과 간격 통일)
+        private const val KR_SUFFIX = "_AL"
+        private const val CRYPTO_PREFIX = "KRW-"
+        private val YYYYMMDD: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+    }
+
+    private data class MemberAsset(val memberId: Long, val code: String, val name: String)
+
+    private fun targets(interest: List<MemberAsset>, holdings: List<MemberHolding>): Pair<List<MemberAsset>, Set<Pair<Long, String>>> {
+        val held = holdings.map { it.memberId to it.stkCd }.toSet()
+        val all = (interest + holdings.map { MemberAsset(it.memberId, it.stkCd, it.stkNm) }).distinctBy { it.memberId to it.code }
+        return all to held
     }
 
     @Scheduled(cron = SchedulerCron.PRICE_ALERT, scheduler = "fastScheduler")
@@ -65,19 +90,28 @@ class PriceAlertScheduler(
             }
 
             val start = System.currentTimeMillis()
+            val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
+            val holdings = memberHoldingRepository.findAll()
+            val holdingHits = mutableListOf<HoldingAlertHit>()
             var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
             var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
 
             try {
-                stockDataMap = checkStockAlerts()
+                stockDataMap = checkStockAlerts(holdings.filter { it.stkCd.endsWith(KR_SUFFIX) }, holdingHits)
             } catch (e: Exception) {
                 log.error(e) { "주식 가격 알림 체크 실패" }
             }
 
             try {
-                tickerMap = checkCryptoAlerts()
+                tickerMap = checkCryptoAlerts(holdings.filter { it.stkCd.startsWith(CRYPTO_PREFIX) }, holdingHits)
             } catch (e: Exception) {
                 log.error(e) { "암호화폐 가격 알림 체크 실패" }
+            }
+
+            try {
+                usHoldingAlertChecker.check(holdings.filter { it.stkCd.endsWith(UsHoldingAlertChecker.US_SUFFIX) }, holdingHits, now)
+            } catch (e: Exception) {
+                log.error(e) { "미국 주식 보유 알림 체크 실패" }
             }
 
             try {
@@ -92,12 +126,22 @@ class PriceAlertScheduler(
                 log.error(e) { "암호화폐 목표가 알림 체크 실패" }
             }
 
+            try {
+                val posted = holdingAlertService.publish(holdingHits, now)
+                if (posted > 0) log.info { "보유 종목 급등락 비서 게시: ${posted}건 (hit ${holdingHits.size})" }
+            } catch (e: Exception) {
+                log.error(e) { "보유 종목 급등락 비서 게시 실패" }
+            }
+
             SecurityContextHolder.clearContext()
             log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
         }
     }
 
-    private fun checkStockAlerts(): Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest> {
+    private fun checkStockAlerts(
+        krHoldings: List<MemberHolding>,
+        hits: MutableList<HoldingAlertHit>,
+    ): Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest> {
         if (holidayService.isHoliday()) {
             return emptyMap()
         }
@@ -106,69 +150,41 @@ class PriceAlertScheduler(
             return emptyMap()
         }
 
-        data class MemberStock(val memberId: Long, val stkCd: String, val stkNm: String)
-
-        val memberStocks = mutableListOf<MemberStock>()
-
-        val allGroups = interestGroupRepository.findAll()
-        if (allGroups.isNotEmpty()) {
-            val groupIds = allGroups.map { it.id }
-            val allItems = interestItemRepository.findByGroupIdIn(groupIds)
-            val groupToMember = allGroups.associate { it.id to it.memberId }
-
-            allItems.forEach { item ->
-                val memberId = groupToMember[item.groupId] ?: return@forEach
-                memberStocks.add(MemberStock(memberId, item.stkCd, item.stkNm))
-            }
-        }
-
-        val allHoldings = memberHoldingRepository.findAll()
-        allHoldings.forEach { holding ->
-            memberStocks.add(MemberStock(holding.memberId, holding.stkCd, holding.stkNm))
-        }
-
+        val groups = interestGroupRepository.findAll()
+        val groupToMember = groups.associate { it.id to it.memberId }
+        val interest = if (groups.isEmpty()) emptyList() else interestItemRepository.findByGroupIdIn(groups.map { it.id })
+            .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.stkCd, item.stkNm) } }
+        val (memberStocks, heldKeys) = targets(interest, krHoldings)
         if (memberStocks.isEmpty()) return emptyMap()
 
-        val uniqueStkCds = memberStocks.map { it.stkCd }.distinct()
-        val stkCdParam = uniqueStkCds.joinToString("|")
-
+        val stkCdParam = memberStocks.map { it.code }.distinct().joinToString("|")
         val kiwoomStockInterestRes = runBlocking { stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam)) }
         val stockDataMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: return emptyMap()
 
-        val memberStockSet = mutableSetOf<Pair<Long, String>>()
+        fun price(s: String?) = s?.toDoubleOrNull()?.let { abs(it) }?.takeIf { it > 0 }
+        fun target(item: MemberAsset, curRate: Double?) = AlertTarget(
+            item.memberId, AssetType.STOCK, item.code, item.name, "/stock/detail/${item.code.substringBefore("_")}",
+            held = (item.memberId to item.code) in heldKeys, curRate = curRate,
+        )
 
         for (item in memberStocks) {
-            val key = Pair(item.memberId, item.stkCd)
-            if (!memberStockSet.add(key)) continue
+            val stockData = stockDataMap[item.code] ?: continue
+            val basePric = price(stockData.base_pric) ?: continue
+            val highPric = price(stockData.high_pric) ?: continue
+            val lowPric = price(stockData.low_pric) ?: continue
+            val curRate = price(stockData.cur_prc)?.let { (it - basePric) / basePric * 100 }
+            val maxUpRt = (highPric - basePric) / basePric * 100
+            val maxDownRt = (lowPric - basePric) / basePric * 100
+            val t = target(item, curRate)
 
-            val stockData = stockDataMap[item.stkCd] ?: continue
-            val basePric = kotlin.math.abs(stockData.base_pric?.toDoubleOrNull() ?: continue)
-            if (basePric == 0.0) continue
-            val highPric = kotlin.math.abs(stockData.high_pric?.toDoubleOrNull() ?: continue)
-            if (highPric == 0.0) continue
-            val lowPric = kotlin.math.abs(stockData.low_pric?.toDoubleOrNull() ?: continue)
-            if (lowPric == 0.0) continue
-            val uplPric = stockData.upl_pric?.toDoubleOrNull()
-            val lstPric = stockData.lst_pric?.toDoubleOrNull()
+            val setting = notificationSettingService.getSettingByMemberId(item.memberId)
+            val upperReached = price(stockData.upl_pric)?.let { highPric >= it } ?: false
+            val lowerReached = price(stockData.lst_pric)?.let { lowPric <= it } ?: false
 
-            val maxUpRt = ((highPric - basePric) / basePric) * 100
-            val maxDownRt = ((lowPric - basePric) / basePric) * 100
-
-            if (maxUpRt > 0) {
-                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UP, STOCK_THRESHOLDS)
-            }
-
-            if (maxDownRt < 0) {
-                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.DOWN, STOCK_THRESHOLDS)
-            }
-
-            if (uplPric != null && highPric >= kotlin.math.abs(uplPric)) {
-                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxUpRt, Direction.UPPER_LIMIT, listOf(0.0))
-            }
-
-            if (lstPric != null && lowPric <= kotlin.math.abs(lstPric)) {
-                checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, maxDownRt, Direction.LOWER_LIMIT, listOf(0.0))
-            }
+            if (upperReached) judge.judge(t, Direction.UPPER_LIMIT, maxUpRt, PriceAlertJudge.SINGLE, hits)
+            if (lowerReached) judge.judge(t, Direction.LOWER_LIMIT, maxDownRt, PriceAlertJudge.SINGLE, hits)
+            if (maxUpRt > 0 && !(upperReached && setting.upperLimitEnabled)) judge.judge(t, Direction.UP, maxUpRt, STOCK_THRESHOLDS, hits)
+            if (maxDownRt < 0 && !(lowerReached && setting.lowerLimitEnabled)) judge.judge(t, Direction.DOWN, maxDownRt, STOCK_THRESHOLDS, hits)
         }
 
         try {
@@ -180,19 +196,14 @@ class PriceAlertScheduler(
             val newLowCodes = newLowRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
             log.info { "250일 신저가 종목 수: ${newLowCodes.size}, 종목: ${newLowCodes.take(10)}" }
 
-            val processedSet = mutableSetOf<Pair<Long, String>>()
             for (item in memberStocks) {
-                val key = Pair(item.memberId, item.stkCd)
-                if (!processedSet.add(key)) continue
-
-                if (item.stkCd in newHighCodes) {
-                    val highPric = kotlin.math.abs(stockDataMap[item.stkCd]?.high_pric?.toDoubleOrNull() ?: 0.0)
-                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, highPric, Direction.HIGH_52W, listOf(0.0))
-                }
-                if (item.stkCd in newLowCodes) {
-                    val lowPric = kotlin.math.abs(stockDataMap[item.stkCd]?.low_pric?.toDoubleOrNull() ?: 0.0)
-                    checkThresholds(item.memberId, AssetType.STOCK, item.stkCd, item.stkNm, lowPric, Direction.LOW_52W, listOf(0.0))
-                }
+                if (item.code !in newHighCodes && item.code !in newLowCodes) continue
+                val stockData = stockDataMap[item.code]
+                val basePric = price(stockData?.base_pric)
+                val curRate = price(stockData?.cur_prc)?.let { c -> basePric?.let { (c - it) / it * 100 } }
+                val t = target(item, curRate)
+                if (item.code in newHighCodes) judge.judge(t, Direction.HIGH_52W, price(stockData?.high_pric) ?: 0.0, PriceAlertJudge.SINGLE, hits)
+                if (item.code in newLowCodes) judge.judge(t, Direction.LOW_52W, price(stockData?.low_pric) ?: 0.0, PriceAlertJudge.SINGLE, hits)
             }
         } catch (e: Exception) {
             log.warn { "250일 신고저가 체크 실패: ${e.message}" }
@@ -201,102 +212,44 @@ class PriceAlertScheduler(
         return stockDataMap
     }
 
-    private fun checkCryptoAlerts(): Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes> {
-        val allGroups = cryptoInterestGroupRepository.findAll()
-        if (allGroups.isEmpty()) return emptyMap()
+    private fun checkCryptoAlerts(
+        cryptoHoldings: List<MemberHolding>,
+        hits: MutableList<HoldingAlertHit>,
+    ): Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes> {
+        val groups = cryptoInterestGroupRepository.findAll()
+        val groupToMember = groups.associate { it.id to it.memberId }
+        val interest = if (groups.isEmpty()) emptyList() else cryptoInterestItemRepository.findByGroupIdIn(groups.map { it.id })
+            .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.market, item.koreanName) } }
+        val (memberCryptos, heldKeys) = targets(interest, cryptoHoldings)
+        if (memberCryptos.isEmpty()) return emptyMap()
 
-        val groupIds = allGroups.map { it.id }
-        val allItems = cryptoInterestItemRepository.findByGroupIdIn(groupIds)
-        if (allItems.isEmpty()) return emptyMap()
+        val tickerMap = tickerClient.getTickers(memberCryptos.map { it.code }.distinct().joinToString(",")).associateBy { it.market }
+        val today = LocalDate.now().format(YYYYMMDD)
 
-        val groupToMember = allGroups.associate { it.id to it.memberId }
-
-        val uniqueMarkets = allItems.map { it.market }.distinct()
-        val marketsParam = uniqueMarkets.joinToString(",")
-
-        val tickers = tickerClient.getTickers(marketsParam)
-        val tickerMap = tickers.associateBy { it.market }
-
-        val memberCryptoSet = mutableSetOf<Pair<Long, String>>()
-
-        for (item in allItems) {
-            val memberId = groupToMember[item.groupId] ?: continue
-            val key = Pair(memberId, item.market)
-            if (!memberCryptoSet.add(key)) continue
-
-            val ticker = tickerMap[item.market] ?: continue
-            val prevClosing = ticker.prev_closing_price ?: continue
-            if (prevClosing == 0.0) continue
+        for (item in memberCryptos) {
+            val ticker = tickerMap[item.code] ?: continue
+            val prevClosing = ticker.prev_closing_price?.takeIf { it > 0 } ?: continue
             val highPrice = ticker.high_price ?: continue
             val lowPrice = ticker.low_price ?: continue
+            val curRate = ticker.trade_price?.takeIf { it > 0 }?.let { (it - prevClosing) / prevClosing * 100 }
+            val maxUpRt = (highPrice - prevClosing) / prevClosing * 100
+            val maxDownRt = (lowPrice - prevClosing) / prevClosing * 100
+            val t = AlertTarget(item.memberId, AssetType.CRYPTO, item.code, item.name, "/crypto/detail/${item.code}",
+                held = (item.memberId to item.code) in heldKeys, curRate = curRate)
 
-            val maxUpRt = ((highPrice - prevClosing) / prevClosing) * 100
-            val maxDownRt = ((lowPrice - prevClosing) / prevClosing) * 100
-
-            if (maxUpRt > 0) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxUpRt, Direction.UP, CRYPTO_THRESHOLDS)
-            }
-
-            if (maxDownRt < 0) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, maxDownRt, Direction.DOWN, CRYPTO_THRESHOLDS)
-            }
-
-            // 52주 신고가/신저가 체크
-            val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"))
-            if (ticker.highest_52_week_date == today) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, ticker.highest_52_week_price ?: 0.0, Direction.HIGH_52W, listOf(0.0))
-            }
-            if (ticker.lowest_52_week_date == today) {
-                checkThresholds(memberId, AssetType.CRYPTO, item.market, item.koreanName, ticker.lowest_52_week_price ?: 0.0, Direction.LOW_52W, listOf(0.0))
-            }
+            if (maxUpRt > 0) judge.judge(t, Direction.UP, maxUpRt, CRYPTO_THRESHOLDS, hits)
+            if (maxDownRt < 0) judge.judge(t, Direction.DOWN, maxDownRt, CRYPTO_THRESHOLDS, hits)
+            if (ticker.highest_52_week_date == today) judge.judge(t, Direction.HIGH_52W, ticker.highest_52_week_price ?: 0.0, PriceAlertJudge.SINGLE, hits)
+            if (ticker.lowest_52_week_date == today) judge.judge(t, Direction.LOW_52W, ticker.lowest_52_week_price ?: 0.0, PriceAlertJudge.SINGLE, hits)
         }
 
         return tickerMap
-    }
-
-    private fun checkThresholds(
-        memberId: Long,
-        assetType: AssetType,
-        assetCode: String,
-        assetName: String,
-        fluRt: Double,
-        direction: Direction,
-        thresholds: List<Double>
-    ) {
-        // 알림 설정 체크
-        val setting = notificationSettingService.getSettingByMemberId(memberId)
-        when (direction) {
-            Direction.UP -> if (!setting.priceUpEnabled) return
-            Direction.DOWN -> if (!setting.priceDownEnabled) return
-            Direction.UPPER_LIMIT -> if (!setting.upperLimitEnabled) return
-            Direction.LOWER_LIMIT -> if (!setting.lowerLimitEnabled) return
-            Direction.HIGH_52W -> if (!setting.high52wEnabled) return
-            Direction.LOW_52W -> if (!setting.low52wEnabled) return
-            else -> {}
-        }
-
-        val absFluRt = kotlin.math.abs(fluRt)
-
-        for (threshold in thresholds) {
-            if (absFluRt >= threshold) {
-                notificationService.createPriceAlert(
-                    memberId = memberId,
-                    assetType = assetType,
-                    assetCode = assetCode,
-                    assetName = assetName,
-                    threshold = threshold,
-                    direction = direction,
-                    fluRt = fluRt
-                )
-            }
-        }
     }
 
     private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>) {
         val targets = priceTargetRepository.findByAssetType(AssetType.STOCK)
         if (targets.isEmpty()) return
 
-        // stockDataMap에 없는 종목은 별도 조회
         val missingCodes = targets.map { it.assetCode }.filter { it !in stockDataMap }.distinct()
         val additionalMap = if (missingCodes.isNotEmpty()) {
             try {
@@ -313,7 +266,7 @@ class PriceAlertScheduler(
 
         for (target in targets) {
             val stockData = combinedMap[target.assetCode] ?: continue
-            val curPrc = kotlin.math.abs(stockData.cur_prc?.toDoubleOrNull() ?: continue)
+            val curPrc = abs(stockData.cur_prc?.toDoubleOrNull() ?: continue)
 
             val reached = when (target.direction) {
                 PriceTargetDirection.ABOVE -> curPrc >= target.targetPrice

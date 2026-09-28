@@ -7,10 +7,14 @@ import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.assistant.dto.req.AssistantSettingReq
 import com.example.investfeed.domain.assistant.dto.req.ReadMarkerReq
+import com.example.investfeed.domain.assistant.dto.req.TelegramStatusReq
 import com.example.investfeed.domain.assistant.dto.req.TimelineQueryReq
 import com.example.investfeed.domain.assistant.dto.res.AssistantSettingRes
 import com.example.investfeed.domain.assistant.dto.res.AssistantTokenRes
+import com.example.investfeed.domain.assistant.dto.res.TelegramLinkCodeRes
+import com.example.investfeed.domain.assistant.dto.res.TelegramStatusRes
 import com.example.investfeed.domain.assistant.service.AssistantTokenService
+import com.example.investfeed.domain.assistant.service.TelegramLinkService
 import java.time.LocalDateTime
 import java.time.ZoneId
 import com.example.investfeed.domain.assistant.dto.res.TimelinePageRes
@@ -30,6 +34,7 @@ class AssistantController(
     private val timelineService: TimelineService,
     private val assistantSettingService: AssistantSettingService,
     private val assistantTokenService: AssistantTokenService,
+    private val telegramLinkService: TelegramLinkService,
 ) {
 
     @GetMapping("timeline")
@@ -91,6 +96,35 @@ class AssistantController(
         @Valid @RequestBody req: AssistantSettingReq,
     ): ResponseEntity<ApiResponse<AssistantSettingRes>> =
         ok(ResponseCode.ASSISTANT_SETTING_UPDATE, assistantSettingService.saveSetting(user.member.id, req))
+
+    @GetMapping("telegram")
+    @RequiresAction(action = Actions.READ)
+    fun getTelegram(
+        @AuthenticationPrincipal user: CustomUserDetails,
+    ): ResponseEntity<ApiResponse<TelegramStatusRes>> =
+        ok(ResponseCode.ASSISTANT_TELEGRAM_STATUS, telegramLinkService.status(user.member.id))
+
+    @PostMapping("telegram/link-code")
+    @RequiresAction(action = Actions.CREATE)
+    fun issueTelegramLinkCode(
+        @AuthenticationPrincipal user: CustomUserDetails,
+    ): ResponseEntity<ApiResponse<TelegramLinkCodeRes>> =
+        ok(ResponseCode.ASSISTANT_TELEGRAM_LINK_CODE, telegramLinkService.issueLinkCode(user.member.id))
+
+    @PatchMapping("telegram")
+    @RequiresAction(action = Actions.UPDATE)
+    fun updateTelegram(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @Valid @RequestBody req: TelegramStatusReq,
+    ): ResponseEntity<ApiResponse<TelegramStatusRes>> =
+        ok(ResponseCode.ASSISTANT_TELEGRAM_UPDATE, telegramLinkService.setStatus(user.member.id, req.status))
+
+    @DeleteMapping("telegram")
+    @RequiresAction(action = Actions.DELETE)
+    fun unlinkTelegram(
+        @AuthenticationPrincipal user: CustomUserDetails,
+    ): ResponseEntity<ApiResponse<TelegramStatusRes>> =
+        ok(ResponseCode.ASSISTANT_TELEGRAM_UNLINK, telegramLinkService.unlink(user.member.id))
 
     private fun timeline(memberId: Long, req: TimelineQueryReq, includePersonal: Boolean) =
         if (req.date != null) timelineService.getTimelineByDate(memberId, req.date, includePersonal)

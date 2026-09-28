@@ -245,5 +245,11 @@ enum class ResponseCode(
     ASSISTANT_SETTING_UPDATE(message = "비서 설정 저장에 성공하셨습니다."),
     ASSISTANT_TOKEN_ISSUE(message = "비서 토큰 발급에 성공하셨습니다."),
     ASSISTANT_TOOL_RESULT(message = "비서 도구 조회에 성공하셨습니다."),
+    ASSISTANT_TELEGRAM_STATUS(message = "텔레그램 연결 상태 조회에 성공하셨습니다."),
+    ASSISTANT_TELEGRAM_LINK_CODE(message = "텔레그램 연결 코드 발급에 성공하셨습니다."),
+    ASSISTANT_TELEGRAM_UPDATE(message = "텔레그램 발송 설정 변경에 성공하셨습니다."),
+    ASSISTANT_TELEGRAM_UNLINK(message = "텔레그램 연결 해제에 성공하셨습니다."),
+    MONITORING_TELEGRAM_SEND_GET(message = "텔레그램 전체 발송 상태 조회에 성공하셨습니다."),
+    MONITORING_TELEGRAM_SEND_UPDATE(message = "텔레그램 전체 발송 상태 변경에 성공하셨습니다."),
 
 }

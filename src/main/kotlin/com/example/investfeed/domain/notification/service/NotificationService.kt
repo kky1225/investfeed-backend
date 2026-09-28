@@ -60,14 +60,15 @@ class NotificationService(
         assetName: String,
         threshold: Double,
         direction: Direction,
-        fluRt: Double
-    ) {
-        val today = LocalDate.now()
+        fluRt: Double,
+        alertDate: LocalDate = LocalDate.now(),
+    ): Boolean {
+        val today = alertDate
 
         val alreadySent = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
             memberId, assetType, assetCode, threshold, direction, today
         )
-        if (alreadySent) return
+        if (alreadySent) return false
 
         val notification = Notification(
             memberId = memberId,
@@ -99,6 +100,7 @@ class NotificationService(
         } catch (e: Exception) {
             log.warn { "WebSocket 알림 전송 실패: ${e.message}" }
         }
+        return true
     }
 
     @Transactional

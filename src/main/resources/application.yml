@@ -106,3 +106,8 @@ assistant:
     kid: ${ASSISTANT_JWT_KID}
     private-key: ${ASSISTANT_JWT_PRIVATE_KEY}
     expiration-seconds: 300
+
+telegram:
+  api-url: https://api.telegram.org
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  bot-username: ${TELEGRAM_BOT_USERNAME:}

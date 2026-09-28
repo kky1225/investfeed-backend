@@ -32,6 +32,7 @@ class IndexAlertService(
     private val assistantSettingService: AssistantSettingService,
     private val memberRepository: MemberRepository,
     private val timelineService: TimelineService,
+    private val telegramNotifier: TelegramNotifier,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = KotlinLogging.logger {}
@@ -170,11 +171,16 @@ class IndexAlertService(
             else -> { s -> s.usWarnEnabled }
         }
         val finalBody = body.copy(refs = mapOf("alertId" to entity.id))
+        val telegramText = AlertTemplateRenderer.renderIndexAlertTelegram(fact, card)
         var posted = 0
         memberRepository.findAll()
             .filter { recipient(assistantSettingService.findOrDefault(it.id)) }
             .forEach { member ->
                 runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
+                    .onSuccess {
+                        runCatching { telegramNotifier.notify(member.id, telegramText) }
+                            .onFailure { log.error(it) { "지수 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
+                    }
                     .onFailure { log.error(it) { "지수 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
             }
         return posted

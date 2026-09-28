@@ -45,3 +45,14 @@ data class ReleaseFact(
     val prevValue: String?,
     val detectedAt: LocalDateTime,
 )
+
+data class HoldingAlertHit(
+    val memberId: Long,
+    val assetCode: String,                 // 005930_AL / TLT_US / KRW-BTC
+    val assetName: String,
+    val link: String,                      // 내부 라우트 (/stock/detail/… · /us-stock/detail/… · /crypto/detail/…)
+    val direction: com.example.investfeed.domain.notification.entity.Direction,   // UP / DOWN / UPPER_LIMIT / LOWER_LIMIT / HIGH_52W / LOW_52W
+    val threshold: Double,                 // 이번 분에 새로 넘은 가장 높은 임계(%). 상하한가·52주는 0
+    val triggerRate: Double?,              // 판정 근거 등락률 (당일 고가·저가 기준). 52주는 null
+    val currentRate: Double?,              // 발송 시점 현재가 등락률
+)

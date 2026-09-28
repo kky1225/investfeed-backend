@@ -51,6 +51,7 @@ class ReleaseAlertService(
     private val assistantSettingService: AssistantSettingService,
     private val memberRepository: MemberRepository,
     private val timelineService: TimelineService,
+    private val telegramNotifier: TelegramNotifier,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = KotlinLogging.logger {}
@@ -91,10 +92,15 @@ class ReleaseAlertService(
             saved++
             if (suppressed) { suppressedCount++; return@forEach }
             val finalBody = body.copy(refs = mapOf("alertId" to entity.id))
+            val telegramText = AlertTemplateRenderer.renderReleaseTelegram(fact, target)
             memberRepository.findAll()
                 .filter { assistantSettingService.findOrDefault(it.id).releaseAlertEnabled }
                 .forEach { member ->
                     runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
+                        .onSuccess {
+                            runCatching { telegramNotifier.notify(member.id, telegramText) }
+                                .onFailure { log.error(it) { "발표 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
+                        }
                         .onFailure { log.error(it) { "발표 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
                 }
         }

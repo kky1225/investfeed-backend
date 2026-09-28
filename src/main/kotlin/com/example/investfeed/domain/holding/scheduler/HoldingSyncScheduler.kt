@@ -14,9 +14,12 @@ import com.example.investfeed.domain.notification.service.NotificationSettingSer
 import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.domain.auth.entity.MemberApiKey
+import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.toss.account.client.TossAccountClient
 import com.example.investfeed.toss.holding.TossSymbolMapper
 import com.example.investfeed.toss.holding.client.TossHoldingClient
+import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
+import com.example.investfeed.upbit.market.client.MarketClient
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -32,6 +35,8 @@ class HoldingSyncScheduler(
     private val holdingClient: HoldingClient,
     private val tossAccountClient: TossAccountClient,
     private val tossHoldingClient: TossHoldingClient,
+    private val cryptoHoldingClient: CryptoHoldingClient,
+    private val marketClient: MarketClient,
     private val schedulerLogService: SchedulerLogService,
     private val holidayService: HolidayService,
     private val notificationService: NotificationService,
@@ -56,6 +61,7 @@ class HoldingSyncScheduler(
 
             syncKiwoomHoldings()
             syncTossHoldings()
+            syncUpbitHoldings()
 
             log.info { "보유종목 동기화 스케줄러 완료 (${System.currentTimeMillis() - start}ms)" }
         }
@@ -151,6 +157,55 @@ class HoldingSyncScheduler(
         }
 
         log.info { "토스 보유종목 동기화 완료: 성공 $successCount / 실패 $failCount (총 ${tossApiKeys.size})" }
+    }
+
+    private fun syncUpbitHoldings() {
+        val upbitBroker = brokerRepository.findByName("업비트") ?: return
+        val upbitApiKeys = memberApiKeyRepository.findAllByBrokerId(upbitBroker.id)
+            .filter { it.member.role.code != "ADMIN" }
+        if (upbitApiKeys.isEmpty()) return
+
+        val marketNames = try {
+            marketClient.getKrwMarkets().associate { it.market.removePrefix("KRW-") to it.korean_name }
+        } catch (e: Exception) {
+            log.warn { "업비트 마켓 목록 조회 실패, 코인 보유 동기화 건너뜀: ${e.message}" }
+            return
+        }
+
+        var successCount = 0
+        var authFailCount = 0
+        var otherFailCount = 0
+
+        upbitApiKeys.forEach { apiKey ->
+            try {
+                val accounts = cryptoHoldingClient.getAccounts(apiKey.appKey, apiKey.secretKey)
+                val holdings = accounts
+                    .filter { it.currency != "KRW" && it.unit_currency == "KRW" }
+                    .mapNotNull { account ->
+                        val currency = account.currency ?: return@mapNotNull null
+                        val name = marketNames[currency] ?: return@mapNotNull null
+                        "KRW-$currency" to name
+                    }
+
+                memberHoldingSyncService.sync(
+                    memberId = apiKey.member.id,
+                    holdings = holdings,
+                    broker = upbitBroker
+                )
+
+                successCount++
+                log.info { "업비트 보유코인 동기화 완료: ${apiKey.member.loginId} (${holdings.size}건)" }
+            } catch (e: InvalidApiKeyException) {
+                authFailCount++
+                log.warn { "업비트 보유코인 동기화 인증 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
+                sendAuthFailedNotification(apiKey, upbitBroker)
+            } catch (e: Exception) {
+                otherFailCount++
+                log.warn { "업비트 보유코인 동기화 실패(기타): loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}, ${e.javaClass.simpleName}: ${e.message}" }
+            }
+        }
+
+        log.info { "업비트 보유코인 동기화 완료: 성공 $successCount / 인증실패 $authFailCount / 기타실패 $otherFailCount (총 ${upbitApiKeys.size})" }
     }
 
     private fun isAuthFailure(e: Throwable): Boolean {

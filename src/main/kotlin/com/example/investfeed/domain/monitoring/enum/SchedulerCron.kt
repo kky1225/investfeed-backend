@@ -42,4 +42,5 @@ object SchedulerCron {
     // ── AI 비서 장중 알림 (2단계) ──
     const val ASSISTANT_INDEX_ALERT_KR = "0 * 9-15 * * MON-FRI"   // 매분 판정, 코드에서 09:00~15:30·휴장 제외 (FAST)
     const val ASSISTANT_INDEX_ALERT_US = "0 * 22,23,0-6 * * *"    // 매분 판정, 코드에서 미국 세션(09:30 ET~폐장)만 (FAST)
+    const val TELEGRAM_POLL = "*/5 * * * * *"                     // 텔레그램 getUpdates 5초 폴링 (FAST). 같은 작업은 겹쳐 실행되지 않음
 }

@@ -30,6 +30,16 @@ class AssistantSetting(
     @Column(name = "release_alert_enabled", nullable = false)
     var releaseAlertEnabled: Boolean = true, // 지표 발표 알림. 서킷브레이커는 설정 없이 항상 발송
 
+    @Column(name = "telegram_chat_id")
+    var telegramChatId: Long? = null,        // 3단계. 미연결 NULL. 채팅 하나 = 회원 하나 (UNIQUE)
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "telegram_status", nullable = false, length = 10)
+    var telegramStatus: TelegramStatus = TelegramStatus.NONE,   // 알림 종류별 텔레그램 설정은 없고 위 스위치를 그대로 따른다
+
+    @Column(name = "telegram_linked_at")
+    var telegramLinkedAt: LocalDateTime? = null,
+
     @Column(name = "last_seen_message_id", nullable = false)
     var lastSeenMessageId: Long = 0,
 
@@ -39,3 +49,5 @@ class AssistantSetting(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 )
+
+enum class TelegramStatus { NONE, ACTIVE, PAUSED, BLOCKED }
