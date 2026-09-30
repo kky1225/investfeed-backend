@@ -10,6 +10,8 @@ data class HoldingFact(
     val eval: Double? = null,
     val curPrc: Double? = null,
     val evalProfit: Double? = null,
+    val qty: Double? = null,        // 보유 수량
+    val purPrice: Double? = null,   // 평단
 )
 
 data class BrokerHoldingsFact(

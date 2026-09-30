@@ -11,4 +11,5 @@ interface AssistantMessageRepository : JpaRepository<AssistantMessage, Long> {
     fun findByMemberIdAndCreatedAtBetweenOrderByIdDesc(memberId: Long, start: LocalDateTime, end: LocalDateTime): List<AssistantMessage>
     fun countByMemberIdAndIdGreaterThanAndTypeIn(memberId: Long, lastSeenId: Long, types: Collection<String>): Long
     fun existsByMemberIdAndRefBriefingId(memberId: Long, refBriefingId: Long): Boolean
+    fun findFirstByMemberIdAndTypeAndSubtypeAndCreatedAtBetweenOrderByIdDesc(memberId: Long, type: String, subtype: String, start: LocalDateTime, end: LocalDateTime): AssistantMessage?
 }

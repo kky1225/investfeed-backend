@@ -15,6 +15,7 @@ import com.example.investfeed.domain.assistant.dto.res.TelegramLinkCodeRes
 import com.example.investfeed.domain.assistant.dto.res.TelegramStatusRes
 import com.example.investfeed.domain.assistant.service.AssistantTokenService
 import com.example.investfeed.domain.assistant.service.TelegramLinkService
+import com.example.investfeed.internal.assistant.tool.CardStore
 import java.time.LocalDateTime
 import java.time.ZoneId
 import com.example.investfeed.domain.assistant.dto.res.TimelinePageRes
@@ -35,6 +36,7 @@ class AssistantController(
     private val assistantSettingService: AssistantSettingService,
     private val assistantTokenService: AssistantTokenService,
     private val telegramLinkService: TelegramLinkService,
+    private val cardStore: CardStore,
 ) {
 
     @GetMapping("timeline")
@@ -125,6 +127,17 @@ class AssistantController(
         @AuthenticationPrincipal user: CustomUserDetails,
     ): ResponseEntity<ApiResponse<TelegramStatusRes>> =
         ok(ResponseCode.ASSISTANT_TELEGRAM_UNLINK, telegramLinkService.unlink(user.member.id))
+
+    @GetMapping("secure/cards/{ref}")
+    @RequiresAction(action = Actions.READ)
+    fun getCard(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable ref: String,
+    ): ResponseEntity<ApiResponse<CardStore.StoredCard?>> {
+        val card = cardStore.get(user.member.id, ref)
+            ?: return ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_CARD_GET.code, message = "카드가 없거나 만료되었습니다.", result = null), HttpStatus.NOT_FOUND)
+        return ok(ResponseCode.ASSISTANT_CARD_GET, card)
+    }
 
     private fun timeline(memberId: Long, req: TimelineQueryReq, includePersonal: Boolean) =
         if (req.date != null) timelineService.getTimelineByDate(memberId, req.date, includePersonal)

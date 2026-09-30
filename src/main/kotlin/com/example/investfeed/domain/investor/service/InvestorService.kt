@@ -40,34 +40,23 @@ class InvestorService(
     companion object {
         private val ALL_COMBINATIONS = listOf("6" to "1", "6" to "2", "7" to "1", "7" to "2")
 
-        private val SCHEDULE_RUN_START: LocalTime = MarketTimeUtil.KRX_TRADE_CLOSE  // 15:36
+        private val SCHEDULE_RUN_START: LocalTime = MarketTimeUtil.KRX_TRADE_CLOSE  // 20:01
         private val SCHEDULE_RUN_END: LocalTime = LocalTime.of(21, 0)
-        /** 다음 거래일 갱신 재개 시각. 스케줄러 재시작(15:36) + 여유 5분 */
-        private val NEXT_DAY_REFRESH_TIME: LocalTime = LocalTime.of(15, 41)
+        private val NEXT_DAY_REFRESH_TIME: LocalTime = SCHEDULE_RUN_START.plusMinutes(5)
     }
 
-    /**
-     * 투자자별 장마감 순위 캐시의 동적 TTL 계산.
-     *
-     * - 스케줄러 실행 구간(15:36 ~ 21:00) 저장: 다음 분 + 1분 여유 (매 분 덮어쓰기 사이클)
-     * - 그 외 시각(장 외 시간대/주말/휴일) 저장: 다음 거래일 15:41 까지
-     *   → 15:41 = 스케줄러 재시작(15:36) + 5분 여유. 첫 덮어쓰기 타이밍 공백 방지.
-     */
     internal fun ttlUntilNextInvestorUpdate(now: LocalDateTime): Duration {
         val nowTime = now.toLocalTime()
         val target: LocalDateTime =
             if (!nowTime.isBefore(SCHEDULE_RUN_START) && nowTime.isBefore(SCHEDULE_RUN_END)) {
-                // 스케줄러 실행 중: 다음 분 + 1분 여유
                 now.plusMinutes(1).truncatedTo(ChronoUnit.MINUTES).plusMinutes(1)
             } else {
-                // 장 외 시간/주말/휴일: 다음 거래일 15:41
                 val baseDate: LocalDate =
-                    if (!nowTime.isBefore(SCHEDULE_RUN_END)) now.toLocalDate()  // 21:00 이후 → 오늘 이후 거래일
-                    else now.toLocalDate().minusDays(1)  // 15:36 이전 → 어제 이후 거래일(오늘 포함)
+                    if (!nowTime.isBefore(SCHEDULE_RUN_END)) now.toLocalDate()
+                    else now.toLocalDate().minusDays(1)
                 holidayService.nextTradingDay(baseDate).atTime(NEXT_DAY_REFRESH_TIME)
             }
         val duration = Duration.between(now, target)
-        // 안전 하한: 음수/0 방지 (극히 짧은 시간이라도 캐시되도록)
         return if (duration.isNegative || duration.isZero) Duration.ofMinutes(1) else duration
     }
 
@@ -77,31 +66,25 @@ class InvestorService(
         val now = LocalTime.now()
 
         if (MarketTimeUtil.isKrxTradeClose(now)) {
-            return getCloseMarketWithCache(req, now)
+            return getCloseMarketWithCache(req)
         }
 
         return buildOpenMarketResult(req)
     }
 
-    private fun getCloseMarketWithCache(req: InvestorListReq, now: LocalTime): InvestorListRes? {
+    private fun getCloseMarketWithCache(req: InvestorListReq): InvestorListRes? {
         val cacheKey = "$CACHE_PREFIX${req.orgnTp}:${req.trdeTp}"
 
         redisTemplate.opsForValue().get(cacheKey)?.let { cached ->
             return objectMapper.readValue(cached, InvestorListRes::class.java)
         }
 
-        val rawRes = refreshCloseMarketCache(now)
+        val rawRes = refreshCloseMarketCache()
         return buildFromRaw(rawRes, req.orgnTp, req.trdeTp)
     }
 
-    /**
-     * 4조합(외국인/기관 × 매수/매도) 의 Redis 캐시를 현재 시점 기준으로 새로 채운다.
-     *
-     * - InvestorCloseMarketScheduler 에서 매분 호출 (15:36~21:00 평일)
-     * - on-demand fallback 경로에서도 호출 (cache miss 시)
-     */
-    fun refreshCloseMarketCache(now: LocalTime = LocalTime.now()): KiwoomInvestorTradeCloseMarketRes {
-        val rawRes = fetchRawCloseMarket(now)
+    fun refreshCloseMarketCache(): KiwoomInvestorTradeCloseMarketRes {
+        val rawRes = fetchRawCloseMarket()
 
         val ttl = ttlUntilNextInvestorUpdate(LocalDateTime.now())
         ALL_COMBINATIONS.forEach { (orgnTp, trdeTp) ->
@@ -115,13 +98,13 @@ class InvestorService(
         return rawRes
     }
 
-    private fun fetchRawCloseMarket(now: LocalTime): KiwoomInvestorTradeCloseMarketRes {
+    private fun fetchRawCloseMarket(): KiwoomInvestorTradeCloseMarketRes {
         return runBlocking { priceClient.investorTradeCloseMarket(
             req = KiwoomInvestorTradeCloseMarketReq(
                 mrkt_tp = "000",
                 amt_qty_tp = "1",
                 trde_tp = "0",
-                stex_tp = if (MarketTimeUtil.isNxtTradeClose(now)) "3" else "1",
+                stex_tp = "3",
             )
         ) }
     }
@@ -178,7 +161,7 @@ class InvestorService(
                         invsr = req.orgnTp,
                         frgn_all = "0",
                         smtm_netprps_tp = "1",
-                        stex_tp = "1",
+                        stex_tp = "3",
                     )
                 ) }
 
@@ -189,7 +172,7 @@ class InvestorService(
                         invsr = req.orgnTp,
                         frgn_all = "1",
                         smtm_netprps_tp = "1",
-                        stex_tp = "1",
+                        stex_tp = "3",
                     )
                 ) }
 
@@ -283,8 +266,6 @@ class InvestorService(
 
         return InvestorListRes(investorList = investorList)
     }
-
-    // ─── 소켓 스트리밍 ────────────────────────────────────────────────────────
 
     fun streamInvestors(
         req: InvestorStreamReq

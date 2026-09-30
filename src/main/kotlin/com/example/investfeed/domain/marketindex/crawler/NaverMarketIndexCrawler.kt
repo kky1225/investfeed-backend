@@ -101,10 +101,10 @@ class NaverMarketIndexCrawler(
 
     fun fetchIndexOhlc(type: MarketIndexType): IndexOhlc? = runBlocking {
         val path = OHLC_PATHS[type] ?: return@runBlocking null
-        fetchOne(type, "$naverPollingUrl$path") { _, body -> parseOhlc(body) }
+        fetchOne(type, "$naverPollingUrl$path") { indexType, body -> parseOhlc(indexType, body) }
     }
 
-    private fun parseOhlc(body: String): IndexOhlc {
+    private fun parseOhlc(type: MarketIndexType, body: String): IndexOhlc {
         val data = objectMapper.readTree(body)?.get("datas")?.firstOrNull() ?: throw MarketIndexResponseException()
         fun raw(field: String): Double? = data.textOrNull(field)?.replace(",", "")?.toDoubleOrNull()
         val tradedAt = data.textOrNull("localTradedAt")?.takeIf { it.length >= 10 } ?: throw MarketIndexResponseException()
@@ -112,22 +112,24 @@ class NaverMarketIndexCrawler(
         val change = raw("compareToPreviousClosePriceRaw")?.let { abs ->
             when (data.path("compareToPreviousPrice").textOrNull("name")) { "FALLING" -> -abs; "RISING" -> abs; else -> 0.0 }
         }
+        val openRaw = raw("openPriceRaw")
+        val highRaw = raw("highPriceRaw")
+        val lowRaw = raw("lowPriceRaw")
+        if (openRaw == null || highRaw == null || lowRaw == null) {
+            log.warn { "[${type.displayName}] 시·고·저가 누락 — 현재가로 대체 (localTradedAt=$tradedAt, close=$close)" }
+        }
+
         return IndexOhlc(
             tradeDate = LocalDate.parse(tradedAt.substring(0, 10)),
-            open = raw("openPriceRaw") ?: throw MarketIndexResponseException(),
-            high = raw("highPriceRaw") ?: throw MarketIndexResponseException(),
-            low = raw("lowPriceRaw") ?: throw MarketIndexResponseException(),
+            open = openRaw ?: close,
+            high = highRaw ?: close,
+            low = lowRaw ?: close,
             close = close,
             prevClose = change?.let { close - it }?.takeIf { it > 0 },
             marketStatus = data.textOrNull("marketStatus"),
         )
     }
 
-    /**
-     * 여러 외부 API를 병렬 호출하여 주요 시장 지수를 수집한다.
-     * 개별 엔드포인트 실패는 로깅만 하고 부분 결과를 반환한다(crawler 특성상 partial-fail 허용).
-     * 코루틴 경계: 스케줄러(동기)에서 호출되므로 여기서 runBlocking 으로 감싼다.
-     */
     fun crawl(): List<MarketIndexRes> = runBlocking { crawlSuspend() }
 
     private suspend fun crawlSuspend(): List<MarketIndexRes> {

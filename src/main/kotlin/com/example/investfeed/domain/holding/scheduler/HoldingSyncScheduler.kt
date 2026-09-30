@@ -49,12 +49,16 @@ class HoldingSyncScheduler(
     }
 
     @Scheduled(cron = SchedulerCron.HOLDING_SYNC, scheduler = "slowScheduler")
-    fun syncAllHoldings() {
+    fun scheduledSyncAllHoldings() {
         schedulerLogService.markFired(SchedulerName.HoldingSyncScheduler)
         if (holidayService.isHoliday()) {
             log.info { "HoldingSyncScheduler skipped: today is holiday" }
             return
         }
+        syncAllHoldings()
+    }
+
+    fun syncAllHoldings() {
         schedulerLogService.execute(SchedulerName.HoldingSyncScheduler) {
             log.info { "보유종목 동기화 스케줄러 시작" }
             val start = System.currentTimeMillis()

@@ -41,7 +41,7 @@ class DashboardService(
                     mrkt_tp = "001",
                     stk_inds_tp = "0",
                     amt_qty_tp = "0",
-                    stex_tp = "1"
+                    stex_tp = "3"
                 )
             )
         }

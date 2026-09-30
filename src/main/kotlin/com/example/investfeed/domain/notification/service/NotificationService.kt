@@ -103,6 +103,39 @@ class NotificationService(
         return true
     }
 
+    fun isPriceAlertSent(
+        memberId: Long,
+        assetType: AssetType,
+        assetCode: String,
+        threshold: Double,
+        direction: Direction,
+        alertDate: LocalDate = LocalDate.now(),
+    ): Boolean = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
+        memberId, assetType, assetCode, threshold, direction, alertDate
+    )
+
+    @Transactional
+    fun recordPriceAlertSent(
+        memberId: Long,
+        assetType: AssetType,
+        assetCode: String,
+        threshold: Double,
+        direction: Direction,
+        alertDate: LocalDate = LocalDate.now(),
+    ) {
+        if (isPriceAlertSent(memberId, assetType, assetCode, threshold, direction, alertDate)) return
+        alertLogRepository.save(
+            NotificationAlertLog(
+                memberId = memberId,
+                assetType = assetType,
+                assetCode = assetCode,
+                threshold = threshold,
+                direction = direction,
+                alertDate = alertDate
+            )
+        )
+    }
+
     @Transactional
     fun createPriceTargetAlert(priceTarget: PriceTarget, currentPrice: Double) {
         val notification = Notification(

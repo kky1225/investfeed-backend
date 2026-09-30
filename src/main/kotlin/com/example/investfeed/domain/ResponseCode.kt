@@ -249,6 +249,10 @@ enum class ResponseCode(
     ASSISTANT_TELEGRAM_LINK_CODE(message = "텔레그램 연결 코드 발급에 성공하셨습니다."),
     ASSISTANT_TELEGRAM_UPDATE(message = "텔레그램 발송 설정 변경에 성공하셨습니다."),
     ASSISTANT_TELEGRAM_UNLINK(message = "텔레그램 연결 해제에 성공하셨습니다."),
+    ASSISTANT_CARD_GET(message = "비서 카드 조회에 성공하셨습니다."),
+    ASSISTANT_ALIAS_LIST(message = "종목 별칭 조회에 성공하셨습니다."),
+    ASSISTANT_ALIAS_CREATE(message = "종목 별칭 등록에 성공하셨습니다."),
+    ASSISTANT_ALIAS_DELETE(message = "종목 별칭 삭제에 성공하셨습니다."),
     MONITORING_TELEGRAM_SEND_GET(message = "텔레그램 전체 발송 상태 조회에 성공하셨습니다."),
     MONITORING_TELEGRAM_SEND_UPDATE(message = "텔레그램 전체 발송 상태 변경에 성공하셨습니다."),
 

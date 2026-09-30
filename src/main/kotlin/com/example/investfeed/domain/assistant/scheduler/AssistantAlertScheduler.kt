@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
@@ -41,8 +42,11 @@ class AssistantAlertScheduler(
     @Scheduled(cron = SchedulerCron.ASSISTANT_INDEX_ALERT_US, scheduler = "fastScheduler")
     fun scheduledUs() = runUs()
 
-    fun triggerKr() = runKr()
-    fun triggerUs() = runUs()
+    fun triggerKr() = executeKr(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES))
+    fun triggerUs() {
+        val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
+        executeUs(now, toNy(now).toLocalDate())
+    }
 
     private fun runKr() {
         val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
@@ -53,6 +57,10 @@ class AssistantAlertScheduler(
             log.info { "AssistantIndexAlertKrScheduler skipped: 국내 세션 밖 ($t)" }
             return
         }
+        executeKr(now)
+    }
+
+    private fun executeKr(now: LocalDateTime) {
         schedulerLogService.execute(SchedulerName.AssistantIndexAlertKrScheduler) {
             setSchedulerSecurityContext()
             try {
@@ -71,13 +79,20 @@ class AssistantAlertScheduler(
     private fun runUs() {
         val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
         schedulerLogService.markFired(SchedulerName.AssistantIndexAlertUsScheduler)
-        val ny = now.atZone(UsMarketCalendarService.KST).withZoneSameInstant(UsMarketCalendarService.NY)
+        val ny = toNy(now)
         val usDate = ny.toLocalDate()
         val nyTime = ny.toLocalTime()
         if (!usMarketCalendarService.isUsTradingDay(usDate) || nyTime.isBefore(US_OPEN_ET) || nyTime.isAfter(usMarketCalendarService.closeTimeEt(usDate))) {
             log.info { "AssistantIndexAlertUsScheduler skipped: 미국 세션 밖 (ET $usDate $nyTime)" }
             return
         }
+        executeUs(now, usDate)
+    }
+
+    private fun toNy(now: LocalDateTime) =
+        now.atZone(UsMarketCalendarService.KST).withZoneSameInstant(UsMarketCalendarService.NY)
+
+    private fun executeUs(now: LocalDateTime, usDate: LocalDate) {
         schedulerLogService.execute(SchedulerName.AssistantIndexAlertUsScheduler) {
             try {
                 val result = indexAlertService.runUs(now, usDate)

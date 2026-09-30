@@ -57,6 +57,18 @@ class PersonalBriefingService(
         }
     }
 
+    fun buildAllHoldingsSheet(member: Member, date: LocalDate): PersonalFactSheet = withMember(member) {
+        val stock = fetchStockHoldings(member)
+        PersonalFactSheet(
+            memberId = member.id,
+            krBrokers = stock.map { (mb, res) -> toKrHoldingsFact(mb, res) },
+            usBrokers = stock.mapNotNull { (mb, res) -> toUsHoldingsFact(mb, res) },
+            usdKrw = marketIndexService.getMarketIndex(MarketIndexType.USD_KRW)?.price?.let { TemplateFormat.parse(it) },
+            coinExchanges = fetchCryptoHoldings(member, date),
+            realized = runCatching { fetchRealizedProfit(member.id) }.onFailure { log.error(it) { "실현손익 조회 실패 memberId=${member.id}" } }.getOrNull(),
+        )
+    }
+
     private fun buildKrHoldingsSheet(member: Member): PersonalFactSheet {
         val stock = fetchStockHoldings(member)
         return PersonalFactSheet(
@@ -129,7 +141,7 @@ class PersonalBriefingService(
             }
             val code = h.stkCd.substringBefore("_")
             HoldingFact(code = code, name = h.stkNm, link = "/stock/detail/$code", dayRate = dayRate, dayChange = dayChange, totalRate = TemplateFormat.parse(h.prftRt), eval = eval,
-                curPrc = cur, evalProfit = TemplateFormat.parse(h.evltvPrft))
+                curPrc = cur, evalProfit = TemplateFormat.parse(h.evltvPrft), qty = qty, purPrice = TemplateFormat.parse(h.purPric))
         }
         val eval = items.sumOf { it.eval ?: 0.0 }
         val dayChange = items.mapNotNull { it.dayChange }.takeIf { it.isNotEmpty() }?.sum()
@@ -149,7 +161,7 @@ class PersonalBriefingService(
                 .onFailure { log.error(it) { "미국 종목 시세 조회 실패 $ticker" } }.getOrNull()
             val dayChange = if (dayRate != null && evalUsd != null && (1 + dayRate / 100) > 0) evalUsd - evalUsd / (1 + dayRate / 100) else null
             HoldingFact(code = ticker, name = h.stkNm.ifBlank { ticker }, link = "/us-stock/detail/${h.stexTp}/$ticker", dayRate = dayRate, dayChange = dayChange, totalRate = TemplateFormat.parse(h.prftRt), eval = evalUsd,
-                curPrc = TemplateFormat.parse(h.curPrcUsd), evalProfit = TemplateFormat.parse(h.evltvPrftUsd))
+                curPrc = TemplateFormat.parse(h.curPrcUsd), evalProfit = TemplateFormat.parse(h.evltvPrftUsd), qty = TemplateFormat.parse(h.rmndQty), purPrice = TemplateFormat.parse(h.purPricUsd))
         }
         val eval = items.sumOf { it.eval ?: 0.0 }
         val dayChange = items.mapNotNull { it.dayChange }.takeIf { it.isNotEmpty() }?.sum()
@@ -174,7 +186,7 @@ class PersonalBriefingService(
                         val eval = day?.let { it.close * qty }
                         val dayChange = day?.prevClose?.let { pc -> (day.close - pc) * qty }
                         HoldingFact(code = h.stkCd, name = name, link = "/crypto/detail/${h.stkCd}", dayRate = day?.changeRate, dayChange = dayChange, totalRate = TemplateFormat.parse(h.prftRt), eval = eval,
-                            curPrc = day?.close, evalProfit = eval?.let { e -> TemplateFormat.parse(h.purAmt)?.let { e - it } })
+                            curPrc = day?.close, evalProfit = eval?.let { e -> TemplateFormat.parse(h.purAmt)?.let { e - it } }, qty = qty, purPrice = TemplateFormat.parse(h.purPric))
                     }
                     val eval = items.sumOf { it.eval ?: 0.0 }
                     val dayChange = items.mapNotNull { it.dayChange }.takeIf { it.isNotEmpty() }?.sum()

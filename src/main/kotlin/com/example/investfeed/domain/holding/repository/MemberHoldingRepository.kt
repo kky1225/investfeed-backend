@@ -17,4 +17,5 @@ interface MemberHoldingRepository : JpaRepository<MemberHolding, Long> {
     fun findMaxDisplayOrder(memberId: Long, brokerId: Long): Int
 
     fun findByBrokerId(brokerId: Long): List<MemberHolding>
+    fun findByMemberId(memberId: Long): List<MemberHolding>
 }

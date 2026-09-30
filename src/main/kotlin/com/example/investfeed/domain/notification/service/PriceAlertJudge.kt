@@ -47,10 +47,15 @@ class PriceAlertJudge(
         if (!enabled) return null
 
         val absFluRt = abs(fluRt)
-        val highestFired = thresholds
+        val pending = thresholds
             .filter { absFluRt >= it }
-            .filter { notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, it, direction, fluRt, alertDate) }
-            .maxOrNull() ?: return null
+            .filterNot { notificationService.isPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate) }
+        val highestFired = pending.maxOrNull() ?: return null
+
+        if (!notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, highestFired, direction, fluRt, alertDate)) return null
+        pending.filter { it < highestFired }.forEach {
+            notificationService.recordPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate)
+        }
 
         if (target.held) {
             val is52w = direction == Direction.HIGH_52W || direction == Direction.LOW_52W

@@ -123,6 +123,7 @@ class MonitoringService(
 
     /**
      * 스케줄러 상태 판정.
+     * - RUNNING: 시작했고 아직 안 끝났으며 timeout_sec 이내 (첫 실행 중이어도 PENDING 보다 우선)
      * - PENDING: 한 번도 실행 안 됨
      * - STUCK: 시작했는데 안 끝나고 timeout_sec 초과
      * - FAILED: 마지막 실행이 실패
@@ -132,14 +133,14 @@ class MonitoringService(
     private fun computeState(s: SchedulerStatus): String {
         val now = LocalDateTime.now()
 
-        if (s.lastSuccessAt == null && s.lastFailureAt == null) return "PENDING"
-
         val startedAt = s.lastStartedAt
         val finishedAt = s.lastFinishedAt
-        val isStuck = startedAt != null &&
-            (finishedAt == null || finishedAt.isBefore(startedAt)) &&
-            Duration.between(startedAt, now).seconds > s.timeoutSec
-        if (isStuck) return "STUCK"
+        val inProgress = startedAt != null && (finishedAt == null || finishedAt.isBefore(startedAt))
+        if (inProgress && Duration.between(startedAt, now).seconds <= s.timeoutSec) return "RUNNING"
+
+        if (s.lastSuccessAt == null && s.lastFailureAt == null) return "PENDING"
+
+        if (inProgress) return "STUCK"
 
         val lastFailureAt = s.lastFailureAt
         val lastSuccessAt = s.lastSuccessAt

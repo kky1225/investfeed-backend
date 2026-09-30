@@ -27,7 +27,7 @@ class InvestorCloseMarketScheduler(
     private val log = KotlinLogging.logger {}
 
     companion object {
-        private val RUN_START: LocalTime = MarketTimeUtil.KRX_TRADE_CLOSE  // 15:36
+        private val RUN_START: LocalTime = MarketTimeUtil.KRX_TRADE_CLOSE  // 20:01
         private val RUN_END: LocalTime = LocalTime.of(21, 0)
     }
 
@@ -49,7 +49,7 @@ class InvestorCloseMarketScheduler(
             }
 
             try {
-                investorService.refreshCloseMarketCache(now)
+                investorService.refreshCloseMarketCache()
             } catch (e: Exception) {
                 log.error(e) { "InvestorCloseMarketScheduler 캐시 갱신 실패" }
             } finally {

@@ -12,7 +12,7 @@ object MarketTimeUtil {
     val KRX_CLOSE: LocalTime = LocalTime.of(15, 30)
     val NXT_OPEN: LocalTime = LocalTime.of(8, 0)
     val NXT_CLOSE: LocalTime = LocalTime.of(20, 0)
-    val KRX_TRADE_CLOSE: LocalTime = LocalTime.of(15, 36)
+    val KRX_TRADE_CLOSE: LocalTime = LocalTime.of(20, 1)
     val STOCK_ALERT_START: LocalTime = LocalTime.of(8, 1)
     val KRX_HOLDING_CLOSE: LocalTime = LocalTime.of(15, 40)
     val PRE_MARKET_CALL_START: LocalTime = LocalTime.of(8, 50)

@@ -21,7 +21,7 @@ enum class SchedulerName(
         SchedulerType.FAST, 60, "매분(09:00~15:30)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.ASSISTANT_INDEX_ALERT_KR),
     ),
-    InvestorCloseMarketScheduler(SchedulerType.FAST, 60, "매분(15:36~21:00)", crons = listOf(SchedulerCron.INVESTOR_CLOSE_MARKET)),
+    InvestorCloseMarketScheduler(SchedulerType.FAST, 60, "매분(20:01~21:00)", crons = listOf(SchedulerCron.INVESTOR_CLOSE_MARKET)),
     AssistantIndexAlertUsScheduler(SchedulerType.FAST, 60, "매분(22:30~05:00, 미국 세션)", crons = listOf(SchedulerCron.ASSISTANT_INDEX_ALERT_US)),
     TelegramUpdatePoller(SchedulerType.FAST, 60, "5초 (텔레그램 수신)", crons = listOf(SchedulerCron.TELEGRAM_POLL)),   // FAST 라 성공은 status 만 갱신
 
