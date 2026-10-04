@@ -7,12 +7,13 @@ data class ToolResponse<T>(
     val data: T? = null,
     val error: String? = null,
     val candidates: List<StockCandidate>? = null,   // 종목 후보 복수
+    val query: String? = null,                      // 후보를 낸 종목 검색어
     val asOf: LocalDateTime? = null,
     val source: String? = null,                     // 데이터 출처
 ) {
     companion object {
-        fun <T> ok(data: T, source: String? = null, asOf: LocalDateTime = LocalDateTime.now()) = ToolResponse(true, data, null, null, asOf, source)
-        fun <T> fail(error: String, candidates: List<StockCandidate>? = null) = ToolResponse<T>(false, null, error, candidates)
+        fun <T> ok(data: T, source: String? = null, asOf: LocalDateTime = LocalDateTime.now()) = ToolResponse(ok = true, data = data, asOf = asOf, source = source)
+        fun <T> fail(error: String, candidates: List<StockCandidate>? = null, query: String? = null) = ToolResponse<T>(ok = false, error = error, candidates = candidates, query = query)
     }
 }
 
@@ -44,4 +45,4 @@ data class ResolvedStock(
 data class CardRef(val cardRef: String, val kind: String)
 
 /** 도구 인자 오류·종목 미확정. 컨트롤러가 fail 봉투로 바꾼다 */
-class ToolException(message: String, val candidates: List<StockCandidate>? = null) : RuntimeException(message)
+class ToolException(message: String, val candidates: List<StockCandidate>? = null, val query: String? = null) : RuntimeException(message)

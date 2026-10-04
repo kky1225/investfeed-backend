@@ -14,7 +14,7 @@ interface CalendarEventRepository : JpaRepository<CalendarEventEntity, Long> {
     fun countFrozenApiEvents(year: Int, month: Int): Long
 
     @Modifying
-    @Query("DELETE FROM CalendarEventEntity e WHERE e.year = :year AND e.month = :month AND e.type IN ('INDICATOR', 'HOLIDAY')")
+    @Query("DELETE FROM CalendarEventEntity e WHERE e.year = :year AND e.month = :month AND e.source IN ('FRED', 'ECOS', 'HOLIDAY') AND e.type IN ('INDICATOR', 'HOLIDAY')")
     fun deleteApiEventsByYearAndMonth(year: Int, month: Int)
 
     fun findByYearAndMonthAndTypeIn(year: Int, month: Int, types: Collection<String>): List<CalendarEventEntity>

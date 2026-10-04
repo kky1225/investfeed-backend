@@ -118,6 +118,28 @@ class MarketFactSheetService(
             .map { (grade, rows) -> RecommendFact(grade, rows.map { it.stkNm }.sorted()) }
     }
 
+    fun collectKrNow(asOf: LocalDateTime, kospi: Boolean = true, kosdaq: Boolean = true): KrCloseFactSheet {
+        val kospiInfo = if (kospi) fetchOrNull("코스피 지수") { indexService.getIndexInfo(KOSPI) } else null
+        val kosdaqInfo = if (kosdaq) fetchOrNull("코스닥 지수") { indexService.getIndexInfo(KOSDAQ) } else null
+        return KrCloseFactSheet(
+            tradeDate = asOf.toLocalDate(),
+            asOf = asOf,
+            kospi = kospiInfo?.let { toIndexFact("코스피", it) },
+            kosdaq = kosdaqInfo?.let { toIndexFact("코스닥", it) },
+            kospi200 = if (kospi) fetchOrNull("코스피200 현재가") { sectPriceNowFact("코스피200", KOSPI200) } else null,
+            kosdaq150 = if (kosdaq) fetchOrNull("코스닥150 현재가") { sectPriceNowFact("코스닥150", KOSDAQ150) } else null,
+            flow = if (kospiInfo == null && kosdaqInfo == null) null else FlowFact(
+                kospi = fetchOrNull("코스피 수급") { kospiInfo?.let { marketFlow(it, null) } },
+                kosdaq = fetchOrNull("코스닥 수급") { kosdaqInfo?.let { marketFlow(it, null) } },
+            ),
+            sectors = null,
+            usdKrw = null,
+        )
+    }
+
+    fun collectUsNow(asOf: LocalDateTime): UsCloseFactSheet =
+        collectUsClose(usMarketCalendarService.lastClosedUsTradingDay(asOf), asOf)
+
     fun collectUsClose(usTradeDate: LocalDate, asOf: LocalDateTime): UsCloseFactSheet {
         val indexes = fetchOrNull("미국 지수") {
             listOf(

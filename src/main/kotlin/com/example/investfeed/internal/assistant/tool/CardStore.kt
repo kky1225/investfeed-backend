@@ -40,5 +40,9 @@ class CardStore(
             ?.let { objectMapper.readValue(it, StoredCard::class.java) }
             ?.takeIf { it.memberId == memberId }
 
+    fun delete(ref: String) {
+        redisTemplate.delete(key(ref))
+    }
+
     private fun key(ref: String) = "${RedisKeyPrefix.ASSISTANT.prefix}CARD:$ref"
 }

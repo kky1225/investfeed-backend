@@ -15,6 +15,7 @@ data class AlertTarget(
     val link: String,
     val held: Boolean,
     val curRate: Double?,
+    val curPrice: Double? = null,
 )
 
 @Service
@@ -52,7 +53,7 @@ class PriceAlertJudge(
             .filterNot { notificationService.isPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate) }
         val highestFired = pending.maxOrNull() ?: return null
 
-        if (!notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, highestFired, direction, fluRt, alertDate)) return null
+        if (!notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, highestFired, direction, fluRt, alertDate, target.curPrice)) return null
         pending.filter { it < highestFired }.forEach {
             notificationService.recordPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate)
         }
@@ -61,7 +62,8 @@ class PriceAlertJudge(
             val is52w = direction == Direction.HIGH_52W || direction == Direction.LOW_52W
             hits += HoldingAlertHit(
                 target.memberId, target.code, target.name, target.link, direction,
-                threshold = highestFired, triggerRate = if (is52w) null else fluRt, currentRate = target.curRate,
+                threshold = highestFired, triggerRate = if (is52w) null else fluRt,
+                price = if (is52w) fluRt else target.curPrice,
             )
         }
         return highestFired

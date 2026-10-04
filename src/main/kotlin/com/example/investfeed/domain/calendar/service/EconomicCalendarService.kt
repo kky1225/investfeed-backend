@@ -5,6 +5,7 @@ import com.example.investfeed.domain.calendar.entity.CalendarEventEntity
 import com.example.investfeed.domain.calendar.repository.CalendarEventRepository
 import com.example.investfeed.ecos.client.EcosClient
 import com.example.investfeed.fred.client.FredClient
+import com.example.investfeed.fred.dto.res.FredObservation
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.global.holiday.MarketHolidayRepository
@@ -19,7 +20,6 @@ import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -55,20 +55,26 @@ class EconomicCalendarService(
 
         val US_INDICATORS = listOf(
             UsIndicatorDef("DFEDTARU", "미국 기준금리", "%", "D"),
-            UsIndicatorDef("CPIAUCSL", "소비자물가지수(전년동월비)", "%", "M"),
+            UsIndicatorDef("CPIAUCNS", "소비자물가지수(전년동월비)", "%", "M"),
             UsIndicatorDef("A191RL1Q225SBEA", "GDP 성장률", "%", "Q"),
             UsIndicatorDef("UNRATE", "실업률", "%", "M"),
             UsIndicatorDef("PAYEMS", "비농업 신규고용", "천 명", "M"),
             UsIndicatorDef("ICSA", "신규 실업수당 청구건수", "건", "W"),
-            UsIndicatorDef("PCEPI", "PCE 물가지수(전년동월비)", "%", "M"),
+            UsIndicatorDef("PCEPILFE", "근원 PCE 물가지수(전년동월비)", "%", "M"),
             UsIndicatorDef("T10Y2Y", "장단기 금리차", "%", "D"),
         )
 
         // 직전 관측일이 아니라 "값이 마지막으로 바뀐 시점"과 비교해야 인상/인하폭이 유지된다.
         val STEP_INDICATOR_CODES = setOf("DFEDTARU", "722Y001")
 
+        // 한국 CPI 발표 일정 이름의 기준월 접두어 (예: "2026-08 소비자물가지수(전년동월비)")
+        private val KR_CPI_NAME_PREFIX = Regex("^(\\d{4})-(\\d{2}) ")
+
+        // GDP 추정치(속보/잠정/확정) 발표일 판정용 — 실질 GDP 수준은 추정치 발표마다 값이 바뀌어 vintage 가 빠짐없이 생긴다
+        const val GDP_ESTIMATE_VINTAGE_SERIES = "GDPC1"
+
         // FRED units=pc1 (전년동월비 %) 적용 대상 시리즈
-        val FRED_PC1_SERIES = setOf("CPIAUCSL", "PCEPI")
+        val FRED_PC1_SERIES = setOf("CPIAUCNS", "PCEPILFE")
         // FRED units=chg (전월 대비 증감) 적용 대상 시리즈 — level 대신 MoM 증감 표시
         val FRED_CHG_SERIES = setOf("PAYEMS")
 
@@ -78,9 +84,9 @@ class EconomicCalendarService(
                 FredReleaseSeries("비농업고용", "PAYEMS", "천 명"),
                 FredReleaseSeries("실업률", "UNRATE", "%"),
             ),
-            10 to listOf(FredReleaseSeries("소비자물가지수(전년동월비)", "CPIAUCSL", "%")),
+            10 to listOf(FredReleaseSeries("소비자물가지수(전년동월비)", "CPIAUCNS", "%")),
             53 to listOf(FredReleaseSeries("GDP 성장률", "A191RL1Q225SBEA", "%")),
-            54 to listOf(FredReleaseSeries("PCE 물가지수(전년동월비)", "PCEPI", "%")),
+            54 to listOf(FredReleaseSeries("근원 PCE 물가지수(전년동월비)", "PCEPILFE", "%")),
             180 to listOf(FredReleaseSeries("신규 실업수당", "ICSA", "건")),
         )
         // 주간 릴리즈(매주 표시)
@@ -88,11 +94,11 @@ class EconomicCalendarService(
 
         // 히스토리 차트용: 시리즈 → release_id (realtime 기반 발표일 매핑)
         val FRED_SERIES_RELEASE_ID = mapOf(
-            "CPIAUCSL" to 10,
+            "CPIAUCNS" to 10,
             "A191RL1Q225SBEA" to 53,
             "UNRATE" to 50,
             "PAYEMS" to 50,
-            "PCEPI" to 54,
+            "PCEPILFE" to 54,
             "ICSA" to 180,
         )
 
@@ -478,7 +484,7 @@ class EconomicCalendarService(
             firstVintageByObs.entries.sortedBy { it.key }.mapNotNull { (obsDate, pair) ->
                 val (releaseDate, originalIdx) = pair
                 val prevObs = shiftObsDateMinus12(obsDate) ?: return@mapNotNull null
-                val originalPrev = firstVintageByObs[prevObs]?.second ?: return@mapNotNull null
+                val originalPrev = vintageValueAt(grouped[prevObs], releaseDate) ?: return@mapNotNull null
                 val latestCur = latestVintageByObs[obsDate] ?: return@mapNotNull null
                 val latestPrev = latestVintageByObs[prevObs] ?: return@mapNotNull null
                 if (originalPrev == 0.0 || latestPrev == 0.0) return@mapNotNull null
@@ -504,7 +510,7 @@ class EconomicCalendarService(
             firstVintageByObs.entries.sortedBy { it.key }.mapNotNull { (obsDate, pair) ->
                 val (releaseDate, originalCur) = pair
                 val prevObs = shiftObsDateMinus1(obsDate) ?: return@mapNotNull null
-                val originalPrev = firstVintageByObs[prevObs]?.second ?: return@mapNotNull null
+                val originalPrev = vintageValueAt(grouped[prevObs], releaseDate) ?: return@mapNotNull null
                 val latestCur = latestVintageByObs[obsDate] ?: return@mapNotNull null
                 val latestPrev = latestVintageByObs[prevObs] ?: return@mapNotNull null
                 val originalChg = (originalCur - originalPrev).toLong()
@@ -536,6 +542,11 @@ class EconomicCalendarService(
         val d = LocalDate.parse(obsDate)
         d.minusYears(1).format(DATE_FMT)
     }.getOrNull()
+
+    private fun vintageValueAt(vintages: List<FredObservation>?, asOf: String): Double? =
+        vintages?.firstOrNull { v ->
+            v.realtime_start!! <= asOf && (v.realtime_end == null || asOf <= v.realtime_end)
+        }?.value?.toDoubleOrNull()
 
     /** FRED 관측 date(YYYY-MM-DD) → 1개월 전 같은 월(YYYY-MM-DD) */
     private fun shiftObsDateMinus1(obsDate: String): String? = runCatching {
@@ -678,7 +689,7 @@ class EconomicCalendarService(
     }
 
     private fun mergeManualEvents(apiResult: CalendarEventsRes, year: Int, month: Int): CalendarEventsRes {
-        val manualEvents = calendarEventRepository.findByYearAndMonthAndTypeIn(year, month, setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION", "HOLIDAY"))
+        val manualEvents = calendarEventRepository.findByYearAndMonthAndTypeIn(year, month, setOf("RATE_DECISION", "GDP_RELEASE", "CPI_RELEASE", "US_RATE_DECISION", "HOLIDAY"))
             .filter { it.type != "HOLIDAY" || it.source == "MANUAL" }
         if (manualEvents.isEmpty()) return apiResult
 
@@ -691,7 +702,7 @@ class EconomicCalendarService(
     }
 
     private fun isManualEnrichable(entity: CalendarEventEntity): Boolean =
-        entity.type in setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION")
+        entity.type in setOf("RATE_DECISION", "GDP_RELEASE", "CPI_RELEASE", "US_RATE_DECISION")
 
     private fun fetchApiEvents(
         year: Int,
@@ -699,51 +710,9 @@ class EconomicCalendarService(
         prefetchedReleaseDates: Map<Int, List<String>>? = null,
     ): List<CalendarEvent> {
         val events = mutableListOf<CalendarEvent>()
-        events.addAll(fetchKrMonthlyEvents(year, month))
         events.addAll(fetchFredEvents(year, month, prefetchedReleaseDates))
         events.addAll(fetchHolidayEvents(year, month))
         return events
-    }
-
-    /** 한국 월별 지표 (CPI) — 분기/일별은 MANUAL로 별도 관리 */
-    private fun fetchKrMonthlyEvents(year: Int, month: Int): List<CalendarEvent> {
-        val result = mutableListOf<CalendarEvent>()
-        val monthStart = LocalDate.of(year, month, 1)
-        val monthEnd = monthStart.plusMonths(1).minusDays(1)
-
-        for (def in KR_INDICATORS) {
-            if (def.frequency != "M") continue
-            runCatching {
-                // YoY 계산 지표는 12개월 전 값도 필요 → 쿼리 범위를 1년+1개월 확장
-                val rangeStart = if (def.computeYoY) monthStart.minusMonths(13) else monthStart
-                val (start, end) = ecosRange(def.frequency, rangeStart, monthEnd)
-                val rows = ecosClient.getStatistics(def.tableCode, def.frequency, start, end, def.itemCode)
-                    ?.statisticSearch?.row ?: return@runCatching
-
-                val targetTime = "%04d%02d".format(year, month)
-                if (def.computeYoY) {
-                    val yoyPoints = indexToYoY(rows).associateBy { it.date }
-                    val point = yoyPoints[targetTime] ?: return@runCatching
-                    val eventDate = "$year-${"%02d".format(month)}-01"
-                    result.add(CalendarEvent(
-                        date = eventDate, name = def.name, country = "KR",
-                        value = formatEventValue(point.value, def.unit),
-                        isFuture = false, type = "INDICATOR", source = "ECOS",
-                    ))
-                } else {
-                    rows.forEach { row ->
-                        if (row.TIME == null || row.DATA_VALUE == null) return@forEach
-                        val eventDate = "${row.TIME.substring(0, 4)}-${row.TIME.substring(4, 6)}-01"
-                        result.add(CalendarEvent(
-                            date = eventDate, name = def.name, country = "KR",
-                            value = formatEventValue(row.DATA_VALUE, def.unit),
-                            isFuture = false, type = "INDICATOR", source = "ECOS",
-                        ))
-                    }
-                }
-            }.onFailure { log.warn { "한국 월별 지표 조회 실패 (${def.name}): ${it.message}" } }
-        }
-        return result
     }
 
     /**
@@ -809,35 +778,38 @@ class EconomicCalendarService(
                     val vintagesByObs = obs.groupBy { it.date!! }
 
                     if (isGdp) {
-                        // GDP: 각 분기마다 속보치/잠정치/확정치 모든 vintage 를 별도 이벤트로 생성.
-                        // 최초 발표일로부터 90일 내 모든 vintage (값이 동일해도 발표 일정 자체는 이벤트).
-                        vintagesByObs.forEach { (obsDate, vintages) ->
-                            val sorted = vintages.sortedBy { it.realtime_start!! }
-                            val firstReleaseDate = LocalDate.parse(sorted.first().realtime_start!!)
+                        // GDP: 성장률 시리즈는 값이 직전 추정치와 같으면 vintage 가 생기지 않아 발표가 누락되고,
+                        // release 53 발표일에는 추정치 발표가 아닌 날도 섞여 있다.
+                        // → 실질 GDP 수준(GDPC1) vintage 날짜 = 추정치 발표일로 보고,
+                        //   그날 최신 분기 · 그 분기 최초 발표 이후 몇 번째 발표인지로 속보/잠정/확정을 정한다.
+                        val firstReleaseByObs = vintagesByObs.mapValues { (_, vs) -> vs.minOf { it.realtime_start!! } }
+                        val estimateDates = fredClient.getSeriesVintageDates(
+                            GDP_ESTIMATE_VINTAGE_SERIES,
+                            realtimeStart = monthStart.minusMonths(6).format(DATE_FMT),
+                            realtimeEnd = monthEndRealtimeStr,
+                        ).vintage_dates.orEmpty().sorted()
 
-                            sorted.forEach { v ->
-                                val rd = LocalDate.parse(v.realtime_start!!)
-                                val days = ChronoUnit.DAYS.between(firstReleaseDate, rd)
-                                val inTargetMonth = !rd.isBefore(monthStart) && !rd.isAfter(monthEnd)
+                        estimateDates.filter { it in monthStartStr..monthEndFullStr }.forEach { rdStr ->
+                            val (obsDate, firstRelease) = firstReleaseByObs.entries
+                                .filter { it.value <= rdStr }
+                                .maxByOrNull { it.key }
+                                ?.toPair() ?: return@forEach
+                            val order = estimateDates.count { it in firstRelease..rdStr }
+                            val stage = when (order) { 1 -> "속보치"; 2 -> "잠정치"; else -> "확정치" }
+                            val isFuture = LocalDate.parse(rdStr).isAfter(today)
+                            val raw = vintageValueAt(vintagesByObs[obsDate], rdStr)?.toString()
+                            val m = obsDate.substring(5, 7).toInt()
+                            val quarter = "${obsDate.substring(0, 4)}Q${(m - 1) / 3 + 1}"
 
-                                if (inTargetMonth && days <= 90) {
-                                    val isFuture = rd.isAfter(today)
-                                    val value = if (isFuture) null else formatEventValue(v.value, series.unit)
-                                    val y = obsDate.substring(0, 4)
-                                    val m = obsDate.substring(5, 7).toInt()
-                                    val quarter = "${y}Q${(m - 1) / 3 + 1}"
-
-                                    result.add(CalendarEvent(
-                                        date = v.realtime_start!!,
-                                        name = "$quarter GDP ${resolveGdpStage(quarter, rd)}",
-                                        country = "US",
-                                        value = value,
-                                        isFuture = isFuture,
-                                        type = "INDICATOR",
-                                        source = "FRED",
-                                    ))
-                                }
-                            }
+                            result.add(CalendarEvent(
+                                date = rdStr,
+                                name = "$quarter GDP $stage",
+                                country = "US",
+                                value = if (isFuture) null else formatEventValue(raw, series.unit),
+                                isFuture = isFuture,
+                                type = "INDICATOR",
+                                source = "FRED",
+                            ))
                         }
                     } else {
                         // GDP 외: 각 obs 의 최초 vintage 만 이벤트화 (기존 로직)
@@ -862,13 +834,15 @@ class EconomicCalendarService(
                             val rawDisplay: String? = when {
                                 curVal == null -> null
                                 series.seriesId in FRED_PC1_SERIES -> {
+                                    // 전년 값은 최초 vintage 가 아니라 발표일 시점에 유효했던(개정 반영) vintage 를 써야 발표치와 일치한다
                                     val prevObs = shiftObsDateMinus12(obsDate)
-                                    val prev = prevObs?.let { firstVintageByObs[it]?.second?.toDoubleOrNull() }
+                                    val prev = prevObs?.let { vintageValueAt(vintagesByObs[it], releaseDateStr) }
                                     if (prev != null && prev != 0.0) String.format("%.1f", (curVal / prev - 1.0) * 100.0) else null
                                 }
                                 series.seriesId in FRED_CHG_SERIES -> {
+                                    // 전월 값도 발표일 시점의 개정값 기준 (공식 발표 증감 = 당월 최초치 - 당시 개정된 전월치)
                                     val prevObs = shiftObsDateMinus1(obsDate)
-                                    val prev = prevObs?.let { firstVintageByObs[it]?.second?.toDoubleOrNull() }
+                                    val prev = prevObs?.let { vintageValueAt(vintagesByObs[it], releaseDateStr) }
                                     if (prev != null) (curVal - prev).toLong().toString() else null
                                 }
                                 else -> firstValueStr
@@ -910,42 +884,6 @@ class EconomicCalendarService(
             }
         }
         return result
-    }
-
-    /** GDP 발표 단계 판단 (속보/잠정/확정) — 해당 분기 release_id=53 발표일 순서로 결정 */
-    private fun resolveGdpStage(quarter: String, releaseDate: LocalDate): String {
-        return runCatching {
-            val qYear = quarter.substring(0, 4).toInt()
-            val qNum = quarter.substring(5).toInt()
-            // 분기 종료 후 ~6개월 내 모든 release 53 발표일 조회
-            val qEnd = LocalDate.of(qYear, qNum * 3, 1).plusMonths(1).minusDays(1)
-            val searchStart = qEnd.format(DATE_FMT)
-            val searchEnd = releaseDate.format(DATE_FMT)
-
-            val dates = fredClient.getReleaseDatesByReleaseId(
-                releaseId = 53, realtimeStart = searchStart, realtimeEnd = searchEnd,
-                sortOrder = "asc", includeReleaseDatesWithNoData = false,
-            )?.release_dates?.mapNotNull { it.date }?.sorted() ?: return@runCatching "발표"
-
-            // releaseDate 이전까지 해당 분기 데이터를 반영하는 release 개수
-            var count = 0
-            for (d in dates) {
-                val rd = LocalDate.parse(d)
-                val obsRes = fredClient.getSeriesObservations(
-                    "A191RL1Q225SBEA", observationStart = qEnd.minusMonths(6).format(DATE_FMT),
-                    observationEnd = d, realtimeStart = d, realtimeEnd = d,
-                )
-                val latestObsDate = obsRes.observations?.filter { it.value != "." }?.lastOrNull()?.date
-                if (latestObsDate != null) {
-                    val y = latestObsDate.substring(0, 4)
-                    val m = latestObsDate.substring(5, 7).toInt()
-                    val q = "${y}Q${(m - 1) / 3 + 1}"
-                    if (q == quarter) count++
-                }
-                if (rd == releaseDate) break
-            }
-            when (count) { 1 -> "속보치"; 2 -> "잠정치"; else -> "확정치" }
-        }.getOrElse { "발표" }
     }
 
     private fun fetchHolidayEvents(year: Int, month: Int): List<CalendarEvent> {
@@ -1003,9 +941,46 @@ class EconomicCalendarService(
         return when (event.type) {
             "RATE_DECISION" -> enrichFromEcos(event, "722Y001", "0101000", "기준금리", "%", persistToDb)
             "GDP_RELEASE" -> enrichFromEcos(event, "200Y102", "10111", null, "%", persistToDb)
+            "CPI_RELEASE" -> enrichKrCpi(event, persistToDb)
             "US_RATE_DECISION" -> enrichFromFred(event, "DFEDTARU", "미국 기준금리", "%", persistToDb)
             else -> event
         }
+    }
+
+    /**
+     * 한국 CPI 발표 일정(MANUAL) 값 채우기. ECOS 는 발표일을 주지 않아 발표일은 국가데이터처 보도계획 기준으로 수동 등록하고,
+     * 값은 기준월 지수로 전년동월비를 계산한다. 기준월은 이름의 "YYYY-MM" 접두어, 없으면 발표일로 추정
+     * (12월분은 같은 달 말일 발표, 나머지는 익월 초 발표).
+     */
+    private fun enrichKrCpi(event: CalendarEvent, persistToDb: Boolean): CalendarEvent {
+        val def = KR_INDICATORS.first { it.computeYoY }
+        val eventDate = LocalDate.parse(event.date)
+        val refMonth = KR_CPI_NAME_PREFIX.find(event.name)
+            ?.let { YearMonth.of(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+            ?: YearMonth.from(eventDate).let { if (eventDate.dayOfMonth >= 25) it else it.minusMonths(1) }
+        val refTime = "%04d%02d".format(refMonth.year, refMonth.monthValue)
+        val startTime = refMonth.minusMonths(13).let { "%04d%02d".format(it.year, it.monthValue) }
+
+        val yoy = runCatching {
+            ecosClient.getStatistics(def.tableCode, def.frequency, startTime, refTime, def.itemCode)
+                .statisticSearch?.row?.let { indexToYoY(it) }
+                ?.firstOrNull { it.date == refTime }
+        }.onFailure { log.error { "한국 CPI 값 조회 실패 ($refTime): ${it.message}" } }
+            .getOrNull() ?: return event
+
+        val displayValue = formatEventValue(yoy.value, def.unit) ?: return event
+        val finalName = if (KR_CPI_NAME_PREFIX.containsMatchIn(event.name)) event.name else "$refMonth ${def.name}"
+
+        if (persistToDb && event.id != null) {
+            calendarEventRepository.findById(event.id).ifPresent { entity ->
+                entity.name = finalName
+                entity.value = displayValue
+                entity.source = "ECOS"
+                calendarEventRepository.save(entity)
+            }
+            return event.copy(name = finalName, value = displayValue, source = "ECOS")
+        }
+        return event.copy(name = finalName, value = displayValue)
     }
 
     private fun enrichFromEcos(event: CalendarEvent, tableCode: String, itemCode: String, name: String?, unit: String, persistToDb: Boolean): CalendarEvent {
@@ -1097,8 +1072,13 @@ class EconomicCalendarService(
         log.info { "캘린더 이벤트 freeze 완료: $year-$month (${entities.size}건)" }
     }
 
+    /**
+     * 과거 월만 DB 에 확정(freeze)한다. 현재/미래 월을 확정하면 발표 전 빈 값이 굳어
+     * 과거 월이 된 뒤에도 DB 값이 계속 읽히므로, 해당 월의 API 이벤트는 비우고 캐시만 무효화한다.
+     */
     fun refreshEvents(year: Int, month: Int) {
-        freezeMonth(year, month)
+        val isPast = YearMonth.of(year, month).isBefore(YearMonth.now().minusMonths(FREEZE_GRACE_MONTHS))
+        if (isPast) freezeMonth(year, month) else calendarFreezeWriter.replaceApiEvents(year, month, emptyList())
         runCatching { redisTemplate.delete("${CACHE_PREFIX}events:$year:$month") }
     }
 

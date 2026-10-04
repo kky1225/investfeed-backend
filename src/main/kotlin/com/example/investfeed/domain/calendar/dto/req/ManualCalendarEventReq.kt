@@ -11,5 +11,5 @@ data class ManualCalendarEventReq(
     val country: String,  // KR / US
     val value: String? = null,
     @field:NotBlank(message = "유형을 선택해주세요.")
-    val type: String,     // RATE_DECISION, US_RATE_DECISION, GDP_RELEASE, CUSTOM, HOLIDAY(휴장일)
+    val type: String,     // RATE_DECISION, US_RATE_DECISION, GDP_RELEASE, CPI_RELEASE(한국 CPI 발표), CUSTOM, HOLIDAY(휴장일)
 )

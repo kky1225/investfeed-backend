@@ -52,6 +52,7 @@ class StockResolver(
         throw ToolException(
             "종목 후보가 여럿입니다: $q",
             candidates.take(MAX_CANDIDATES).map { StockCandidate(it.code, it.name, it.market) },
+            query = q,
         )
     }
 

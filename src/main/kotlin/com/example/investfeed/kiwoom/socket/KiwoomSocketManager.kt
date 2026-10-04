@@ -2,6 +2,7 @@ package com.example.investfeed.kiwoom.socket
 
 import com.example.investfeed.kiwoom.config.KiwoomWebSocketClient
 import com.example.investfeed.kiwoom.config.WebSocketHandler
+import com.example.investfeed.kiwoom.socket.dto.KiwoomStream
 import com.example.investfeed.kiwoom.socket.dto.KiwoomStreamReq
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PreDestroy
@@ -24,10 +25,24 @@ class KiwoomSocketManager(
     private val lock = Any()
     private var client: KiwoomWebSocketClient? = null
 
-    fun send(accessToken: String, req: KiwoomStreamReq) {
+    private val registered = mutableMapOf<String, List<KiwoomStream>>()
+
+    fun register(accessToken: String, groups: Map<String, List<KiwoomStream>>) {
         synchronized(lock) {
             val connected = connection(accessToken) ?: return
-            connected.send(objectMapper.writeValueAsString(req))
+
+            groups.forEach { (grpNo, data) ->
+                when {
+                    data.isNotEmpty() -> {
+                        connected.send(objectMapper.writeValueAsString(KiwoomStreamReq(grp_no = grpNo, data = data)))
+                        registered[grpNo] = data
+                    }
+
+                    else -> registered.remove(grpNo)?.let { prev ->
+                        connected.send(objectMapper.writeValueAsString(KiwoomStreamReq(trnm = "REMOVE", grp_no = grpNo, data = prev)))
+                    }
+                }
+            }
         }
     }
 
@@ -35,6 +50,8 @@ class KiwoomSocketManager(
         client?.takeIf { it.isOpen && it.loginSucceeded }?.let { return it }
 
         client?.close()
+        // 새 연결에는 기존 등록이 없다
+        registered.clear()
 
         val fresh = KiwoomWebSocketClient(accessToken) { webSocketHandler.broadcast(it) }
 

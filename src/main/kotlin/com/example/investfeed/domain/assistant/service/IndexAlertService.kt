@@ -2,7 +2,9 @@ package com.example.investfeed.domain.assistant.service
 
 import com.example.investfeed.domain.assistant.dto.factsheet.AlertDirection
 import com.example.investfeed.domain.assistant.dto.factsheet.AlertTrigger
+import com.example.investfeed.domain.assistant.dto.factsheet.IndexAlertCardFact
 import com.example.investfeed.domain.assistant.dto.factsheet.IndexAlertFact
+import com.example.investfeed.domain.assistant.dto.factsheet.IndexFact
 import com.example.investfeed.domain.assistant.dto.factsheet.IndexQuote
 import com.example.investfeed.domain.assistant.entity.AssistantIndexAlert
 import com.example.investfeed.domain.assistant.entity.AssistantSetting
@@ -148,13 +150,14 @@ class IndexAlertService(
             else -> return null
         }
         if (dir == AlertDirection.DOWN) s.firedDownLevels.addAll(levels) else s.firedUpLevels.addAll(levels)
-        return IndexAlertFact(quote = q, trigger = AlertTrigger.THRESHOLD, direction = dir, triggerRate = basis, firedAt = now)
+        return IndexAlertFact(quote = q, trigger = AlertTrigger.THRESHOLD, direction = dir, triggerRate = basis, level = levels.max(), firedAt = now)
     }
 
     private fun publish(fact: IndexAlertFact, kr: Boolean): Int {
         val card = runCatching {
             if (kr) marketFactSheetService.collectKrIndexAlert(fact.quote.indexCode) else marketFactSheetService.collectUsIndexAlert()
         }.onFailure { log.error(it) { "알림 카드 데이터 수집 실패: ${fact.quote.indexCode}" } }.getOrNull()
+            .let { withJudgedQuote(it, fact.quote) }
         val body = AlertTemplateRenderer.renderIndexAlert(fact, card)
         val entity = alertRepository.save(
             AssistantIndexAlert(
@@ -184,6 +187,13 @@ class IndexAlertService(
                     .onFailure { log.error(it) { "지수 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
             }
         return posted
+    }
+
+    private fun withJudgedQuote(card: IndexAlertCardFact?, q: IndexQuote): IndexAlertCardFact {
+        val judged = IndexFact(AlertTemplateRenderer.indexName(q.indexCode), q.current, q.currentRate, q.current - q.prevClose, q.high, q.low)
+        val base = card ?: IndexAlertCardFact(primary = null, secondary = null, flow = null)
+        return if (q.indexCode == SP500) base.copy(secondary = judged.copy(delayStatus = base.secondary?.delayStatus))
+        else base.copy(primary = judged.copy(delayStatus = base.primary?.delayStatus))
     }
 
     fun summarize(r: RunResult): String = r.quotes.joinToString(", ") { q ->

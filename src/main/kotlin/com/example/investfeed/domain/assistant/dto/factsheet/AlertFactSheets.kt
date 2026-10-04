@@ -26,6 +26,7 @@ data class IndexAlertFact(
     val direction: AlertDirection,
     val triggerRate: Double,          // 발동 근거 등락률 (고가·저가, 국내 CB 는 현재값)
     val stage: Int? = null,           // CB 단계
+    val level: Double? = null,        // 급변 알림이 새로 넘은 가장 높은 단계 (3 / 5%). 헤드라인 "+3% 도달"
     val firedAt: LocalDateTime,
 )
 
@@ -54,5 +55,5 @@ data class HoldingAlertHit(
     val direction: com.example.investfeed.domain.notification.entity.Direction,   // UP / DOWN / UPPER_LIMIT / LOWER_LIMIT / HIGH_52W / LOW_52W
     val threshold: Double,                 // 이번 분에 새로 넘은 가장 높은 임계(%). 상하한가·52주는 0
     val triggerRate: Double?,              // 판정 근거 등락률 (당일 고가·저가 기준). 52주는 null
-    val currentRate: Double?,              // 발송 시점 현재가 등락률
+    val price: Double?,                    // 알림함과 같은 괄호 금액: 등락·상하한가=발송 시점 현재가, 52주=52주 고가·저가 (국내·코인 원, 미국 달러)
 )

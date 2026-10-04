@@ -27,17 +27,14 @@ enum class ReleaseTarget(
     US_FOMC("FOMC 기준금리", "US", "DFEDTARU", "직전", { it.type == "US_RATE_DECISION" }),
     KR_BASE_RATE("한국 기준금리", "KR", "722Y001", "직전", { it.type == "RATE_DECISION" }),
     KR_GDP("한국 GDP 성장률", "KR", "200Y102", "전기", { it.type == "GDP_RELEASE" }),
-    US_CPI("미국 CPI", "US", "CPIAUCSL", "전월", { it.isUsFred() && it.name.endsWith("소비자물가지수(전년동월비)") }),
-    US_PCE("미국 PCE 물가", "US", "PCEPI", "전월", { it.isUsFred() && it.name.endsWith("PCE 물가지수(전년동월비)") }),
+    US_CPI("미국 CPI", "US", "CPIAUCNS", "전월", { it.isUsFred() && it.name.endsWith("소비자물가지수(전년동월비)") }),
+    US_PCE("미국 근원 PCE 물가", "US", "PCEPILFE", "전월", { it.isUsFred() && it.name.endsWith("근원 PCE 물가지수(전년동월비)") }),
     US_PAYROLL("미국 비농업고용", "US", "PAYEMS", "전월", { it.isUsFred() && it.name.endsWith("비농업고용") }),
     US_UNRATE("미국 실업률", "US", "UNRATE", "전월", { it.isUsFred() && it.name.endsWith("실업률") }),
     US_GDP("미국 GDP 성장률", "US", "A191RL1Q225SBEA", "전기", { it.isUsFred() && it.name.contains(" GDP ") }),
-    KR_CPI("한국 CPI", "KR", "901Y009", "전월", { it.country == "KR" && it.source == "ECOS" && it.name == "소비자물가지수(전년동월비)" });
+    KR_CPI("한국 CPI", "KR", "901Y009", "전월", { it.type == "CPI_RELEASE" });
 
-    fun isFresh(eventDate: LocalDate, today: LocalDate): Boolean = when (this) {
-        KR_CPI -> YearMonth.from(eventDate).let { it == YearMonth.from(today) || it == YearMonth.from(today).minusMonths(1) }
-        else -> !eventDate.isBefore(today.minusDays(7))
-    }
+    fun isFresh(eventDate: LocalDate, today: LocalDate): Boolean = !eventDate.isBefore(today.minusDays(7))
 
     companion object {
         fun match(e: CalendarEvent): ReleaseTarget? = entries.firstOrNull { it.matcher(e) }

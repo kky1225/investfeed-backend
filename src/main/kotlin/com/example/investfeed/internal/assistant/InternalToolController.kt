@@ -13,8 +13,6 @@ import com.example.investfeed.internal.assistant.tool.ToolResponse
 import mu.KotlinLogging
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -32,7 +30,7 @@ class InternalToolController(
     private inline fun <T> tool(name: String, source: String? = null, block: () -> T): ToolResponse<T> = try {
         ToolResponse.ok(block(), source)
     } catch (e: ToolException) {
-        ToolResponse.fail(e.message ?: "도구 오류", e.candidates)
+        ToolResponse.fail(e.message ?: "도구 오류", e.candidates, e.query)
     } catch (e: Exception) {
         log.error(e) { "비서 도구 실패: $name" }
         ToolResponse.fail("$name 조회에 실패했습니다: ${e.javaClass.simpleName}")
@@ -40,9 +38,9 @@ class InternalToolController(
 
     @GetMapping("get_market_summary")
     fun marketSummary(
-        @RequestParam(defaultValue = "KOSPI") market: DataToolService.Market,
+        @RequestParam(required = false) market: DataToolService.Market?,   // 미지정 = 국내 지수 전체 (코스피·코스닥)
         @RequestParam(required = false) date: LocalDate?,
-    ) = tool("get_market_summary", "키움 ka20001·수급") { data.marketSummary(market, date) }
+    ) = tool("get_market_summary", "키움 시세·수급") { data.marketSummary(market, date) }
 
     @GetMapping("get_market_investor_flow")
     fun marketInvestorFlow(
@@ -51,35 +49,44 @@ class InternalToolController(
         @RequestParam(defaultValue = "1") days: Int,
         @RequestParam(defaultValue = "BUY") side: DataToolService.Side,
         @RequestParam(required = false) minStreakDays: Int?,
-    ) = tool("get_market_investor_flow", "키움 ka10131/ka10058") { data.marketInvestorFlow(investor, market, days, side, minStreakDays) }
+    ) = tool("get_market_investor_flow", "키움 수급") { data.marketInvestorFlow(investor, market, days, side, minStreakDays) }
 
     @GetMapping("get_stock_quote")
     fun stockQuote(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestParam stockQuery: List<String>,
         @RequestParam(required = false) market: StockMarket?,
-    ) = tool("get_stock_quote", "키움·업비트 시세") { data.stockQuotes(stockQuery, user.member.id, market) }
+    ) = tool("get_stock_quote") { data.stockQuotes(stockQuery, user.member.id, market) }
+        .let { r -> r.copy(source = r.data?.let { quoteSource(it) }) }
+
+    private fun quoteSource(quotes: List<DataToolService.StockQuote>): String? =
+        listOfNotNull(
+            "키움".takeIf { quotes.any { it.market != StockMarket.CRYPTO } },
+            "업비트".takeIf { quotes.any { it.market == StockMarket.CRYPTO } },
+        ).takeIf { it.isNotEmpty() }?.joinToString("·", postfix = " 시세")
 
     @GetMapping("get_stock_investor_flow")
     fun stockInvestorFlow(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestParam stockQuery: List<String>,
         @RequestParam(defaultValue = "5") days: Int,
-    ) = tool("get_stock_investor_flow", "키움 ka10059") { data.stockInvestorFlows(stockQuery, user.member.id, days) }
+    ) = tool("get_stock_investor_flow", "키움 수급") { data.stockInvestorFlows(stockQuery, user.member.id, days) }
 
     @GetMapping("get_global_indexes")
-    fun globalIndexes() = tool("get_global_indexes", "네이버 시장지표") { data.globalIndexes() }
+    fun globalIndexes() = tool("get_global_indexes", "네이버 시장지표·국채") { data.globalIndexes() }
 
     @GetMapping("get_calendar")
     fun calendar(
         @RequestParam from: LocalDate,
         @RequestParam to: LocalDate,
         @RequestParam(required = false) keyword: String?,
-    ) = tool("get_calendar", "경제 캘린더") { data.calendar(from, to, keyword) }
+        @RequestParam(required = false) type: DataToolService.CalendarType?,
+        @RequestParam(required = false) country: DataToolService.CalendarCountry?,
+    ) = tool("get_calendar", "경제 캘린더") { data.calendar(from, to, keyword, type, country) }
 
     @GetMapping("get_recommend_list")
     fun recommendList(@RequestParam(required = false) grade: String?) =
-        tool("get_recommend_list", "추천 시스템 (시스템 분류)") { data.recommendList(grade) }
+        tool("get_recommend_list", "추천 시스템") { data.recommendList(grade) }
 
     @GetMapping("search_news")
     fun searchNews(@RequestParam query: String, @RequestParam(defaultValue = "5") n: Int) =
@@ -122,10 +129,4 @@ class InternalToolController(
         @RequestParam price: Long,
         @RequestParam direction: PriceTargetDirection,
     ) = tool("create_price_alert") { action.previewPriceAlert(user.member, stockQuery, price, direction) }
-
-    data class CreatePriceAlertReq(val assetCode: String, val name: String, val market: StockMarket, val price: Long, val direction: PriceTargetDirection)
-
-    @PostMapping("create_price_alert")
-    fun createPriceAlert(@AuthenticationPrincipal user: CustomUserDetails, @RequestBody req: CreatePriceAlertReq) =
-        tool("create_price_alert") { action.createPriceAlert(user.member, req.assetCode, req.name, req.market, req.price, req.direction) }
 }

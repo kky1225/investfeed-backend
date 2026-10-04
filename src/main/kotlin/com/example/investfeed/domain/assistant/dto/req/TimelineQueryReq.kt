@@ -8,4 +8,11 @@ data class TimelineQueryReq(
     val limit: Int = 20,
     @field:DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     val date: LocalDate? = null,
+    val view: TimelineView = TimelineView.ALL,
 )
+
+enum class TimelineView(val types: List<String>?) {
+    ALL(null),
+    BRIEFING(listOf("BRIEFING", "ALERT", "SYSTEM")),
+    CHAT(listOf("USER", "ASSISTANT")),
+}

@@ -6,6 +6,7 @@ import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.notification.service.PriceTargetService
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
@@ -14,6 +15,7 @@ class ActionToolService(
     private val stockResolver: StockResolver,
     private val priceTargetService: PriceTargetService,
     private val cardStore: CardStore,
+    private val objectMapper: ObjectMapper,
 ) {
     companion object {
         const val KIND_CONFIRM_PRICE_ALERT = "CONFIRM_PRICE_ALERT"
@@ -32,12 +34,18 @@ class ActionToolService(
         return cardStore.put(member.id, KIND_CONFIRM_PRICE_ALERT, preview)
     }
 
-    fun createPriceAlert(member: Member, assetCode: String, name: String, market: StockMarket, price: Long, direction: PriceTargetDirection): PriceTargetRes =
-        priceTargetService.createPriceTarget(
+    fun confirmPriceAlert(member: Member, cardRef: String): PriceTargetRes {
+        val card = cardStore.get(member.id, cardRef)?.takeIf { it.kind == KIND_CONFIRM_PRICE_ALERT }
+            ?: throw ToolException("확인 카드가 만료되었거나 이미 등록되었습니다")
+        val p = objectMapper.convertValue(card.payload, PriceAlertPreview::class.java)
+        val res = priceTargetService.createPriceTarget(
             member.id,
             PriceTargetCreateReq(
-                assetType = if (market == StockMarket.CRYPTO) AssetType.CRYPTO else AssetType.STOCK,
-                assetCode = assetCode, assetName = name, targetPrice = price, direction = direction,
+                assetType = if (p.market == StockMarket.CRYPTO) AssetType.CRYPTO else AssetType.STOCK,
+                assetCode = p.assetCode, assetName = p.name, targetPrice = p.price, direction = p.direction,
             ),
         )
+        cardStore.delete(cardRef)
+        return res
+    }
 }

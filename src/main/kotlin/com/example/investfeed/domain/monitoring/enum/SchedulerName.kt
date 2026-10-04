@@ -30,6 +30,8 @@ enum class SchedulerName(
         SchedulerType.SLOW, 120, "매 5분(09:00~21:55)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.RECOMMEND_TODAY_DIRECTION),
     ),
+    // 매분 깨어 판정, 미국 마감(서머타임·조기폐장 반영)+10분에 1회만 실행 → 완주 체크(1일 주기) 대상 아님
+    BriefingUsCloseScheduler(SchedulerType.SLOW, 300, "매분(화~토 02:00~07:59, 미국 마감+10분 1회)", crons = listOf(SchedulerCron.BRIEFING_US_CLOSE)),
     CalendarSyncScheduler(SchedulerType.SLOW, 300, "매 30분 (+비서 지표 발표 알림)", crons = listOf(SchedulerCron.CALENDAR_SYNC)),
     GoalAlertScheduler(SchedulerType.SLOW, 60, "매시 정각", crons = listOf(SchedulerCron.GOAL_ALERT)),
     RebalancingAlertScheduler(SchedulerType.SLOW, 60, "매시 정각", crons = listOf(SchedulerCron.REBALANCING_ALERT)),
@@ -46,10 +48,9 @@ enum class SchedulerName(
     ),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00", crons = listOf(SchedulerCron.SCHEDULER_LOG_CLEANUP)),
     StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00", crons = listOf(SchedulerCron.STOCK_MASTER_SYNC)),
-    BriefingUsCloseScheduler(SchedulerType.SLOW, 300, "미국 거래일 05:10/06:10", crons = listOf(SchedulerCron.BRIEFING_US_CLOSE)),
     InterestSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15", crons = listOf(SchedulerCron.INTEREST_SYNC)),
     IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.INDEX_INVESTOR_DAILY)),
-    BriefingKrPreScheduler(SchedulerType.SLOW, 300, "매일 07:00", crons = listOf(SchedulerCron.BRIEFING_KR_PRE)),
+    BriefingKrPreScheduler(SchedulerType.SLOW, 300, "거래일 07:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.BRIEFING_KR_PRE)),
     PaperTradeExecScheduler(
         SchedulerType.SLOW, 600, "거래일 08:50(장전)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.PAPER_TRADE_EXEC),
@@ -61,6 +62,6 @@ enum class SchedulerName(
     ApiKeyExpiryScheduler(SchedulerType.SLOW, 60, "매일 09:00", crons = listOf(SchedulerCron.API_KEY_EXPIRY)),
     BriefingCoinDailyScheduler(SchedulerType.SLOW, 300, "매일 09:05", crons = listOf(SchedulerCron.BRIEFING_COIN_DAILY)),
     StockDividendScheduler(SchedulerType.SLOW, 60, "매일 13:30", crons = listOf(SchedulerCron.STOCK_DIVIDEND)),
-    BriefingKrCloseScheduler(SchedulerType.SLOW, 300, "거래일 16:05", crons = listOf(SchedulerCron.BRIEFING_KR_CLOSE)),
-    BriefingKrHoldingsScheduler(SchedulerType.SLOW, 300, "거래일 20:05", crons = listOf(SchedulerCron.BRIEFING_KR_HOLDINGS)),
+    BriefingKrCloseScheduler(SchedulerType.SLOW, 300, "거래일 16:05", blockedOnHoliday = true, crons = listOf(SchedulerCron.BRIEFING_KR_CLOSE)),
+    BriefingKrHoldingsScheduler(SchedulerType.SLOW, 300, "거래일 20:05", blockedOnHoliday = true, crons = listOf(SchedulerCron.BRIEFING_KR_HOLDINGS)),
 }

@@ -2,9 +2,11 @@ package com.example.investfeed.fred.client
 
 import com.example.investfeed.fred.dto.res.FredReleaseDatesRes
 import com.example.investfeed.fred.dto.res.FredSeriesRes
+import com.example.investfeed.fred.dto.res.FredVintageDatesRes
 import com.example.investfeed.fred.exception.FredApiException
 import com.example.investfeed.fred.exception.FredReleaseDatesException
 import com.example.investfeed.fred.exception.FredSeriesObservationsException
+import com.example.investfeed.fred.exception.FredVintageDatesException
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -137,6 +139,57 @@ class FredClient(
             } catch (e: Exception) {
                 lastError = e
                 log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
+                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            }
+        }
+
+        if (lastError is FredApiException) throw lastError as FredApiException
+        throw RuntimeException(lastError?.message)
+    }
+
+    fun getSeriesVintageDates(
+        seriesId: String,
+        realtimeStart: String? = null,
+        realtimeEnd: String? = null,
+    ): FredVintageDatesRes {
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                val res = fredWebClient.get()
+                    .uri { uriBuilder ->
+                        uriBuilder.path("/fred/series/vintagedates")
+                            .queryParam("series_id", seriesId)
+                            .queryParam("api_key", apiKey)
+                            .queryParam("file_type", "json")
+                            .queryParam("limit", 10000)
+                        if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
+                        if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
+                        uriBuilder.build()
+                    }
+                    .retrieve()
+                    .onStatus({ it.isError }, { res ->
+                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
+                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
+                            FredApiException()
+                        }
+                    })
+                    .bodyToMono<FredVintageDatesRes>()
+                    .block()
+
+                if (res?.vintage_dates == null) {
+                    throw FredVintageDatesException()
+                }
+
+                return res
+            } catch (e: FredApiException) {
+                lastError = e
+                log.warn { "getSeriesVintageDates attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
+                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            } catch (e: FredVintageDatesException) {
+                throw e
+            } catch (e: Exception) {
+                lastError = e
+                log.warn { "getSeriesVintageDates attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
                 if (attempt < 2) Thread.sleep(300L * (attempt + 1))
             }
         }

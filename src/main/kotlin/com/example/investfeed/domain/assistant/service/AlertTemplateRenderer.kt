@@ -2,6 +2,7 @@ package com.example.investfeed.domain.assistant.service
 
 import com.example.investfeed.domain.assistant.dto.factsheet.*
 import com.example.investfeed.domain.assistant.dto.message.*
+import com.example.investfeed.domain.assistant.service.TemplateFormat.colored
 import com.example.investfeed.domain.assistant.service.TemplateFormat.coloredEok
 import com.example.investfeed.domain.assistant.service.TemplateFormat.coloredRate
 import com.example.investfeed.domain.assistant.service.TemplateFormat.eok
@@ -9,16 +10,17 @@ import com.example.investfeed.domain.assistant.service.TemplateFormat.monthDay
 import com.example.investfeed.domain.assistant.service.TemplateFormat.num
 import com.example.investfeed.domain.assistant.service.TemplateFormat.rate
 import com.example.investfeed.domain.notification.entity.Direction
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 object AlertTemplateRenderer {
     const val SUBTYPE_WARN = "INDEX_WARN"
     const val SUBTYPE_CB = "INDEX_CB"
     const val SUBTYPE_RELEASE = "RELEASE"
     const val SUBTYPE_HOLDING = "HOLDING"
-
-    private const val RETREAT_GAP = 0.2
 
     fun indexName(code: String): String = when (code) {
         "KOSPI" -> "코스피"; "KOSDAQ" -> "코스닥"; "NASDAQ" -> "나스닥"; "SP500" -> "S&P500"; else -> code
@@ -45,12 +47,9 @@ object AlertTemplateRenderer {
         val value = num(q.current, 2)
         if (f.trigger == AlertTrigger.CB) return "$name 서킷브레이커 ${f.stage}단계 ${rate(f.triggerRate, 2)} ($value)"
 
-        val retreated = when (f.direction) {
-            AlertDirection.DOWN -> q.currentRate - f.triggerRate >= RETREAT_GAP
-            AlertDirection.UP -> f.triggerRate - q.currentRate >= RETREAT_GAP
-        }
-        return if (retreated) "$name 장중 ${rate(f.triggerRate, 2)} 도달 · 현재 ${rate(q.currentRate, 2)} ($value)"
-        else "$name ${rate(f.triggerRate, 2)} ($value)"
+        val level = f.level ?: return "$name ${rate(f.triggerRate, 2)} ($value)"
+        val signed = if (f.direction == AlertDirection.DOWN) -level else level
+        return "$name ${rate(signed, 0)} 도달 ($value)"
     }
 
     private fun indexSummary(card: IndexAlertCardFact): String =
@@ -99,7 +98,6 @@ object AlertTemplateRenderer {
     private class MergedHit(val main: HoldingAlertHit, val extra52: HoldingAlertHit?) {
         val assetName get() = main.assetName
         val link get() = main.link
-        val currentRate get() = main.currentRate
     }
 
     private fun isLimit(d: Direction) = d == Direction.UPPER_LIMIT || d == Direction.LOWER_LIMIT
@@ -113,15 +111,25 @@ object AlertTemplateRenderer {
             MergedHit(main, group.firstOrNull { is52w(it.direction) && it !== main })
         }.sortedByDescending { it.main.triggerRate?.let { r -> kotlin.math.abs(r) } ?: -1.0 }   // 등락 폭 큰 순, 52주만인 것은 뒤
 
+    /** 알림함(프론트 formatAlertPrice)과 같은 금액 표기: 미국(_US) 달러 소수 2~4자리, 국내·코인 원 소수 최대 3자리 */
+    private fun alertPrice(v: Double, assetCode: String): String =
+        if (assetCode.endsWith("_US")) "$" + DecimalFormat("#,##0.00##", DecimalFormatSymbols(Locale.US)).format(v)
+        else DecimalFormat("#,##0.###", DecimalFormatSymbols(Locale.US)).format(v) + "원"
+
+    /** 알림함과 같은 문구: "+5% 도달 (72,300원)" · "상한가 도달" · "52주 신고가 달성 (75,000원)" */
     private fun hitLabel(h: HoldingAlertHit, colored: Boolean): String {
-        fun r(v: Double, digits: Int = 1) = if (colored) coloredRate(v, digits) else rate(v, digits)
+        val price = h.price?.let { " (${alertPrice(it, h.assetCode)})" } ?: ""
+        fun threshold(signed: Double): String {
+            val text = rate(signed, 0)
+            return if (colored) colored(text, signed) else text
+        }
         return when (h.direction) {
-            Direction.UP -> "${h.triggerRate?.let { r(it) } ?: ""} 도달 (${num(h.threshold)}% 상승)"
-            Direction.DOWN -> "${h.triggerRate?.let { r(it) } ?: ""} 도달 (${num(h.threshold)}% 하락)"
-            Direction.UPPER_LIMIT -> "상한가${h.triggerRate?.let { " ${r(it)}" } ?: ""}"
-            Direction.LOWER_LIMIT -> "하한가${h.triggerRate?.let { " ${r(it)}" } ?: ""}"
-            Direction.HIGH_52W -> "52주 신고가"
-            Direction.LOW_52W -> "52주 신저가"
+            Direction.UP -> "${threshold(h.threshold)} 도달$price"
+            Direction.DOWN -> "${threshold(-h.threshold)} 도달$price"
+            Direction.UPPER_LIMIT -> "상한가 도달"
+            Direction.LOWER_LIMIT -> "하한가 도달"
+            Direction.HIGH_52W -> "52주 신고가 달성$price"
+            Direction.LOW_52W -> "52주 신저가 달성$price"
             else -> h.direction.name
         }
     }
@@ -137,19 +145,49 @@ object AlertTemplateRenderer {
         return "보유 ${merged.size}종목 급등락"
     }
 
+    /** 시세 카드 모양용 알림 문구 — 가격은 카드에 크게 따로 보이므로 괄호 금액 없이 ("+5% 도달", "상한가 도달", "52주 신고가 달성") */
+    private fun bareLabel(h: HoldingAlertHit): String = when (h.direction) {
+        Direction.UP -> "${rate(h.threshold, 0)} 도달"
+        Direction.DOWN -> "${rate(-h.threshold, 0)} 도달"
+        Direction.UPPER_LIMIT -> "상한가 도달"
+        Direction.LOWER_LIMIT -> "하한가 도달"
+        Direction.HIGH_52W -> "52주 신고가 달성"
+        Direction.LOW_52W -> "52주 신저가 달성"
+        else -> h.direction.name
+    }
+
+    private fun isUpSide(d: Direction) = d == Direction.UP || d == Direction.UPPER_LIMIT || d == Direction.HIGH_52W
+
+    /**
+     * 보유 종목 급등락 — 2026-10-02 잠금 해제: 종목명·등락만 있어 알림함·텔레그램과 같은 수준으로 공개(2차 인증 불필요).
+     * 화면은 종목마다 시세 카드 모양(turnCards HOLDING_ALERT)으로 그리고, 섹션 표는 예전 화면용으로 함께 둔다
+     */
     fun renderHoldingAlert(hits: List<HoldingAlertHit>, now: LocalDateTime): MessageBody {
         val merged = mergeHits(hits)
-        val rows = merged.joinToString("\n") { m ->
-            "| [${m.assetName}](${m.link}) | ${mergedLabel(m, colored = true)} | ${m.currentRate?.let { coloredRate(it) } ?: "-"} |"
-        }
+        val rows = merged.joinToString("\n") { m -> "| [${m.assetName}](${m.link}) | ${mergedLabel(m, colored = true)} |" }
         val section = Section(
-            id = "H1", title = "보유 종목", personal = true, asOf = now,
-            text = "| 종목 | 알림 | 현재 |\n|---|---|---:|\n$rows",
+            id = "H1", title = "보유 종목", personal = false, asOf = now,
+            text = "| 종목 | 알림 |\n|---|---|\n$rows",
         )
+        val cards = merged.map { m ->
+            TurnCard(
+                kind = "HOLDING_ALERT",
+                asOf = now,
+                payload = mapOf(
+                    "name" to m.assetName,
+                    "link" to m.link,
+                    "price" to m.main.price,
+                    "currency" to if (m.main.assetCode.endsWith("_US")) "USD" else "KRW",
+                    "label" to (bareLabel(m.main) + (m.extra52?.let { " · ${bareLabel(it)}" } ?: "")),
+                    "up" to isUpSide(m.main.direction),
+                ),
+            )
+        }
         return MessageBody(
             type = MessageType.ALERT, subtype = SUBTYPE_HOLDING, asOf = now,
-            headline = Headline(holdingHeadline(merged), HeadlineScope.PERSONAL, "보유 종목 급등락 ${merged.size}건"),
+            headline = Headline(holdingHeadline(merged), HeadlineScope.MARKET),
             sections = listOf(section),
+            turnCards = cards,
         )
     }
 
@@ -194,17 +232,7 @@ object AlertTemplateRenderer {
     fun renderHoldingAlertTelegram(hits: List<HoldingAlertHit>): String {
         val merged = mergeHits(hits)
         val lines = mutableListOf("🔔 <b>${esc(holdingHeadline(merged))}</b>")
-        fun currentOf(m: MergedHit) = m.currentRate?.takeUnless { isLimit(m.main.direction) }
-        if (merged.size == 1) {
-            currentOf(merged.first())?.let { lines += esc("현재 ${rate(it)}") }
-        } else {
-            merged.forEach { m ->
-                val current = currentOf(m)?.let { " · 현재 ${rate(it)}" } ?: ""
-                val label = mergedLabel(m, colored = false)
-                val line = if (label.contains(" (")) label.replaceFirst(" (", "$current (") else "$label$current"
-                lines += esc("${m.assetName} $line")
-            }
-        }
+        if (merged.size > 1) merged.forEach { m -> lines += esc("${m.assetName} ${mergedLabel(m, colored = false)}") }
         return lines.joinToString("\n")
     }
 }

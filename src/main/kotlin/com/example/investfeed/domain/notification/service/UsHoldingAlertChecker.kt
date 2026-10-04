@@ -55,13 +55,14 @@ class UsHoldingAlertChecker(
             val base = price(res.base_close_pric) ?: return@forEach
             val high = price(res.high_pric) ?: return@forEach
             val low = price(res.low_pric) ?: return@forEach
-            val curRate = price(res.cur_prc)?.let { (it - base) / base * 100 }
+            val curPrice = price(res.cur_prc)
+            val curRate = curPrice?.let { (it - base) / base * 100 }
             val maxUpRt = (high - base) / base * 100
             val maxDownRt = (low - base) / base * 100
             val link = "/us-stock/detail/$stexTp/$ticker"
 
             holders.filter { seen.add(it.memberId to it.stkCd) }.forEach { h ->
-                val t = AlertTarget(h.memberId, AssetType.STOCK, h.stkCd, h.stkNm, link, held = true, curRate = curRate)
+                val t = AlertTarget(h.memberId, AssetType.STOCK, h.stkCd, h.stkNm, link, held = true, curRate = curRate, curPrice = curPrice)
                 if (maxUpRt > 0) judge.judge(t, Direction.UP, maxUpRt, US_STOCK_THRESHOLDS, hits, usDate)
                 if (maxDownRt < 0) judge.judge(t, Direction.DOWN, maxDownRt, US_STOCK_THRESHOLDS, hits, usDate)
                 if (res.wk52_hgst_pric_dt == todayUs) judge.judge(t, Direction.HIGH_52W, high, PriceAlertJudge.SINGLE, hits, usDate)

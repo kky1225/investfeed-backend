@@ -49,7 +49,7 @@ class KiwoomWebSocketClient(
 
                 else -> {
                     if ((rootNode.get("return_code")?.asInt() ?: 0) != 0) {
-                        log.error { "소켓 응답 오류 : ${rootNode.get("return_msg")?.asText()}" }
+                        log.error { "소켓 응답 오류 [${rootNode.get("trnm")?.asText()}/${rootNode.get("return_code")?.asText()}] : ${rootNode.get("return_msg")?.asText()}" }
                     }
                 }
             }

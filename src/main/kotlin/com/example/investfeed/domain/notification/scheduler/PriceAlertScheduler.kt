@@ -162,9 +162,9 @@ class PriceAlertScheduler(
         val stockDataMap = kiwoomStockInterestRes.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: return emptyMap()
 
         fun price(s: String?) = s?.toDoubleOrNull()?.let { abs(it) }?.takeIf { it > 0 }
-        fun target(item: MemberAsset, curRate: Double?) = AlertTarget(
+        fun target(item: MemberAsset, curRate: Double?, curPrice: Double?) = AlertTarget(
             item.memberId, AssetType.STOCK, item.code, item.name, "/stock/detail/${item.code.substringBefore("_")}",
-            held = (item.memberId to item.code) in heldKeys, curRate = curRate,
+            held = (item.memberId to item.code) in heldKeys, curRate = curRate, curPrice = curPrice,
         )
 
         for (item in memberStocks) {
@@ -172,10 +172,11 @@ class PriceAlertScheduler(
             val basePric = price(stockData.base_pric) ?: continue
             val highPric = price(stockData.high_pric) ?: continue
             val lowPric = price(stockData.low_pric) ?: continue
-            val curRate = price(stockData.cur_prc)?.let { (it - basePric) / basePric * 100 }
+            val curPrice = price(stockData.cur_prc)
+            val curRate = curPrice?.let { (it - basePric) / basePric * 100 }
             val maxUpRt = (highPric - basePric) / basePric * 100
             val maxDownRt = (lowPric - basePric) / basePric * 100
-            val t = target(item, curRate)
+            val t = target(item, curRate, curPrice)
 
             val setting = notificationSettingService.getSettingByMemberId(item.memberId)
             val upperReached = price(stockData.upl_pric)?.let { highPric >= it } ?: false
@@ -200,8 +201,9 @@ class PriceAlertScheduler(
                 if (item.code !in newHighCodes && item.code !in newLowCodes) continue
                 val stockData = stockDataMap[item.code]
                 val basePric = price(stockData?.base_pric)
-                val curRate = price(stockData?.cur_prc)?.let { c -> basePric?.let { (c - it) / it * 100 } }
-                val t = target(item, curRate)
+                val curPrice = price(stockData?.cur_prc)
+                val curRate = curPrice?.let { c -> basePric?.let { (c - it) / it * 100 } }
+                val t = target(item, curRate, curPrice)
                 if (item.code in newHighCodes) judge.judge(t, Direction.HIGH_52W, price(stockData?.high_pric) ?: 0.0, PriceAlertJudge.SINGLE, hits)
                 if (item.code in newLowCodes) judge.judge(t, Direction.LOW_52W, price(stockData?.low_pric) ?: 0.0, PriceAlertJudge.SINGLE, hits)
             }
@@ -231,11 +233,12 @@ class PriceAlertScheduler(
             val prevClosing = ticker.prev_closing_price?.takeIf { it > 0 } ?: continue
             val highPrice = ticker.high_price ?: continue
             val lowPrice = ticker.low_price ?: continue
-            val curRate = ticker.trade_price?.takeIf { it > 0 }?.let { (it - prevClosing) / prevClosing * 100 }
+            val curPrice = ticker.trade_price?.takeIf { it > 0 }
+            val curRate = curPrice?.let { (it - prevClosing) / prevClosing * 100 }
             val maxUpRt = (highPrice - prevClosing) / prevClosing * 100
             val maxDownRt = (lowPrice - prevClosing) / prevClosing * 100
             val t = AlertTarget(item.memberId, AssetType.CRYPTO, item.code, item.name, "/crypto/detail/${item.code}",
-                held = (item.memberId to item.code) in heldKeys, curRate = curRate)
+                held = (item.memberId to item.code) in heldKeys, curRate = curRate, curPrice = curPrice)
 
             if (maxUpRt > 0) judge.judge(t, Direction.UP, maxUpRt, CRYPTO_THRESHOLDS, hits)
             if (maxDownRt < 0) judge.judge(t, Direction.DOWN, maxDownRt, CRYPTO_THRESHOLDS, hits)

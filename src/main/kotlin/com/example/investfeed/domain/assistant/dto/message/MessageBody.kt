@@ -12,6 +12,19 @@ data class MessageBody(
     val sections: List<Section> = emptyList(),
     val cards: List<String> = emptyList(),
     val refs: Map<String, Long> = emptyMap(),
+    val turnCards: List<TurnCard> = emptyList(),   // 5단계 Q&A 답변 카드
+)
+
+data class TurnCard(
+    val kind: String,                 // 도구 이름 또는 카드 종류 (PORTFOLIO / STOCK_CHOICE …)
+    val personal: Boolean = false,
+    val status: SectionStatus = SectionStatus.OK,
+    val ref: String? = null,          // 표시 도구 카드 참조 (확인 카드 버튼용)
+    val asOf: LocalDateTime? = null,
+    val source: String? = null,
+    val error: String? = null,
+    val payload: Any? = null,
+    val args: Map<String, Any?>? = null,   // 조회 조건 (공개 데이터 카드만). 화면의 조건 기준 안내용
 )
 
 data class Headline(

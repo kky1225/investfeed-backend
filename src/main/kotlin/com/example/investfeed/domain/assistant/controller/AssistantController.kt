@@ -9,13 +9,18 @@ import com.example.investfeed.domain.assistant.dto.req.AssistantSettingReq
 import com.example.investfeed.domain.assistant.dto.req.ReadMarkerReq
 import com.example.investfeed.domain.assistant.dto.req.TelegramStatusReq
 import com.example.investfeed.domain.assistant.dto.req.TimelineQueryReq
+import com.example.investfeed.domain.assistant.dto.req.TimelineView
 import com.example.investfeed.domain.assistant.dto.res.AssistantSettingRes
 import com.example.investfeed.domain.assistant.dto.res.AssistantTokenRes
 import com.example.investfeed.domain.assistant.dto.res.TelegramLinkCodeRes
 import com.example.investfeed.domain.assistant.dto.res.TelegramStatusRes
 import com.example.investfeed.domain.assistant.service.AssistantTokenService
 import com.example.investfeed.domain.assistant.service.TelegramLinkService
+import com.example.investfeed.domain.assistant.dto.req.PriceAlertActionReq
+import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
+import com.example.investfeed.internal.assistant.tool.ActionToolService
 import com.example.investfeed.internal.assistant.tool.CardStore
+import com.example.investfeed.internal.assistant.tool.ToolException
 import java.time.LocalDateTime
 import java.time.ZoneId
 import com.example.investfeed.domain.assistant.dto.res.TimelinePageRes
@@ -37,6 +42,7 @@ class AssistantController(
     private val assistantTokenService: AssistantTokenService,
     private val telegramLinkService: TelegramLinkService,
     private val cardStore: CardStore,
+    private val actionToolService: ActionToolService,
 ) {
 
     @GetMapping("timeline")
@@ -71,6 +77,26 @@ class AssistantController(
         timelineService.markRead(user.member.id, req.lastSeenId)
         return ok(ResponseCode.ASSISTANT_READ_MARKER_UPDATE, timelineService.unreadCount(user.member.id))
     }
+
+    @DeleteMapping("timeline/messages/{id}")
+    @RequiresAction(action = Actions.DELETE)
+    fun deleteMessage(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable id: Long,
+    ): ResponseEntity<ApiResponse<Long?>> {
+        if (!timelineService.deleteMessage(user.member.id, id)) {
+            return ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_MESSAGE_DELETE.code, message = "메시지가 없거나 이미 삭제되었습니다.", result = null), HttpStatus.NOT_FOUND)
+        }
+        return ok(ResponseCode.ASSISTANT_MESSAGE_DELETE, id)
+    }
+
+    @DeleteMapping("timeline/messages")
+    @RequiresAction(action = Actions.DELETE)
+    fun deleteMessages(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @RequestParam view: TimelineView,
+    ): ResponseEntity<ApiResponse<Int>> =
+        ok(ResponseCode.ASSISTANT_MESSAGES_DELETE, timelineService.deleteByView(user.member.id, view))
 
     @PostMapping("secure/token")
     @RequiresAction(action = Actions.CREATE)
@@ -139,9 +165,20 @@ class AssistantController(
         return ok(ResponseCode.ASSISTANT_CARD_GET, card)
     }
 
+    @PostMapping("secure/actions/price-alert")
+    @RequiresAction(action = Actions.CREATE)
+    fun confirmPriceAlert(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @Valid @RequestBody req: PriceAlertActionReq,
+    ): ResponseEntity<ApiResponse<PriceTargetRes?>> = try {
+        ok(ResponseCode.ASSISTANT_PRICE_ALERT_CREATE, actionToolService.confirmPriceAlert(user.member, req.cardRef))
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_PRICE_ALERT_CREATE.code, message = e.message ?: "등록할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
     private fun timeline(memberId: Long, req: TimelineQueryReq, includePersonal: Boolean) =
-        if (req.date != null) timelineService.getTimelineByDate(memberId, req.date, includePersonal)
-        else timelineService.getTimeline(memberId, req.before, req.limit, includePersonal)
+        if (req.date != null) timelineService.getTimelineByDate(memberId, req.date, includePersonal, req.view)
+        else timelineService.getTimeline(memberId, req.before, req.limit, includePersonal, req.view)
 
     private fun <T> ok(code: ResponseCode, result: T): ResponseEntity<ApiResponse<T>> =
         ResponseEntity(ApiResponse(code = code.code, message = code.message, result = result), HttpStatus.OK)

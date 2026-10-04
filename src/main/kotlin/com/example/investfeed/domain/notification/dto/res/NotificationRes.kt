@@ -12,6 +12,7 @@ data class NotificationRes(
     val threshold: Double,
     val direction: Direction,
     val fluRt: Double,
+    val price: Double?,
     val isRead: Boolean,
     val createdAt: LocalDateTime
 ) {
@@ -25,6 +26,7 @@ data class NotificationRes(
             threshold = notification.threshold,
             direction = notification.direction,
             fluRt = notification.fluRt,
+            price = notification.price,
             isRead = notification.isRead,
             createdAt = notification.createdAt
         )

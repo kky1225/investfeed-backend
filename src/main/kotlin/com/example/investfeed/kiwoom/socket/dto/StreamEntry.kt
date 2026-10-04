@@ -6,8 +6,8 @@ data class StreamEntry(
     val types: List<String>,
 )
 
-enum class StreamMarket {
-    KRX,
-    NXT,
-    US,
+enum class StreamMarket(val grpNo: String) {
+    KRX("1"),
+    NXT("1"),
+    US("2"),
 }

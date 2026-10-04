@@ -62,6 +62,7 @@ class NotificationService(
         direction: Direction,
         fluRt: Double,
         alertDate: LocalDate = LocalDate.now(),
+        price: Double? = null,
     ): Boolean {
         val today = alertDate
 
@@ -78,7 +79,8 @@ class NotificationService(
             assetName = assetName,
             threshold = threshold,
             direction = direction,
-            fluRt = fluRt
+            fluRt = fluRt,
+            price = price,
         )
         notificationRepository.save(notification)
 
@@ -228,8 +230,6 @@ class NotificationService(
     ) {
         val assetCode = "API_KEY_$apiKeyId"
 
-        // 중복 방지 기준 날짜. 만료 계열은 API Key 생명주기 동안 1회 발송(고정값),
-        // 인증 실패는 매일 1회 발송(당일 날짜) — 사용자가 조치할 때까지 매일 인지시켜야 하므로.
         val alertDate = if (direction == Direction.API_KEY_AUTH_FAILED) {
             LocalDate.now()
         } else {

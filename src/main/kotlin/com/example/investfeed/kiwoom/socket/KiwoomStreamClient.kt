@@ -5,7 +5,6 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomStream
-import com.example.investfeed.kiwoom.socket.dto.KiwoomStreamReq
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import mu.KotlinLogging
@@ -21,17 +20,21 @@ class KiwoomStreamClient(
 
     @KiwoomToken
     fun register(vararg entries: StreamEntry) {
-        val data = entries
-            .filter { it.items.isNotEmpty() && isOpen(it.market) }
-            .map { KiwoomStream(item = it.items, type = it.types) }
+        val openEntries = entries.filter { it.items.isNotEmpty() && isOpen(it.market) }
 
-        if (data.isEmpty()) return
+        if (openEntries.isEmpty()) return
 
-        log.debug { "실시간 등록 $data" }
+        val groups = StreamMarket.entries.map { it.grpNo }.distinct().associateWith { grpNo ->
+            openEntries
+                .filter { it.market.grpNo == grpNo }
+                .map { KiwoomStream(item = it.items, type = it.types) }
+        }
 
-        socketManager.send(
+        log.debug { "실시간 등록 $groups" }
+
+        socketManager.register(
             accessToken = authClient.getCurrentAccessToken(),
-            req = KiwoomStreamReq(data = data)
+            groups = groups,
         )
     }
 

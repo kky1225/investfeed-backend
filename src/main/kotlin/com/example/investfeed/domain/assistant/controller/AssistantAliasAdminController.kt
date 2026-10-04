@@ -10,6 +10,7 @@ import com.example.investfeed.domain.assistant.repository.AssistantStockAliasRep
 import com.example.investfeed.internal.assistant.tool.StockMarket
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import java.time.LocalDateTime
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -20,9 +21,9 @@ import org.springframework.web.bind.annotation.*
 class AssistantAliasAdminController(
     private val aliasRepository: AssistantStockAliasRepository,
 ) {
-    data class AliasRes(val id: Long, val alias: String, val market: StockMarket, val stkCd: String) {
+    data class AliasRes(val id: Long, val alias: String, val market: StockMarket, val stkCd: String, val createdAt: LocalDateTime) {
         companion object {
-            fun from(e: AssistantStockAlias) = AliasRes(e.id, e.alias, StockMarket.valueOf(e.market), e.stkCd)
+            fun from(e: AssistantStockAlias) = AliasRes(e.id, e.alias, StockMarket.valueOf(e.market), e.stkCd, e.createdAt)
         }
     }
 

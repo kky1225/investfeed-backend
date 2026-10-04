@@ -253,6 +253,11 @@ enum class ResponseCode(
     ASSISTANT_ALIAS_LIST(message = "종목 별칭 조회에 성공하셨습니다."),
     ASSISTANT_ALIAS_CREATE(message = "종목 별칭 등록에 성공하셨습니다."),
     ASSISTANT_ALIAS_DELETE(message = "종목 별칭 삭제에 성공하셨습니다."),
+    ASSISTANT_PRICE_ALERT_CREATE(message = "비서 목표가 알림 등록에 성공하셨습니다."),
+    ASSISTANT_USAGE_GET(message = "비서 사용량 조회에 성공하셨습니다."),
+    ASSISTANT_USAGE_LOG_GET(message = "비서 회원별 처리 기록 조회에 성공하셨습니다."),
+    ASSISTANT_MESSAGE_DELETE(message = "비서 메시지 삭제에 성공하셨습니다."),
+    ASSISTANT_MESSAGES_DELETE(message = "비서 메시지 전체 삭제에 성공하셨습니다."),
     MONITORING_TELEGRAM_SEND_GET(message = "텔레그램 전체 발송 상태 조회에 성공하셨습니다."),
     MONITORING_TELEGRAM_SEND_UPDATE(message = "텔레그램 전체 발송 상태 변경에 성공하셨습니다."),
 

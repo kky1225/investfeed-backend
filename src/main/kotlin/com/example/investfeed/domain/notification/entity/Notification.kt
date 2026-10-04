@@ -37,6 +37,9 @@ class Notification(
     @Column(nullable = false)
     val fluRt: Double,
 
+    @Column
+    val price: Double? = null,
+
     @Column(nullable = false)
     var isRead: Boolean = false,
 

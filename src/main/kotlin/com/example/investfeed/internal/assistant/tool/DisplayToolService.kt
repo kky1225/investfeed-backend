@@ -2,6 +2,9 @@ package com.example.investfeed.internal.assistant.tool
 
 import com.example.investfeed.domain.assistant.dto.factsheet.BrokerHoldingsFact
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingFact
+import com.example.investfeed.domain.assistant.dto.factsheet.PersonalFactSheet
+import com.example.investfeed.domain.assistant.dto.message.Section
+import com.example.investfeed.domain.assistant.service.BriefingTemplateRenderer
 import com.example.investfeed.domain.assistant.dto.message.MessageType
 import com.example.investfeed.domain.assistant.repository.AssistantMessageRepository
 import com.example.investfeed.domain.assistant.service.BriefingType
@@ -39,6 +42,7 @@ class DisplayToolService(
         val asOf: LocalDateTime, val totalEvalKrw: Double?, val usdKrw: Double?,
         val classes: List<ClassSummary>, val topGainers: List<HoldingRow>, val topLosers: List<HoldingRow>,
         val filter: HoldingFilter?, val filtered: List<HoldingRow>?, val realizedMonthWon: Long?,
+        val sections: List<Section> = emptyList(),
     )
     data class HoldingFilter(val dayRateLt: Double? = null, val dayRateGt: Double? = null, val totalRateLt: Double? = null, val totalRateGt: Double? = null) {
         fun hasCondition() = dayRateLt != null || dayRateGt != null || totalRateLt != null || totalRateGt != null
@@ -79,8 +83,27 @@ class DisplayToolService(
             filter = filter?.takeIf { it.hasCondition() },
             filtered = filter?.takeIf { it.hasCondition() }?.let { f -> rows.filter { f.matches(it) }.sortedBy { it.dayRate } },
             realizedMonthWon = sheet.realized?.monthTotalWon,
+            sections = accountSections(sheet, assetClass, filter?.takeIf { it.hasCondition() }),
         )
         return cardStore.put(member.id, KIND_PORTFOLIO, card)
+    }
+
+    private fun accountSections(sheet: PersonalFactSheet, assetClass: AssetClass?, filter: HoldingFilter?): List<Section> {
+        fun keep(c: AssetClass, brokers: List<BrokerHoldingsFact>?) = brokers?.let { bs ->
+            if (filter == null) bs
+            else bs.map { b -> b.copy(items = b.items.filter { filter.matches(row(c, b, it)) }) }.filter { it.failed || it.items.isNotEmpty() }
+        }
+        val shown = sheet.copy(
+            krBrokers = keep(AssetClass.KR, sheet.krBrokers),
+            usBrokers = keep(AssetClass.US, sheet.usBrokers),
+            coinExchanges = keep(AssetClass.CRYPTO, sheet.coinExchanges),
+        )
+        val scoped = if (assetClass == null) shown else shown.copy(
+            krBrokers = shown.krBrokers.takeIf { assetClass == AssetClass.KR }.orEmpty(),
+            usBrokers = shown.usBrokers.takeIf { assetClass == AssetClass.US }.orEmpty(),
+            coinExchanges = shown.coinExchanges.takeIf { assetClass == AssetClass.CRYPTO }.orEmpty(),
+        )
+        return BriefingTemplateRenderer.accountSectionsByBroker(scoped)
     }
 
     private fun row(c: AssetClass, b: BrokerHoldingsFact, h: HoldingFact) =

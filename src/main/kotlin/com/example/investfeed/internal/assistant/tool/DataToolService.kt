@@ -2,8 +2,9 @@ package com.example.investfeed.internal.assistant.tool
 
 import com.example.investfeed.domain.assistant.service.MarketFactSheetService
 import com.example.investfeed.domain.assistant.service.TemplateFormat
+import com.example.investfeed.domain.assistant.dto.message.Section
+import com.example.investfeed.domain.assistant.service.BriefingTemplateRenderer
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
-import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
 import com.example.investfeed.domain.news.service.NewsService
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
@@ -58,32 +59,25 @@ class DataToolService(
     enum class Investor { FOREIGN, INSTITUTION, PENSION, INDIVIDUAL }
     enum class Side { BUY, SELL }
 
-    // ── get_market_summary ──
+    data class MarketCard(val title: String, val asOf: LocalDateTime, val summary: String, val sections: List<Section>)
 
-    data class IndexSnapshot(val name: String, val close: Double, val changeRate: Double?, val changeAmount: Double?, val high: Double?, val low: Double?)
-    data class FlowSnapshot(val foreignEok: Long?, val institutionEok: Long?, val individualEok: Long?)
-    data class MarketSummary(val market: Market, val index: IndexSnapshot, val secondary: IndexSnapshot?, val flow: FlowSnapshot?, val tradingDay: LocalDate)
-
-    /** 당일(직전 개장일) 스냅샷만. 과거 일자 조회는 4단계 범위 밖 */
-    fun marketSummary(market: Market, date: LocalDate?): MarketSummary {
+    fun marketSummary(market: Market?, date: LocalDate?): MarketCard {
         val tradingDay = periodResolver.lastTradingDay()
         if (date != null && date != tradingDay) throw ToolException("지수는 직전 개장일($tradingDay)만 조회할 수 있습니다")
-        val card = marketFactSheetService.collectKrIndexAlert(market.name)
-        val primary = card.primary ?: throw ToolException("${market.name} 지수 조회에 실패했습니다")
-        fun snap(f: com.example.investfeed.domain.assistant.dto.factsheet.IndexFact) = IndexSnapshot(f.name, f.close, f.changeRate, f.changeAmount, f.high, f.low)
-        return MarketSummary(market, snap(primary), card.secondary?.let { snap(it) }, card.flow?.let { FlowSnapshot(it.foreign, it.institution, it.individual) }, tradingDay)
+        val now = LocalDateTime.now()
+        val kospi = market != Market.KOSDAQ
+        val kosdaq = market != Market.KOSPI
+        val sheet = marketFactSheetService.collectKrNow(now, kospi = kospi, kosdaq = kosdaq)
+        if (sheet.kospi == null && sheet.kosdaq == null) throw ToolException("국내 지수 조회에 실패했습니다")
+        val r = BriefingTemplateRenderer.renderKrMarketNow(sheet, kospi = kospi, kosdaq = kosdaq)
+        val title = when (market) { Market.KOSPI -> "코스피"; Market.KOSDAQ -> "코스닥"; null -> "국내 시장" }
+        return MarketCard(title, now, r.summary, r.sections)
     }
-
-    // ── get_market_investor_flow ──
 
     /** netAmountEok: 순매수 금액(억원). 키움은 백만원 단위로 주므로 /100 (대시보드와 같은 변환) */
     data class FlowStock(val code: String, val name: String, val netAmountEok: Long, val periodChangeRate: Double?, val streakDays: Int?)
     data class MarketInvestorFlow(val investor: Investor, val market: Market, val days: Int, val side: Side, val minStreakDays: Int?, val stocks: List<FlowStock>)
 
-    /**
-     * 기간 누적 순매수 상위 종목. 외국인·기관은 ka10131(기관외국인연속매매현황) 로 연속일수까지, 연기금·개인은 ka10058(투자자별 일별매매) 누적.
-     * "3일 연속 산 종목" = investor=FOREIGN, minStreakDays=3
-     */
     fun marketInvestorFlow(investor: Investor, market: Market, days: Int, side: Side, minStreakDays: Int?): MarketInvestorFlow {
         if (days !in RANK_PERIODS) throw ToolException("days 는 ${RANK_PERIODS.joinToString("/")} 중 하나여야 합니다")
         if (minStreakDays != null && investor !in listOf(Investor.FOREIGN, Investor.INSTITUTION)) throw ToolException("연속 순매수 조건은 외국인·기관만 지원합니다")
@@ -207,15 +201,26 @@ class DataToolService(
         return count * sign
     }
 
-    // ── get_global_indexes ──
-
-    fun globalIndexes(): List<MarketIndexRes> = marketIndexService.listMarketIndexes()
-
-    // ── get_calendar ──
+    /** 미국 시장: 미국 마감 브리핑과 같은 지수 타일(나스닥·S&P500·다우·필라델피아 반도체·VIX) + 국채 + 환율 */
+    fun globalIndexes(): MarketCard {
+        val now = LocalDateTime.now()
+        val sheet = marketFactSheetService.collectUsNow(now)
+        if (sheet.indexes == null) throw ToolException("미국 지수 조회에 실패했습니다")
+        val r = BriefingTemplateRenderer.renderUsMarketNow(sheet)
+        return MarketCard("미국 시장", now, r.summary, r.sections)
+    }
 
     data class CalendarItem(val date: String, val name: String, val country: String, val type: String, val value: String?)
 
-    fun calendar(from: LocalDate, to: LocalDate, keyword: String?): List<CalendarItem> {
+    enum class CalendarType(val eventTypes: Set<String>) {
+        INDICATOR(setOf("INDICATOR", "GDP_RELEASE", "CPI_RELEASE")),
+        HOLIDAY(setOf("HOLIDAY")),
+        MEETING(setOf("RATE_DECISION", "US_RATE_DECISION")),
+    }
+
+    enum class CalendarCountry { KR, US }
+
+    fun calendar(from: LocalDate, to: LocalDate, keyword: String?, type: CalendarType?, country: CalendarCountry?): List<CalendarItem> {
         if (to.isBefore(from)) throw ToolException("종료일이 시작일보다 앞섭니다")
         if (java.time.temporal.ChronoUnit.DAYS.between(from, to) > 92) throw ToolException("일정은 최대 3개월 범위로 조회할 수 있습니다")
         var ym = YearMonth.from(from)
@@ -227,26 +232,24 @@ class DataToolService(
             out += events
                 .filter { runCatching { LocalDate.parse(it.date) }.getOrNull()?.let { d -> !d.isBefore(from) && !d.isAfter(to) } ?: false }
                 .filter { keyword.isNullOrBlank() || it.name.contains(keyword, ignoreCase = true) }
+                .filter { type == null || it.type in type.eventTypes }
+                .filter { country == null || it.country == country.name }
                 .map { CalendarItem(it.date, it.name, it.country, it.type, it.value) }
             ym = ym.plusMonths(1)
         }
         return out.sortedBy { it.date }.take(MAX_CALENDAR)
     }
 
-    // ── get_recommend_list ──
-
     data class RecommendItem(val code: String, val name: String, val grade: String)
     data class RecommendList(val label: String, val pickDate: LocalDateTime?, val items: List<RecommendItem>)
 
-    /** 당일 추천 = "시스템 분류" (C-12: 모의투자 아님). 등급명만, 사유 없음 */
+    /** 당일 추천 (C-12: 모의투자 아님). 등급명만, 사유 없음 */
     fun recommendList(grade: String?): RecommendList {
         val picks = stockPickRepository.findAllByOrderByStkCdAsc()
             .filter { grade == null || it.type.equals(grade, ignoreCase = true) }
             .map { RecommendItem(it.stkCd.substringBefore("_"), it.stkNm, it.type) }
-        return RecommendList("시스템 분류", stockPickHistoryRepository.findMaxPickDate(), picks)
+        return RecommendList("추천 종목", stockPickHistoryRepository.findMaxPickDate(), picks)
     }
-
-    // ── search_news ──
 
     data class NewsRow(val title: String, val link: String, val pubDate: String)
 

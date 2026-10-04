@@ -47,16 +47,15 @@ object BriefingTemplateRenderer {
         return "| ${k.name} | $amount | ${rate5d?.let { coloredRate(it) } ?: "-"} |"
     }
 
-    private fun flowSection(f: FlowFact?): Section {
+    private fun flowSection(f: FlowFact?, withKospi: Boolean = true, withKosdaq: Boolean = true): Section {
         f ?: return failedSection("C3", "투자자 수급")
-        val kospi = f.kospi
-        val kosdaq = f.kosdaq
-        if (kospi == null && kosdaq == null) return failedSection("C3", "투자자 수급")
+        val cols = listOfNotNull(("코스피" to f.kospi).takeIf { withKospi }, ("코스닥" to f.kosdaq).takeIf { withKosdaq })
+        if (cols.all { it.second == null }) return failedSection("C3", "투자자 수급")
         fun cell(v: Long?) = v?.let { coloredEok(it) } ?: "-"
-        val lines = mutableListOf("| 주체 | 코스피 | 코스닥 |\n|---|---|---|")
-        lines += "| 외국인 | ${cell(kospi?.foreign)} | ${cell(kosdaq?.foreign)} |"
-        lines += "| 기관 | ${cell(kospi?.institution)} | ${cell(kosdaq?.institution)} |"
-        lines += "| 개인 | ${cell(kospi?.individual)} | ${cell(kosdaq?.individual)} |"
+        val lines = mutableListOf("| 주체 | ${cols.joinToString(" | ") { it.first }} |\n|---|${cols.joinToString("") { "---|" }}")
+        lines += "| 외국인 | ${cols.joinToString(" | ") { cell(it.second?.foreign) }} |"
+        lines += "| 기관 | ${cols.joinToString(" | ") { cell(it.second?.institution) }} |"
+        lines += "| 개인 | ${cols.joinToString(" | ") { cell(it.second?.individual) }} |"
         return okSection("C3", "투자자 수급 · 잠정", lines.joinToString("\n"))
     }
 
@@ -87,7 +86,7 @@ object BriefingTemplateRenderer {
         list ?: return failedSection("P2B", "오늘 추천")
         if (list.isEmpty()) return okSection("P2B", "오늘 추천", "오늘 추천 산출 없음")
         val rows = list.joinToString("\n") { r -> "| ${TemplateFormat.coloredGrade(r.grade)} | ${r.names.size} | ${r.names.joinToString(", ")} |" }
-        return okSection("P2B", "오늘 추천 · 시스템 분류", "| 등급 | 종목 수 | 종목 |\n|:---|---:|:---|\n$rows")
+        return okSection("P2B", "오늘 추천", "| 등급 | 종목 수 | 종목 |\n|:---|---:|:---|\n$rows")
     }
 
     private fun krPreSummary(s: KrPreFactSheet): String {
@@ -133,6 +132,14 @@ object BriefingTemplateRenderer {
         return okSection("K2", "코인 시세 · 업비트 09:00 마감", "| 코인 | 종가 | 등락 | 거래대금 |\n|---|---|---|---|\n" + rows.joinToString("\n"))
     }
 
+    /** 비서 "코스피 어때" 카드: 장 마감 카드와 같은 지수 타일 + 투자자 수급 표. 물어본 시장만 (코스피 / 코스닥 / 둘 다) */
+    fun renderKrMarketNow(sheet: KrCloseFactSheet, kospi: Boolean = true, kosdaq: Boolean = true): Rendered =
+        Rendered(summary = krCloseSummary(sheet), sections = listOf(flowSection(sheet.flow, kospi, kosdaq)))
+
+    /** 비서 "미국장 어때" 카드: 미국 마감 카드에서 내 미국 종목·마감 시각 안내를 뺀 것 (지수 타일 + 국채 + 환율) */
+    fun renderUsMarketNow(sheet: UsCloseFactSheet): Rendered =
+        Rendered(summary = usCloseSummary(sheet), sections = listOf(treasurySection(sheet.treasury), usFxSection(sheet.usdKrw, "환율")))
+
     fun renderUsClose(sheet: UsCloseFactSheet, personal: PersonalFactSheet?): Rendered {
         val sections = mutableListOf<Section>()
         personal?.let { p -> myUsHoldingsSection(p)?.let { sections += it } }
@@ -177,9 +184,50 @@ object BriefingTemplateRenderer {
         return okSection("U2B", "미국 국채 금리$suffix", parts.first())
     }
 
-    private fun usFxSection(q: QuoteFact?): Section {
+    private fun usFxSection(q: QuoteFact?, title: String = "환율 · 전일 서울 고시"): Section {
         q ?: return failedSection("U4", "환율")
-        return okSection("U4", "환율 · 전일 서울 고시", "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+        return okSection("U4", title, "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+    }
+
+    /**
+     * 비서 "내 계좌" 카드용 — 계좌(증권사)마다 섹션 1개 (2026-10-01).
+     * 모양은 브리핑 계좌 섹션과 같다: 총 평가금액(원화 환산) + 총 수익·일간 수익·실현(이달) 칸, 그 아래 국내·해외·코인 카드와 같은 종목 표
+     */
+    fun accountSectionsByBroker(p: PersonalFactSheet): List<Section> {
+        data class Part(val label: String, val fact: BrokerHoldingsFact, val krw: Boolean, val nameHeader: String)
+        val fx = p.usdKrw
+        val realizedBy = p.realized?.byBroker?.toMap().orEmpty()
+        val parts = p.krBrokers.orEmpty().map { Part("국내", it, true, "종목명") } +
+            p.usBrokers.orEmpty().map { Part("해외", it, false, "종목명") } +
+            p.coinExchanges.orEmpty().map { Part("코인", it, true, "코인명") }
+        fun toKrw(v: Double, part: Part): Double? = if (part.krw) v else fx?.let { v * it }
+        fun withRate(amount: Double?, rate: Double?): String? = when {
+            amount != null -> coloredWon(Math.round(amount)) + (rate?.let { " (${coloredRate(it)})" } ?: "")
+            rate != null -> coloredRate(rate)
+            else -> null
+        }
+        return parts.groupBy { it.fact.brokerName }.entries.mapIndexedNotNull { i, (broker, ps) ->
+            val id = "ACC${i + 1}"
+            val ok = ps.filter { !it.fact.failed && it.fact.items.isNotEmpty() }
+            if (ok.isEmpty()) return@mapIndexedNotNull if (ps.any { it.fact.failed }) failedSection(id, broker, personal = true) else null
+            val evalKrw = ok.mapNotNull { toKrw(it.fact.eval, it) }.sum()
+            val profitKrw = ok.flatMap { pt -> pt.fact.items.mapNotNull { h -> h.evalProfit?.let { toKrw(it, pt) } } }.takeIf { it.isNotEmpty() }?.sum()
+            val dayKrw = ok.mapNotNull { pt -> pt.fact.dayChange?.let { toKrw(it, pt) } }.takeIf { it.isNotEmpty() }?.sum()
+            val stats = listOfNotNull(
+                withRate(profitKrw, profitKrw?.let { pr -> (evalKrw - pr).takeIf { it > 0 }?.let { pr / it * 100 } })?.let { AccountStat("총 수익", it) },
+                withRate(dayKrw, dayKrw?.let { d -> (evalKrw - d).takeIf { it > 0 }?.let { d / it * 100 } })?.let { AccountStat("일간 수익", it) },
+                realizedBy[broker]?.let { AccountStat("실현 (이달)", coloredWon(it)) },
+            )
+            val cards = ps.filter { it.fact.failed || it.fact.items.isNotEmpty() }.map { pt ->
+                if (pt.fact.failed) AccountBroker(name = pt.label, total = null, failed = true)
+                else AccountBroker(
+                    name = pt.label,
+                    total = if (pt.krw) won(Math.round(pt.fact.eval)) else usd(pt.fact.eval),
+                    table = stockTable(pt.fact, pt.krw, pt.nameHeader),
+                )
+            }
+            okSection(id, broker, "", personal = true, account = AccountBlock(total = won(Math.round(evalKrw)), stats = stats, brokers = cards))
+        }
     }
 
     private fun myKrHoldingsSection(p: PersonalFactSheet): Section? {
