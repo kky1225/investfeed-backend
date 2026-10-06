@@ -45,12 +45,14 @@ class DataToolService(
 ) {
     private val log = KotlinLogging.logger {}
 
+    /** 도구 인자 범위의 기준. Python registry.py 도구 설명 문구("종목 1~3개" 등)도 이 값에 맞춘다 */
     companion object {
         const val MAX_STOCKS = 3
         const val MAX_STOCK_FLOW_DAYS = 10
         const val MAX_NEWS = 5
         const val MAX_CALENDAR = 50
         const val MAX_FLOW_STOCKS = 10
+        val STREAK_DAYS_RANGE = 2..20
         val RANK_PERIODS = listOf(1, 3, 5, 10, 20)
         private val YYYYMMDD: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
     }
@@ -81,6 +83,7 @@ class DataToolService(
     fun marketInvestorFlow(investor: Investor, market: Market, days: Int, side: Side, minStreakDays: Int?): MarketInvestorFlow {
         if (days !in RANK_PERIODS) throw ToolException("days 는 ${RANK_PERIODS.joinToString("/")} 중 하나여야 합니다")
         if (minStreakDays != null && investor !in listOf(Investor.FOREIGN, Investor.INSTITUTION)) throw ToolException("연속 순매수 조건은 외국인·기관만 지원합니다")
+        if (minStreakDays != null && minStreakDays !in STREAK_DAYS_RANGE) throw ToolException("연속 순매수 조건은 ${STREAK_DAYS_RANGE.first}~${STREAK_DAYS_RANGE.last}일로 지정해 주세요")
         val mrktTp = if (market == Market.KOSPI) "001" else "101"
         val stocks = when (investor) {
             Investor.FOREIGN, Investor.INSTITUTION -> {
