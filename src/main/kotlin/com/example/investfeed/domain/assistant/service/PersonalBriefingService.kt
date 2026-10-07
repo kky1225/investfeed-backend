@@ -7,7 +7,6 @@ import com.example.investfeed.domain.holding.dto.res.HoldingListRes
 import com.example.investfeed.domain.holding.entity.BrokerType
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.entity.MemberBroker
-import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.holding.service.CryptoHoldingService
 import com.example.investfeed.domain.holding.service.CryptoManualHoldingService
@@ -16,7 +15,7 @@ import com.example.investfeed.domain.holding.service.ManualHoldingService
 import com.example.investfeed.domain.holding.service.TossHoldingService
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
-import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
+import com.example.investfeed.domain.realizedpnl.service.RealizedPnlSummaryService
 import com.example.investfeed.domain.security.CustomUserDetailsService
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
@@ -30,7 +29,6 @@ import java.time.LocalDate
 @Service
 class PersonalBriefingService(
     private val memberBrokerRepository: MemberBrokerRepository,
-    private val brokerRepository: BrokerRepository,
     private val holdingService: HoldingService,
     private val tossHoldingService: TossHoldingService,
     private val manualHoldingService: ManualHoldingService,
@@ -38,7 +36,7 @@ class PersonalBriefingService(
     private val cryptoManualHoldingService: CryptoManualHoldingService,
     private val usStockClient: UsStockClient,
     private val marketIndexService: MarketIndexService,
-    private val memberRealizedPnlRepository: MemberRealizedPnlRepository,
+    private val realizedPnlSummaryService: RealizedPnlSummaryService,
     private val customUserDetailsService: CustomUserDetailsService,
     private val marketFactSheetService: MarketFactSheetService,
 ) {
@@ -210,12 +208,12 @@ class PersonalBriefingService(
 
     private fun fetchRealizedProfit(memberId: Long): RealizedFact? {
         val today = LocalDate.now()
-        val rows = memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(memberId, MarketType.STOCK, today.year, today.monthValue)
+        // 수동 입력분(DB) + 키움(API 즉시 조회) — 대시보드와 같은 기준. withMember 안에서 불려 키움 토큰을 쓸 수 있다
+        val rows = realizedPnlSummaryService.stockItems(memberId, today.year, today.monthValue)
         if (rows.isEmpty()) return null
-        val names = brokerRepository.findAllByOrderByIdAsc().associate { it.id to it.name }
         return RealizedFact(
             monthTotalWon = rows.sumOf { it.realizedPnl },
-            byBroker = rows.map { (names[it.broker.id] ?: "증권사") to it.realizedPnl },
+            byBroker = rows.map { it.brokerName to it.realizedPnl },
         )
     }
 

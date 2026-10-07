@@ -12,6 +12,7 @@ import com.example.investfeed.domain.assistant.service.PersonalBriefingService
 import com.example.investfeed.domain.auth.entity.Member
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
+import com.example.investfeed.domain.realizedpnl.service.RealizedPnlSummaryService
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -22,6 +23,7 @@ class DisplayToolService(
     private val stockResolver: StockResolver,
     private val periodResolver: PeriodResolver,
     private val memberRealizedPnlRepository: MemberRealizedPnlRepository,
+    private val realizedPnlSummaryService: RealizedPnlSummaryService,
     private val assistantMessageRepository: AssistantMessageRepository,
     private val cardStore: CardStore,
 ) {
@@ -138,9 +140,15 @@ class DisplayToolService(
         val (year, month) = periodResolver.resolve(period)
         val markets = when (assetClass) { null -> listOf(MarketType.STOCK, MarketType.CRYPTO); AssetClass.CRYPTO -> listOf(MarketType.CRYPTO); else -> listOf(MarketType.STOCK) }
         val rows = markets.flatMap { m ->
-            (if (month != null) memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(member.id, m, year, month)
-             else memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(member.id, m, year))
-                .map { PnlRow(it.broker.name, m, it.year, it.month, it.realizedPnl) }
+            if (m == MarketType.STOCK) {
+                // 국내주식은 수동 입력분(DB) + 키움(API 즉시 조회) — 대시보드·브리핑과 같은 기준
+                realizedPnlSummaryService.stockItems(member.id, year, month)
+                    .map { PnlRow(it.brokerName, m, it.year, it.month, it.realizedPnl) }
+            } else {
+                (if (month != null) memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(member.id, m, year, month)
+                 else memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(member.id, m, year))
+                    .map { PnlRow(it.broker.name, m, it.year, it.month, it.realizedPnl) }
+            }
         }
         val card = PnlCard(period, year, month, rows.sumOf { it.realizedPnl }, rows.groupBy { it.market.name }.mapValues { (_, v) -> v.sumOf { it.realizedPnl } }, rows)
         return cardStore.put(member.id, KIND_PNL, card)

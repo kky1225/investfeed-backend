@@ -1,15 +1,14 @@
 package com.example.investfeed.domain.realizedpnl.service
 
 import com.example.investfeed.domain.holding.entity.MarketType
+import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.realizedpnl.dto.req.RealizedPnlSyncReq
 import com.example.investfeed.domain.realizedpnl.dto.res.BrokerRealizedPnlItem
-import com.example.investfeed.domain.realizedpnl.dto.res.MonthlyPnlItem
 import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlDashboardItem
 import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlItem
-import com.example.investfeed.domain.realizedpnl.dto.res.RealizedPnlSummaryRes
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
-import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.security.CustomUserDetails
+import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -20,6 +19,29 @@ class RealizedPnlSummaryService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val stockRealizedPnlService: StockRealizedPnlService,
 ) {
+    private val log = KotlinLogging.logger {}
+
+    /**
+     * 국내주식 실현손익 (증권사·월별). 수동 입력 증권사는 DB 저장값, 키움은 저장하지 않고 키움 API로 즉시 조회해 이어 붙인다.
+     */
+    fun stockItems(memberId: Long, year: Int, month: Int?): List<RealizedPnlItem> {
+        val manual = (if (month != null) memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearAndMonthOrderByYearDescMonthDesc(memberId, MarketType.STOCK, year, month)
+            else memberRealizedPnlRepository.findByMemberIdAndBrokerMarketAndYearOrderByYearDescMonthDesc(memberId, MarketType.STOCK, year))
+            .map {
+                RealizedPnlItem(
+                    id = it.id, brokerName = it.broker.name, brokerId = it.broker.id,
+                    market = it.broker.market.name, year = it.year, month = it.month,
+                    realizedPnl = it.realizedPnl, totalBuyAmt = it.totalBuyAmt,
+                    totalSellAmt = it.totalSellAmt, tradeFee = it.tradeFee,
+                    tradeTax = it.tradeTax, source = it.source.name
+                )
+            }
+        val kiwoom = runCatching { stockRealizedPnlService.syncStockRealizedPnls(RealizedPnlSyncReq(year, month)).items }
+            .onFailure { log.error(it) { "키움 실현손익 조회 실패 memberId=$memberId $year-${month ?: "전체"}" } }
+            .getOrDefault(emptyList())
+        return manual + kiwoom
+    }
+
 
     fun getDashboardSummary(): RealizedPnlDashboardItem {
         val memberId = getMemberId()
