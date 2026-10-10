@@ -109,8 +109,12 @@ class NaverMarketIndexCrawler(
         fun raw(field: String): Double? = data.textOrNull(field)?.replace(",", "")?.toDoubleOrNull()
         val tradedAt = data.textOrNull("localTradedAt")?.takeIf { it.length >= 10 } ?: throw MarketIndexResponseException()
         val close = raw("closePriceRaw") ?: throw MarketIndexResponseException()
-        val change = raw("compareToPreviousClosePriceRaw")?.let { abs ->
-            when (data.path("compareToPreviousPrice").textOrNull("name")) { "FALLING" -> -abs; "RISING" -> abs; else -> 0.0 }
+        // 네이버 값은 하락일에 이미 음수(-345.35)로 온다. 크기만 취해 방향으로 부호를 붙여야 이중 반전이 없다
+        // (부호를 그대로 뒤집어 하락일 전일 종가가 낮게 잡혀 +3% 오알림 발생, 2026-10-09)
+        val change = raw("compareToPreviousClosePriceRaw")?.let { amount ->
+            when (data.path("compareToPreviousPrice").textOrNull("name")) {
+                "FALLING" -> -kotlin.math.abs(amount); "RISING" -> kotlin.math.abs(amount); else -> 0.0
+            }
         }
         val openRaw = raw("openPriceRaw")
         val highRaw = raw("highPriceRaw")

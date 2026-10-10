@@ -27,7 +27,7 @@ class CalendarEventEntity(
     var type: String, // INDICATOR, HOLIDAY, MEETING
 
     @Column(nullable = false, length = 20)
-    var source: String, // ECOS, FRED, HOLIDAY, MANUAL
+    var source: String, // ECOS, FRED, HOLIDAY(공휴일), KRX(거래소 자체 휴장), MANUAL
 
     @Column(nullable = false)
     val year: Int,

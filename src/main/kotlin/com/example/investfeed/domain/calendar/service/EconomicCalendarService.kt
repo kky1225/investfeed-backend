@@ -909,9 +909,9 @@ class EconomicCalendarService(
             }
             events.add(
                 CalendarEvent(
-                    date = closure.toString(), name = "연말 휴장일 (KRX)", country = "KR", value = null,
+                    date = closure.toString(), name = "연말 휴장", country = "KR", value = null,
                     isFuture = closure.isAfter(today),
-                    type = "HOLIDAY", source = "HOLIDAY",
+                    type = "HOLIDAY", source = "KRX",
                 )
             )
         }
