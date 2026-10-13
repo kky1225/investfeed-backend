@@ -98,12 +98,20 @@ class AssistantController(
     ): ResponseEntity<ApiResponse<Int>> =
         ok(ResponseCode.ASSISTANT_MESSAGES_DELETE, timelineService.deleteByView(user.member.id, view))
 
+    @PostMapping("token")
+    @RequiresAction(action = Actions.CREATE)
+    fun issueMarketToken(
+        @AuthenticationPrincipal user: CustomUserDetails,
+    ): ResponseEntity<ApiResponse<AssistantTokenRes>> = issue(user.member.id, AssistantTokenService.SCOPE_CHAT_MARKET)
+
     @PostMapping("secure/token")
     @RequiresAction(action = Actions.CREATE)
     fun issueToken(
         @AuthenticationPrincipal user: CustomUserDetails,
-    ): ResponseEntity<ApiResponse<AssistantTokenRes>> {
-        val issued = assistantTokenService.issue(user.member.id)
+    ): ResponseEntity<ApiResponse<AssistantTokenRes>> = issue(user.member.id, AssistantTokenService.SCOPE_CHAT)
+
+    private fun issue(memberId: Long, scope: String): ResponseEntity<ApiResponse<AssistantTokenRes>> {
+        val issued = assistantTokenService.issue(memberId, scope)
         return ok(
             ResponseCode.ASSISTANT_TOKEN_ISSUE,
             AssistantTokenRes(token = issued.token, expiresAt = LocalDateTime.ofInstant(issued.expiresAt, ZoneId.systemDefault()), kid = issued.kid),

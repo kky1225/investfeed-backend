@@ -28,7 +28,8 @@ class AssistantTokenService(
         const val ISSUER = "investfeed-core"
         const val AUD_ASSISTANT = "assistant"
         const val AUD_CORE_TOOLS = "core-tools"
-        const val SCOPE_CHAT = "chat"
+        const val SCOPE_CHAT_MARKET = "chat.market"    // 로그인만으로 발급 — 공개 데이터(시세·수급·일정 등) 조회만 가능
+        const val SCOPE_CHAT = "chat"                  // 2차 인증 후 발급 — 위에 더해 개인 데이터(계좌·보유·실현손익) 조회까지 가능
     }
 
     private val privateKey: PrivateKey = loadPrivateKey(privateKeyPem)

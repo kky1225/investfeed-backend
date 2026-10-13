@@ -31,6 +31,7 @@ class AssistantTurnService(
             "show_briefing",
         )
         private const val EXPIRED_CARD = "카드가 만료되어 저장하지 못했습니다"
+        private const val ROUTE_AUTH_REQUIRED = "AUTH_REQUIRED"   // Python app/graph/nodes.py
     }
 
     data class TurnSaveRes(val userMessageId: Long?, val assistantMessageId: Long?, val duplicated: Boolean = false)
@@ -38,6 +39,12 @@ class AssistantTurnService(
     @Transactional
     fun saveTurn(memberId: Long, req: TurnSaveReq): TurnSaveRes {
         if (chatLogRepository.existsByRequestId(req.requestId)) return TurnSaveRes(null, null, duplicated = true)
+
+        // 2차 인증 대기로 끝난 요청은 사용량만 남긴다. 질문·답은 인증 후 이어서 실행된 턴이 한 번만 저장한다
+        if (req.log.route == ROUTE_AUTH_REQUIRED) {
+            saveLog(memberId, req)
+            return TurnSaveRes(null, null)
+        }
 
         val now = LocalDateTime.now()
         val user = timelineService.postMessage(
@@ -57,6 +64,11 @@ class AssistantTurnService(
             ),
             requestId = req.requestId,
         )
+        saveLog(memberId, req)
+        return TurnSaveRes(user.id, assistant.id)
+    }
+
+    private fun saveLog(memberId: Long, req: TurnSaveReq) {
         chatLogRepository.save(req.log.let {
             AssistantChatLog(
                 memberId = memberId,
@@ -76,7 +88,6 @@ class AssistantTurnService(
                 latencyMs = it.latencyMs,
             )
         })
-        return TurnSaveRes(user.id, assistant.id)
     }
 
     private fun toTurnCard(memberId: Long, c: TurnCardReq): TurnCard {

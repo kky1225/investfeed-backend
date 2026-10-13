@@ -26,6 +26,16 @@ class ServiceTokenFilter(
 
     private val log = KotlinLogging.logger {}
 
+    companion object {
+        private val CHAT_SCOPES = setOf(AssistantTokenService.SCOPE_CHAT, AssistantTokenService.SCOPE_CHAT_MARKET)
+
+        /** 개인 도구 (Python registry 의 DISPLAY·ACTION). 시장 토큰으로는 호출할 수 없다 — Python 이 먼저 막고 여기서 한 번 더 막는다 */
+        private val PERSONAL_TOOL_PREFIXES = listOf(
+            "/internal/assistant/tools/show_",
+            "/internal/assistant/tools/create_price_alert",
+        )
+    }
+
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
         !request.requestURI.startsWith(SecurityPaths.INTERNAL_PATTERN.removeSuffix("**"))
 
@@ -36,7 +46,11 @@ class ServiceTokenFilter(
 
         val member = try {
             val claims = assistantTokenService.verifyForCoreTools(token)
-            if (claims["scope"] != AssistantTokenService.SCOPE_CHAT) return reject(response, "scope must be chat")
+            val scope = claims["scope"]
+            if (scope !in CHAT_SCOPES) return reject(response, "scope must be chat")
+            if (scope != AssistantTokenService.SCOPE_CHAT && PERSONAL_TOOL_PREFIXES.any { request.requestURI.startsWith(it) }) {
+                return reject(response, "secondary auth required", HttpServletResponse.SC_FORBIDDEN)
+            }
             val memberId = claims.subject.toLongOrNull() ?: return reject(response, "sub must be memberId")
             memberRepository.findById(memberId).orElse(null) ?: return reject(response, "unknown member")
         } catch (e: Exception) {
@@ -53,8 +67,8 @@ class ServiceTokenFilter(
         }
     }
 
-    private fun reject(response: HttpServletResponse, reason: String) {
-        response.status = HttpServletResponse.SC_UNAUTHORIZED
+    private fun reject(response: HttpServletResponse, reason: String, status: Int = HttpServletResponse.SC_UNAUTHORIZED) {
+        response.status = status
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = "UTF-8"
         objectMapper.writeValue(

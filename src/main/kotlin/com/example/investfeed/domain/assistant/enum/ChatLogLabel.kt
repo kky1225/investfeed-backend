@@ -14,6 +14,8 @@ object ChatLogLabel {
     private val ROUTE = mapOf(
         "TOOL" to "정상 응답",
         "PICK" to "종목 선택",
+        "AUTH_REQUIRED" to "2차 인증 요청",
+        "RESUME" to "인증 후 실행",
         "REJECT" to "거절",
         "ASK_USER" to "되묻기",
         "BLOCKED" to "차단",
@@ -68,7 +70,7 @@ object ChatLogLabel {
         val toolText = tools.map { TOOL[it] ?: it }.distinct().joinToString(", ").ifEmpty { null }
         val routeLabel = ROUTE[route] ?: route
         return when (route) {
-            "TOOL", "PICK" -> Labels(routeLabel, toolText, null)
+            "TOOL", "PICK", "AUTH_REQUIRED", "RESUME" -> Labels(routeLabel, toolText, null)
             "REJECT" -> REJECT[reason]
                 ?.let { (request, why) -> Labels(routeLabel, request, why) }
                 ?: Labels(routeLabel, toolText, reason)
