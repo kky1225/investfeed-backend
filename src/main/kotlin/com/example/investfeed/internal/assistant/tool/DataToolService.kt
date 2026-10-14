@@ -123,6 +123,7 @@ class DataToolService(
         val code: String, val name: String, val market: StockMarket, val link: String, val currency: String,
         val price: Double, val changeRate: Double?, val changeAmount: Double?, val volume: Double?,
         val high: Double?, val low: Double?, val high52w: Double?, val low52w: Double?,
+        val title: String = name,   // 카드 제목(상세형). 비교 표는 name(목록형)
     )
 
     fun stockQuotes(queries: List<String>, memberId: Long, marketHint: StockMarket?): List<StockQuote> {
@@ -142,7 +143,7 @@ class DataToolService(
                 s.code, s.name, s.market, s.link, "KRW",
                 price = p(info.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다"),
                 changeRate = TemplateFormat.parse(info.flu_rt), changeAmount = TemplateFormat.parse(info.pred_pre), volume = p(info.trde_qty),
-                high = p(info.high_pric), low = p(info.low_pric), high52w = p(def?._250hgst), low52w = p(def?._250lwst),
+                high = p(info.high_pric), low = p(info.low_pric), high52w = p(def?._250hgst), low52w = p(def?._250lwst), title = s.title,
             )
         }
         StockMarket.US -> {
@@ -152,7 +153,7 @@ class DataToolService(
                 s.code, s.name, s.market, s.link, "USD",
                 price = p(r.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다"),
                 changeRate = TemplateFormat.parse(r.flu_rt), changeAmount = TemplateFormat.parse(r.pred_pre), volume = p(r.acc_trde_qty),
-                high = p(r.high_pric), low = p(r.low_pric), high52w = p(r.wk52_hgst_pric), low52w = p(r.wk52_lwst_pric),
+                high = p(r.high_pric), low = p(r.low_pric), high52w = p(r.wk52_hgst_pric), low52w = p(r.wk52_lwst_pric), title = s.title,
             )
         }
         StockMarket.CRYPTO -> {
@@ -162,7 +163,7 @@ class DataToolService(
             StockQuote(
                 s.code, s.name, s.market, s.link, "KRW",
                 price = price, changeRate = prev?.let { (price / it - 1) * 100 }, changeAmount = prev?.let { price - it }, volume = t.acc_trade_volume_24h,
-                high = t.high_price, low = t.low_price, high52w = t.highest_52_week_price, low52w = t.lowest_52_week_price,
+                high = t.high_price, low = t.low_price, high52w = t.highest_52_week_price, low52w = t.lowest_52_week_price, title = s.title,
             )
         }
     }

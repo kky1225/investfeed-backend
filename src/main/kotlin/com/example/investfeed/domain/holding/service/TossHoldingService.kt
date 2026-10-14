@@ -9,6 +9,7 @@ import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
+import com.example.investfeed.domain.us.stock.service.UsEtfService
 import com.example.investfeed.toss.account.client.TossAccountClient
 import com.example.investfeed.toss.exception.TossBuyingPowerException
 import com.example.investfeed.toss.exception.TossExchangeRateException
@@ -37,6 +38,7 @@ class TossHoldingService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val memberApiKeyRepository: MemberApiKeyRepository,
     private val usStockMasterRepository: UsStockMasterRepository,
+    private val usEtfService: UsEtfService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -92,6 +94,8 @@ class TossHoldingService(
         }
 
         val stexTpBySymbol = resolveStexTps(items)
+        // 미국 ETF 는 티커로 표기 (키움 보유 HoldingService 와 같은 규칙)
+        val etfTickers = usEtfService.etfTickers(items.filter { TossSymbolMapper.isUs(it.marketCountry) }.mapNotNull { it.symbol })
 
         var totEvltAmt = 0L
         var totPurAmt = 0L
@@ -109,7 +113,7 @@ class TossHoldingService(
 
             HoldingItem(
                 stkCd = stkCd,
-                stkNm = item.name ?: symbol,
+                stkNm = (if (isUs) usEtfService.displayName(symbol, item.name, etfTickers) else item.name) ?: symbol,
                 curPrc = v.curPrc.toString(),
                 purPric = v.purPric.toString(),
                 purAmt = v.purAmt.toString(),

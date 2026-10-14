@@ -3,6 +3,7 @@ package com.example.investfeed.internal.assistant.tool
 import com.example.investfeed.domain.assistant.repository.AssistantStockAliasRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
+import com.example.investfeed.domain.us.stock.entity.UsStockMaster
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.upbit.market.client.MarketClient
 import mu.KotlinLogging
@@ -65,7 +66,7 @@ class StockResolver(
             coins().firstOrNull { it.market == upper }?.let { return ResolvedStock(it.market, it.koreanName, StockMarket.CRYPTO) }
         }
         if ((hint == null || hint == StockMarket.US) && US_TICKER.matches(upper)) {
-            usStockMasterRepository.findByStkCdIn(listOf(upper)).firstOrNull()?.let { return ResolvedStock(it.stkCd, it.stkNm ?: it.stkCd, StockMarket.US, it.stexTp) }
+            usStockMasterRepository.findByStkCdIn(listOf(upper)).firstOrNull()?.let { return us(it) }
         }
         return null
     }
@@ -81,7 +82,7 @@ class StockResolver(
         }
         if (hint == null || hint == StockMarket.US) {
             usStockMasterRepository.search(q, PageRequest.of(0, 20)).firstOrNull { it.stkNm.equals(q, true) || it.stkEnm.equals(q, true) }
-                ?.let { return ResolvedStock(it.stkCd, it.stkNm ?: it.stkCd, StockMarket.US, it.stexTp) }
+                ?.let { return us(it) }
         }
         return null
     }
@@ -95,9 +96,16 @@ class StockResolver(
             out += coins().filter { it.koreanName.contains(q) }.map { ResolvedStock(it.market, it.koreanName, StockMarket.CRYPTO) }
         }
         if ((hint == null || hint == StockMarket.US) && q.length >= 2) {
-            out += usStockMasterRepository.search(q, PageRequest.of(0, 20)).map { ResolvedStock(it.stkCd, it.stkNm ?: it.stkCd, StockMarket.US, it.stexTp) }
+            out += usStockMasterRepository.search(q, PageRequest.of(0, 20)).map { us(it) }
         }
         return out
+    }
+
+    /** 미국 종목 표기: 목록은 ETF 만 티커, 상세형은 title (기존 웹 화면과 같은 규칙) */
+    private fun us(m: UsStockMaster): ResolvedStock {
+        val fullName = m.stkNm ?: m.stkEnm ?: m.stkCd
+        val etf = m.isEtf == "Y"
+        return ResolvedStock(m.stkCd, if (etf) m.stkCd else fullName, StockMarket.US, m.stexTp, fullName = fullName, etf = etf)
     }
 
     private fun coins(): List<Coin> {

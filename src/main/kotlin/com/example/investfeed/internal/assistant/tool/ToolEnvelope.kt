@@ -24,10 +24,19 @@ data class StockCandidate(val code: String, val name: String, val market: StockM
 /** 종목명 해석 결과 */
 data class ResolvedStock(
     val code: String,          // 005930 / TLT / KRW-BTC
-    val name: String,
+    val name: String,          // 목록형 표기 — 미국 ETF 는 티커 (UsEtfService.displayName 과 같은 규칙)
     val market: StockMarket,
     val stexTp: String? = null,   // 미국만 (ND/NY/NA)
+    val fullName: String = name,  // 미국만 의미 있음 — 종목 마스터 이름 (ETF 도 풀네임)
+    val etf: Boolean = false,
 ) {
+    /** 상세형 표기 — 미국 종목 상세 페이지 제목과 같은 규칙 (ETF: 티커 (풀네임), 개별주: 이름 (티커)). 국내·코인은 이름 그대로 */
+    val title: String get() = when {
+        market != StockMarket.US -> name
+        etf -> "$code ($fullName)"
+        else -> "$name ($code)"
+    }
+
     val link: String get() = when (market) {
         StockMarket.KR -> "/stock/detail/$code"
         StockMarket.US -> "/us-stock/detail/$stexTp/$code"

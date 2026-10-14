@@ -115,6 +115,7 @@ class DisplayToolService(
     data class HoldingCard(
         val asOf: LocalDateTime, val code: String, val name: String, val market: StockMarket, val link: String, val currency: String,
         val curPrc: Double?, val dayRate: Double?, val dayChange: Double?, val brokers: List<HoldingCardBroker>,
+        val title: String = name,   // 카드 제목(상세형)
     )
 
     fun myHolding(member: Member, stockQuery: String): CardRef {
@@ -129,6 +130,7 @@ class DisplayToolService(
             currency = if (s.market == StockMarket.US) "USD" else "KRW",
             curPrc = first.curPrc, dayRate = first.dayRate, dayChange = hits.mapNotNull { it.second.dayChange }.takeIf { it.isNotEmpty() }?.sum(),
             brokers = hits.map { (b, h) -> HoldingCardBroker(b.brokerName, h.qty, h.purPrice, h.eval, h.evalProfit, h.totalRate) },
+            title = s.title,
         )
         return cardStore.put(member.id, KIND_HOLDING, card)
     }
