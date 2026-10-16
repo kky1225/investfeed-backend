@@ -31,7 +31,6 @@ import java.time.ZonedDateTime
 class BriefingService(
     private val marketFactSheetService: MarketFactSheetService,
     private val personalBriefingService: PersonalBriefingService,
-    private val usIndexDailyService: UsIndexDailyService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val holidayService: HolidayService,
     private val briefingRepository: AssistantBriefingRepository,
@@ -90,11 +89,7 @@ class BriefingService(
             BriefingType.KR_PRE -> marketFactSheetService.collectKrPre(date, asOf)
             BriefingType.KR_HOLDINGS -> KrHoldingsFactSheet(date, asOf)
             BriefingType.COIN_DAILY -> marketFactSheetService.collectCoinDaily(date, asOf)
-            BriefingType.US_CLOSE -> {
-                usIndexDailyService.backfillIfEmpty(date)
-                usIndexDailyService.captureFromRedis(date)
-                marketFactSheetService.collectUsClose(date, asOf)
-            }
+            BriefingType.US_CLOSE -> marketFactSheetService.collectUsClose(date, asOf)
         }
         val (headline, rendered) = compose(sheet, null)
         return SharedPack(sheet, headline, rendered)

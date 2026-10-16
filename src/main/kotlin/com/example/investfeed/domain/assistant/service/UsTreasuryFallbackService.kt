@@ -14,7 +14,9 @@ class UsTreasuryFallbackService(
     companion object {
         val FRED_SERIES = mapOf(
             "US2Y" to "DGS2",
+            "US5Y" to "DGS5",
             "US10Y" to "DGS10",
+            "US30Y" to "DGS30",
         )
     }
 

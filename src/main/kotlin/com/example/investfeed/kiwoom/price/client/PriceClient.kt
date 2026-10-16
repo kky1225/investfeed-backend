@@ -65,41 +65,6 @@ class PriceClient(
     }
 
     @KiwoomToken
-    suspend fun stockSinglePriceList(
-        req: KiwoomStockSinglePriceReq
-    ): KiwoomStockSinglePriceRes? {
-        val accessToken = authClient.getCurrentAccessToken()
-
-        try {
-            val res = kiwoomWebClient.post()
-                .uri(DEFAULT_URL + PRICE_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .header("api-id", "ka10087")
-                .bodyValue(req)
-                .retrieve()
-                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-                .awaitBodyOrNull<KiwoomStockSinglePriceRes>()
-
-            if(res?.return_code != 0) {
-                log.error { "키움 API 응답 오류: api=stockSinglePriceList, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
-                throw StockSinglePriceListException()
-            }
-
-            return res
-        }catch (e: KiwoomApiException) {
-            throw e
-        }catch (e: StockSinglePriceListException) {
-            throw e
-        } catch (e: CancellationException) {
-            throw e
-        }catch (e: Exception) {
-            log.warn { "stockSinglePriceList Error" }
-
-            throw RuntimeException(e.message)
-        }
-    }
-
-    @KiwoomToken
     suspend fun goldPriceNow(
         req: KiwoomGoldPriceNowReq
     ): KiwoomGoldPriceNowRes {

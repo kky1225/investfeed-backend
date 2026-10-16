@@ -43,4 +43,8 @@ object SchedulerCron {
     const val ASSISTANT_INDEX_ALERT_KR = "0 * 9-15 * * MON-FRI"   // 매분 판정, 코드에서 09:00~15:30·휴장 제외 (FAST)
     const val ASSISTANT_INDEX_ALERT_US = "0 * 22,23,0-6 * * *"    // 매분 판정, 코드에서 미국 세션(09:30 ET~폐장)만 (FAST)
     const val TELEGRAM_POLL = "*/5 * * * * *"                     // 텔레그램 getUpdates 5초 폴링 (FAST). 같은 작업은 겹쳐 실행되지 않음
+
+    // ── 서킷브레이커 (지수 실시간 판정) ──
+    const val CIRCUIT_BREAKER_SUBSCRIBE = "0 * 9-15 * * MON-FRI"  // 매분 0J 상시 구독 보장 + 수신 간격 로그, 코드에서 09:00~15:30·휴장 제외 (FAST)
+    const val CIRCUIT_BREAKER_CHECK = "* * 9-15 * * MON-FRI"      // 매초 1분 유지 판정, 코드에서 09:00~15:30·휴장 제외 (FAST)
 }

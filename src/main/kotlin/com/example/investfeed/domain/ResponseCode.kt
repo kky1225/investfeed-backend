@@ -6,6 +6,7 @@ enum class ResponseCode(
 ) {
     DASHBOARD(message = "대시보드 조회에 성공하셨습니다."),
     DASHBOARD_STREAM(message = "실시간 대시보드 조회에 성공하셨습니다."),
+    CIRCUIT_BREAKER_LIST(message = "서킷브레이커 발동 현황 조회에 성공하셨습니다."),
     ASSET_DASHBOARD(message = "통합 자산 대시보드 조회에 성공하셨습니다."),
     ASSET_STOCK_STREAM(message = "실시간 통합자산 주식 조회에 성공하셨습니다."),
     ASSET_CRYPTO_STREAM(message = "실시간 통합자산 코인 조회에 성공하셨습니다."),

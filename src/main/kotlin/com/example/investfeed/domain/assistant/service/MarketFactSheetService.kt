@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.assistant.service
 
 import com.example.investfeed.domain.assistant.dto.factsheet.*
+import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerService
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.index.dto.res.IndexInfo
 import com.example.investfeed.domain.index.service.IndexService
@@ -32,10 +33,12 @@ class MarketFactSheetService(
     private val marketIndexService: MarketIndexService,
     private val candleClient: CandleClient,
     private val cryptoService: CryptoService,
-    private val usIndexDailyService: UsIndexDailyService,
+    private val usTreasuryService: UsTreasuryService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val holidayService: HolidayService,
     private val stockPickRepository: StockPickRepository,
+    private val circuitBreakerService: CircuitBreakerService,
+    private val krTreasuryFallbackService: KrTreasuryFallbackService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -47,6 +50,11 @@ class MarketFactSheetService(
         const val KOSDAQ150 = "150"
         private val SECTOR_EXCLUDE = listOf("종합", "대형주", "중형주", "소형주", "200", "KRX", "KOSTAR", "변동성", "코스피", "배당")
         const val STREAK_LOOKBACK = 10
+        private val CB_INDEX_NAME = mapOf("KOSPI" to "코스피", "KOSDAQ" to "코스닥")
+        private val KR_TREASURY_TYPES = listOf(
+            MarketIndexType.KR_TREASURY_2Y, MarketIndexType.KR_TREASURY_3Y, MarketIndexType.KR_TREASURY_5Y,
+            MarketIndexType.KR_TREASURY_10Y, MarketIndexType.KR_TREASURY_20Y, MarketIndexType.KR_TREASURY_30Y,
+        )
     }
 
     fun collectKrClose(tradeDate: LocalDate, asOf: LocalDateTime): KrCloseFactSheet {
@@ -67,6 +75,8 @@ class MarketFactSheetService(
             ),
             sectors = fetchOrNull("업종") { fetchSectors() },
             usdKrw = fetchOrNull("환율") { fetchQuote(MarketIndexType.USD_KRW) },
+            circuitBreakers = circuitBreakerFacts(tradeDate),
+            krTreasury = fetchOrNull("한국 국채") { fetchKrTreasury(tradeDate) },
         )
     }
 
@@ -134,8 +144,16 @@ class MarketFactSheetService(
             ),
             sectors = null,
             usdKrw = null,
+            circuitBreakers = circuitBreakerFacts(holidayService.lastTradingDay(asOf.toLocalDate())).filter { (kospi && it.name == "코스피") || (kosdaq && it.name == "코스닥") },
         )
     }
+
+    private fun circuitBreakerFacts(date: LocalDate): List<CircuitBreakerFact> =
+        fetchOrNull("서킷브레이커") {
+            circuitBreakerService.findByDate(date).map {
+                CircuitBreakerFact(CB_INDEX_NAME[it.indexCode] ?: it.indexCode, it.stage, it.triggerRate, it.startedAt, it.endedAt)
+            }
+        }.orEmpty()
 
     fun collectUsNow(asOf: LocalDateTime): UsCloseFactSheet =
         collectUsClose(usMarketCalendarService.lastClosedUsTradingDay(asOf), asOf)
@@ -241,14 +259,27 @@ class MarketFactSheetService(
         }.takeIf { it.isNotEmpty() }
     }
 
+    private fun fetchKrTreasury(tradeDate: LocalDate): KrTreasuryFact? =
+        KR_TREASURY_TYPES.mapNotNull { type ->
+            val name = type.displayName.removePrefix("한국 국채 ")
+            // 옛 값이어도 버리지 않고 "몇 시 기준"으로 표기. Redis 에 값 자체가 없을 때만 ECOS 종가로 대체
+            val res = marketIndexService.getMarketIndex(type)
+            val value = res?.let { TemplateFormat.parse(it.price) }
+            if (value != null) return@mapNotNull YieldFact(name, value, TemplateFormat.parse(res.changeAmount)?.let { it * 100 }, staleAt = marketIndexService.staleAt(res))
+            log.warn { "[${type.displayName}] 네이버 시세 결측 → ECOS 대체 시도" }
+            krTreasuryFallbackService.latestClose(type, tradeDate)?.let { YieldFact(name, it.value, it.changeBp, fallbackDate = it.tradeDate) }
+        }.takeIf { it.isNotEmpty() }?.let { KrTreasuryFact(it) }
+
     private fun fetchQuote(type: MarketIndexType): QuoteFact? {
         val res = marketIndexService.getMarketIndex(type) ?: return null
         val price = TemplateFormat.parse(res.price) ?: return null
+        // 네이버 수집이 실패하면 Redis(TTL 1일)에 옛 값이 남는다 → 값은 쓰되 마지막 갱신 시각을 함께 넘겨 "몇 시 기준"으로 표기
         return QuoteFact(
             price = price,
             changeRate = TemplateFormat.parse(res.changeRate),
             changeAmount = TemplateFormat.parse(res.changeAmount),
             delayStatus = res.delayStatus,
+            staleAt = marketIndexService.staleAt(res),
         )
     }
 
@@ -278,18 +309,25 @@ class MarketFactSheetService(
     }
 
     private fun fetchTreasury(usTradeDate: LocalDate): TreasuryFact? {
-        val y2 = usIndexDailyService.findByDate("US2Y", usTradeDate) ?: usIndexDailyService.latestOnOrBefore("US2Y", usTradeDate)
-        val y10 = usIndexDailyService.findByDate("US10Y", usTradeDate) ?: usIndexDailyService.latestOnOrBefore("US10Y", usTradeDate)
-        if (y2 == null && y10 == null) return null
-        val asOfDate = listOfNotNull(y2?.tradeDate, y10?.tradeDate).min()
+        fun q(type: MarketIndexType) = fetchOrNull("미국 국채 ${type.displayName}") { usTreasuryService.quote(type, usTradeDate) }
+        val y2 = q(MarketIndexType.US_TREASURY_2Y)
+        val y5 = q(MarketIndexType.US_TREASURY_5Y)
+        val y10 = q(MarketIndexType.US_TREASURY_10Y)
+        val y30 = q(MarketIndexType.US_TREASURY_30Y)
+        val all = listOfNotNull(y2, y5, y10, y30)
+        if (all.isEmpty()) return null
+        val asOfDate = all.minOf { it.tradeDate }
         val spread = if (y2 != null && y10 != null) Math.round((y10.value - y2.value) * 100).toInt() else null
         return TreasuryFact(
-            y2 = y2?.value, y2Bp = y2?.change,
-            y10 = y10?.value, y10Bp = y10?.change,
+            y2 = y2?.value, y2Bp = y2?.changeBp,
+            y10 = y10?.value, y10Bp = y10?.changeBp,
+            y5 = y5?.value, y5Bp = y5?.changeBp,
+            y30 = y30?.value, y30Bp = y30?.changeBp,
             spreadBp = spread,
-            source = listOfNotNull(y2?.source, y10?.source).let { if (it.contains(UsIndexDailyService.SOURCE_FRED)) UsIndexDailyService.SOURCE_FRED else UsIndexDailyService.SOURCE_NAVER },
+            source = all.map { it.source }.let { if (it.contains(UsTreasuryService.SOURCE_FRED)) UsTreasuryService.SOURCE_FRED else UsTreasuryService.SOURCE_NAVER },
             asOfDate = asOfDate,
             stale = asOfDate.isBefore(usTradeDate),
+            bondHoliday = usMarketCalendarService.isUsBondHoliday(usTradeDate),
         )
     }
 

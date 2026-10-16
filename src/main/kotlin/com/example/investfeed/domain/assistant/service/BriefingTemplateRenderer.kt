@@ -12,10 +12,13 @@ import com.example.investfeed.domain.assistant.service.TemplateFormat.monthDay
 import com.example.investfeed.domain.assistant.service.TemplateFormat.num
 import com.example.investfeed.domain.assistant.service.TemplateFormat.usd
 import com.example.investfeed.domain.assistant.service.TemplateFormat.won
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 object BriefingTemplateRenderer {
     private const val MAX_ROWS = 15
+    private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     data class Rendered(val summary: String, val sections: List<Section>)
 
@@ -24,6 +27,7 @@ object BriefingTemplateRenderer {
         sections += krIndexSection(sheet)
         sections += flowSection(sheet.flow)
         sections += sectorSection(sheet.sectors)
+        sections += krTreasurySection(sheet.krTreasury)
         sections += krFxSection(sheet.usdKrw)
         return Rendered(summary = krCloseSummary(sheet), sections = sections)
     }
@@ -33,18 +37,29 @@ object BriefingTemplateRenderer {
             "${it.name} ${it.changeRate?.let { r -> coloredRate(r, 2) } ?: num(it.close, 2)} (${num(it.close, 2)})"
         }
 
+    /**
+     * 서킷브레이커가 발동한 지수 이름 옆 경고 표기 `{!|툴팁}` — 지수 표(C2)에만 붙인다. 프론트가 경고 아이콘 + 툴팁으로 그림 (종목 상세 투자경고 아이콘과 같은 모양).
+     * 툴팁은 단계별 한 줄씩 "1단계 12:38~13:08", 3단계는 당일 장 종료라 "3단계 14:40~장 종료"
+     */
+    private fun cbWarn(name: String, list: List<CircuitBreakerFact>): String {
+        val mine = list.filter { it.name == name }.sortedBy { it.stage }
+        if (mine.isEmpty()) return ""
+        val lines = mine.map { cb -> "${cb.stage}단계 ${cb.firedAt.format(HHMM)}~${cb.resumeAt?.format(HHMM) ?: "장 종료"}" }
+        return "{!|${(listOf("서킷브레이커") + lines).joinToString("\n")}}"
+    }
+
     private fun krIndexSection(s: KrCloseFactSheet): Section {
         val rows = listOfNotNull(
-            s.kospi?.let { tradeRow(it, s.kospiRate5d) },
-            s.kosdaq?.let { tradeRow(it, s.kosdaqRate5d) },
+            s.kospi?.let { tradeRow(it, s.kospiRate5d, cbWarn(it.name, s.circuitBreakers)) },
+            s.kosdaq?.let { tradeRow(it, s.kosdaqRate5d, cbWarn(it.name, s.circuitBreakers)) },
         )
         if (rows.isEmpty()) return failedSection("C2", "거래대금 · 5일 등락")
         return okSection("C2", "거래대금 · 5일 등락", "| 지수 | 거래대금 | 5일 등락 |\n|---|---|---|\n" + rows.joinToString("\n"))
     }
 
-    private fun tradeRow(k: IndexFact, rate5d: Double?): String {
+    private fun tradeRow(k: IndexFact, rate5d: Double?, warn: String = ""): String {
         val amount = k.tradeAmount?.let { "${num(it / 1_000_000.0, 1)}조" } ?: "-"
-        return "| ${k.name} | $amount | ${rate5d?.let { coloredRate(it) } ?: "-"} |"
+        return "| ${k.name}$warn | $amount | ${rate5d?.let { coloredRate(it) } ?: "-"} |"
     }
 
     private fun flowSection(f: FlowFact?, withKospi: Boolean = true, withKosdaq: Boolean = true): Section {
@@ -70,10 +85,33 @@ object BriefingTemplateRenderer {
         return okSection("C4", "업종", table.trimEnd())
     }
 
+    private fun krTreasurySection(t: KrTreasuryFact?): Section {
+        val list = t?.yields.orEmpty()
+        if (list.isEmpty()) return failedSection("C7", "한국 국채 금리")
+        val fallbackDates = list.mapNotNull { it.fallbackDate }.distinct()
+        val allFallback = list.all { it.fallbackDate != null } && fallbackDates.size == 1
+        val rows = list.sortedByDescending { it.name.removeSuffix("년").toIntOrNull() ?: 0 }
+            .map { y ->
+                val note = y.fallbackDate?.takeIf { !allFallback }?.let { " _(ECOS ${monthDay(it)} 종가)_" }
+                    ?: y.staleAt?.let { " _(${monthDay(it.toLocalDate())} ${it.format(HHMM)} 기준)_" } ?: ""
+                "| ${y.name}물 | ${num(y.yield, 2)}%$note | ${y.changeBp?.let { b -> coloredBp(b) } ?: "-"} |"
+            }
+        val y10 = list.firstOrNull { it.name == "10년" }
+        val y3 = list.firstOrNull { it.name == "3년" }
+        val spread = if (y10 != null && y3 != null && y10.fallbackDate == y3.fallbackDate) Math.round((y10.yield - y3.yield) * 100).toInt() else null
+        val spreadRow = spread?.let { listOf("| 스프레드(10-3년) | ${colored("${TemplateFormat.sign(it.toDouble())}${abs(it)}bp", it.toDouble())}${if (it < 0) " (역전)" else ""} | - |") }.orEmpty()
+        val suffix = if (allFallback) " · ECOS ${monthDay(fallbackDates.first())} 종가 기준 (당일 값 미수신)" else ""
+        return okSection("C7", "한국 국채 금리$suffix", "| 만기 | 수익률 | 변화 |\n|---|---|---|\n" + (rows + spreadRow).joinToString("\n"))
+    }
+
     private fun krFxSection(q: QuoteFact?): Section {
         q ?: return failedSection("C6", "환율 마감")
-        return okSection("C6", "환율 마감 · 하나은행 고시", "| 통화 | 마감 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+        return okSection("C6", "환율 마감 · 하나은행 고시", "| 통화 | 마감 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
     }
+
+    /** 오래된 시세(수집 실패로 갱신 안 된 값)면 값 옆에 "10/16(금) 15:52 기준"을 붙인다 */
+    private fun staleNote(q: QuoteFact): String =
+        q.staleAt?.let { " _(${monthDay(it.toLocalDate())} ${it.format(HHMM)} 기준)_" } ?: ""
 
     fun renderKrPre(sheet: KrPreFactSheet): Rendered {
         val sections = mutableListOf<Section>()
@@ -99,10 +137,10 @@ object BriefingTemplateRenderer {
     private fun macroSection(m: MacroFact?): Section {
         m ?: return failedSection("P4", "매크로")
         val rows = listOfNotNull(
-            m.usdKrw?.let { "| 원/달러 | ${num(it.price, 1)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
-            m.dollarIndex?.let { "| 달러인덱스 | ${num(it.price, 2)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
-            m.gold?.let { "| 금 | ${num(it.price, 1)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
-            m.wti?.let { "| WTI | ${num(it.price, 2)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
+            m.usdKrw?.let { "| 원/달러 | ${num(it.price, 1)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
+            m.dollarIndex?.let { "| 달러인덱스 | ${num(it.price, 2)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
+            m.gold?.let { "| 금 | ${num(it.price, 1)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
+            m.wti?.let { "| WTI | ${num(it.price, 2)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
         )
         if (rows.isEmpty()) return failedSection("P4", "매크로")
         return okSection("P4", "매크로", "| 항목 | 값 | 등락 |\n|---|---|---|\n" + rows.joinToString("\n"))
@@ -132,11 +170,22 @@ object BriefingTemplateRenderer {
         return okSection("K2", "코인 시세 · 업비트 09:00 마감", "| 코인 | 종가 | 등락 | 거래대금 |\n|---|---|---|---|\n" + rows.joinToString("\n"))
     }
 
-    /** 비서 "코스피 어때" 카드: 장 마감 카드와 같은 지수 타일 + 투자자 수급 표. 물어본 시장만 (코스피 / 코스닥 / 둘 다) */
     fun renderKrMarketNow(sheet: KrCloseFactSheet, kospi: Boolean = true, kosdaq: Boolean = true): Rendered =
-        Rendered(summary = krCloseSummary(sheet), sections = listOf(flowSection(sheet.flow, kospi, kosdaq)))
+        Rendered(
+            summary = krCloseSummary(sheet),
+            sections = listOf(cbStatusSection(sheet.circuitBreakers, kospi, kosdaq), flowSection(sheet.flow, kospi, kosdaq)),
+        )
 
-    /** 비서 "미국장 어때" 카드: 미국 마감 카드에서 내 미국 종목·마감 시각 안내를 뺀 것 (지수 타일 + 국채 + 환율) */
+    /** 비서 채팅 시장 요약 전용: 서킷브레이커 발생 여부를 항상 보여 준다 ("발동했어?"에 "발생 없음"으로도 답할 수 있게) */
+    private fun cbStatusSection(list: List<CircuitBreakerFact>, kospi: Boolean, kosdaq: Boolean): Section {
+        val rows = listOfNotNull("코스피".takeIf { kospi }, "코스닥".takeIf { kosdaq }).map { name ->
+            val stages = list.filter { it.name == name }.sortedBy { it.stage }
+                .joinToString(", ") { cb -> "${cb.stage}단계 ${cb.firedAt.format(HHMM)}~${cb.resumeAt?.format(HHMM) ?: "장 종료"}" }
+            "| $name | ${stages.ifEmpty { "발생 없음" }} |"
+        }
+        return okSection("CB", "서킷브레이커", "| 지수 | 발동 |\n|---|---|\n" + rows.joinToString("\n"))
+    }
+
     fun renderUsMarketNow(sheet: UsCloseFactSheet): Rendered =
         Rendered(summary = usCloseSummary(sheet), sections = listOf(treasurySection(sheet.treasury), usFxSection(sheet.usdKrw, "환율")))
 
@@ -169,16 +218,21 @@ object BriefingTemplateRenderer {
 
     private fun treasurySection(t: TreasuryFact?): Section {
         t ?: return failedSection("U2B", "미국 국채 금리")
+        // 채권 휴장일엔 직전 거래일 값만 보이고 변화는 "-" (그날 움직임이 아님)
+        fun bp(v: Double?) = v?.takeUnless { t.bondHoliday }?.let { coloredBp(it) } ?: "-"
         val rows = listOfNotNull(
-            t.y10?.let { "| 10년물 | ${num(it, 2)}% | ${t.y10Bp?.let { b -> coloredBp(b) } ?: "-"} |" },
-            t.y2?.let { "| 2년물 | ${num(it, 2)}% | ${t.y2Bp?.let { b -> coloredBp(b) } ?: "-"} |" },
+            t.y30?.let { "| 30년물 | ${num(it, 2)}% | ${bp(t.y30Bp)} |" },
+            t.y10?.let { "| 10년물 | ${num(it, 2)}% | ${bp(t.y10Bp)} |" },
+            t.y5?.let { "| 5년물 | ${num(it, 2)}% | ${bp(t.y5Bp)} |" },
+            t.y2?.let { "| 2년물 | ${num(it, 2)}% | ${bp(t.y2Bp)} |" },
             t.spreadBp?.let { "| 스프레드 | ${colored("${TemplateFormat.sign(it.toDouble())}${abs(it)}bp", it.toDouble())}${if (it < 0) " (역전)" else ""} | - |" },
         )
         if (rows.isEmpty()) return failedSection("U2B", "미국 국채 금리")
         val parts = listOf("| 만기 | 수익률 | 변화 |\n|---|---|---|\n" + rows.joinToString("\n"))
         val suffix = when {
-            t.stale -> " · ${if (t.source == UsIndexDailyService.SOURCE_FRED) "FRED " else ""}${monthDay(t.asOfDate)} 마감 기준 (당일 값 미수신)"
-            t.source == UsIndexDailyService.SOURCE_FRED -> " · FRED"
+            t.bondHoliday -> " · 채권시장 휴장 (${monthDay(t.asOfDate)} 마감 기준)"
+            t.stale -> " · ${if (t.source == UsTreasuryService.SOURCE_FRED) "FRED " else ""}${monthDay(t.asOfDate)} 마감 기준 (당일 값 미수신)"
+            t.source == UsTreasuryService.SOURCE_FRED -> " · FRED"
             else -> ""
         }
         return okSection("U2B", "미국 국채 금리$suffix", parts.first())
@@ -186,7 +240,7 @@ object BriefingTemplateRenderer {
 
     private fun usFxSection(q: QuoteFact?, title: String = "환율 · 전일 서울 고시"): Section {
         q ?: return failedSection("U4", "환율")
-        return okSection("U4", title, "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+        return okSection("U4", title, "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
     }
 
     /**

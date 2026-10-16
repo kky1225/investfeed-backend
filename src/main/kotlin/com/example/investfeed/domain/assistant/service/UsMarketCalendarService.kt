@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
@@ -27,6 +28,16 @@ class UsMarketCalendarService(
 
     fun isUsTradingDay(date: LocalDate): Boolean =
         date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY && date !in yearOf(date.year).fullHolidays
+
+    /**
+     * 주식시장은 열고 미국 채권시장만 쉬는 날 (SIFMA 전면 마감 권고). 캘린더에는 표기하지 않고 브리핑 국채 저장·표시에만 쓴다.
+     * 콜럼버스 데이(10월 둘째 월요일), 재향군인의 날(11/11, 일요일이면 다음 월요일).
+     */
+    fun isUsBondHoliday(date: LocalDate): Boolean {
+        val columbusDay = LocalDate.of(date.year, 10, 1).with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY))
+        val veteransDay = LocalDate.of(date.year, 11, 11).let { if (it.dayOfWeek == DayOfWeek.SUNDAY) it.plusDays(1) else it }
+        return date == columbusDay || date == veteransDay
+    }
 
     fun isEarlyClose(date: LocalDate): Boolean = date in yearOf(date.year).earlyCloses
 

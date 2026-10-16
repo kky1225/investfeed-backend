@@ -10,6 +10,7 @@ import com.example.investfeed.domain.assistant.entity.AssistantIndexAlert
 import com.example.investfeed.domain.assistant.entity.AssistantSetting
 import com.example.investfeed.domain.assistant.repository.AssistantIndexAlertRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
+import com.example.investfeed.domain.circuitbreaker.dto.CircuitBreakerFiredEvent
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.crawler.NaverMarketIndexCrawler
 import com.example.investfeed.kiwoom.sect.client.SectClient
@@ -19,6 +20,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -36,13 +38,14 @@ class IndexAlertService(
     private val timelineService: TimelineService,
     private val telegramNotifier: TelegramNotifier,
     private val objectMapper: ObjectMapper,
+    private val usMarketCalendarService: UsMarketCalendarService,
 ) {
     private val log = KotlinLogging.logger {}
 
     companion object {
         val WARN_LEVELS = listOf(3.0, 5.0)
-        val CB_LEVELS_KR = listOf(-8.0, -15.0, -20.0)
         val CB_LEVELS_US = listOf(-7.0, -13.0, -20.0)
+        private val US_CB_LATE_CUTOFF: java.time.Duration = java.time.Duration.ofMinutes(34)   // 마감 34분 전(15:26·12:26)부터 1·2단계 제외
 
         const val KOSPI = "KOSPI"; const val KOSDAQ = "KOSDAQ"; const val NASDAQ = "NASDAQ"; const val SP500 = "SP500"
         private val KR_INDS_CD = mapOf(KOSPI to "001", KOSDAQ to "101")
@@ -126,19 +129,26 @@ class IndexAlertService(
         return fired
     }
 
+    // 국내 CB 는 지수 실시간(0J) 1분 연속 판정(CircuitBreakerService)이 단독 담당 → onCircuitBreakerFired. 여기선 미국(S&P500)만
     private fun judgeCb(q: IndexQuote, state: AlertStateService.IndexAlertState, now: LocalDateTime, kr: Boolean): IndexAlertFact? {
-        val levels = when {
-            kr -> CB_LEVELS_KR
-            q.indexCode == SP500 -> CB_LEVELS_US
-            else -> return null
-        }
-        val basis = if (kr) q.currentRate else q.lowRate
-        val stage = levels.count { basis <= it }
-        if (stage == 0 || stage in state.cbStages) { state.cbPendingStage = null; return null }
-        if (kr && state.cbPendingStage != stage) { state.cbPendingStage = stage; return null }   // 1분 지속: 다음 판정에서 확정
-        state.cbPendingStage = null
+        if (kr || q.indexCode != SP500) return null
+        val stage = CB_LEVELS_US.count { q.lowRate <= it }
+        if (stage == 0 || stage in state.cbStages) return null
+        // 1·2단계는 15:25 ET 까지(포함)만 발동, 15:26 부터는 발동하지 않는다. 조기폐장일은 12:25 까지 (NYSE Rule 7.12 원문). 3단계는 언제든
+        val nowEt = now.atZone(UsMarketCalendarService.KST).withZoneSameInstant(UsMarketCalendarService.NY).toLocalTime()
+        if (stage < 3 && !nowEt.isBefore(usMarketCalendarService.closeTimeEt(q.tradeDate).minus(US_CB_LATE_CUTOFF))) return null
         state.cbStages.add(stage)
-        return IndexAlertFact(q, AlertTrigger.CB, AlertDirection.DOWN, basis, stage = stage, firedAt = now)
+        return IndexAlertFact(q, AlertTrigger.CB, AlertDirection.DOWN, q.lowRate, stage = stage, firedAt = now)
+    }
+
+    /** 실시간 판정이 국내 CB 발동을 확정하면 알림 게시. 지수·단계별 하루 1회는 CircuitBreakerService 가 보장한다 */
+    @EventListener
+    fun onCircuitBreakerFired(e: CircuitBreakerFiredEvent) {
+        val ev = e.event
+        val quote = IndexQuote(ev.indexCode, ev.tradeDate, ev.triggerValue, e.prevClose, maxOf(e.high, ev.triggerValue), minOf(e.low, ev.triggerValue))
+        val fact = IndexAlertFact(quote, AlertTrigger.CB, AlertDirection.DOWN, ev.triggerRate, stage = ev.stage, firedAt = ev.startedAt)
+        runCatching { publish(fact, kr = true) }
+            .onFailure { log.error(it) { "서킷브레이커 알림 게시 실패: ${ev.indexCode} ${ev.stage}단계" } }
     }
 
     private fun judgeWarn(q: IndexQuote, s: AlertStateService.IndexAlertState, now: LocalDateTime): IndexAlertFact? {

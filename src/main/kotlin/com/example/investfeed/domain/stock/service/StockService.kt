@@ -15,7 +15,6 @@ import com.example.investfeed.kiwoom.chart.enum.StockChartType
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeMinuteReq
-import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockSinglePriceReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockTradeInfoReq
 import com.example.investfeed.kiwoom.shortselling.client.ShortSellingClient
 import com.example.investfeed.kiwoom.shortselling.dto.req.KiwoomStockShortSellingReq
@@ -112,27 +111,10 @@ class StockService(
                 marketName = normalizeMarketName(kiwoomStockInfoRes.marketName),
                 upName = kiwoomStockInfoRes.upName,
             ).apply {
-                when {
-                    MarketTimeUtil.isOvtSinglePrice() && marketName == "ETF" -> {
-                        val ovtRes = priceClient.stockSinglePriceList(
-                            req = KiwoomStockSinglePriceReq(
-                                stk_cd = stkCd.replace("_AL", "").replace("_NXT", "").replace("_SOR", "")
-                            )
-                        )
-                        ovtRes?.let {
-                            val pric = it.ovt_sigpric_cur_prc
-                            if (!pric.isNullOrBlank() && pric != "0") {
-                                expCntrPric = pric
-                                expCntrFluRt = it.ovt_sigpric_flu_rt
-                                expCntrPreSig = it.ovt_sigpric_pred_pre_sig
-                            }
-                        }
-                    }
-                    MarketTimeUtil.isCallAuction() -> {
-                        val pric = kiwoomStockDefaultInfoRes.exp_cntr_pric
-                        if (!pric.isNullOrBlank() && pric != "0") {
-                            expCntrPric = pric
-                        }
+                if (MarketTimeUtil.isCallAuction()) {
+                    val pric = kiwoomStockDefaultInfoRes.exp_cntr_pric
+                    if (!pric.isNullOrBlank() && pric != "0") {
+                        expCntrPric = pric
                     }
                 }
             }

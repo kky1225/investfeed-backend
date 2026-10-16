@@ -71,7 +71,15 @@ class NaverMarketIndexCrawler(
 
         private val BOND_PATHS = mapOf(
             MarketIndexType.US_TREASURY_2Y to "/marketindex/bond/US2YT=RR",
+            MarketIndexType.US_TREASURY_5Y to "/marketindex/bond/US5YT=RR",
             MarketIndexType.US_TREASURY_10Y to "/marketindex/bond/US10YT=RR",
+            MarketIndexType.US_TREASURY_30Y to "/marketindex/bond/US30YT=RR",
+            MarketIndexType.KR_TREASURY_2Y to "/marketindex/bond/KR2YT=RR",
+            MarketIndexType.KR_TREASURY_3Y to "/marketindex/bond/KR3YT=RR",
+            MarketIndexType.KR_TREASURY_5Y to "/marketindex/bond/KR5YT=RR",
+            MarketIndexType.KR_TREASURY_10Y to "/marketindex/bond/KR10YT=RR",
+            MarketIndexType.KR_TREASURY_20Y to "/marketindex/bond/KR20YT=RR",
+            MarketIndexType.KR_TREASURY_30Y to "/marketindex/bond/KR30YT=RR",
         )
 
         private val POLLING_PATHS = mapOf(
@@ -132,6 +140,33 @@ class NaverMarketIndexCrawler(
             prevClose = change?.let { close - it }?.takeIf { it > 0 },
             marketStatus = data.textOrNull("marketStatus"),
         )
+    }
+
+    /** 채권 일별 확정 종가 1행. tradeDate 는 현지 거래일 (localTradedAt 의 날짜부) */
+    data class BondDailyClose(val tradeDate: LocalDate, val close: Double, val changeBp: Double?)
+
+    /**
+     * 채권 일별 확정 종가 (네이버 `/marketindex/bond/{코드}/prices`, 최신순). 그날 장이 끝난 뒤 행이 생기고(미국 17:05 ET),
+     * 채권시장 휴장일에는 행이 없다 (2026-10-12 콜럼버스 데이 확인). 실시간 시세가 아니라 종가 저장·보정용
+     */
+    fun fetchBondDailyCloses(type: MarketIndexType, pageSize: Int = 10): List<BondDailyClose> = runBlocking {
+        val path = BOND_PATHS[type] ?: return@runBlocking emptyList()
+        fetchOne(type, "$naverApiUrl$path/prices?page=1&pageSize=$pageSize") { _, body -> parseBondDailyCloses(body) }.orEmpty()
+    }
+
+    private fun parseBondDailyCloses(body: String): List<BondDailyClose> {
+        val rows = objectMapper.readTree(body)?.takeIf { it.isArray } ?: throw MarketIndexResponseException()
+        return rows.mapNotNull { row ->
+            val tradedAt = row.textOrNull("localTradedAt")?.takeIf { it.length >= 10 } ?: return@mapNotNull null
+            val close = row.textOrNull("closePrice")?.replace(",", "")?.toDoubleOrNull() ?: return@mapNotNull null
+            // 하락일 변동값은 이미 음수로 오기도 해서 크기만 취해 방향으로 부호를 붙인다 (parseOhlc 와 같은 이유)
+            val change = row.textOrNull("fluctuations")?.replace(",", "")?.toDoubleOrNull()?.let { amount ->
+                when (row.path("fluctuationsType").textOrNull("name")) {
+                    "FALLING" -> -kotlin.math.abs(amount); "RISING" -> kotlin.math.abs(amount); else -> 0.0
+                }
+            }
+            BondDailyClose(LocalDate.parse(tradedAt.substring(0, 10)), close, change?.let { it * 100 })   // %p → bp
+        }
     }
 
     fun crawl(): List<MarketIndexRes> = runBlocking { crawlSuspend() }

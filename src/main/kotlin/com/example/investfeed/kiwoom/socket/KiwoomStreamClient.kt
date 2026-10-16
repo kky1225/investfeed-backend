@@ -38,6 +38,16 @@ class KiwoomStreamClient(
         )
     }
 
+    fun registerPersistent(loginId: String, entry: StreamEntry) {
+        if (entry.items.isEmpty() || !isOpen(entry.market)) return
+
+        authClient.ensureAccessToken(loginId)
+        socketManager.ensurePersistent(
+            accessToken = authClient.getAccessToken(loginId),
+            stream = KiwoomStream(item = entry.items, type = entry.types),
+        )
+    }
+
     private fun isOpen(market: StreamMarket): Boolean = when (market) {
         StreamMarket.US -> true
         StreamMarket.KRX -> !holidayService.isHoliday() && MarketTimeUtil.isKrxOpen()

@@ -29,6 +29,7 @@ enum class ReleaseTarget(
     KR_GDP("한국 GDP 성장률", "KR", "200Y102", "전기", { it.type == "GDP_RELEASE" }),
     US_CPI("미국 CPI", "US", "CPIAUCNS", "전월", { it.isUsFred() && it.name.endsWith("소비자물가지수(전년동월비)") }),
     US_PCE("미국 근원 PCE 물가", "US", "PCEPILFE", "전월", { it.isUsFred() && it.name.endsWith("근원 PCE 물가지수(전년동월비)") }),
+    US_PPI("미국 PPI 전월비", "US", "PPIFIS", "전월", { it.isUsFred() && it.name.endsWith("생산자물가지수(전월비)") }),
     US_PAYROLL("미국 비농업고용", "US", "PAYEMS", "전월", { it.isUsFred() && it.name.endsWith("비농업고용") }),
     US_UNRATE("미국 실업률", "US", "UNRATE", "전월", { it.isUsFred() && it.name.endsWith("실업률") }),
     US_GDP("미국 GDP 성장률", "US", "A191RL1Q225SBEA", "전기", { it.isUsFred() && it.name.contains(" GDP ") }),

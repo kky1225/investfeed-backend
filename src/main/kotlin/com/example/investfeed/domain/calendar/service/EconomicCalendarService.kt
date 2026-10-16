@@ -61,6 +61,7 @@ class EconomicCalendarService(
             UsIndicatorDef("PAYEMS", "비농업 신규고용", "천 명", "M"),
             UsIndicatorDef("ICSA", "신규 실업수당 청구건수", "건", "W"),
             UsIndicatorDef("PCEPILFE", "근원 PCE 물가지수(전년동월비)", "%", "M"),
+            UsIndicatorDef("PPIFIS", "생산자물가지수(전월비)", "%", "M"),
             UsIndicatorDef("T10Y2Y", "장단기 금리차", "%", "D"),
         )
 
@@ -77,6 +78,8 @@ class EconomicCalendarService(
         val FRED_PC1_SERIES = setOf("CPIAUCNS", "PCEPILFE")
         // FRED units=chg (전월 대비 증감) 적용 대상 시리즈 — level 대신 MoM 증감 표시
         val FRED_CHG_SERIES = setOf("PAYEMS")
+        // FRED units=pch (전월 대비 %) 적용 대상 시리즈 — PPI 는 미국 발표 헤드라인이 계절조정 전월비라 그에 맞춘다 (2026-10-16)
+        val FRED_PCH_SERIES = setOf("PPIFIS")
 
         // FRED release_id → 캘린더에 표시할 시리즈 목록 (한 릴리즈가 여러 지표 포함 가능)
         val FRED_RELEASE_SERIES = mapOf(
@@ -87,6 +90,7 @@ class EconomicCalendarService(
             10 to listOf(FredReleaseSeries("소비자물가지수(전년동월비)", "CPIAUCNS", "%")),
             53 to listOf(FredReleaseSeries("GDP 성장률", "A191RL1Q225SBEA", "%")),
             54 to listOf(FredReleaseSeries("근원 PCE 물가지수(전년동월비)", "PCEPILFE", "%")),
+            46 to listOf(FredReleaseSeries("생산자물가지수(전월비)", "PPIFIS", "%")),
             180 to listOf(FredReleaseSeries("신규 실업수당", "ICSA", "건")),
         )
         // 주간 릴리즈(매주 표시)
@@ -99,6 +103,7 @@ class EconomicCalendarService(
             "UNRATE" to 50,
             "PAYEMS" to 50,
             "PCEPILFE" to 54,
+            "PPIFIS" to 46,
             "ICSA" to 180,
         )
 
@@ -256,6 +261,7 @@ class EconomicCalendarService(
             val units = when {
                 def.seriesId in FRED_PC1_SERIES -> "pc1"
                 def.seriesId in FRED_CHG_SERIES -> "chg"
+                def.seriesId in FRED_PCH_SERIES -> "pch"
                 else -> null
             }
             val obs = fredClient.getSeriesObservations(def.seriesId, observationStart = yearAgoStr, units = units)
@@ -265,13 +271,13 @@ class EconomicCalendarService(
             val latest = obs.last()
             val prev = obs.getOrNull(obs.size - 2)
             val latestVal = when (units) {
-                "pc1" -> latest.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
+                "pc1", "pch" -> latest.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
                 "chg" -> latest.value?.toDoubleOrNull()?.toLong()?.toString()
                 else -> latest.value
             }
             val prevVal = when {
                 def.seriesId in STEP_INDICATOR_CODES -> stepPreviousValue(obs.map { it.value }, latestVal)
-                units == "pc1" -> prev?.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
+                units == "pc1" || units == "pch" -> prev?.value?.toDoubleOrNull()?.let { String.format("%.1f", it) }
                 units == "chg" -> prev?.value?.toDoubleOrNull()?.toLong()?.toString()
                 else -> prev?.value
             }
@@ -444,10 +450,11 @@ class EconomicCalendarService(
     }
 
     private fun fetchUsHistoryByRealtime(def: UsIndicatorDef): IndicatorHistoryRes? {
-        // pc1/chg 시리즈는 realtime 범위 조회 불가(FRED 제약) → 6년 index 조회 후 자체 계산
+        // pc1/chg/pch 시리즈는 realtime 범위 조회 불가(FRED 제약) → 6년 index 조회 후 자체 계산
         val needYoY = def.seriesId in FRED_PC1_SERIES
         val needChg = def.seriesId in FRED_CHG_SERIES
-        val rangeStart = if (needYoY || needChg) LocalDate.now().minusYears(6) else LocalDate.now().minusYears(5)
+        val needPch = def.seriesId in FRED_PCH_SERIES
+        val rangeStart = if (needYoY || needChg || needPch) LocalDate.now().minusYears(6) else LocalDate.now().minusYears(5)
         val obs = fredClient.getSeriesObservations(
             def.seriesId,
             observationStart = rangeStart.format(DATE_FMT),
@@ -469,8 +476,8 @@ class EconomicCalendarService(
                     } else null
                 }
             }.sortedBy { it.date }
-        } else if (needYoY) {
-            // 관측월별로 vintage 정렬 → 최초(원본) + 최종(개정) 둘 다 확보
+        } else if (needYoY || needPch) {
+            // 관측월별로 vintage 정렬 → 최초(원본) + 최종(개정) 둘 다 확보. 전년비는 12개월 전, 전월비는 1개월 전과 비교
             // 최초 vintage: 발표일 + 원본 YoY (발표 당시 수치)
             // 최종 vintage: 현재 FRED 값 = 개정판 YoY (차트 메인 값)
             val grouped = obs.groupBy { it.date!! }
@@ -483,17 +490,17 @@ class EconomicCalendarService(
             }
             firstVintageByObs.entries.sortedBy { it.key }.mapNotNull { (obsDate, pair) ->
                 val (releaseDate, originalIdx) = pair
-                val prevObs = shiftObsDateMinus12(obsDate) ?: return@mapNotNull null
+                val prevObs = (if (needPch) shiftObsDateMinus1(obsDate) else shiftObsDateMinus12(obsDate)) ?: return@mapNotNull null
                 val originalPrev = vintageValueAt(grouped[prevObs], releaseDate) ?: return@mapNotNull null
                 val latestCur = latestVintageByObs[obsDate] ?: return@mapNotNull null
                 val latestPrev = latestVintageByObs[prevObs] ?: return@mapNotNull null
                 if (originalPrev == 0.0 || latestPrev == 0.0) return@mapNotNull null
-                val originalYoy = (originalIdx / originalPrev - 1.0) * 100.0
-                val latestYoy = (latestCur / latestPrev - 1.0) * 100.0
+                val originalRate = (originalIdx / originalPrev - 1.0) * 100.0
+                val latestRate = (latestCur / latestPrev - 1.0) * 100.0
                 IndicatorDataPoint(
                     date = releaseDate,
-                    value = String.format("%.1f", latestYoy),
-                    originalValue = String.format("%.1f", originalYoy),
+                    value = formatRate1(latestRate),
+                    originalValue = formatRate1(originalRate),
                     observationDate = obsDate,
                 )
             }
@@ -547,6 +554,9 @@ class EconomicCalendarService(
         vintages?.firstOrNull { v ->
             v.realtime_start!! <= asOf && (v.realtime_end == null || asOf <= v.realtime_end)
         }?.value?.toDoubleOrNull()
+
+    /** 등락률 소수 첫째 자리. 0 에 가까운 음수가 "-0.0" 으로 찍히지 않게 한다 (전월비는 0 근처 값이 잦음) */
+    private fun formatRate1(v: Double): String = String.format("%.1f", v).let { if (it == "-0.0") "0.0" else it }
 
     /** FRED 관측 date(YYYY-MM-DD) → 1개월 전 같은 월(YYYY-MM-DD) */
     private fun shiftObsDateMinus1(obsDate: String): String? = runCatching {
@@ -838,6 +848,12 @@ class EconomicCalendarService(
                                     val prevObs = shiftObsDateMinus12(obsDate)
                                     val prev = prevObs?.let { vintageValueAt(vintagesByObs[it], releaseDateStr) }
                                     if (prev != null && prev != 0.0) String.format("%.1f", (curVal / prev - 1.0) * 100.0) else null
+                                }
+                                series.seriesId in FRED_PCH_SERIES -> {
+                                    // 전월 값은 발표일 시점의 개정값 기준 (공식 발표 전월비와 일치)
+                                    val prevObs = shiftObsDateMinus1(obsDate)
+                                    val prev = prevObs?.let { vintageValueAt(vintagesByObs[it], releaseDateStr) }
+                                    if (prev != null && prev != 0.0) formatRate1((curVal / prev - 1.0) * 100.0) else null
                                 }
                                 series.seriesId in FRED_CHG_SERIES -> {
                                     // 전월 값도 발표일 시점의 개정값 기준 (공식 발표 증감 = 당월 최초치 - 당시 개정된 전월치)

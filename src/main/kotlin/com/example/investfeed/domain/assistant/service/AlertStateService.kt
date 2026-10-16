@@ -22,8 +22,7 @@ class AlertStateService(
     data class IndexAlertState(
         var firedUpLevels: MutableList<Double> = mutableListOf(),    // 발동한 상승 임계
         var firedDownLevels: MutableList<Double> = mutableListOf(),  // 발동한 하락 임계
-        var cbStages: MutableList<Int> = mutableListOf(),
-        var cbPendingStage: Int? = null,
+        var cbStages: MutableList<Int> = mutableListOf(),           // 미국(S&P500) CB 발동 단계. 국내 CB 는 CircuitBreakerService 가 관리
     )
 
     fun get(indexCode: String, date: LocalDate): IndexAlertState =
