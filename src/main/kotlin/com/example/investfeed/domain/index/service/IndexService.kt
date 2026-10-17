@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.index.service
 
+import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerService
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.index.IndexType
@@ -50,6 +51,7 @@ class IndexService(
     private val indexDailyCloseRepository: IndexDailyCloseRepository,
     private val schedulerLogService: SchedulerLogService,
     private val authClient: AuthClient,
+    private val circuitBreakerService: CircuitBreakerService,
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String,
 ) {
@@ -228,6 +230,8 @@ class IndexService(
             programChartList = programChartList.reversed(),
             programList = programList,
             investorDailyList = getIndexInvestorDailyList(indsCd),
+            circuitBreakers = CircuitBreakerService.INDS_CD[indsCd]
+                ?.let { code -> circuitBreakerService.findToday().filter { it.indexCode == code } }.orEmpty(),
         )
     }
 

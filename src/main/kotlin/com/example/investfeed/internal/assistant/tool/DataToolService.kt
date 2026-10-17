@@ -205,7 +205,7 @@ class DataToolService(
         return count * sign
     }
 
-    /** 미국 시장: 미국 마감 브리핑과 같은 지수 타일(나스닥·S&P500·다우·필라델피아 반도체·VIX) + 국채 + 환율 */
+    /** 미국 시장: 미국 마감 브리핑과 같은 지수 타일(나스닥·S&P500·다우·필라델피아 반도체) + 국채 + 환율 */
     fun globalIndexes(): MarketCard {
         val now = LocalDateTime.now()
         val sheet = marketFactSheetService.collectUsNow(now)

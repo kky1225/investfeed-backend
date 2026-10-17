@@ -162,7 +162,7 @@ class MarketFactSheetService(
         val indexes = fetchOrNull("미국 지수") {
             listOf(
                 MarketIndexType.NASDAQ to "나스닥", MarketIndexType.SP500 to "S&P500", MarketIndexType.DOW to "다우",
-                MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "필라델피아 반도체", MarketIndexType.VIX to "VIX",
+                MarketIndexType.PHILADELPHIA_SEMICONDUCTOR to "필라델피아 반도체",
             ).mapNotNull { (type, name) ->
                 fetchQuote(type)?.let { q -> IndexFact(name = name, close = q.price, changeRate = q.changeRate, changeAmount = q.changeAmount, delayStatus = q.delayStatus) }
             }.takeIf { it.isNotEmpty() }
