@@ -4,12 +4,14 @@ import com.example.investfeed.domain.assistant.service.BriefingType
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.internal.assistant.tool.ActionToolService
+import com.example.investfeed.internal.assistant.tool.CircuitBreakerToolService
 import com.example.investfeed.internal.assistant.tool.DataToolService
 import com.example.investfeed.internal.assistant.tool.DisplayToolService
 import com.example.investfeed.internal.assistant.tool.PeriodResolver
 import com.example.investfeed.internal.assistant.tool.StockMarket
 import com.example.investfeed.internal.assistant.tool.ToolException
 import com.example.investfeed.internal.assistant.tool.ToolResponse
+import com.example.investfeed.internal.assistant.tool.TreasuryToolService
 import mu.KotlinLogging
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -24,6 +26,8 @@ class InternalToolController(
     private val data: DataToolService,
     private val display: DisplayToolService,
     private val action: ActionToolService,
+    private val circuitBreakerTool: CircuitBreakerToolService,
+    private val treasuryTool: TreasuryToolService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -42,22 +46,37 @@ class InternalToolController(
         @RequestParam(required = false) date: LocalDate?,
     ) = tool("get_market_summary", "키움 시세·수급") { data.marketSummary(market, date) }
 
+    @GetMapping("get_circuit_breakers")
+    fun circuitBreakers(
+        @RequestParam market: CircuitBreakerToolService.CbMarket,
+        @RequestParam(required = false) index: CircuitBreakerToolService.CbIndex?,   // 지수를 직접 물었을 때 (국내는 그 지수만, 미국은 안내 문구만)
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 오늘(휴장일이면 직전 거래일)
+    ) = tool("get_circuit_breakers", "서킷브레이커 판정·알림") { circuitBreakerTool.circuitBreakers(market, index, date) }
+
     @GetMapping("get_market_investor_flow")
     fun marketInvestorFlow(
         @RequestParam investor: DataToolService.Investor,
-        @RequestParam(defaultValue = "KOSPI") market: DataToolService.Market,
         @RequestParam(defaultValue = "1") days: Int,
-        @RequestParam(defaultValue = "BUY") side: DataToolService.Side,
+        @RequestParam side: DataToolService.Side,   // 순매수/순매도 필수 — 질문에 없으면 비서가 되묻는다
         @RequestParam(required = false) minStreakDays: Int?,
-    ) = tool("get_market_investor_flow", "키움 수급") { data.marketInvestorFlow(investor, market, days, side, minStreakDays) }
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 최근 기준. 지정하면 그날까지 days 거래일
+    ) = tool("get_market_investor_flow", "키움 수급") { data.marketInvestorFlow(investor, days, side, minStreakDays, date) }
 
     @GetMapping("get_stock_quote")
     fun stockQuote(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestParam stockQuery: List<String>,
         @RequestParam(required = false) market: StockMarket?,
-    ) = tool("get_stock_quote") { data.stockQuotes(stockQuery, user.member.id, market) }
-        .let { r -> r.copy(source = r.data?.let { quoteSource(it) }) }
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 현재 시세. 미국은 현지 날짜
+    ) = tool("get_stock_quote") { data.stockQuotes(stockQuery, user.member.id, market, date) }
+        .let { r ->
+            val quotes = when (val d = r.data) {
+                is List<*> -> d.filterIsInstance<DataToolService.StockQuote>()
+                is DataToolService.QuoteAnswer -> d.quotes
+                else -> null
+            }
+            r.copy(source = quotes?.let { quoteSource(it) })
+        }
 
     private fun quoteSource(quotes: List<DataToolService.StockQuote>): String? =
         listOfNotNull(
@@ -70,10 +89,17 @@ class InternalToolController(
         @AuthenticationPrincipal user: CustomUserDetails,
         @RequestParam stockQuery: List<String>,
         @RequestParam(defaultValue = "5") days: Int,
-    ) = tool("get_stock_investor_flow", "키움 수급") { data.stockInvestorFlows(stockQuery, user.member.id, days) }
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 오늘까지
+    ) = tool("get_stock_investor_flow", "키움 수급") { data.stockInvestorFlows(stockQuery, user.member.id, days, date) }
 
     @GetMapping("get_global_indexes")
     fun globalIndexes() = tool("get_global_indexes", "네이버 시장지표·국채") { data.globalIndexes() }
+
+    @GetMapping("get_treasury_yields")
+    fun treasuryYields(
+        @RequestParam(required = false) market: TreasuryToolService.TreasuryMarket?,   // 미지정 = 한국·미국 둘 다
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 당일(네이버). 지정 = 그날 종가(미국 FRED·한국 ECOS)
+    ) = tool("get_treasury_yields", "네이버·FRED·ECOS 국채") { treasuryTool.treasuryYields(market, date) }
 
     @GetMapping("get_calendar")
     fun calendar(
@@ -85,8 +111,10 @@ class InternalToolController(
     ) = tool("get_calendar", "경제 캘린더") { data.calendar(from, to, keyword, type, country) }
 
     @GetMapping("get_recommend_list")
-    fun recommendList(@RequestParam(required = false) grade: String?) =
-        tool("get_recommend_list", "추천 시스템") { data.recommendList(grade) }
+    fun recommendList(
+        @RequestParam(required = false) grade: String?,
+        @RequestParam(required = false) date: LocalDate?,   // 미지정 = 현재 추천. 지정하면 그날 산출 기록
+    ) = tool("get_recommend_list", "추천 시스템") { data.recommendList(grade, date) }
 
     @GetMapping("search_news")
     fun searchNews(@RequestParam query: String, @RequestParam(defaultValue = "5") n: Int) =

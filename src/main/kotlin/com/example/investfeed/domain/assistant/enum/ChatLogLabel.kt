@@ -24,6 +24,8 @@ object ChatLogLabel {
 
     private val TOOL = mapOf(
         "get_market_summary" to "국내 지수·수급",
+        "get_circuit_breakers" to "서킷브레이커",
+        "get_treasury_yields" to "국채 금리",
         "get_market_investor_flow" to "시장 투자자별 매매",
         "get_stock_quote" to "종목 시세",
         "get_stock_investor_flow" to "종목 투자자별 매매",
@@ -44,6 +46,7 @@ object ChatLogLabel {
         "PAPER_TRADE" to ("모의투자 질문" to "모의투자는 관리자 기능이라 비서 범위 밖"),
         "GREETING" to ("인사" to "조회할 내용이 없는 인사"),
         "OUT_OF_SCOPE" to ("범위 밖 질문" to "투자 데이터와 무관한 질문"),
+        "DATE_UNSUPPORTED" to ("날짜 지정 질문" to "날짜 지정 조회를 아직 지원하지 않는 데이터"),
         "NO_TOOL" to ("해석되지 않은 질문" to "조회할 기능을 고르지 못해 범위 밖으로 처리"),
         "REFUSAL" to ("응답 거부된 질문" to "모델이 응답을 거부함"),
     )
@@ -54,6 +57,9 @@ object ChatLogLabel {
         "DIRECTION" to "방향(이상·이하)이 빠짐",
         "PERIOD" to "기간이 빠짐",
         "DATE_RANGE" to "날짜 범위가 빠짐",
+        "MARKET" to "국내/미국 시장이 빠짐",
+        "INVESTOR" to "투자자가 빠짐",
+        "SIDE" to "순매수/순매도가 빠짐",
     )
 
     private val BLOCK = mapOf(

@@ -8,5 +8,6 @@ interface IndexInvestorDailyRepository : JpaRepository<IndexInvestorDaily, Long>
     fun findByIndsCdOrderByDtDesc(indsCd: String, pageable: Pageable): List<IndexInvestorDaily>
     fun existsByIndsCdAndDt(indsCd: String, dt: String): Boolean
     fun findFirstByIndsCdOrderByDtDesc(indsCd: String): IndexInvestorDaily?
+    fun findByIndsCdAndDt(indsCd: String, dt: String): IndexInvestorDaily?
     fun findByIndsCdAndDtGreaterThanEqualOrderByDtAsc(indsCd: String, dt: String): List<IndexInvestorDaily>
 }

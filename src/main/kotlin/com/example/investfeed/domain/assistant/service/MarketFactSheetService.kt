@@ -4,6 +4,7 @@ import com.example.investfeed.domain.assistant.dto.factsheet.*
 import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerService
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.index.dto.res.IndexInfo
+import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
@@ -39,6 +40,7 @@ class MarketFactSheetService(
     private val stockPickRepository: StockPickRepository,
     private val circuitBreakerService: CircuitBreakerService,
     private val krTreasuryFallbackService: KrTreasuryFallbackService,
+    private val indexInvestorDailyRepository: IndexInvestorDailyRepository,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -144,9 +146,39 @@ class MarketFactSheetService(
             ),
             sectors = null,
             usdKrw = null,
-            circuitBreakers = circuitBreakerFacts(holidayService.lastTradingDay(asOf.toLocalDate())).filter { (kospi && it.name == "코스피") || (kosdaq && it.name == "코스닥") },
         )
     }
+
+    /**
+     * 지난 거래일의 국내 지수 (비서 채팅 날짜 지정 조회). 지수는 업종 일봉(ka20006), 수급은 매일 07:00 저장하는 확정치(index_investor_daily).
+     * 수급 저장분이 없으면 flow = null
+     */
+    fun collectKrOn(tradeDate: LocalDate, asOf: LocalDateTime, kospi: Boolean = true, kosdaq: Boolean = true): KrCloseFactSheet {
+        val flow = FlowFact(
+            kospi = if (kospi) storedFlow(KOSPI, tradeDate) else null,
+            kosdaq = if (kosdaq) storedFlow(KOSDAQ, tradeDate) else null,
+        )
+        return KrCloseFactSheet(
+            tradeDate = tradeDate,
+            asOf = asOf,
+            kospi = if (kospi) fetchOrNull("코스피 일봉") { dailyIndexFact("코스피", KOSPI, tradeDate) } else null,
+            kosdaq = if (kosdaq) fetchOrNull("코스닥 일봉") { dailyIndexFact("코스닥", KOSDAQ, tradeDate) } else null,
+            kospi200 = if (kospi) fetchOrNull("코스피200 일봉") { dailyIndexFact("코스피200", KOSPI200, tradeDate) } else null,
+            kosdaq150 = if (kosdaq) fetchOrNull("코스닥150 일봉") { dailyIndexFact("코스닥150", KOSDAQ150, tradeDate) } else null,
+            flow = flow.takeIf { it.kospi != null || it.kosdaq != null },
+            sectors = null,
+            usdKrw = null,
+        )
+    }
+
+    private fun storedFlow(indsCd: String, date: LocalDate): MarketFlowFact? =
+        indexInvestorDailyRepository.findByIndsCdAndDt(indsCd, date.format(YYYYMMDD))?.let {
+            MarketFlowFact(
+                foreign = TemplateFormat.parseLong(it.frgnrNetprps),
+                institution = TemplateFormat.parseLong(it.orgnNetprps),
+                individual = TemplateFormat.parseLong(it.indNetprps),
+            )
+        }
 
     private fun circuitBreakerFacts(date: LocalDate): List<CircuitBreakerFact> =
         fetchOrNull("서킷브레이커") {
@@ -258,6 +290,10 @@ class MarketFactSheetService(
             SectorFact(name = name, changeRate = rate, tradeAmount = TemplateFormat.parseLong(s.trdePrica))
         }.takeIf { it.isNotEmpty() }
     }
+
+    fun krTreasuryNow(tradeDate: LocalDate): KrTreasuryFact? = fetchOrNull("한국 국채") { fetchKrTreasury(tradeDate) }
+
+    fun usTreasuryNow(usTradeDate: LocalDate): TreasuryFact? = fetchOrNull("미국 국채") { fetchTreasury(usTradeDate) }
 
     private fun fetchKrTreasury(tradeDate: LocalDate): KrTreasuryFact? =
         KR_TREASURY_TYPES.mapNotNull { type ->

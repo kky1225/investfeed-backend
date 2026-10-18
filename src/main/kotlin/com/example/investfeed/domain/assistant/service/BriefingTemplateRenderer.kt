@@ -62,7 +62,8 @@ object BriefingTemplateRenderer {
         return "| ${k.name}$warn | $amount | ${rate5d?.let { coloredRate(it) } ?: "-"} |"
     }
 
-    private fun flowSection(f: FlowFact?, withKospi: Boolean = true, withKosdaq: Boolean = true): Section {
+    // provisional: 장중·마감 직후 수급은 잠정치 (20:00 이후·지난 날짜는 확정치)
+    private fun flowSection(f: FlowFact?, withKospi: Boolean = true, withKosdaq: Boolean = true, provisional: Boolean = true): Section {
         f ?: return failedSection("C3", "투자자 수급")
         val cols = listOfNotNull(("코스피" to f.kospi).takeIf { withKospi }, ("코스닥" to f.kosdaq).takeIf { withKosdaq })
         if (cols.all { it.second == null }) return failedSection("C3", "투자자 수급")
@@ -71,7 +72,7 @@ object BriefingTemplateRenderer {
         lines += "| 외국인 | ${cols.joinToString(" | ") { cell(it.second?.foreign) }} |"
         lines += "| 기관 | ${cols.joinToString(" | ") { cell(it.second?.institution) }} |"
         lines += "| 개인 | ${cols.joinToString(" | ") { cell(it.second?.individual) }} |"
-        return okSection("C3", "투자자 수급 · 잠정", lines.joinToString("\n"))
+        return okSection("C3", if (provisional) "투자자 수급 · 잠정" else "투자자 수급", lines.joinToString("\n"))
     }
 
     private fun sectorSection(list: List<SectorFact>?): Section {
@@ -170,20 +171,19 @@ object BriefingTemplateRenderer {
         return okSection("K2", "코인 시세 · 업비트 09:00 마감", "| 코인 | 종가 | 등락 | 거래대금 |\n|---|---|---|---|\n" + rows.joinToString("\n"))
     }
 
-    fun renderKrMarketNow(sheet: KrCloseFactSheet, kospi: Boolean = true, kosdaq: Boolean = true): Rendered =
+    /** 비서 채팅 국내 지수 카드. 지난 날짜에 수급 저장분이 없으면(flowRequired=false) 수급 칸을 뺀다 */
+    fun renderKrMarketNow(sheet: KrCloseFactSheet, kospi: Boolean = true, kosdaq: Boolean = true, provisional: Boolean = true, flowRequired: Boolean = true): Rendered =
         Rendered(
             summary = krCloseSummary(sheet),
-            sections = listOf(cbStatusSection(sheet.circuitBreakers, kospi, kosdaq), flowSection(sheet.flow, kospi, kosdaq)),
+            sections = if (sheet.flow == null && !flowRequired) emptyList() else listOf(flowSection(sheet.flow, kospi, kosdaq, provisional)),
         )
 
-    /** 비서 채팅 시장 요약 전용: 서킷브레이커 발생 여부를 항상 보여 준다 ("발동했어?"에 "발생 없음"으로도 답할 수 있게) */
-    private fun cbStatusSection(list: List<CircuitBreakerFact>, kospi: Boolean, kosdaq: Boolean): Section {
-        val rows = listOfNotNull("코스피".takeIf { kospi }, "코스닥".takeIf { kosdaq }).map { name ->
-            val stages = list.filter { it.name == name }.sortedBy { it.stage }
-                .joinToString(", ") { cb -> "${cb.stage}단계 ${cb.firedAt.format(HHMM)}~${cb.resumeAt?.format(HHMM) ?: "장 종료"}" }
-            "| $name | ${stages.ifEmpty { "발생 없음" }} |"
-        }
-        return okSection("CB", "서킷브레이커", "| 지수 | 발동 |\n|---|---|\n" + rows.joinToString("\n"))
+    fun renderTreasury(kr: KrTreasuryFact?, us: TreasuryFact?, krNotice: String?, usNotice: String?, withKr: Boolean, withUs: Boolean, krTitleNote: String? = null): Rendered {
+        val sections = mutableListOf<Section>()
+        if (withKr) sections += krNotice?.let { okSection("C7", "한국 국채 금리", it) }
+            ?: krTreasurySection(kr).let { sec -> krTitleNote?.let { sec.copy(title = "${sec.title} · $it") } ?: sec }
+        if (withUs) sections += usNotice?.let { okSection("U2B", "미국 국채 금리", it) } ?: treasurySection(us)
+        return Rendered(summary = "", sections = sections)
     }
 
     fun renderUsMarketNow(sheet: UsCloseFactSheet): Rendered =
@@ -220,7 +220,7 @@ object BriefingTemplateRenderer {
             t.y10?.let { "| 10년물 | ${num(it, 2)}% | ${bp(t.y10Bp)} |" },
             t.y5?.let { "| 5년물 | ${num(it, 2)}% | ${bp(t.y5Bp)} |" },
             t.y2?.let { "| 2년물 | ${num(it, 2)}% | ${bp(t.y2Bp)} |" },
-            t.spreadBp?.let { "| 스프레드 | ${colored("${TemplateFormat.sign(it.toDouble())}${abs(it)}bp", it.toDouble())}${if (it < 0) " (역전)" else ""} | - |" },
+            t.spreadBp?.let { "| 스프레드(10-2년) | ${colored("${TemplateFormat.sign(it.toDouble())}${abs(it)}bp", it.toDouble())}${if (it < 0) " (역전)" else ""} | - |" },
         )
         if (rows.isEmpty()) return failedSection("U2B", "미국 국채 금리")
         val parts = listOf("| 만기 | 수익률 | 변화 |\n|---|---|---|\n" + rows.joinToString("\n"))

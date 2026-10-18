@@ -31,8 +31,9 @@ class UsStockChartClient(
     @KiwoomToken
     fun usStockMinuteChart(req: KiwoomUsStockChartReq): KiwoomUsStockChartRes = usStockChart("usa06011", req)
 
+    /** stopAt(yyyyMMdd): 받은 일봉이 이 날짜까지 내려오면 더 이어 받지 않는다 (비서 날짜 지정 조회) */
     @KiwoomToken
-    fun usStockDayChart(req: KiwoomUsStockChartReq): KiwoomUsStockChartRes = usStockChart("usa06012", req)
+    fun usStockDayChart(req: KiwoomUsStockChartReq, stopAt: String? = null): KiwoomUsStockChartRes = usStockChart("usa06012", req, stopAt)
 
     @KiwoomToken
     fun usStockWeekChart(req: KiwoomUsStockChartReq): KiwoomUsStockChartRes = usStockChart("usa06013", req)
@@ -47,7 +48,7 @@ class UsStockChartClient(
      * 미국 차트는 1회 100건이라 cont-yn/next-key 로 최대 MAX_PAGES 까지 이어 받는다(국내 1회 600건과 길이 맞춤).
      * 페이지는 최신→과거 순으로 오므로 이어 붙이기만 하면 된다.
      */
-    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq): KiwoomUsStockChartRes {
+    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq, stopAt: String? = null): KiwoomUsStockChartRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
@@ -82,6 +83,7 @@ class UsStockChartClient(
                 nextKey = entity.headers.getFirst("next-key") ?: ""
 
                 if (contYn != "Y" || nextKey.isBlank()) break
+                if (stopAt != null && list.lastOrNull()?.dt?.let { it <= stopAt } == true) break
             }
 
             return KiwoomUsStockChartRes(
