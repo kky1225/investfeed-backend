@@ -27,6 +27,7 @@ object ChatLogLabel {
         "get_circuit_breakers" to "서킷브레이커",
         "get_treasury_yields" to "국채 금리",
         "get_market_investor_flow" to "시장 투자자별 매매",
+        "get_trading_rank" to "거래대금·거래량 순위",
         "get_stock_quote" to "종목 시세",
         "get_stock_investor_flow" to "종목 투자자별 매매",
         "get_global_indexes" to "미국 지수·금리·환율",
@@ -60,6 +61,7 @@ object ChatLogLabel {
         "MARKET" to "국내/미국 시장이 빠짐",
         "INVESTOR" to "투자자가 빠짐",
         "SIDE" to "순매수/순매도가 빠짐",
+        "RANK_TYPE" to "순위 종류(거래대금·거래량·급증률)가 빠짐",
     )
 
     private val BLOCK = mapOf(

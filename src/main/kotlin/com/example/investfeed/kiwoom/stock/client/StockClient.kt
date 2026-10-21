@@ -46,6 +46,7 @@ class StockClient(
 ) {
     private val log = KotlinLogging.logger {}
     private final val STOCK_URL = "/api/dostk/stkinfo"
+    private final val STOCK_INTEREST_MAX_CODES = 100
 
     @KiwoomToken
     suspend fun stockInfoList(
@@ -364,6 +365,21 @@ class StockClient(
 
     @KiwoomToken
     suspend fun stockInterest(
+        req: KiwoomStockInterestReq
+    ): KiwoomStockInterestRes {
+        val codes = req.stk_cd.split("|").filter { it.isNotBlank() }
+        if (codes.size <= STOCK_INTEREST_MAX_CODES) return stockInterestChunk(req)
+
+        val results = codes.chunked(STOCK_INTEREST_MAX_CODES)
+            .map { chunk -> stockInterestChunk(KiwoomStockInterestReq(stk_cd = chunk.joinToString("|"))) }
+        return KiwoomStockInterestRes(
+            return_code = 0,
+            return_msg = results.last().return_msg,
+            atn_stk_infr = results.flatMap { it.atn_stk_infr.orEmpty() },
+        )
+    }
+
+    private suspend fun stockInterestChunk(
         req: KiwoomStockInterestReq
     ): KiwoomStockInterestRes {
         val accessToken = authClient.getCurrentAccessToken()

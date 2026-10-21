@@ -181,6 +181,13 @@ class TossAuthClient(
         return "Basic $encoded"
     }
 
+    fun hasApiKey(loginId: String): Boolean {
+        val broker = brokerRepository.findByName(BROKER_NAME) ?: return false
+        return memberApiKeyRepository.findByMemberLoginIdAndBrokerId(loginId, broker.id) != null
+    }
+
+    fun currentLoginIdOrNull(): String? = runCatching { getLoginIdFromSecurityContext() }.getOrNull()
+
     private fun resolveApiKeys(loginId: String): Pair<String, String> {
         val broker = brokerRepository.findByName(BROKER_NAME)
             ?: throw ApiKeyNotFoundException()

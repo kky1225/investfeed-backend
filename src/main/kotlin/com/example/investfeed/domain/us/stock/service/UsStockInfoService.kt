@@ -2,6 +2,8 @@ package com.example.investfeed.domain.us.stock.service
 
 import com.example.investfeed.domain.us.stock.dto.req.UsStockChartType
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
+import com.example.investfeed.domain.us.stock.dto.res.UsSessionBaseItem
+import com.example.investfeed.domain.us.stock.dto.res.UsSessionBaseRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChart
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChartRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDailyPrice
@@ -32,8 +34,13 @@ class UsStockInfoService(
     private val usStockClient: UsStockClient,
     private val usStockChartClient: UsStockChartClient,
     private val usStockMasterRepository: UsStockMasterRepository,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
+
+    companion object {
+        private const val MAX_SESSION_BASE_STOCKS = 200
+    }
 
     fun searchUsStocks(
         keyword: String
@@ -186,6 +193,16 @@ class UsStockInfoService(
             currUnit = info.curr_unit,
             trdSuspTp = info.trd_susp_tp,
         )
+
+    fun getUsSessionBases(stkCds: List<String>): UsSessionBaseRes? =
+        usSessionBaseService.currentBases(stkCds.take(MAX_SESSION_BASE_STOCKS))?.let { b ->
+            UsSessionBaseRes(
+                session = b.session.name,
+                sessionLabel = b.session.label,
+                baseDate = b.baseDate.toString(),
+                bases = b.closes.map { (stkCd, close) -> UsSessionBaseItem(stkCd = stkCd, regularClose = close) },
+            )
+        }
 
     fun streamUsStock(stkCd: String, stexTp: String) {
         kiwoomStreamClient.register(

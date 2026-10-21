@@ -1,0 +1,147 @@
+package com.example.investfeed.internal.assistant.tool
+
+import com.example.investfeed.domain.assistant.service.TemplateFormat
+import com.example.investfeed.domain.assistant.service.UsMarketCalendarService
+import com.example.investfeed.domain.rank.dto.req.RankListReq
+import com.example.investfeed.domain.rank.service.RankService
+import com.example.investfeed.domain.us.rank.dto.req.UsRankListReq
+import com.example.investfeed.domain.us.rank.service.UsRankService
+import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
+import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
+import mu.KotlinLogging
+import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import kotlin.math.abs
+
+@Service
+class RankToolService(
+    private val rankService: RankService,
+    private val usRankService: UsRankService,
+    private val holidayService: HolidayService,
+    private val usMarketCalendarService: UsMarketCalendarService,
+    private val usStockChartClient: UsStockChartClient,
+) {
+    private val log = KotlinLogging.logger {}
+
+    enum class RankMarket { KR, US }
+
+    enum class RankType(val code: String, val label: String) {
+        VALUE("0", "거래대금"), VOLUME("1", "거래량"), SURGE("2", "거래량 급증률"),
+    }
+
+    companion object {
+        const val MAX_RANK_STOCKS = 100   // 카드는 처음 10개만 보이고 더보기로 카드 안 스크롤 (투자자별 순위와 같음)
+        private val KR_OPEN: LocalTime = LocalTime.of(9, 0)
+        private val KR_CLOSE: LocalTime = LocalTime.of(15, 30)
+        private val US_OPEN_ET: LocalTime = LocalTime.of(9, 30)
+        private const val US_SESSION_TICKER = "SPY"
+    }
+
+    /** value: 순위 기준 값 (단위는 valueLabel — 순위 화면 열 제목과 같음. 급증률은 %) */
+    data class RankStock(
+        val rank: Int, val code: String, val name: String, val link: String,
+        val changeRate: Double?, val price: Double?, val value: Double?,
+    )
+
+    /** basis: "10/17(금) 장중"·"10/17(금) 기준"·"현지 10/16(목) 기준" */
+    data class TradingRank(
+        val market: RankMarket, val type: RankType, val basis: String, val currency: String, val valueLabel: String,
+        val stocks: List<RankStock>,
+    )
+
+    private data class Session(val date: LocalDate, val live: Boolean)
+
+    fun tradingRank(market: RankMarket, type: RankType, requested: AssistantDate?): Any {
+        if (market == RankMarket.KR) {
+            val session = krSession()
+            requested?.resolve(StockMarket.KR)?.let { d -> unavailableDay(market, type, d, session)?.let { return DataToolService.TextReply(it) } }
+            return kr(type, session)
+        }
+        // 미국 "지금" 거래일은 달력이 아니라 최근 체결로 정한다 — 키움 순위는 데이마켓부터 다음 거래일 값이라
+        // 달력 기준(현지 날짜)으로 판정하면 끝난 장의 날짜("어제")가 통과해 데이마켓 순위가 나간다 (2026-10-20)
+        val tick = usLatestSession()
+        val session = tick?.let { Session(it.first, true) } ?: usSession()
+        requested?.resolve(StockMarket.US)?.let { d -> unavailableDay(market, type, d, session)?.let { return DataToolService.TextReply(it) } }
+        return us(type, session, tick)
+    }
+
+    /** 미국 최근 체결이 속한 거래일·장구분 (SPY 기준 — 데이마켓·프리·정규·애프터 모두 거래가 많다). 실패하면 null → 달력 기준 */
+    private fun usLatestSession(): Pair<LocalDate, UsMarketCalendarService.UsSession>? =
+        runCatching { usStockChartClient.usStockLatestTick(KiwoomUsStockChartReq(stex_tp = "NY", stk_cd = US_SESSION_TICKER)) }
+            .onFailure { log.error(it) { "미국 최근 체결 조회 실패 $US_SESSION_TICKER" } }.getOrNull()
+            ?.let { usMarketCalendarService.tickSession(it.cntr_tm, it.bus_dt) }
+
+    private fun krSession(now: LocalDateTime = LocalDateTime.now()): Session {
+        val today = now.toLocalDate()
+        val open = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(KR_OPEN)
+        return Session(if (open) today else holidayService.lastTradingDay(today.minusDays(1)), open && now.toLocalTime().isBefore(KR_CLOSE))
+    }
+
+    private fun usSession(): Session {
+        val nowEt = LocalDateTime.now().atZone(UsMarketCalendarService.KST).withZoneSameInstant(UsMarketCalendarService.NY)
+        val d = nowEt.toLocalDate()
+        val started = usMarketCalendarService.isUsTradingDay(d) && !nowEt.toLocalTime().isBefore(US_OPEN_ET)
+        val date = if (started) d else usMarketCalendarService.lastClosedUsTradingDay()
+        return Session(date, started && nowEt.toLocalTime().isBefore(usMarketCalendarService.closeTimeEt(d)))
+    }
+
+    private fun unavailableDay(market: RankMarket, type: RankType, date: LocalDate, session: Session): String? {
+        val md = TemplateFormat.monthDay(date)
+        val past = "${type.label} 순위는 지난 날짜를 조회할 수 없습니다. 당일(장 시작 전·휴장일에는 직전 거래일) 순위만 볼 수 있습니다."
+        return when (market) {
+            RankMarket.KR -> {
+                val today = LocalDate.now()
+                when {
+                    date.isAfter(today) -> "${md}은 아직 장이 열리지 않았습니다."
+                    holidayService.isHoliday(date) -> "${md}은 국내 증시 휴장일입니다."
+                    date == today && LocalTime.now().isBefore(KR_OPEN) -> "오늘 국내 장은 아직 열리지 않았습니다. (09:00 개장)"
+                    date != session.date -> past
+                    else -> null
+                }
+            }
+            RankMarket.US -> when {
+                !usMarketCalendarService.isUsTradingDay(date) -> "미국 증시는 현지 ${md} 휴장일입니다."
+                date.isAfter(session.date) -> "미국 증시 현지 ${md} 장은 아직 열리지 않았습니다."
+                date != session.date -> past
+                else -> null
+            }
+        }
+    }
+
+    private fun basis(session: Session, prefix: String = "") =
+        "$prefix${TemplateFormat.monthDay(session.date)} ${if (session.live) "장중" else "기준"}"
+
+    private fun kr(type: RankType, session: Session): TradingRank {
+        val res = rankService.listRanks(RankListReq(type = type.code))
+        if (res.return_code != 0) throw ToolException("국내 ${type.label} 순위 조회에 실패했습니다")
+        val stocks = res.rankList.orEmpty().mapIndexedNotNull { i, r ->
+            val code = r.stkCd?.substringBefore("_") ?: return@mapIndexedNotNull null
+            RankStock(
+                rank = r.rank?.toIntOrNull() ?: (i + 1), code = code, name = r.stkNm ?: code, link = "/stock/detail/$code",
+                changeRate = TemplateFormat.parse(r.fluRt), price = TemplateFormat.parse(r.curPrc)?.let { abs(it) },
+                value = TemplateFormat.parse(r.trdePrica)?.let { abs(it) },
+            )
+        }.take(MAX_RANK_STOCKS)
+        val valueLabel = when (type) { RankType.VALUE -> "거래대금(백만)"; RankType.VOLUME -> "거래량"; RankType.SURGE -> "급증률" }
+        return TradingRank(RankMarket.KR, type, basis(session), "KRW", valueLabel, stocks)
+    }
+
+    private fun us(type: RankType, session: Session, tick: Pair<LocalDate, UsMarketCalendarService.UsSession>?): TradingRank {
+        val res = usRankService.listUsRanks(UsRankListReq(type = type.code))
+        if (res.return_code != 0) throw ToolException("미국 ${type.label} 순위 조회에 실패했습니다")
+        val stocks = res.rankList.orEmpty().mapIndexedNotNull { i, r ->
+            val code = r.stkCd ?: return@mapIndexedNotNull null
+            RankStock(
+                rank = r.rank?.toIntOrNull() ?: (i + 1), code = code, name = r.stkNm ?: code, link = "/us-stock/detail/${r.stexTp}/$code",
+                changeRate = TemplateFormat.parse(r.fluRt), price = TemplateFormat.parse(r.curPrc)?.let { abs(it) },
+                value = TemplateFormat.parse(r.trdePrica)?.let { abs(it) },
+            )
+        }.take(MAX_RANK_STOCKS)
+        val valueLabel = when (type) { RankType.VALUE -> "거래대금(천 USD)"; RankType.VOLUME -> "거래량"; RankType.SURGE -> "급증률" }
+        val basis = tick?.let { (date, s) -> "${TemplateFormat.monthDay(date)} ${s.label}" } ?: basis(session, "현지 ")
+        return TradingRank(RankMarket.US, type, basis, "USD", valueLabel, stocks)
+    }
+}

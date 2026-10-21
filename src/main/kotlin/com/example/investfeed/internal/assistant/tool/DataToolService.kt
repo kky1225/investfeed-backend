@@ -12,6 +12,7 @@ import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.domain.investor.dto.req.InvestorListReq
 import com.example.investfeed.domain.investor.service.InvestorService
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeDayReq
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeRankListReq
@@ -58,6 +59,7 @@ class DataToolService(
     private val usStockChartClient: UsStockChartClient,
     private val candleClient: CandleClient,
     private val investorService: InvestorService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -224,7 +226,10 @@ class DataToolService(
         val high: Double?, val low: Double?, val high52w: Double?, val low52w: Double?,
         val title: String = name,   // 카드 제목(상세형). 비교 표는 name(목록형)
         val basis: String? = null,  // 기준 표기 "10/15(수) 종가"·"10/17(금) 장중"·"현지 10/15(수) 종가". 코인 실시간은 null
+        val session: SessionQuote? = null,  // 미국 데이·프리·애프터마켓 등락률 (토스 연동 회원만). 없으면 키움 값만 보인다
     )
+
+    data class SessionQuote(val label: String, val regularClose: Double, val regularCloseDate: String, val changeAmount: Double, val changeRate: Double)
 
     /** 여러 종목 중 일부만 그날 조회할 수 없을 때 (예: 미국만 휴장) — 조회된 카드와 안내 문장을 함께 */
     data class QuoteAnswer(val quotes: List<StockQuote>, val notice: String)
@@ -271,16 +276,21 @@ class DataToolService(
     /**
      * date 미지정 = 현재 시세. 지정하면 그날 일봉(종가·고가·저가·거래량, 전일 종가 대비 등락). 미국은 현지 날짜, 코인은 09:00~익일 09:00 일봉.
      */
-    fun stockQuotes(queries: List<String>, memberId: Long, marketHint: StockMarket?, date: LocalDate?): Any {
+    fun stockQuotes(queries: List<String>, memberId: Long, marketHint: StockMarket?, date: AssistantDate?): Any {
         if (queries.isEmpty()) throw ToolException("종목을 입력해 주세요")
         if (queries.size > MAX_STOCKS) throw ToolException("종목은 최대 ${MAX_STOCKS}개까지 비교할 수 있습니다")
         val stocks = queries.map { q -> stockResolver.resolve(q, memberId, marketHint) }
-        if (date == null) return stocks.map { quote(it) }
+        // 종목마다 시장 기준으로 날짜를 정한다 (미국 "오늘"은 날짜 없이 = 지금 시세)
+        fun dateOf(s: ResolvedStock) = date?.resolve(s.market)
+        if (stocks.all { dateOf(it) == null }) return stocks.map { quote(it) }
 
-        val notices = stocks.mapNotNull { unavailableDay(it.market, date) }.distinct()
-        val available = stocks.filter { unavailableDay(it.market, date) == null }
+        val notices = stocks.mapNotNull { s -> dateOf(s)?.let { unavailableDay(s.market, it) } }.distinct()
+        val available = stocks.filter { s -> dateOf(s)?.let { unavailableDay(s.market, it) } == null }
         if (available.isEmpty()) return TextReply(notices.joinToString("\n"))
-        val quotes = available.map { s -> if (isLiveDay(s.market, date)) quote(s) else dailyQuote(s, date) }
+        val quotes = available.map { s ->
+            val d = dateOf(s)
+            if (d == null || isLiveDay(s.market, d)) quote(s) else dailyQuote(s, d)
+        }
         return if (notices.isEmpty()) quotes else QuoteAnswer(quotes, notices.joinToString("\n"))
     }
 
@@ -331,10 +341,28 @@ class DataToolService(
     private fun quote(s: ResolvedStock): StockQuote = currentQuote(s).let { q ->
         when (s.market) {
             StockMarket.KR -> krSession().let { q.copy(basis = "${TemplateFormat.monthDay(it.date)} ${if (it.open) "장중" else "기준"}") }
-            StockMarket.US -> usSession().let { q.copy(basis = "현지 ${TemplateFormat.monthDay(it.date)} ${if (it.open) "장중" else "기준"}") }
+            StockMarket.US -> q.copy(
+                basis = usTickBasis(s.stexTp ?: "ND", s.code)
+                    ?: usSession().let { "현지 ${TemplateFormat.monthDay(it.date)} ${if (it.open) "장중" else "기준"}" },
+                session = sessionQuote(s.code, q.price),
+            )
             StockMarket.CRYPTO -> q
         }
     }
+
+    private fun sessionQuote(code: String, price: Double): SessionQuote? =
+        runCatching { usSessionBaseService.currentBases(listOf(code)) }
+            .onFailure { log.error(it) { "미국 장구분 기준 종가 조회 실패 $code" } }.getOrNull()
+            ?.let { b ->
+                b.closes[code]?.let { close ->
+                    SessionQuote(b.session.label, close, TemplateFormat.monthDay(b.baseDate), price - close, (price / close - 1) * 100)
+                }
+            }
+
+    private fun usTickBasis(stexTp: String, code: String): String? =
+        runCatching { usStockChartClient.usStockLatestTick(KiwoomUsStockChartReq(stex_tp = stexTp, stk_cd = code)) }
+            .onFailure { log.error(it) { "미국 최근 체결 조회 실패 $code" } }.getOrNull()
+            ?.let { usMarketCalendarService.tickBasis(it.cntr_tm, it.bus_dt) }
 
     private fun currentQuote(s: ResolvedStock): StockQuote = when (s.market) {
         StockMarket.KR -> runBlocking {

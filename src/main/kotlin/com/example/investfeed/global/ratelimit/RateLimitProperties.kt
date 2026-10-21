@@ -21,6 +21,8 @@ class RateLimitProperties(
     val tossAssetIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.toss-market-info-interval-ms:334}")
     val tossMarketInfoIntervalMs: Long,
+    @param:Value("\${external-api.rate-limit.toss-market-data-chart-interval-ms:50}")
+    val tossMarketDataChartIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.toss-auth-interval-ms:200}")
     val tossAuthIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.log-delays-over-ms:0}")

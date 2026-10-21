@@ -5,9 +5,11 @@ import com.example.investfeed.common.security.Actions
 import com.example.investfeed.common.security.Permissions
 import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.us.stock.dto.req.UsSessionBaseReq
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailStreamReq
 import com.example.investfeed.domain.us.stock.dto.req.UsStockSearchReq
+import com.example.investfeed.domain.us.stock.dto.res.UsSessionBaseRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDetailRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockSearchItem
 import com.example.investfeed.domain.us.stock.service.UsStockInfoService
@@ -41,6 +43,20 @@ class UsStockController(
                 code = ResponseCode.US_STOCK_SEARCH.code,
                 message = ResponseCode.US_STOCK_SEARCH.message,
                 result = usStockInfoService.searchUsStocks(req.keyword)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/session-bases")
+    @RequiresAction(action = Actions.READ)
+    fun getUsSessionBases(
+        req: UsSessionBaseReq
+    ): ResponseEntity<ApiResponse<UsSessionBaseRes?>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.US_STOCK_SESSION_BASE.code,
+                message = ResponseCode.US_STOCK_SESSION_BASE.message,
+                result = usStockInfoService.getUsSessionBases(req.stkCds)
             ), HttpStatus.OK
         )
     }

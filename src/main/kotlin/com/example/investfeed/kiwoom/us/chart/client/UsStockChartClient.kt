@@ -36,6 +36,10 @@ class UsStockChartClient(
     fun usStockDayChart(req: KiwoomUsStockChartReq, stopAt: String? = null): KiwoomUsStockChartRes = usStockChart("usa06012", req, stopAt)
 
     @KiwoomToken
+    fun usStockLatestTick(req: KiwoomUsStockChartReq): KiwoomUsStockChartItem? =
+        usStockChart("usa06010", req.copy(tic_scope = "1"), maxPages = 1).result_list?.firstOrNull()
+
+    @KiwoomToken
     fun usStockWeekChart(req: KiwoomUsStockChartReq): KiwoomUsStockChartRes = usStockChart("usa06013", req)
 
     @KiwoomToken
@@ -48,7 +52,7 @@ class UsStockChartClient(
      * 미국 차트는 1회 100건이라 cont-yn/next-key 로 최대 MAX_PAGES 까지 이어 받는다(국내 1회 600건과 길이 맞춤).
      * 페이지는 최신→과거 순으로 오므로 이어 붙이기만 하면 된다.
      */
-    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq, stopAt: String? = null): KiwoomUsStockChartRes {
+    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq, stopAt: String? = null, maxPages: Int = MAX_PAGES): KiwoomUsStockChartRes {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
@@ -57,7 +61,7 @@ class UsStockChartClient(
             var nextKey = ""
             var returnMsg = ""
 
-            for (page in 1..MAX_PAGES) {
+            for (page in 1..maxPages) {
                 val entity = kiwoomWebClient.post()
                     .uri(DEFAULT_URL + CHART_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")

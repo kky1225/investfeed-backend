@@ -42,8 +42,9 @@ class TreasuryToolService(
         private const val NAVER_PAGE_SIZE = 20
     }
 
-    /** market 미지정 = 한국·미국 둘 다 */
-    fun treasuryYields(market: TreasuryMarket?, date: LocalDate?): Any {
+    fun treasuryYields(market: TreasuryMarket?, requested: AssistantDate?): Any {
+        // 미국만 물었으면 미국 기준 날짜 (미국 "오늘" = 날짜 없이 직전 장), 아니면 한국 기준 날짜로 분기·제목을 정한다
+        val date = requested?.resolve(if (market == TreasuryMarket.US) StockMarket.US else StockMarket.KR)
         val withKr = market != TreasuryMarket.US
         val withUs = market != TreasuryMarket.KR
         val now = LocalDateTime.now()
@@ -77,18 +78,21 @@ class TreasuryToolService(
             }
         }
 
+        // 한국·미국 함께: 한국 오늘이면 한국은 오늘, 미국은 직전 장
+        val usDate = requested.resolve(StockMarket.US) ?: usLatest
+        val usMd = TemplateFormat.monthDay(usDate)
         val usNotice: String?
         val us: TreasuryFact?
         if (!withUs) { usNotice = null; us = null } else when {
-            date.isAfter(usLatest) -> { usNotice = "미국 채권시장 현지 ${md} 장은 아직 끝나지 않았습니다."; us = null }
-            !usMarketCalendarService.isUsTradingDay(date) || usMarketCalendarService.isUsBondHoliday(date) -> {
-                usNotice = "미국 채권시장은 현지 ${md} 휴장일입니다."; us = null
+            usDate.isAfter(usLatest) -> { usNotice = "미국 채권시장 현지 ${usMd} 장은 아직 끝나지 않았습니다."; us = null }
+            !usMarketCalendarService.isUsTradingDay(usDate) || usMarketCalendarService.isUsBondHoliday(usDate) -> {
+                usNotice = "미국 채권시장은 현지 ${usMd} 휴장일입니다."; us = null
             }
             // 직전 거래일(가장 최근에 끝난 장)은 네이버 (브리핑과 같은 조회), 그 전은 FRED
-            date == usLatest -> { usNotice = null; us = marketFactSheetService.usTreasuryNow(date) }
+            usDate == usLatest -> { usNotice = null; us = marketFactSheetService.usTreasuryNow(usDate) }
             else -> {
-                us = usFredOn(date)
-                usNotice = if (us == null) "현지 ${md} 미국 국채 금리는 제공되지 않습니다." else null
+                us = usFredOn(usDate)
+                usNotice = if (us == null) "현지 ${usMd} 미국 국채 금리는 제공되지 않습니다." else null
             }
         }
 

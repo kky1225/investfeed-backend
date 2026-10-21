@@ -43,9 +43,9 @@ class CircuitBreakerToolService(
     data class Answer(val market: CbMarket, val tradeDate: LocalDate, val reply: String?, val alerts: List<AlertCard>)
 
     /** date 미지정 = 오늘(휴장일이면 직전 거래일). 지정하면 그날만 답한다 (미국은 현지 날짜) */
-    fun circuitBreakers(market: CbMarket, index: CbIndex?, date: LocalDate?): Answer = when (market) {
-        CbMarket.KR -> kr(index, date)
-        CbMarket.US -> us(index, date)
+    fun circuitBreakers(market: CbMarket, index: CbIndex?, date: AssistantDate?): Answer = when (market) {
+        CbMarket.KR -> kr(index, date?.resolve(StockMarket.KR))
+        CbMarket.US -> us(index, date?.resolve(StockMarket.US))
     }
 
     private fun kr(index: CbIndex?, asked: LocalDate?): Answer {
