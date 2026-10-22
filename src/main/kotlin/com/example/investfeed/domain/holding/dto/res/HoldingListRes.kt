@@ -31,4 +31,6 @@ data class HoldingItem(
     val purPricUsd: String? = null, // 매입단가 (USD)
     val evltAmtUsd: String? = null, // 평가금액 (USD)
     val evltvPrftUsd: String? = null, // 평가손익 (USD)
+    val sessionLabel: String? = null, // 미국 데이·프리·애프터마켓 (토스 연동 회원만)
+    val regularClose: Double? = null, // 장구분 등락률 기준 정규장 종가 (USD)
 )

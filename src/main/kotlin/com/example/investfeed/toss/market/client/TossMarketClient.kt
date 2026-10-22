@@ -14,7 +14,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class TossMarketClient(
@@ -27,7 +28,7 @@ class TossMarketClient(
     private val log = KotlinLogging.logger {}
 
     @TossToken
-    fun dailyCandles(symbol: String, count: Int): TossCandleRes {
+    suspend fun dailyCandles(symbol: String, count: Int): TossCandleRes {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -36,8 +37,7 @@ class TossMarketClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossCandleRes>()
-                .block()
+                .awaitBodyOrNull<TossCandleRes>()
 
             if (res?.result == null) {
                 log.error { "토스 API 응답 오류: api=dailyCandles, symbol=$symbol" }
@@ -48,6 +48,8 @@ class TossMarketClient(
             throw e
         } catch (e: TossCandleException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn { "toss dailyCandles Error: symbol=$symbol, ${e.message}" }
             throw RuntimeException(e.message)
@@ -55,7 +57,7 @@ class TossMarketClient(
     }
 
     @TossToken
-    fun usMarketCalendar(): TossUsMarketCalendarRes {
+    suspend fun usMarketCalendar(): TossUsMarketCalendarRes {
         val accessToken = tossAuthClient.getCurrentAccessToken()
 
         try {
@@ -64,8 +66,7 @@ class TossMarketClient(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
-                .bodyToMono<TossUsMarketCalendarRes>()
-                .block()
+                .awaitBodyOrNull<TossUsMarketCalendarRes>()
 
             if (res?.result == null) {
                 log.error { "토스 API 응답 오류: api=usMarketCalendar" }
@@ -75,6 +76,8 @@ class TossMarketClient(
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossMarketCalendarException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn { "toss usMarketCalendar Error: ${e.message}" }

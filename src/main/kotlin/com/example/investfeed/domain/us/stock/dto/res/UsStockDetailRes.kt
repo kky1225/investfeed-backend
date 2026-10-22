@@ -4,6 +4,12 @@ data class UsStockDetailRes(
     val usStockInfo: UsStockInfo,
     val chartList: List<UsStockChart>,
     val dailyPriceList: List<UsStockDailyPrice>,
+    val sessionBase: UsSessionBase? = null, // 데이·프리·애프터마켓 등락률 기준 (토스 연동 회원만, 정규장·휴장이면 null)
+)
+
+data class UsSessionBase(
+    val sessionLabel: String, // 데이마켓 / 프리마켓 / 애프터마켓
+    val regularClose: Double, // 기준 정규장 공식 종가 (USD). 데이·프리=직전 거래일, 애프터=그날
 )
 
 data class UsStockInfo(

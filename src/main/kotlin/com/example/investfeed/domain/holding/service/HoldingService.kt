@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.holding.service
 
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.kiwoom.exception.UsHoldingListException
 import com.example.investfeed.kiwoom.exception.UsDepositException
 import com.example.investfeed.kiwoom.exception.HoldingListException
@@ -45,6 +46,7 @@ class HoldingService(
     private val usStockMasterRepository: UsStockMasterRepository,
     private val usEtfService: UsEtfService,
     private val stockClient: StockClient,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -116,7 +118,7 @@ class HoldingService(
 
         val balance = depositRes.d2_entra ?: throw DepositException()
         val usRes = usHoldingDeferred.await()
-        val usHoldingList = toUsHoldingItems(usRes)
+        val usHoldingList = usSessionBaseService.withSessionBase(toUsHoldingItems(usRes))
         val usdDeposit = usdDepositDeferred.await()
 
         val totPurAmt = res.tot_pur_amt.toAmount("tot_pur_amt") { HoldingListException() } +

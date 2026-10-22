@@ -30,7 +30,6 @@ enum class ResponseCode(
     STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
     US_STOCK_SEARCH(message = "미국 종목 검색에 성공하셨습니다."),
     US_STOCK_DETAIL(message = "미국 주식 상세 조회에 성공하셨습니다."),
-    US_STOCK_SESSION_BASE(message = "미국 주식 장구분 기준 종가 조회에 성공하셨습니다."),
     US_STOCK_DETAIL_WS(message = "실시간 미국 주식 상세 조회에 성공하셨습니다."),
 
     US_EXCHANGE_RATE(message = "미국 환전 적용환율 조회에 성공하셨습니다."),

@@ -351,7 +351,7 @@ class DataToolService(
     }
 
     private fun sessionQuote(code: String, price: Double): SessionQuote? =
-        runCatching { usSessionBaseService.currentBases(listOf(code)) }
+        runCatching { runBlocking { usSessionBaseService.currentBases(listOf(code)) } }
             .onFailure { log.error(it) { "미국 장구분 기준 종가 조회 실패 $code" } }.getOrNull()
             ?.let { b ->
                 b.closes[code]?.let { close ->

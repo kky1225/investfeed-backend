@@ -1,10 +1,14 @@
 package com.example.investfeed.domain.us.stock.service
 
+import com.example.investfeed.domain.holding.dto.res.HoldingItem
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.toss.auth.service.TossAuthClient
 import com.example.investfeed.toss.market.client.TossMarketClient
 import com.example.investfeed.toss.market.dto.res.TossMarketSession
 import com.example.investfeed.toss.market.dto.res.TossUsMarketCalendar
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import mu.KotlinLogging
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -13,6 +17,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class UsSessionBaseService(
@@ -42,18 +47,28 @@ class UsSessionBaseService(
     @Volatile
     private var calendarCache: Pair<Instant, TossUsMarketCalendar>? = null
 
-    fun currentBases(stkCds: Collection<String>): SessionBase? {
+    /** 토스 연동 회원만. 미연동·정규장·휴장이면 null. 종목별 기준 종가는 병렬로 받는다 (처음 한 번만 토스 호출, 이후 Redis) */
+    suspend fun currentBases(stkCds: Collection<String>): SessionBase? {
         val loginId = tossAuthClient.currentLoginIdOrNull() ?: return null
         if (!tossAuthClient.hasApiKey(loginId)) return null
         val tickers = stkCds.map { it.substringBefore("_").trim() }.filter { it.isNotBlank() }.distinct()
         if (tickers.isEmpty()) return null
 
         val current = currentSession() ?: return null
-        val closes = tickers.mapNotNull { t -> regularClose(t, current.baseDate, current.cacheable)?.let { t to it } }.toMap()
+        val closes = coroutineScope {
+            tickers.map { t -> async { regularClose(t, current.baseDate, current.cacheable)?.let { t to it } } }.awaitAll()
+        }.filterNotNull().toMap()
         return SessionBase(current.session, current.baseDate, closes)
     }
 
-    private fun currentSession(now: Instant = Instant.now()): CurrentSession? {
+    suspend fun withSessionBase(items: List<HoldingItem>): List<HoldingItem> {
+        val base = currentBases(items.mapNotNull { it.usStkCd }) ?: return items
+        return items.map { item ->
+            item.usStkCd?.let { item.copy(sessionLabel = base.session.label, regularClose = base.closes[it]) } ?: item
+        }
+    }
+
+    private suspend fun currentSession(now: Instant = Instant.now()): CurrentSession? {
         val cal = calendar(now) ?: return null
         val days = listOfNotNull(cal.previousBusinessDay, cal.today, cal.nextBusinessDay)
         days.forEachIndexed { i, day ->
@@ -71,21 +86,30 @@ class UsSessionBaseService(
         return null
     }
 
-    private fun calendar(now: Instant): TossUsMarketCalendar? {
+    private suspend fun calendar(now: Instant): TossUsMarketCalendar? {
         calendarCache?.let { (at, cal) -> if (at.plus(CALENDAR_TTL).isAfter(now)) return cal }
-        return runCatching { tossMarketClient.usMarketCalendar().result }
-            .onFailure { log.error(it) { "토스 미국 장 운영 정보 조회 실패" } }
-            .getOrNull()
-            ?.also { calendarCache = now to it }
+        return try {
+            tossMarketClient.usMarketCalendar().result?.also { calendarCache = now to it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error(e) { "토스 미국 장 운영 정보 조회 실패" }
+            null
+        }
     }
 
-    private fun regularClose(ticker: String, date: LocalDate, cacheable: Boolean): Double? {
+    private suspend fun regularClose(ticker: String, date: LocalDate, cacheable: Boolean): Double? {
         val key = "$PREFIX$ticker:$date"
         redisTemplate.opsForValue().get(key)?.let { return if (it == MISSING) null else it.toDoubleOrNull() }
 
-        val candles = runCatching { tossMarketClient.dailyCandles(ticker, CANDLE_COUNT).result?.candles.orEmpty() }
-            .onFailure { log.error(it) { "토스 일봉 조회 실패: $ticker" } }
-            .getOrNull() ?: return null   // 호출 실패는 저장하지 않고 다음에 다시 묻는다
+        val candles = try {
+            tossMarketClient.dailyCandles(ticker, CANDLE_COUNT).result?.candles.orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error(e) { "토스 일봉 조회 실패: $ticker" }
+            return null   // 호출 실패는 저장하지 않고 다음에 다시 묻는다
+        }
         val close = candles
             .firstOrNull { c -> c.timestamp?.let { ts -> runCatching { OffsetDateTime.parse(ts).atZoneSameInstant(NY).toLocalDate() }.getOrNull() } == date }
             ?.closePrice?.toDoubleOrNull()

@@ -2,8 +2,7 @@ package com.example.investfeed.domain.us.stock.service
 
 import com.example.investfeed.domain.us.stock.dto.req.UsStockChartType
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
-import com.example.investfeed.domain.us.stock.dto.res.UsSessionBaseItem
-import com.example.investfeed.domain.us.stock.dto.res.UsSessionBaseRes
+import com.example.investfeed.domain.us.stock.dto.res.UsSessionBase
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChart
 import com.example.investfeed.domain.us.stock.dto.res.UsStockChartRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDailyPrice
@@ -23,6 +22,7 @@ import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoListReq
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
 import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -37,10 +37,6 @@ class UsStockInfoService(
     private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
-
-    companion object {
-        private const val MAX_SESSION_BASE_STOCKS = 200
-    }
 
     fun searchUsStocks(
         keyword: String
@@ -149,10 +145,14 @@ class UsStockInfoService(
             emptyList()
         }
 
+        val sessionBase = runBlocking { usSessionBaseService.currentBases(listOf(stkCd)) }
+            ?.let { b -> b.closes[stkCd]?.let { UsSessionBase(sessionLabel = b.session.label, regularClose = it) } }
+
         return UsStockDetailRes(
             usStockInfo = mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)),
             chartList = chartList,
             dailyPriceList = dailyPriceList,
+            sessionBase = sessionBase,
         )
     }
 
@@ -193,16 +193,6 @@ class UsStockInfoService(
             currUnit = info.curr_unit,
             trdSuspTp = info.trd_susp_tp,
         )
-
-    fun getUsSessionBases(stkCds: List<String>): UsSessionBaseRes? =
-        usSessionBaseService.currentBases(stkCds.take(MAX_SESSION_BASE_STOCKS))?.let { b ->
-            UsSessionBaseRes(
-                session = b.session.name,
-                sessionLabel = b.session.label,
-                baseDate = b.baseDate.toString(),
-                bases = b.closes.map { (stkCd, close) -> UsSessionBaseItem(stkCd = stkCd, regularClose = close) },
-            )
-        }
 
     fun streamUsStock(stkCd: String, stexTp: String) {
         kiwoomStreamClient.register(

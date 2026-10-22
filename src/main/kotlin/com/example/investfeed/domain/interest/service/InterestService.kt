@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.interest.service
 
 import com.example.investfeed.domain.interest.dto.req.AddItemReq
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.domain.interest.dto.req.CreateGroupReq
 import com.example.investfeed.domain.interest.dto.req.ReorderGroupsReq
 import com.example.investfeed.domain.interest.dto.req.ReorderItemsReq
@@ -37,6 +38,7 @@ class InterestService(
     private val usStockClient: UsStockClient,
     private val stockMasterRepository: StockMasterRepository,
     private val usEtfService: UsEtfService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -133,6 +135,15 @@ class InterestService(
             interest.curPrc = quote?.cur_prc
             interest.fluRt = quote?.flu_rt
             interest.preSig = quote?.pred_pre_sig
+        }
+
+        if (usItems.isNotEmpty()) {
+            runBlocking { usSessionBaseService.currentBases(usItems.map { it.stkCd }) }?.let { b ->
+                usItems.forEach { interest ->
+                    interest.sessionLabel = b.session.label
+                    interest.regularClose = b.closes[interest.stkCd]
+                }
+            }
         }
 
         return interestItemRes

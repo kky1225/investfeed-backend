@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.holding.service
 
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
@@ -39,6 +40,7 @@ class TossHoldingService(
     private val memberApiKeyRepository: MemberApiKeyRepository,
     private val usStockMasterRepository: UsStockMasterRepository,
     private val usEtfService: UsEtfService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -148,7 +150,7 @@ class TossHoldingService(
         )
 
         val memberHoldings = memberHoldingRepository.findByMemberIdAndBrokerIdOrderByDisplayOrderAsc(memberId, tossBroker.id)
-        val holdingMap = holdingListWithPossRt.associateBy { it.stkCd }
+        val holdingMap = usSessionBaseService.withSessionBase(holdingListWithPossRt).associateBy { it.stkCd }
         val sortedHoldingList = memberHoldings.mapNotNull { mh ->
             holdingMap[mh.stkCd]?.copy(id = mh.id)
         }
