@@ -11,7 +11,7 @@ class RateLimitProperties(
     val kiwoomMockIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.kiwoom-per-token-interval-ms:0}")
     val kiwoomPerTokenIntervalMs: Long,
-    @param:Value("\${external-api.rate-limit.fred-interval-ms:500}")
+    @param:Value("\${external-api.rate-limit.fred-interval-ms:600}")
     val fredIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.upbit-interval-ms:100}")
     val upbitIntervalMs: Long,

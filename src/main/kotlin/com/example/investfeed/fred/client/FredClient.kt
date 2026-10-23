@@ -4,15 +4,17 @@ import com.example.investfeed.fred.dto.res.FredReleaseDatesRes
 import com.example.investfeed.fred.dto.res.FredSeriesRes
 import com.example.investfeed.fred.dto.res.FredVintageDatesRes
 import com.example.investfeed.fred.exception.FredApiException
+import com.example.investfeed.fred.exception.FredHtmlResponseException
 import com.example.investfeed.fred.exception.FredReleaseDatesException
 import com.example.investfeed.fred.exception.FredSeriesObservationsException
 import com.example.investfeed.fred.exception.FredVintageDatesException
+import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 
 @Service
 class FredClient(
@@ -20,8 +22,37 @@ class FredClient(
     private val fredWebClient: WebClient,
     @param:Value("\${fred.api-key}")
     private val apiKey: String,
+    private val objectMapper: ObjectMapper,
 ) {
     private val log = KotlinLogging.logger {}
+
+    companion object {
+        private val HTML_TITLE = Regex("<title[^>]*>(.*?)</title>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val SCRIPT_STYLE = Regex("<(script|style)[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        private val TAG = Regex("<[^>]+>")
+        private val WS = Regex("\\s+")
+        private val DIAG_HEADERS = setOf("server", "content-type", "content-length", "date", "retry-after", "location", "cache-control")
+    }
+
+    /**
+     * 점검·장애·차단 때 FRED(앞단 Akamai)는 200 OK 로 JSON 대신 HTML 페이지를 준다(2026-10-22 00:00~13:32).
+     * 그대로 역직렬화하면 "200 OK … Content type 'text/html' not supported" 로만 남아 원인이 안 보이므로
+     * 본문을 먼저 확인하고, 사유를 알 수 있게 헤더·제목·본문 텍스트를 메시지에, 원문 HTML 은 파일 로그(warn)에 남긴다
+     */
+    private inline fun <reified T> parseJson(res: ResponseEntity<String>?): T? {
+        val body = res?.body
+        if (body.isNullOrBlank()) return null
+        if (body.trimStart().startsWith("<")) {
+            val headers = res.headers.toSingleValueMap()
+                .filterKeys { name -> name.lowercase().let { it in DIAG_HEADERS || it.startsWith("x-") || "akamai" in it } }
+                .entries.joinToString(", ") { "${it.key}=${it.value}" }
+            val title = HTML_TITLE.find(body)?.groupValues?.get(1)?.replace(WS, " ")?.trim().orEmpty()
+            val text = body.replace(SCRIPT_STYLE, " ").replace(TAG, " ").replace(WS, " ").trim().take(500)
+            log.warn { "FRED HTML 응답 원문: status=${res.statusCode}, headers=[$headers], body=${body.take(3000)}" }
+            throw FredHtmlResponseException("status=${res.statusCode}, headers=[$headers], title=$title, text=$text")
+        }
+        return objectMapper.readValue(body, T::class.java)
+    }
 
 
     /**
@@ -64,8 +95,9 @@ class FredClient(
                             FredApiException()
                         }
                     })
-                    .bodyToMono<FredSeriesRes>()
+                    .toEntity(String::class.java)
                     .block()
+                    .let { parseJson<FredSeriesRes>(it) }
 
                 if (res?.observations == null) {
                     throw FredSeriesObservationsException()
@@ -122,8 +154,9 @@ class FredClient(
                             FredApiException()
                         }
                     })
-                    .bodyToMono<FredReleaseDatesRes>()
+                    .toEntity(String::class.java)
                     .block()
+                    .let { parseJson<FredReleaseDatesRes>(it) }
 
                 if (res?.release_dates == null) {
                     throw FredReleaseDatesException()
@@ -173,8 +206,9 @@ class FredClient(
                             FredApiException()
                         }
                     })
-                    .bodyToMono<FredVintageDatesRes>()
+                    .toEntity(String::class.java)
                     .block()
+                    .let { parseJson<FredVintageDatesRes>(it) }
 
                 if (res?.vintage_dates == null) {
                     throw FredVintageDatesException()

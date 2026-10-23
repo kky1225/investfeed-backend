@@ -37,6 +37,8 @@ enum class ReleaseTarget(
 
     fun isFresh(eventDate: LocalDate, today: LocalDate): Boolean = !eventDate.isBefore(today.minusDays(7))
 
+    val historyByObservation: Boolean get() = this == KR_CPI || this == KR_GDP
+
     companion object {
         fun match(e: CalendarEvent): ReleaseTarget? = entries.firstOrNull { it.matcher(e) }
     }
@@ -73,7 +75,7 @@ class ReleaseAlertService(
             if (releaseRepository.existsByCountryAndEventDateAndEventName(e.country, eventDate, e.name)) return@forEach
 
             val suppressed = seed || !target.isFresh(eventDate, today)
-            val prev = if (suppressed) null else prevValue(target, eventDate)
+            val prev = if (suppressed) null else prevValue(target, eventDate, e.name)
             val fact = ReleaseFact(target.name, e.country, eventDate, e.name, value, prev, now)
             val body = AlertTemplateRenderer.renderRelease(fact, target)
             val entity = try {
@@ -105,9 +107,12 @@ class ReleaseAlertService(
         return RunResult(events.size, saved, suppressedCount, posted, seed)
     }
 
-    private fun prevValue(target: ReleaseTarget, eventDate: LocalDate): String? = runCatching {
+    private fun prevValue(target: ReleaseTarget, eventDate: LocalDate, eventName: String): String? = runCatching {
         val history = economicCalendarService.getIndicatorHistory(target.historyCode, target.country) ?: return@runCatching null
-        val key = eventDate.toString().replace("-", "")
+        // 관측 기간 키 이력을 발표일과 비교하면 이번 발표분 자신(예: 10/2 발표의 9월분)이 직전으로 잡힌다 → 이벤트의 기준 기간과 비교
+        // 이벤트 이름 접두어: "2026-09 소비자물가지수(전년동월비)", "2026Q2 GDP"
+        val key = if (target.historyByObservation) normalizeDateKey(eventName.substringBefore(" ")) ?: return@runCatching null
+            else eventDate.toString().replace("-", "")
         val point = history.data
             .mapNotNull { p -> normalizeDateKey(p.date)?.let { it to p } }
             .filter { (k, _) -> k < key }

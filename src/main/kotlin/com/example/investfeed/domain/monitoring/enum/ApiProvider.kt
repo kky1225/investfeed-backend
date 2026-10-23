@@ -12,4 +12,5 @@ enum class ApiProvider(val label: String, val dailyLimit: Long?) {
     PUBLIC_DATA_HOLIDAY("공공데이터 (휴일)", 10_000),       // 공공데이터포털 SpcdeInfoService /getRestDeInfo 10,000건/일
     PUBLIC_DATA_DIVIDEND("공공데이터 (주식배당)", 10_000),  // 공공데이터포털 GetStocDiviInfoService 10,000건/일
     SEARCH_ETF("Search ETF", null),                       // 비공식 사이트, 알려진 한도 없음
+    PRESS_RELEASE("보도자료 RSS (한은·연준)", null),        // 공개 구독용 피드, 공식 한도 없음
 }

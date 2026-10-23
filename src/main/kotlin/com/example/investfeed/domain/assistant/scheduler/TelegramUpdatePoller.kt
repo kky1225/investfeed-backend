@@ -25,6 +25,10 @@ class TelegramUpdatePoller(
     private var consecutiveFailures = 0
     private var commandsRegistered = false
 
+    companion object {
+        private const val ERROR_AFTER_FAILURES = 12   // 5초 폴링 × 12 ≈ 1분
+    }
+
     @Scheduled(cron = SchedulerCron.TELEGRAM_POLL, scheduler = "fastScheduler")
     fun poll() {
         if (!telegramClient.enabled) return
@@ -42,12 +46,13 @@ class TelegramUpdatePoller(
             telegramClient.getUpdates(offset)
         } catch (e: TelegramClient.GetUpdatesException) {
             consecutiveFailures++
-            if (consecutiveFailures == 1) log.error { "텔레그램 폴링 실패 시작: ${e.message}" }
+            // 수십 초짜리 끊김(연결 리셋·429·502)은 매일 생기고 스스로 복구되므로 1분 넘게 이어질 때만 error
+            if (consecutiveFailures == ERROR_AFTER_FAILURES) log.error { "텔레그램 폴링 1분 이상 실패 지속: ${e.message}" }
             else log.warn { "텔레그램 폴링 실패 ${consecutiveFailures}회 연속: ${e.message}" }
             return
         }
         if (consecutiveFailures > 0) {
-            log.error { "텔레그램 폴링 복구: ${consecutiveFailures}회 연속 실패 후 정상 (약 ${consecutiveFailures * 5}초)" }
+            log.info { "텔레그램 폴링 복구: ${consecutiveFailures}회 연속 실패 후 정상 (약 ${consecutiveFailures * 5}초)" }
             consecutiveFailures = 0
         }
         updates.forEach { update ->

@@ -33,6 +33,7 @@ class EconomicCalendarService(
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
     private val calendarFreezeWriter: CalendarFreezeWriter,
+    private val officialReleaseService: OfficialReleaseService,
 ) {
     private val log = KotlinLogging.logger {}
     private val CACHE_PREFIX = RedisKeyPrefix.ECONOMIC_CALENDAR.prefix
@@ -70,6 +71,12 @@ class EconomicCalendarService(
 
         // 한국 CPI 발표 일정 이름의 기준월 접두어 (예: "2026-08 소비자물가지수(전년동월비)")
         private val KR_CPI_NAME_PREFIX = Regex("^(\\d{4})-(\\d{2}) ")
+
+        // 한국 GDP 발표 일정 이름의 기준 분기 접두어 (예: "2026Q2 GDP")
+        private val GDP_QUARTER_PREFIX = Regex("^\\d{4}Q[1-4]")
+
+        // 발표 전에도 API 에 값이 있어 발표 당일엔 공식 보도자료로 확인해야 하는 이벤트 (OfficialReleaseService)
+        private val OFFICIAL_RELEASE_TYPES = setOf("RATE_DECISION", "GDP_RELEASE", "US_RATE_DECISION")
 
         // GDP 추정치(속보/잠정/확정) 발표일 판정용 — 실질 GDP 수준은 추정치 발표마다 값이 바뀌어 vintage 가 빠짐없이 생긴다
         const val GDP_ESTIMATE_VINTAGE_SERIES = "GDPC1"
@@ -950,6 +957,9 @@ class EconomicCalendarService(
         // 이미 DB에 확정된 row(source가 MANUAL이 아님 + 값 존재)는 API 호출 없이 그대로 재사용
         if (event.source != "MANUAL" && !event.value.isNullOrBlank()) return event
 
+        // 발표 당일엔 API 값이 발표 전 값일 수 있어(기준금리 일별값은 결정 전에도 채워짐, GDP 잠정치 날엔 속보치 존재) 보도자료로 확인된 값만 쓴다
+        if (eventDate == today && event.type in OFFICIAL_RELEASE_TYPES) return enrichFromOfficialRelease(event)
+
         val eventYM = YearMonth.from(eventDate)
         val threshold = YearMonth.now().minusMonths(FREEZE_GRACE_MONTHS)
         val persistToDb = eventYM.isBefore(threshold)
@@ -961,6 +971,20 @@ class EconomicCalendarService(
             "US_RATE_DECISION" -> enrichFromFred(event, "DFEDTARU", "미국 기준금리", "%", persistToDb)
             else -> event
         }
+    }
+
+    /** 발표 당일 값은 공식 보도자료에서만 가져온다. 아직 없으면 값 없이 반환(= 미발표) */
+    private fun enrichFromOfficialRelease(event: CalendarEvent): CalendarEvent {
+        val eventDate = LocalDate.parse(event.date)
+        return when (event.type) {
+            "RATE_DECISION" -> officialReleaseService.findKrRateDecision(eventDate)
+                ?.let { event.copy(name = "기준금리", value = formatEventValue(it, "%")) }
+            "GDP_RELEASE" -> officialReleaseService.findKrGdp(eventDate, GDP_QUARTER_PREFIX.find(event.name)?.value)
+                ?.let { event.copy(value = formatEventValue(it, "%")) }
+            "US_RATE_DECISION" -> officialReleaseService.findFomcDecision(eventDate)
+                ?.let { event.copy(name = "미국 기준금리", value = formatEventValue(it, "%")) }
+            else -> null
+        } ?: event
     }
 
     /**
@@ -1042,8 +1066,9 @@ class EconomicCalendarService(
             // 회의일 당일 또는 이전 7일 내 값 조회 (DFEDTARU는 회의 다음 영업일에 새 rate → 다양한 날짜 범위 필요)
             val obsStart = eventDate.minusDays(7).format(DATE_FMT)
             val obsEnd = eventDate.format(DATE_FMT)
+            // 발표일(KST) 관측값이 아직 없으면 직전 값은 결정 전 금리라 미발표로 둔다 (DFEDTARU 는 주말 포함 매일 관측값이 있음)
             fredClient.getSeriesObservations(seriesId, observationStart = obsStart, observationEnd = obsEnd)
-                .observations?.filter { it.value != "." }?.lastOrNull()?.value
+                .observations?.filter { it.value != "." }?.lastOrNull()?.takeIf { it.date == event.date }?.value
         }.getOrNull() ?: return event
 
         val displayValue = formatEventValue(value, unit) ?: "$value$unit"
