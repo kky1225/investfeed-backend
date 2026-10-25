@@ -21,6 +21,17 @@ class SectService(
     private val kiwoomStreamClient: KiwoomStreamClient,
     private val sectClient: SectClient,
 ) {
+    companion object {
+        // 산업 업종만 남기려고 비업종 코드를 제외한다. 업종 개편으로 생긴 새 코드는 걸러지지 않고 그대로 노출된다.
+        private val NON_INDUSTRY_CODES = setOf(
+            // 코스피: 종합, 대형/중형/소형주, 제조(005~015 합계), 변동성지수, 코스피고배당50, 코스피배당성장50
+            "001", "002", "003", "004", "027", "603", "604", "605",
+            // 코스닥: 종합, 제조(115~127 합계), KOSDAQ 100/MID 300/SMALL, 우량·벤처·중견·신성장기업,
+            // KOSDAQ 150, 코스닥글로벌지수, F-KOSDAQ150, F-KOSDAQ150인버스
+            "101", "106", "138", "139", "140", "142", "143", "144", "145", "150", "151", "160", "165",
+        )
+    }
+
     fun listSects(
         req: SectListReq
     ): SectListRes {
@@ -30,10 +41,10 @@ class SectService(
             )
         ) }
 
-        val sectList = mutableListOf<SectListItem>()
-        if (kiwoomSectIndexRes.return_code == 0) {
-            kiwoomSectIndexRes.all_inds_idex?.forEach {
-                sectList.add(
+        val sectList = if (kiwoomSectIndexRes.return_code == 0) {
+            kiwoomSectIndexRes.all_inds_idex.orEmpty()
+                .filter { it.stk_cd !in NON_INDUSTRY_CODES }
+                .map {
                     SectListItem(
                         stkCd = it.stk_cd,
                         stkNm = it.stk_nm,
@@ -42,10 +53,13 @@ class SectService(
                         curPrc = it.cur_prc,
                         trdeQty = it.trde_qty,
                         trdePrica = it.trde_prica,
+                        rising = it.rising,
+                        stdns = it.stdns,
+                        fall = it.fall,
+                        floStkNum = it.flo_stk_num,
                     )
-                )
-            }
-        }
+                }
+        } else emptyList()
 
         return SectListRes(
             sectList = sectList

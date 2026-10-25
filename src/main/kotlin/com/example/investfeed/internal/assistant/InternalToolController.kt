@@ -12,6 +12,7 @@ import com.example.investfeed.internal.assistant.dto.req.MyPortfolioReq
 import com.example.investfeed.internal.assistant.dto.req.NewsSearchReq
 import com.example.investfeed.internal.assistant.dto.req.PriceAlertPreviewReq
 import com.example.investfeed.internal.assistant.dto.req.RecommendListReq
+import com.example.investfeed.internal.assistant.dto.req.SectorPerformanceReq
 import com.example.investfeed.internal.assistant.dto.req.StockInvestorFlowReq
 import com.example.investfeed.internal.assistant.dto.req.StockQuoteReq
 import com.example.investfeed.internal.assistant.dto.req.TradingRankReq
@@ -22,6 +23,7 @@ import com.example.investfeed.internal.assistant.tool.CircuitBreakerToolService
 import com.example.investfeed.internal.assistant.tool.DataToolService
 import com.example.investfeed.internal.assistant.tool.DisplayToolService
 import com.example.investfeed.internal.assistant.tool.RankToolService
+import com.example.investfeed.internal.assistant.tool.SectorToolService
 import com.example.investfeed.internal.assistant.tool.StockMarket
 import com.example.investfeed.internal.assistant.tool.ToolException
 import com.example.investfeed.internal.assistant.tool.ToolResponse
@@ -43,6 +45,7 @@ class InternalToolController(
     private val circuitBreakerTool: CircuitBreakerToolService,
     private val treasuryTool: TreasuryToolService,
     private val rankTool: RankToolService,
+    private val sectorTool: SectorToolService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -71,6 +74,10 @@ class InternalToolController(
     @GetMapping("get_trading_rank")
     fun tradingRank(@ModelAttribute req: TradingRankReq) =
         tool("get_trading_rank", "키움 순위") { rankTool.tradingRank(req.market, req.type, AssistantDate.parse(req.date)) }
+
+    @GetMapping("get_sector_performance")
+    fun sectorPerformance(@ModelAttribute req: SectorPerformanceReq) =
+        tool("get_sector_performance", "키움 업종") { sectorTool.sectorPerformance(req.market, req.sector, req.multiDay, req.sort, AssistantDate.parse(req.date)) }
 
     @GetMapping("get_stock_quote")
     fun stockQuote(

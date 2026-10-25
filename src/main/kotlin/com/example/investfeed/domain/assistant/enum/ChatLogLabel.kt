@@ -28,6 +28,7 @@ object ChatLogLabel {
         "get_treasury_yields" to "국채 금리",
         "get_market_investor_flow" to "시장 투자자별 매매",
         "get_trading_rank" to "거래대금·거래량 순위",
+        "get_sector_performance" to "업종 등락",
         "get_stock_quote" to "종목 시세",
         "get_stock_investor_flow" to "종목 투자자별 매매",
         "get_global_indexes" to "미국 지수·금리·환율",
@@ -48,6 +49,7 @@ object ChatLogLabel {
         "GREETING" to ("인사" to "조회할 내용이 없는 인사"),
         "OUT_OF_SCOPE" to ("범위 밖 질문" to "투자 데이터와 무관한 질문"),
         "DATE_UNSUPPORTED" to ("날짜 지정 질문" to "날짜 지정 조회를 아직 지원하지 않는 데이터"),
+        "UNSUPPORTED" to ("미지원 질문" to "투자 데이터지만 아직 지원하지 않는 조회"),
         "NO_TOOL" to ("해석되지 않은 질문" to "조회할 기능을 고르지 못해 범위 밖으로 처리"),
         "REFUSAL" to ("응답 거부된 질문" to "모델이 응답을 거부함"),
     )

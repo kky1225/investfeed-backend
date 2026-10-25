@@ -50,7 +50,6 @@ class MarketFactSheetService(
         const val KOSPI200 = "201"
         const val KOSDAQ = "101"
         const val KOSDAQ150 = "150"
-        private val SECTOR_EXCLUDE = listOf("종합", "대형주", "중형주", "소형주", "200", "KRX", "KOSTAR", "변동성", "코스피", "배당")
         const val STREAK_LOOKBACK = 10
         private val CB_INDEX_NAME = mapOf("KOSPI" to "코스피", "KOSDAQ" to "코스닥")
         private val KR_TREASURY_TYPES = listOf(
@@ -285,7 +284,6 @@ class MarketFactSheetService(
         val items = sectService.listSects(SectListReq(indsCd = KOSPI)).sectList.orEmpty()
         return items.mapNotNull { s ->
             val name = s.stkNm ?: return@mapNotNull null
-            if (SECTOR_EXCLUDE.any { name.contains(it) }) return@mapNotNull null
             val rate = TemplateFormat.parse(s.fluRt) ?: return@mapNotNull null
             SectorFact(name = name, changeRate = rate, tradeAmount = TemplateFormat.parseLong(s.trdePrica))
         }.takeIf { it.isNotEmpty() }

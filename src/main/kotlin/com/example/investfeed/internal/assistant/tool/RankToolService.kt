@@ -54,18 +54,26 @@ class RankToolService(
 
     private data class Session(val date: LocalDate, val live: Boolean)
 
+    data class LiveBasis(val basis: String, val unavailable: String?)
+
     fun tradingRank(market: RankMarket, type: RankType, requested: AssistantDate?): Any {
+        val live = liveBasis(market, "${type.label} 순위는", requested)
+        live.unavailable?.let { return DataToolService.TextReply(it) }
+        return if (market == RankMarket.KR) kr(type, live.basis) else us(type, live.basis)
+    }
+
+    /** subject: 지난 날짜 안내 문장의 주어 ("거래대금 순위는", "업종 등락률은") */
+    fun liveBasis(market: RankMarket, subject: String, requested: AssistantDate?): LiveBasis {
         if (market == RankMarket.KR) {
             val session = krSession()
-            requested?.resolve(StockMarket.KR)?.let { d -> unavailableDay(market, type, d, session)?.let { return DataToolService.TextReply(it) } }
-            return kr(type, session)
+            return LiveBasis(basis(session), requested?.resolve(StockMarket.KR)?.let { unavailableDay(market, subject, it, session) })
         }
         // 미국 "지금" 거래일은 달력이 아니라 최근 체결로 정한다 — 키움 순위는 데이마켓부터 다음 거래일 값이라
         // 달력 기준(현지 날짜)으로 판정하면 끝난 장의 날짜("어제")가 통과해 데이마켓 순위가 나간다 (2026-10-20)
         val tick = usLatestSession()
         val session = tick?.let { Session(it.first, true) } ?: usSession()
-        requested?.resolve(StockMarket.US)?.let { d -> unavailableDay(market, type, d, session)?.let { return DataToolService.TextReply(it) } }
-        return us(type, session, tick)
+        val basis = tick?.let { (date, s) -> "${TemplateFormat.monthDay(date)} ${s.label}" } ?: basis(session, "현지 ")
+        return LiveBasis(basis, requested?.resolve(StockMarket.US)?.let { unavailableDay(market, subject, it, session) })
     }
 
     /** 미국 최근 체결이 속한 거래일·장구분 (SPY 기준 — 데이마켓·프리·정규·애프터 모두 거래가 많다). 실패하면 null → 달력 기준 */
@@ -88,9 +96,9 @@ class RankToolService(
         return Session(date, started && nowEt.toLocalTime().isBefore(usMarketCalendarService.closeTimeEt(d)))
     }
 
-    private fun unavailableDay(market: RankMarket, type: RankType, date: LocalDate, session: Session): String? {
+    private fun unavailableDay(market: RankMarket, subject: String, date: LocalDate, session: Session): String? {
         val md = TemplateFormat.monthDay(date)
-        val past = "${type.label} 순위는 지난 날짜를 조회할 수 없습니다. 당일(장 시작 전·휴장일에는 직전 거래일) 순위만 볼 수 있습니다."
+        val past = "$subject 지난 날짜를 조회할 수 없습니다. 당일(장 시작 전·휴장일에는 직전 거래일) 값만 볼 수 있습니다."
         return when (market) {
             RankMarket.KR -> {
                 val today = LocalDate.now()
@@ -114,7 +122,7 @@ class RankToolService(
     private fun basis(session: Session, prefix: String = "") =
         "$prefix${TemplateFormat.monthDay(session.date)} ${if (session.live) "장중" else "기준"}"
 
-    private fun kr(type: RankType, session: Session): TradingRank {
+    private fun kr(type: RankType, basis: String): TradingRank {
         val res = rankService.listRanks(RankListReq(type = type.code))
         if (res.return_code != 0) throw ToolException("국내 ${type.label} 순위 조회에 실패했습니다")
         val stocks = res.rankList.orEmpty().mapIndexedNotNull { i, r ->
@@ -126,10 +134,10 @@ class RankToolService(
             )
         }.take(MAX_RANK_STOCKS)
         val valueLabel = when (type) { RankType.VALUE -> "거래대금(백만)"; RankType.VOLUME -> "거래량"; RankType.SURGE -> "급증률" }
-        return TradingRank(RankMarket.KR, type, basis(session), "KRW", valueLabel, stocks)
+        return TradingRank(RankMarket.KR, type, basis, "KRW", valueLabel, stocks)
     }
 
-    private fun us(type: RankType, session: Session, tick: Pair<LocalDate, UsMarketCalendarService.UsSession>?): TradingRank {
+    private fun us(type: RankType, basis: String): TradingRank {
         val res = usRankService.listUsRanks(UsRankListReq(type = type.code))
         if (res.return_code != 0) throw ToolException("미국 ${type.label} 순위 조회에 실패했습니다")
         val stocks = res.rankList.orEmpty().mapIndexedNotNull { i, r ->
@@ -141,7 +149,6 @@ class RankToolService(
             )
         }.take(MAX_RANK_STOCKS)
         val valueLabel = when (type) { RankType.VALUE -> "거래대금(천 USD)"; RankType.VOLUME -> "거래량"; RankType.SURGE -> "급증률" }
-        val basis = tick?.let { (date, s) -> "${TemplateFormat.monthDay(date)} ${s.label}" } ?: basis(session, "현지 ")
         return TradingRank(RankMarket.US, type, basis, "USD", valueLabel, stocks)
     }
 }
