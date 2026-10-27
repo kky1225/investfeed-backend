@@ -107,7 +107,7 @@ object BriefingTemplateRenderer {
 
     private fun krFxSection(q: QuoteFact?): Section {
         q ?: return failedSection("C6", "환율 마감")
-        return okSection("C6", "환율 마감 · 하나은행 고시", "| 통화 | 마감 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+        return okSection("C6", "환율 마감 · 하나은행 고시", "| 통화 | 마감 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it, 2) } ?: "-"} |")
     }
 
     /** 오래된 시세(수집 실패로 갱신 안 된 값)면 값 옆에 "10/16(금) 15:52 기준"을 붙인다 */
@@ -138,8 +138,8 @@ object BriefingTemplateRenderer {
     private fun macroSection(m: MacroFact?): Section {
         m ?: return failedSection("P4", "매크로")
         val rows = listOfNotNull(
-            m.usdKrw?.let { "| 원/달러 | ${num(it.price, 1)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
-            m.dollarIndex?.let { "| 달러인덱스 | ${num(it.price, 2)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
+            m.usdKrw?.let { "| 원/달러 | ${num(it.price, 1)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r, 2) } ?: "-"} |" },
+            m.dollarIndex?.let { "| 달러인덱스 | ${num(it.price, 2)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r, 2) } ?: "-"} |" },
             m.gold?.let { "| 금 | ${num(it.price, 1)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
             m.wti?.let { "| WTI | ${num(it.price, 2)}${staleNote(it)} | ${it.changeRate?.let { r -> coloredRate(r) } ?: "-"} |" },
         )
@@ -184,6 +184,23 @@ object BriefingTemplateRenderer {
             ?: krTreasurySection(kr).let { sec -> krTitleNote?.let { sec.copy(title = "${sec.title} · $it") } ?: sec }
         if (withUs) sections += usNotice?.let { okSection("U2B", "미국 국채 금리", it) } ?: treasurySection(us)
         return Rendered(summary = "", sections = sections)
+    }
+
+    /**
+     * 비서 환율 카드: 원/달러·달러인덱스 타일(등락률 · 값) + 표(전일 대비).
+     * 환율은 하루 변동이 작아 등락률·전일 대비 모두 소수 2자리 (1자리면 +0.03% 가 0.0% 로 보임)
+     */
+    fun renderExchangeRates(usdKrw: QuoteFact?, dollarIndex: QuoteFact?): Rendered {
+        val items = listOfNotNull(usdKrw?.let { "원/달러" to it }, dollarIndex?.let { "달러인덱스" to it })
+        val summary = items.joinToString(" · ") { (name, q) ->
+            "$name ${q.changeRate?.let { coloredRate(it, 2) } ?: num(q.price, 2)} (${num(q.price, 2)})"
+        }
+        val rows = items.joinToString("\n") { (name, q) ->
+            "| $name | ${num(q.price, 2)}${staleNote(q)} | ${q.changeAmount?.let { colored("${TemplateFormat.sign(it)}${num(abs(it), 2)}", it) } ?: "-"} |"
+        }
+        val section = if (items.isEmpty()) failedSection("FX", "환율")
+            else okSection("FX", "환율", "| 구분 | 값 | 전일 대비 |\n|---|---|---|\n$rows")
+        return Rendered(summary = summary, sections = listOf(section))
     }
 
     fun renderUsMarketNow(sheet: UsCloseFactSheet): Rendered =
@@ -233,9 +250,10 @@ object BriefingTemplateRenderer {
         return okSection("U2B", "미국 국채 금리$suffix", parts.first())
     }
 
+    // 환율 등락률은 하루 변동이 작아 소수 2자리 (1자리면 +0.03% 가 0.0% 로 보임, 2026-10-26). 국내 마감·장전 매크로도 같음
     private fun usFxSection(q: QuoteFact?, title: String = "환율 · 전일 서울 고시"): Section {
         q ?: return failedSection("U4", "환율")
-        return okSection("U4", title, "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it) } ?: "-"} |")
+        return okSection("U4", title, "| 통화 | 값 | 등락 |\n|---|---|---|\n| 원/달러 | ${num(q.price, 1)}${staleNote(q)} | ${q.changeRate?.let { coloredRate(it, 2) } ?: "-"} |")
     }
 
     /**

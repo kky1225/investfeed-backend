@@ -4,6 +4,7 @@ import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.internal.assistant.dto.req.BriefingToolReq
 import com.example.investfeed.internal.assistant.dto.req.CalendarToolReq
 import com.example.investfeed.internal.assistant.dto.req.CircuitBreakerReq
+import com.example.investfeed.internal.assistant.dto.req.ExchangeRateReq
 import com.example.investfeed.internal.assistant.dto.req.MarketInvestorFlowReq
 import com.example.investfeed.internal.assistant.dto.req.MarketSummaryReq
 import com.example.investfeed.internal.assistant.dto.req.MyHoldingReq
@@ -22,6 +23,7 @@ import com.example.investfeed.internal.assistant.tool.AssistantDate
 import com.example.investfeed.internal.assistant.tool.CircuitBreakerToolService
 import com.example.investfeed.internal.assistant.tool.DataToolService
 import com.example.investfeed.internal.assistant.tool.DisplayToolService
+import com.example.investfeed.internal.assistant.tool.ExchangeRateToolService
 import com.example.investfeed.internal.assistant.tool.RankToolService
 import com.example.investfeed.internal.assistant.tool.SectorToolService
 import com.example.investfeed.internal.assistant.tool.StockMarket
@@ -46,6 +48,7 @@ class InternalToolController(
     private val treasuryTool: TreasuryToolService,
     private val rankTool: RankToolService,
     private val sectorTool: SectorToolService,
+    private val exchangeRateTool: ExchangeRateToolService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -113,6 +116,10 @@ class InternalToolController(
     @GetMapping("get_treasury_yields")
     fun treasuryYields(@ModelAttribute req: TreasuryYieldReq) =
         tool("get_treasury_yields", "네이버·FRED·ECOS 국채") { treasuryTool.treasuryYields(req.market, AssistantDate.parse(req.date)) }
+
+    @GetMapping("get_exchange_rates")
+    fun exchangeRates(@ModelAttribute req: ExchangeRateReq) =
+        tool("get_exchange_rates", "네이버 시장지표 · 하나은행 고시") { exchangeRateTool.exchangeRates(AssistantDate.parse(req.date)) }
 
     @GetMapping("get_calendar")
     fun calendar(@ModelAttribute req: CalendarToolReq) =

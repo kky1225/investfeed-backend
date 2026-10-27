@@ -2,6 +2,7 @@ package com.example.investfeed.internal.assistant.tool
 
 import com.example.investfeed.domain.assistant.service.TemplateFormat
 import com.example.investfeed.domain.assistant.service.UsMarketCalendarService
+import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.rank.dto.req.RankListReq
 import com.example.investfeed.domain.rank.service.RankService
 import com.example.investfeed.domain.us.rank.dto.req.UsRankListReq
@@ -23,10 +24,11 @@ class RankToolService(
     private val holidayService: HolidayService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val usStockChartClient: UsStockChartClient,
+    private val cryptoService: CryptoService,
 ) {
     private val log = KotlinLogging.logger {}
 
-    enum class RankMarket { KR, US }
+    enum class RankMarket { KR, US, CRYPTO }
 
     enum class RankType(val code: String, val label: String) {
         VALUE("0", "거래대금"), VOLUME("1", "거래량"), SURGE("2", "거래량 급증률"),
@@ -57,6 +59,7 @@ class RankToolService(
     data class LiveBasis(val basis: String, val unavailable: String?)
 
     fun tradingRank(market: RankMarket, type: RankType, requested: AssistantDate?): Any {
+        if (market == RankMarket.CRYPTO) return crypto(type, requested)
         val live = liveBasis(market, "${type.label} 순위는", requested)
         live.unavailable?.let { return DataToolService.TextReply(it) }
         return if (market == RankMarket.KR) kr(type, live.basis) else us(type, live.basis)
@@ -116,6 +119,7 @@ class RankToolService(
                 date != session.date -> past
                 else -> null
             }
+            RankMarket.CRYPTO -> null   // 코인은 tradingRank 에서 따로 처리 (장 구분 없음)
         }
     }
 
@@ -150,5 +154,22 @@ class RankToolService(
         }.take(MAX_RANK_STOCKS)
         val valueLabel = when (type) { RankType.VALUE -> "거래대금(천 USD)"; RankType.VOLUME -> "거래량"; RankType.SURGE -> "급증률" }
         return TradingRank(RankMarket.US, type, basis, "USD", valueLabel, stocks)
+    }
+
+    /**
+     * 24시간 누적값이라 지난 날짜는 조회할 수 없고, 거래량·급증률 순위는 화면에 없어 안내 문장으로 답한다
+     */
+    private fun crypto(type: RankType, requested: AssistantDate?): Any {
+        if (type != RankType.VALUE) return DataToolService.TextReply("코인은 거래대금 순위만 제공합니다.")
+        if (requested != null && requested.resolve(StockMarket.CRYPTO) != LocalDate.now()) {
+            return DataToolService.TextReply("코인 거래대금 순위는 지난 날짜를 조회할 수 없습니다. 최근 24시간 값만 볼 수 있습니다.")
+        }
+        val stocks = cryptoService.listCryptoRanks().take(MAX_RANK_STOCKS).mapIndexed { i, c ->
+            RankStock(
+                rank = i + 1, code = c.market, name = c.koreanName, link = "/crypto/detail/${c.market}",
+                changeRate = c.signedChangeRate * 100, price = c.tradePrice, value = c.accTradePrice24h / 1_000_000,
+            )
+        }
+        return TradingRank(RankMarket.CRYPTO, type, "최근 24시간", "KRW", "거래대금(백만)", stocks)
     }
 }

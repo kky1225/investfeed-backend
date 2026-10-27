@@ -69,6 +69,9 @@ class NaverMarketIndexCrawler(
             MarketIndexType.USD_KRW to "/marketindex/exchange/FX_USDKRW",
         )
 
+        private const val EXCHANGE_PAGE_SIZE = 60
+        private const val EXCHANGE_MAX_PAGES = 5
+
         private val BOND_PATHS = mapOf(
             MarketIndexType.US_TREASURY_2Y to "/marketindex/bond/US2YT=RR",
             MarketIndexType.US_TREASURY_5Y to "/marketindex/bond/US5YT=RR",
@@ -166,6 +169,39 @@ class NaverMarketIndexCrawler(
                 }
             }
             BondDailyClose(LocalDate.parse(tradedAt.substring(0, 10)), close, change?.let { it * 100 })   // %p → bp
+        }
+    }
+
+    data class ExchangeDailyClose(val tradeDate: LocalDate, val close: Double, val change: Double?, val changeRate: Double?)
+
+    /**
+     * 그날 최종 고시 (네이버 `/marketindex/exchange/{코드}/prices`, 최신순). 그날이 나올 때까지 쪽을 넘긴다
+     * (최대 [EXCHANGE_MAX_PAGES]쪽). 고시가 없는 날(휴일)이면 null
+     */
+    fun fetchExchangeCloseOn(type: MarketIndexType, date: LocalDate): ExchangeDailyClose? = runBlocking {
+        val path = EXCHANGE_PATHS[type] ?: return@runBlocking null
+        for (page in 1..EXCHANGE_MAX_PAGES) {
+            val rows = fetchOne(type, "$naverApiUrl$path/prices?page=$page&pageSize=$EXCHANGE_PAGE_SIZE") { _, body -> parseExchangeDailyCloses(body) }
+                ?: return@runBlocking null
+            rows.firstOrNull { it.tradeDate == date }?.let { return@runBlocking it }
+            // 이 쪽의 가장 옛 행이 그날보다 앞서면 그날 고시가 없는 것 (휴일)
+            if (rows.isEmpty() || rows.last().tradeDate.isBefore(date)) return@runBlocking null
+        }
+        null
+    }
+
+    private fun parseExchangeDailyCloses(body: String): List<ExchangeDailyClose> {
+        val rows = objectMapper.readTree(body)?.takeIf { it.isArray } ?: throw MarketIndexResponseException()
+        return rows.mapNotNull { row ->
+            val tradedAt = row.textOrNull("localTradedAt")?.takeIf { it.length >= 10 } ?: return@mapNotNull null
+            val close = row.textOrNull("closePrice")?.replace(",", "")?.toDoubleOrNull() ?: return@mapNotNull null
+            // 하락일 값이 이미 음수로 오기도 해서 크기만 취해 방향으로 부호를 붙인다 (parseOhlc 와 같은 이유)
+            fun signed(field: String): Double? = row.textOrNull(field)?.replace(",", "")?.toDoubleOrNull()?.let { amount ->
+                when (row.path("fluctuationsType").textOrNull("name")) {
+                    "FALLING" -> -kotlin.math.abs(amount); "RISING" -> kotlin.math.abs(amount); else -> 0.0
+                }
+            }
+            ExchangeDailyClose(LocalDate.parse(tradedAt.substring(0, 10)), close, signed("fluctuations"), signed("fluctuationsRatio"))
         }
     }
 

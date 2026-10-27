@@ -304,7 +304,7 @@ class MarketFactSheetService(
             krTreasuryFallbackService.latestClose(type, tradeDate)?.let { YieldFact(name, it.value, it.changeBp, fallbackDate = it.tradeDate) }
         }.takeIf { it.isNotEmpty() }?.let { KrTreasuryFact(it) }
 
-    private fun fetchQuote(type: MarketIndexType): QuoteFact? {
+    fun fetchQuote(type: MarketIndexType): QuoteFact? {
         val res = marketIndexService.getMarketIndex(type) ?: return null
         val price = TemplateFormat.parse(res.price) ?: return null
         // 네이버 수집이 실패하면 Redis(TTL 1일)에 옛 값이 남는다 → 값은 쓰되 마지막 갱신 시각을 함께 넘겨 "몇 시 기준"으로 표기
