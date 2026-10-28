@@ -19,7 +19,7 @@ class PriceTargetService(
             throw IllegalStateException("목표가 알림은 최대 20개까지 등록할 수 있습니다.")
         }
 
-        if (req.targetPrice <= 0) {
+        if (req.targetPrice.signum() <= 0) {
             throw IllegalArgumentException("목표가는 0보다 커야 합니다.")
         }
 

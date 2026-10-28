@@ -5,12 +5,15 @@ import com.example.investfeed.internal.assistant.dto.req.BriefingToolReq
 import com.example.investfeed.internal.assistant.dto.req.CalendarToolReq
 import com.example.investfeed.internal.assistant.dto.req.CircuitBreakerReq
 import com.example.investfeed.internal.assistant.dto.req.ExchangeRateReq
+import com.example.investfeed.internal.assistant.dto.req.GoalUpdatePreviewReq
 import com.example.investfeed.internal.assistant.dto.req.MarketInvestorFlowReq
 import com.example.investfeed.internal.assistant.dto.req.MarketSummaryReq
 import com.example.investfeed.internal.assistant.dto.req.MyHoldingReq
 import com.example.investfeed.internal.assistant.dto.req.MyPnlReq
 import com.example.investfeed.internal.assistant.dto.req.MyPortfolioReq
+import com.example.investfeed.internal.assistant.dto.req.MyWatchlistReq
 import com.example.investfeed.internal.assistant.dto.req.NewsSearchReq
+import com.example.investfeed.internal.assistant.dto.req.PriceAlertDeletePreviewReq
 import com.example.investfeed.internal.assistant.dto.req.PriceAlertPreviewReq
 import com.example.investfeed.internal.assistant.dto.req.RecommendListReq
 import com.example.investfeed.internal.assistant.dto.req.SectorPerformanceReq
@@ -30,6 +33,7 @@ import com.example.investfeed.internal.assistant.tool.StockMarket
 import com.example.investfeed.internal.assistant.tool.ToolException
 import com.example.investfeed.internal.assistant.tool.ToolResponse
 import com.example.investfeed.internal.assistant.tool.TreasuryToolService
+import com.example.investfeed.internal.assistant.tool.WatchlistToolService
 import mu.KotlinLogging
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -49,6 +53,7 @@ class InternalToolController(
     private val rankTool: RankToolService,
     private val sectorTool: SectorToolService,
     private val exchangeRateTool: ExchangeRateToolService,
+    private val watchlistTool: WatchlistToolService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -133,7 +138,15 @@ class InternalToolController(
     fun searchNews(@ModelAttribute req: NewsSearchReq) =
         tool("search_news", "네이버 뉴스") { data.searchNews(req.query, req.n) }
 
-    // ── 표시 도구 (카드 참조만) ──
+    @GetMapping("get_my_watchlist")
+    fun myWatchlist(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @ModelAttribute req: MyWatchlistReq,
+    ) = tool("get_my_watchlist") { watchlistTool.watchlist(user.member.id, req.kind, req.group, req.groupId) }
+        .let { r ->
+            val card = r.data as? WatchlistToolService.WatchlistCard
+            r.copy(source = card?.let { if (it.kind == WatchlistToolService.WatchlistKind.CRYPTO) "업비트 시세" else "키움 시세" })
+        }
 
     @GetMapping("show_my_portfolio")
     fun myPortfolio(
@@ -155,6 +168,9 @@ class InternalToolController(
         @ModelAttribute req: MyPnlReq,
     ) = tool("show_my_pnl") { display.myPnl(user.member, req.period, req.assetClass) }
 
+    @GetMapping("show_my_goals")
+    fun myGoals(@AuthenticationPrincipal user: CustomUserDetails) = tool("show_my_goals") { display.myGoals(user.member) }
+
     @GetMapping("show_briefing")
     fun briefing(
         @AuthenticationPrincipal user: CustomUserDetails,
@@ -166,4 +182,17 @@ class InternalToolController(
         @AuthenticationPrincipal user: CustomUserDetails,
         @ModelAttribute req: PriceAlertPreviewReq,
     ) = tool("create_price_alert") { action.previewPriceAlert(user.member, req.stockQuery, req.price, req.direction) }
+
+    @GetMapping("delete_price_alert/preview")
+    fun previewPriceAlertDelete(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @ModelAttribute req: PriceAlertDeletePreviewReq,
+    ) = tool("delete_price_alert") { action.previewPriceAlertDelete(user.member, req.stockQuery, req.price) }
+
+    // 투자 목표 변경은 2차 인증 필요 — ServiceTokenFilter 가 이 경로를 시장 토큰으로 막는다
+    @GetMapping("update_my_goal/preview")
+    fun previewGoalUpdate(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @ModelAttribute req: GoalUpdatePreviewReq,
+    ) = tool("update_my_goal") { action.previewGoalUpdate(user.member, req.type, req.targetAmount) }
 }

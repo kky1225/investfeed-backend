@@ -3,6 +3,7 @@ package com.example.investfeed.domain.notification.dto.res
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.PriceTarget
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 data class PriceTargetRes(
@@ -10,7 +11,7 @@ data class PriceTargetRes(
     val assetType: AssetType,
     val assetCode: String,
     val assetName: String,
-    val targetPrice: Long,
+    val targetPrice: BigDecimal,
     val direction: PriceTargetDirection,
     val createdAt: LocalDateTime,
 ) {

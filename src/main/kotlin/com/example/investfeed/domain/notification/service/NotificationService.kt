@@ -19,7 +19,8 @@ class NotificationService(
     private val alertLogRepository: NotificationAlertLogRepository,
     private val priceTargetRepository: PriceTargetRepository,
     private val notificationWebSocketHandler: NotificationWebSocketHandler,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val linkResolver: NotificationLinkResolver,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -29,7 +30,8 @@ class NotificationService(
         } else {
             notificationRepository.findByMemberIdOrderByCreatedAtDesc(memberId)
         }
-        return notifications.map { NotificationRes.from(it) }
+        val links = linkResolver.links(notifications)
+        return notifications.map { NotificationRes.from(it, links[it.id]) }
     }
 
     fun getUnreadCount(memberId: Long): Int {
@@ -96,7 +98,7 @@ class NotificationService(
         )
 
         try {
-            val res = NotificationRes.from(notification)
+            val res = NotificationRes.from(notification, linkResolver.link(notification))
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
@@ -156,7 +158,7 @@ class NotificationService(
         priceTargetRepository.delete(priceTarget)
 
         try {
-            val res = NotificationRes.from(notification)
+            val res = NotificationRes.from(notification, linkResolver.link(notification))
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(priceTarget.memberId, message)
         } catch (e: Exception) {
@@ -212,7 +214,7 @@ class NotificationService(
         )
 
         try {
-            val res = NotificationRes.from(notification)
+            val res = NotificationRes.from(notification, linkResolver.link(notification))
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {
@@ -272,7 +274,7 @@ class NotificationService(
         )
 
         try {
-            val res = NotificationRes.from(notification)
+            val res = NotificationRes.from(notification, linkResolver.link(notification))
             val message = objectMapper.writeValueAsString(res)
             notificationWebSocketHandler.sendToUser(memberId, message)
         } catch (e: Exception) {

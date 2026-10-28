@@ -100,10 +100,10 @@ object Permissions {
 
     // ─── 유저 기능 ────────────────────────────────────────────────────────────
     /** 관심종목 그룹/항목 (코인) */
-    const val CRYPTO_INTEREST = "CRYPTO_INTEREST"
+    const val CRYPTO_WATCHLIST = "CRYPTO_WATCHLIST"
 
     /** 관심종목 그룹/항목 (주식) */
-    const val STOCK_INTEREST = "STOCK_INTEREST"
+    const val STOCK_WATCHLIST = "STOCK_WATCHLIST"
 
     /** 실현손익 조회/관리 (코인) */
     const val CRYPTO_REALIZED_PNL = "CRYPTO_REALIZED_PNL"

@@ -14,10 +14,11 @@ data class NotificationRes(
     val fluRt: Double,
     val price: Double?,
     val isRead: Boolean,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val link: String? = null,
 ) {
     companion object {
-        fun from(notification: Notification) = NotificationRes(
+        fun from(notification: Notification, link: String? = null) = NotificationRes(
             id = notification.id,
             type = notification.type,
             assetType = notification.assetType,
@@ -28,7 +29,8 @@ data class NotificationRes(
             fluRt = notification.fluRt,
             price = notification.price,
             isRead = notification.isRead,
-            createdAt = notification.createdAt
+            createdAt = notification.createdAt,
+            link = link,
         )
     }
 }

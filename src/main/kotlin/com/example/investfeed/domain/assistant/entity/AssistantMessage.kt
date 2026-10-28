@@ -32,7 +32,7 @@ class AssistantMessage(
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
-    val body: String,
+    var body: String,   // 확인 카드 처리 결과(actionStatus)를 기록할 때만 바뀐다
 
     @Column(name = "ref_briefing_id")
     val refBriefingId: Long? = null,

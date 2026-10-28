@@ -5,7 +5,7 @@ import com.example.investfeed.domain.dividend.scheduler.StockDividendScheduler
 import com.example.investfeed.domain.goal.scheduler.GoalAlertScheduler
 import com.example.investfeed.domain.holding.scheduler.HoldingSyncScheduler
 import com.example.investfeed.domain.index.scheduler.IndexInvestorDailyScheduler
-import com.example.investfeed.domain.interest.scheduler.InterestSyncScheduler
+import com.example.investfeed.domain.watchlist.scheduler.WatchlistSyncScheduler
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
@@ -43,7 +43,7 @@ class ManualTriggerService(
     private val indexInvestorDailyScheduler: IndexInvestorDailyScheduler,
     private val apiKeyExpiryScheduler: ApiKeyExpiryScheduler,
     private val schedulerLogCleanupScheduler: SchedulerLogCleanupScheduler,
-    private val interestSyncScheduler: InterestSyncScheduler,
+    private val watchlistSyncScheduler: WatchlistSyncScheduler,
     private val stockMasterSyncScheduler: StockMasterSyncScheduler,
     private val holdingGradeService: HoldingGradeService,
     private val paperTradeExecutionService: PaperTradeExecutionService,
@@ -67,7 +67,7 @@ class ManualTriggerService(
             "IndexInvestorDailyScheduler"  to { indexInvestorDailyScheduler.collectDaily() },
             "ApiKeyExpiryScheduler"        to { apiKeyExpiryScheduler.checkApiKeyExpiry() },
             "SchedulerLogCleanupScheduler" to { schedulerLogCleanupScheduler.cleanup() },
-            "InterestSyncScheduler"        to { interestSyncScheduler.syncAllStkNm() },
+            "WatchlistSyncScheduler"        to { watchlistSyncScheduler.syncAllStkNm() },
             "StockMasterSyncScheduler"     to { stockMasterSyncScheduler.syncStockMaster() },
             "HoldingGradeScheduler"        to { holdingGradeService.runHoldingGrade() },
             "PaperTradeExecScheduler"      to { paperTradeExecutionService.runPaperTradeExec() },

@@ -10,6 +10,8 @@ import com.example.investfeed.domain.assistant.repository.AssistantMessageReposi
 import com.example.investfeed.domain.assistant.service.BriefingType
 import com.example.investfeed.domain.assistant.service.PersonalBriefingService
 import com.example.investfeed.domain.auth.entity.Member
+import com.example.investfeed.domain.goal.dto.res.InvestmentGoalRes
+import com.example.investfeed.domain.goal.service.InvestmentGoalService
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
 import com.example.investfeed.domain.realizedpnl.service.RealizedPnlSummaryService
@@ -26,6 +28,7 @@ class DisplayToolService(
     private val realizedPnlSummaryService: RealizedPnlSummaryService,
     private val assistantMessageRepository: AssistantMessageRepository,
     private val cardStore: CardStore,
+    private val investmentGoalService: InvestmentGoalService,
 ) {
     enum class AssetClass { KR, US, CRYPTO }
 
@@ -33,6 +36,7 @@ class DisplayToolService(
         const val KIND_PORTFOLIO = "PORTFOLIO"
         const val KIND_HOLDING = "HOLDING"
         const val KIND_PNL = "REALIZED_PNL"
+        const val KIND_GOALS = "GOALS"
         private const val TOP_N = 3
     }
 
@@ -155,6 +159,11 @@ class DisplayToolService(
         val card = PnlCard(period, year, month, rows.sumOf { it.realizedPnl }, rows.groupBy { it.market.name }.mapValues { (_, v) -> v.sumOf { it.realizedPnl } }, rows)
         return cardStore.put(member.id, KIND_PNL, card)
     }
+
+    data class GoalsCard(val asOf: LocalDateTime, val goals: List<InvestmentGoalRes>)
+
+    fun myGoals(member: Member): CardRef =
+        cardStore.put(member.id, KIND_GOALS, GoalsCard(LocalDateTime.now(), investmentGoalService.listGoals().goals))
 
     data class BriefingPointer(val messageId: Long, val headline: String, val createdAt: LocalDateTime, val type: BriefingType)
 

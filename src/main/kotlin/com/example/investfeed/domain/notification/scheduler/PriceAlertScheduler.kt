@@ -2,13 +2,15 @@ package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
+import com.example.investfeed.domain.assistant.dto.factsheet.PriceTargetHit
 import com.example.investfeed.domain.assistant.service.HoldingAlertService
-import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestGroupRepository
-import com.example.investfeed.domain.cryptointerest.repository.CryptoInterestItemRepository
+import com.example.investfeed.domain.assistant.service.PriceTargetAlertService
+import com.example.investfeed.domain.cryptowatchlist.repository.CryptoWatchlistGroupRepository
+import com.example.investfeed.domain.cryptowatchlist.repository.CryptoWatchlistItemRepository
 import com.example.investfeed.domain.holding.entity.MemberHolding
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
-import com.example.investfeed.domain.interest.repository.InterestGroupRepository
-import com.example.investfeed.domain.interest.repository.InterestItemRepository
+import com.example.investfeed.domain.watchlist.repository.WatchlistGroupRepository
+import com.example.investfeed.domain.watchlist.repository.WatchlistItemRepository
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
@@ -19,6 +21,7 @@ import com.example.investfeed.domain.notification.service.AlertTarget
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.PriceAlertJudge
 import com.example.investfeed.domain.notification.service.UsHoldingAlertChecker
+import com.example.investfeed.domain.notification.service.UsPriceTargetChecker
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
@@ -40,12 +43,13 @@ import kotlin.math.abs
 
 @Component
 class PriceAlertScheduler(
-    private val interestGroupRepository: InterestGroupRepository,
-    private val interestItemRepository: InterestItemRepository,
-    private val cryptoInterestGroupRepository: CryptoInterestGroupRepository,
-    private val cryptoInterestItemRepository: CryptoInterestItemRepository,
+    private val watchlistGroupRepository: WatchlistGroupRepository,
+    private val watchlistItemRepository: WatchlistItemRepository,
+    private val cryptoWatchlistGroupRepository: CryptoWatchlistGroupRepository,
+    private val cryptoWatchlistItemRepository: CryptoWatchlistItemRepository,
     private val stockClient: StockClient,
     private val usHoldingAlertChecker: UsHoldingAlertChecker,
+    private val usPriceTargetChecker: UsPriceTargetChecker,
     private val tickerClient: TickerClient,
     private val notificationService: NotificationService,
     private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
@@ -54,6 +58,7 @@ class PriceAlertScheduler(
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val holdingAlertService: HoldingAlertService,
+    private val priceTargetAlertService: PriceTargetAlertService,
     private val authClient: AuthClient,
     private val schedulerLogService: SchedulerLogService,
     @param:Value("\${scheduler.login-id:admin}")
@@ -71,9 +76,9 @@ class PriceAlertScheduler(
 
     private data class MemberAsset(val memberId: Long, val code: String, val name: String)
 
-    private fun targets(interest: List<MemberAsset>, holdings: List<MemberHolding>): Pair<List<MemberAsset>, Set<Pair<Long, String>>> {
+    private fun targets(watchlist: List<MemberAsset>, holdings: List<MemberHolding>): Pair<List<MemberAsset>, Set<Pair<Long, String>>> {
         val held = holdings.map { it.memberId to it.stkCd }.toSet()
-        val all = (interest + holdings.map { MemberAsset(it.memberId, it.stkCd, it.stkNm) }).distinctBy { it.memberId to it.code }
+        val all = (watchlist + holdings.map { MemberAsset(it.memberId, it.stkCd, it.stkNm) }).distinctBy { it.memberId to it.code }
         return all to held
     }
 
@@ -93,6 +98,7 @@ class PriceAlertScheduler(
             val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
             val holdings = memberHoldingRepository.findAll()
             val holdingHits = mutableListOf<HoldingAlertHit>()
+            val targetHits = mutableListOf<PriceTargetHit>()
             var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
             var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
 
@@ -115,15 +121,21 @@ class PriceAlertScheduler(
             }
 
             try {
-                checkStockPriceTargets(stockDataMap ?: emptyMap())
+                checkStockPriceTargets(stockDataMap ?: emptyMap(), targetHits)
             } catch (e: Exception) {
                 log.error(e) { "주식 목표가 알림 체크 실패" }
             }
 
             try {
-                checkCryptoPriceTargets(tickerMap ?: emptyMap())
+                checkCryptoPriceTargets(tickerMap ?: emptyMap(), targetHits)
             } catch (e: Exception) {
                 log.error(e) { "암호화폐 목표가 알림 체크 실패" }
+            }
+
+            try {
+                usPriceTargetChecker.check(targetHits, now)
+            } catch (e: Exception) {
+                log.error(e) { "미국 주식 목표가 알림 체크 실패" }
             }
 
             try {
@@ -131,6 +143,13 @@ class PriceAlertScheduler(
                 if (posted > 0) log.info { "보유 종목 급등락 비서 게시: ${posted}건 (hit ${holdingHits.size})" }
             } catch (e: Exception) {
                 log.error(e) { "보유 종목 급등락 비서 게시 실패" }
+            }
+
+            try {
+                val posted = priceTargetAlertService.publish(targetHits, now)
+                if (posted > 0) log.info { "목표가 도달 비서 게시: ${posted}건 (hit ${targetHits.size})" }
+            } catch (e: Exception) {
+                log.error(e) { "목표가 도달 비서 게시 실패" }
             }
 
             SecurityContextHolder.clearContext()
@@ -150,11 +169,11 @@ class PriceAlertScheduler(
             return emptyMap()
         }
 
-        val groups = interestGroupRepository.findAll()
+        val groups = watchlistGroupRepository.findAll()
         val groupToMember = groups.associate { it.id to it.memberId }
-        val interest = if (groups.isEmpty()) emptyList() else interestItemRepository.findByGroupIdIn(groups.map { it.id })
+        val watchlist = if (groups.isEmpty()) emptyList() else watchlistItemRepository.findByGroupIdIn(groups.map { it.id })
             .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.stkCd, item.stkNm) } }
-        val (memberStocks, heldKeys) = targets(interest, krHoldings)
+        val (memberStocks, heldKeys) = targets(watchlist, krHoldings)
         if (memberStocks.isEmpty()) return emptyMap()
 
         val stkCdParam = memberStocks.map { it.code }.distinct().joinToString("|")
@@ -218,11 +237,11 @@ class PriceAlertScheduler(
         cryptoHoldings: List<MemberHolding>,
         hits: MutableList<HoldingAlertHit>,
     ): Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes> {
-        val groups = cryptoInterestGroupRepository.findAll()
+        val groups = cryptoWatchlistGroupRepository.findAll()
         val groupToMember = groups.associate { it.id to it.memberId }
-        val interest = if (groups.isEmpty()) emptyList() else cryptoInterestItemRepository.findByGroupIdIn(groups.map { it.id })
+        val watchlist = if (groups.isEmpty()) emptyList() else cryptoWatchlistItemRepository.findByGroupIdIn(groups.map { it.id })
             .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.market, item.koreanName) } }
-        val (memberCryptos, heldKeys) = targets(interest, cryptoHoldings)
+        val (memberCryptos, heldKeys) = targets(watchlist, cryptoHoldings)
         if (memberCryptos.isEmpty()) return emptyMap()
 
         val tickerMap = tickerClient.getTickers(memberCryptos.map { it.code }.distinct().joinToString(",")).associateBy { it.market }
@@ -249,8 +268,8 @@ class PriceAlertScheduler(
         return tickerMap
     }
 
-    private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>) {
-        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK)
+    private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>, hits: MutableList<PriceTargetHit>) {
+        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK).filterNot { it.assetCode.endsWith(UsHoldingAlertChecker.US_SUFFIX) }   // 미국은 UsPriceTargetChecker
         if (targets.isEmpty()) return
 
         val missingCodes = targets.map { it.assetCode }.filter { it !in stockDataMap }.distinct()
@@ -272,17 +291,18 @@ class PriceAlertScheduler(
             val curPrc = abs(stockData.cur_prc?.toDoubleOrNull() ?: continue)
 
             val reached = when (target.direction) {
-                PriceTargetDirection.ABOVE -> curPrc >= target.targetPrice
-                PriceTargetDirection.BELOW -> curPrc <= target.targetPrice
+                PriceTargetDirection.ABOVE -> curPrc >= target.targetPrice.toDouble()
+                PriceTargetDirection.BELOW -> curPrc <= target.targetPrice.toDouble()
             }
 
             if (reached) {
                 notificationService.createPriceTargetAlert(target, curPrc)
+                hits += targetHit(target, "/stock/detail/${target.assetCode.substringBefore("_")}", curPrc)
             }
         }
     }
 
-    private fun checkCryptoPriceTargets(tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>) {
+    private fun checkCryptoPriceTargets(tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>, hits: MutableList<PriceTargetHit>) {
         val targets = priceTargetRepository.findByAssetType(AssetType.CRYPTO)
         if (targets.isEmpty()) return
 
@@ -305,15 +325,19 @@ class PriceAlertScheduler(
             val tradePrice = ticker.trade_price ?: continue
 
             val reached = when (target.direction) {
-                PriceTargetDirection.ABOVE -> tradePrice >= target.targetPrice
-                PriceTargetDirection.BELOW -> tradePrice <= target.targetPrice
+                PriceTargetDirection.ABOVE -> tradePrice >= target.targetPrice.toDouble()
+                PriceTargetDirection.BELOW -> tradePrice <= target.targetPrice.toDouble()
             }
 
             if (reached) {
                 notificationService.createPriceTargetAlert(target, tradePrice)
+                hits += targetHit(target, "/crypto/detail/${target.assetCode}", tradePrice)
             }
         }
     }
+
+    private fun targetHit(t: com.example.investfeed.domain.notification.entity.PriceTarget, link: String, price: Double) =
+        PriceTargetHit(t.memberId, t.assetCode, t.assetName, link, t.direction, t.targetPrice.toDouble(), price)
 
     private fun setSchedulerSecurityContext() {
         val auth = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())

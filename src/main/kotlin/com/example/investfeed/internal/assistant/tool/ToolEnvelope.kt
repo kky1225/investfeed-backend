@@ -19,7 +19,10 @@ data class ToolResponse<T>(
 
 enum class StockMarket { KR, US, CRYPTO }
 
-data class StockCandidate(val code: String, val name: String, val market: StockMarket)
+data class StockCandidate(
+    val code: String, val name: String, val market: StockMarket,
+    val similar: Boolean = false,   // 정확히 일치하지 않아 제안하는 후보 ("이 종목이 맞나요?")
+)
 
 /** 종목명 해석 결과 */
 data class ResolvedStock(

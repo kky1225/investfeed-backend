@@ -1,6 +1,8 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.domain.assistant.dto.message.ActionStatus
 import com.example.investfeed.domain.assistant.dto.message.Headline
+import com.example.investfeed.domain.assistant.dto.message.TurnCard
 import com.example.investfeed.domain.assistant.dto.message.HeadlineScope
 import com.example.investfeed.domain.assistant.dto.message.SectionStatus
 import com.example.investfeed.domain.assistant.dto.message.MessageBody
@@ -75,6 +77,15 @@ class TimelineService(
     }
 
     fun markRead(memberId: Long, lastSeenId: Long) = assistantSettingService.markRead(memberId, lastSeenId)
+
+    @Transactional
+    fun markActionCard(memberId: Long, ref: String, status: ActionStatus) {
+        val message = assistantMessageRepository.findAnswerContainingRef(memberId, ref) ?: return
+        val body = objectMapper.readValue<MessageBody>(message.body)
+        fun matches(c: TurnCard) = c.ref == ref || (c.payload as? Map<*, *>)?.get("confirmRef") == ref
+        if (body.turnCards.none(::matches)) return
+        message.body = objectMapper.writeValueAsString(body.copy(turnCards = body.turnCards.map { if (matches(it)) it.copy(actionStatus = status) else it }))
+    }
 
     @Transactional
     fun postMessage(

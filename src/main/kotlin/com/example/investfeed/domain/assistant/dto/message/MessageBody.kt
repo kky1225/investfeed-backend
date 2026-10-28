@@ -25,6 +25,7 @@ data class TurnCard(
     val error: String? = null,
     val payload: Any? = null,
     val args: Map<String, Any?>? = null,   // 조회 조건 (공개 데이터 카드만). 화면의 조건 기준 안내용
+    val actionStatus: ActionStatus? = null,   // 확인 카드(목표가 알림·투자 목표)를 처리한 결과. 있으면 버튼 없이 결과만 보인다
 )
 
 data class Headline(
@@ -62,4 +63,5 @@ data class AccountBroker(
 
 enum class MessageType { BRIEFING, ALERT, USER, ASSISTANT, SYSTEM }
 enum class HeadlineScope { PERSONAL, MARKET }
+enum class ActionStatus { CONFIRMED, CANCELED }
 enum class SectionStatus { OK, EMPTY, FAILED, LOCKED }

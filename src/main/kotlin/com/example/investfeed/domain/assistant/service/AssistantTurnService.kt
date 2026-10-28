@@ -27,7 +27,8 @@ class AssistantTurnService(
             DisplayToolService.KIND_PORTFOLIO,
             DisplayToolService.KIND_HOLDING,
             DisplayToolService.KIND_PNL,
-            ActionToolService.KIND_CONFIRM_PRICE_ALERT,
+            DisplayToolService.KIND_GOALS,
+            ActionToolService.KIND_CONFIRM_GOAL,
             "show_briefing",
         )
         private const val EXPIRED_CARD = "카드가 만료되어 저장하지 못했습니다"

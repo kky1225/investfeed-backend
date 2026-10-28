@@ -56,7 +56,7 @@ enum class SchedulerName(
     ),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00", crons = listOf(SchedulerCron.SCHEDULER_LOG_CLEANUP)),
     StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00", crons = listOf(SchedulerCron.STOCK_MASTER_SYNC)),
-    InterestSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15", crons = listOf(SchedulerCron.INTEREST_SYNC)),
+    WatchlistSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15", crons = listOf(SchedulerCron.WATCHLIST_SYNC)),
     IndexInvestorDailyScheduler(SchedulerType.SLOW, 120, "매일 07:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.INDEX_INVESTOR_DAILY)),
     BriefingKrPreScheduler(SchedulerType.SLOW, 300, "거래일 07:00", blockedOnHoliday = true, crons = listOf(SchedulerCron.BRIEFING_KR_PRE)),
     PaperTradeExecScheduler(

@@ -61,7 +61,7 @@ class MemberHoldingSyncService(
     /**
      * 수동(BrokerType.MANUAL) 보유종목의 stkNm 을 키움 API 응답값과 비교해 다르면 UPDATE.
      * 자동 키움 보유종목은 HoldingSyncScheduler 가 처리하므로 제외.
-     * 일 1회 InterestSyncScheduler 에서 호출.
+     * 일 1회 WatchlistSyncScheduler 에서 호출.
      */
     @Transactional
     fun syncAllManualStkNm() {

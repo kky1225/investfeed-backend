@@ -9,6 +9,14 @@ import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
 interface AssistantMessageRepository : JpaRepository<AssistantMessage, Long> {
+    /** 확인 카드(목표가 알림·투자 목표 변경)가 실린 원래 비서 답변 찾기 — 본문 JSON 에 카드 ID(c_xxxx)가 들어 있는 최신 답변.
+     *  [등록]/[취소] 처리 후 그 답변에 처리 상태를 기록해 새로고침해도 버튼이 다시 안 나오게 한다 */
+    @Query(
+        value = "SELECT * FROM assistant_message WHERE member_id = :memberId AND type = 'ASSISTANT' AND body::text LIKE CONCAT('%', :ref, '%') ORDER BY id DESC LIMIT 1",
+        nativeQuery = true,
+    )
+    fun findAnswerContainingRef(@Param("memberId") memberId: Long, @Param("ref") ref: String): AssistantMessage?
+
     fun findByMemberIdAndIdLessThanOrderByIdDesc(memberId: Long, before: Long, pageable: Pageable): List<AssistantMessage>
     fun findByMemberIdOrderByIdDesc(memberId: Long, pageable: Pageable): List<AssistantMessage>
     fun findByMemberIdAndCreatedAtBetweenOrderByIdDesc(memberId: Long, start: LocalDateTime, end: LocalDateTime): List<AssistantMessage>

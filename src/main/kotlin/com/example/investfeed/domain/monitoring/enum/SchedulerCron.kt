@@ -27,7 +27,7 @@ object SchedulerCron {
     const val INDEX_DAILY_CLOSE = "0 10 0 * * *"
     const val SCHEDULER_LOG_CLEANUP = "0 0 4 * * *"
     const val STOCK_MASTER_SYNC = "0 0 5 * * *"
-    const val INTEREST_SYNC = "0 15 5 * * *"
+    const val WATCHLIST_SYNC = "0 15 5 * * *"
     const val INDEX_INVESTOR_DAILY = "0 0 7 * * *"
     const val API_KEY_EXPIRY = "0 0 9 * * *"
     const val STOCK_DIVIDEND = "0 30 13 * * *"

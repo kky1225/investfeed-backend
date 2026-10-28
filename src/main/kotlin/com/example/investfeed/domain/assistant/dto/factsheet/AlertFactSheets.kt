@@ -57,3 +57,14 @@ data class HoldingAlertHit(
     val triggerRate: Double?,              // 판정 근거 등락률 (당일 고가·저가 기준). 52주는 null
     val price: Double?,                    // 알림함과 같은 괄호 금액: 등락·상하한가=발송 시점 현재가, 52주=52주 고가·저가 (국내·코인 원, 미국 달러)
 )
+
+/** 목표가 도달 — 웹 알림(TARGET_PRICE) 저장·목표가 삭제가 끝난 뒤 비서 타임라인·텔레그램용으로 모은다 (국내·코인·미국, 2026-10-27) */
+data class PriceTargetHit(
+    val memberId: Long,
+    val assetCode: String,                 // 005930_AL / AAPL_US / KRW-BTC
+    val assetName: String,
+    val link: String,                      // 내부 라우트 (/stock/detail/… · /us-stock/detail/… · /crypto/detail/…)
+    val direction: com.example.investfeed.domain.notification.entity.PriceTargetDirection,   // ABOVE / BELOW
+    val targetPrice: Double,
+    val currentPrice: Double,              // 도달 판정 시점 현재가 (국내·코인 원, 미국 달러)
+)

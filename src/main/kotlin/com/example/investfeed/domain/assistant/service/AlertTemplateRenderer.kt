@@ -10,6 +10,7 @@ import com.example.investfeed.domain.assistant.service.TemplateFormat.monthDay
 import com.example.investfeed.domain.assistant.service.TemplateFormat.num
 import com.example.investfeed.domain.assistant.service.TemplateFormat.rate
 import com.example.investfeed.domain.notification.entity.Direction
+import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.time.LocalDateTime
@@ -21,6 +22,7 @@ object AlertTemplateRenderer {
     const val SUBTYPE_CB = "INDEX_CB"
     const val SUBTYPE_RELEASE = "RELEASE"
     const val SUBTYPE_HOLDING = "HOLDING"
+    const val SUBTYPE_PRICE_TARGET = "PRICE_TARGET"
 
     fun indexName(code: String): String = when (code) {
         "KOSPI" -> "코스피"; "KOSDAQ" -> "코스닥"; "NASDAQ" -> "나스닥"; "SP500" -> "S&P500"; else -> code
@@ -191,6 +193,42 @@ object AlertTemplateRenderer {
         )
     }
 
+    // ── 목표가 도달 (2026-10-27). 보유 종목 급등락과 같은 시세 카드 모양, 웹 알림처럼 2차 인증 없이 공개. 미국은 장외 시간 포함 ──
+
+    private fun targetLabel(h: PriceTargetHit): String =
+        "목표 ${alertPrice(h.targetPrice, h.assetCode)} ${if (h.direction == PriceTargetDirection.ABOVE) "이상" else "이하"} 도달"
+
+    private fun priceTargetHeadline(hits: List<PriceTargetHit>): String =
+        if (hits.size == 1) hits.first().let { "${it.assetName} ${targetLabel(it)}" } else "목표가 도달 ${hits.size}종목"
+
+    fun renderPriceTargetAlert(hits: List<PriceTargetHit>, now: LocalDateTime): MessageBody {
+        val rows = hits.joinToString("\n") { h -> "| [${h.assetName}](${h.link}) | ${targetLabel(h)} (${alertPrice(h.currentPrice, h.assetCode)}) |" }
+        val section = Section(
+            id = "P1", title = "목표가", personal = false, asOf = now,
+            text = "| 종목 | 알림 |\n|---|---|\n$rows",
+        )
+        val cards = hits.map { h ->
+            TurnCard(
+                kind = "HOLDING_ALERT",
+                asOf = now,
+                payload = mapOf(
+                    "name" to h.assetName,
+                    "link" to h.link,
+                    "price" to h.currentPrice,
+                    "currency" to if (h.assetCode.endsWith("_US")) "USD" else "KRW",
+                    "label" to targetLabel(h),
+                    "up" to (h.direction == PriceTargetDirection.ABOVE),
+                ),
+            )
+        }
+        return MessageBody(
+            type = MessageType.ALERT, subtype = SUBTYPE_PRICE_TARGET, asOf = now,
+            headline = Headline(priceTargetHeadline(hits), HeadlineScope.MARKET),
+            sections = listOf(section),
+            turnCards = cards,
+        )
+    }
+
     // ── 텔레그램 (3단계). 헤드라인 + 요약 2~3줄, HTML, 링크 없음(서버 로컬). 이모지는 여기서만 붙인다 ──
 
     private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -233,6 +271,13 @@ object AlertTemplateRenderer {
         val merged = mergeHits(hits)
         val lines = mutableListOf("🔔 <b>${esc(holdingHeadline(merged))}</b>")
         if (merged.size > 1) merged.forEach { m -> lines += esc("${m.assetName} ${mergedLabel(m, colored = false)}") }
+        return lines.joinToString("\n")
+    }
+
+    fun renderPriceTargetAlertTelegram(hits: List<PriceTargetHit>): String {
+        val lines = mutableListOf("🎯 <b>${esc(priceTargetHeadline(hits))}</b>")
+        if (hits.size == 1) lines += esc("현재가 ${alertPrice(hits.first().currentPrice, hits.first().assetCode)}")
+        else hits.forEach { h -> lines += esc("${h.assetName} ${targetLabel(h)} (현재가 ${alertPrice(h.currentPrice, h.assetCode)})") }
         return lines.joinToString("\n")
     }
 }

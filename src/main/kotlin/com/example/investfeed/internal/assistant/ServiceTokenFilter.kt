@@ -29,10 +29,9 @@ class ServiceTokenFilter(
     companion object {
         private val CHAT_SCOPES = setOf(AssistantTokenService.SCOPE_CHAT, AssistantTokenService.SCOPE_CHAT_MARKET)
 
-        /** 개인 도구 (Python registry 의 DISPLAY·ACTION). 시장 토큰으로는 호출할 수 없다 — Python 이 먼저 막고 여기서 한 번 더 막는다 */
         private val PERSONAL_TOOL_PREFIXES = listOf(
             "/internal/assistant/tools/show_",
-            "/internal/assistant/tools/create_price_alert",
+            "/internal/assistant/tools/update_my_goal",
         )
     }
 

@@ -17,9 +17,9 @@ import com.example.investfeed.domain.assistant.dto.res.TelegramStatusRes
 import com.example.investfeed.domain.assistant.service.AssistantTokenService
 import com.example.investfeed.domain.assistant.service.TelegramLinkService
 import com.example.investfeed.domain.assistant.dto.req.PriceAlertActionReq
+import com.example.investfeed.domain.assistant.dto.req.PriceAlertDeleteActionReq
 import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.internal.assistant.tool.ActionToolService
-import com.example.investfeed.internal.assistant.tool.CardStore
 import com.example.investfeed.internal.assistant.tool.ToolException
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -33,6 +33,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
+/** AI 비서 시장 파트 (로그인만). 개인정보를 다루는 API 는 AssistantSecureController(/api/assistant/secure, 2차 인증)에 둘 것 */
 @RequiresAction(permission = Permissions.ASSISTANT)
 @RestController
 @RequestMapping("/api/assistant")
@@ -41,7 +42,6 @@ class AssistantController(
     private val assistantSettingService: AssistantSettingService,
     private val assistantTokenService: AssistantTokenService,
     private val telegramLinkService: TelegramLinkService,
-    private val cardStore: CardStore,
     private val actionToolService: ActionToolService,
 ) {
 
@@ -52,14 +52,6 @@ class AssistantController(
         @ModelAttribute req: TimelineQueryReq,
     ): ResponseEntity<ApiResponse<TimelinePageRes>> =
         ok(ResponseCode.ASSISTANT_TIMELINE_LIST, timeline(user.member.id, req, includePersonal = false))
-
-    @GetMapping("secure/timeline")
-    @RequiresAction(action = Actions.READ)
-    fun getSecureTimeline(
-        @AuthenticationPrincipal user: CustomUserDetails,
-        @ModelAttribute req: TimelineQueryReq,
-    ): ResponseEntity<ApiResponse<TimelinePageRes>> =
-        ok(ResponseCode.ASSISTANT_TIMELINE_LIST, timeline(user.member.id, req, includePersonal = true))
 
     @GetMapping("timeline/unread-count")
     @RequiresAction(action = Actions.READ)
@@ -102,16 +94,8 @@ class AssistantController(
     @RequiresAction(action = Actions.CREATE)
     fun issueMarketToken(
         @AuthenticationPrincipal user: CustomUserDetails,
-    ): ResponseEntity<ApiResponse<AssistantTokenRes>> = issue(user.member.id, AssistantTokenService.SCOPE_CHAT_MARKET)
-
-    @PostMapping("secure/token")
-    @RequiresAction(action = Actions.CREATE)
-    fun issueToken(
-        @AuthenticationPrincipal user: CustomUserDetails,
-    ): ResponseEntity<ApiResponse<AssistantTokenRes>> = issue(user.member.id, AssistantTokenService.SCOPE_CHAT)
-
-    private fun issue(memberId: Long, scope: String): ResponseEntity<ApiResponse<AssistantTokenRes>> {
-        val issued = assistantTokenService.issue(memberId, scope)
+    ): ResponseEntity<ApiResponse<AssistantTokenRes>> {
+        val issued = assistantTokenService.issue(user.member.id, AssistantTokenService.SCOPE_CHAT_MARKET)
         return ok(
             ResponseCode.ASSISTANT_TOKEN_ISSUE,
             AssistantTokenRes(token = issued.token, expiresAt = LocalDateTime.ofInstant(issued.expiresAt, ZoneId.systemDefault()), kid = issued.kid),
@@ -162,18 +146,7 @@ class AssistantController(
     ): ResponseEntity<ApiResponse<TelegramStatusRes>> =
         ok(ResponseCode.ASSISTANT_TELEGRAM_UNLINK, telegramLinkService.unlink(user.member.id))
 
-    @GetMapping("secure/cards/{ref}")
-    @RequiresAction(action = Actions.READ)
-    fun getCard(
-        @AuthenticationPrincipal user: CustomUserDetails,
-        @PathVariable ref: String,
-    ): ResponseEntity<ApiResponse<CardStore.StoredCard?>> {
-        val card = cardStore.get(user.member.id, ref)
-            ?: return ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_CARD_GET.code, message = "카드가 없거나 만료되었습니다.", result = null), HttpStatus.NOT_FOUND)
-        return ok(ResponseCode.ASSISTANT_CARD_GET, card)
-    }
-
-    @PostMapping("secure/actions/price-alert")
+    @PostMapping("actions/price-alert")
     @RequiresAction(action = Actions.CREATE)
     fun confirmPriceAlert(
         @AuthenticationPrincipal user: CustomUserDetails,
@@ -182,6 +155,43 @@ class AssistantController(
         ok(ResponseCode.ASSISTANT_PRICE_ALERT_CREATE, actionToolService.confirmPriceAlert(user.member, req.cardRef))
     } catch (e: ToolException) {
         ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_PRICE_ALERT_CREATE.code, message = e.message ?: "등록할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
+    @DeleteMapping("actions/price-alert/{cardRef}")
+    @RequiresAction(action = Actions.DELETE)
+    fun cancelPriceAlert(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable cardRef: String,
+    ): ResponseEntity<ApiResponse<Nothing?>> = try {
+        actionToolService.cancelPriceAlert(user.member, cardRef)
+        ok(ResponseCode.ASSISTANT_ACTION_CANCEL, null)
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_ACTION_CANCEL.code, message = e.message ?: "취소할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
+    // 목표가 알림 삭제 — 웹 목표가 알림 삭제처럼 2차 인증 없이 로그인만 (2026-10-28)
+    @PostMapping("actions/price-alert-deletion")
+    @RequiresAction(action = Actions.DELETE)
+    fun confirmPriceAlertDelete(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @Valid @RequestBody req: PriceAlertDeleteActionReq,
+    ): ResponseEntity<ApiResponse<Nothing?>> = try {
+        actionToolService.confirmPriceAlertDelete(user.member, req.cardRef, req.targetId!!)
+        ok(ResponseCode.ASSISTANT_PRICE_ALERT_DELETE, null)
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_PRICE_ALERT_DELETE.code, message = e.message ?: "삭제할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
+    @DeleteMapping("actions/price-alert-deletion/{cardRef}")
+    @RequiresAction(action = Actions.DELETE)
+    fun cancelPriceAlertDelete(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable cardRef: String,
+    ): ResponseEntity<ApiResponse<Nothing?>> = try {
+        actionToolService.cancelPriceAlertDelete(user.member, cardRef)
+        ok(ResponseCode.ASSISTANT_ACTION_CANCEL, null)
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_ACTION_CANCEL.code, message = e.message ?: "취소할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
     }
 
     private fun timeline(memberId: Long, req: TimelineQueryReq, includePersonal: Boolean) =
