@@ -83,7 +83,8 @@ class PressReleaseClient(
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             isExpandEntityReferences = false
         }
-        val items = factory.newDocumentBuilder().parse(InputSource(StringReader(xml))).getElementsByTagName("item")
+        // 연준 피드는 UTF-8 BOM 으로 시작하는데 문자열 디코딩 후에도 남아 파서가 첫 글자에서 실패한다 (2026-10-29)
+        val items = factory.newDocumentBuilder().parse(InputSource(StringReader(xml.removePrefix("﻿")))).getElementsByTagName("item")
         return (0 until items.length).mapNotNull { i ->
             val item = items.item(i) as? Element ?: return@mapNotNull null
             fun text(tag: String) = item.getElementsByTagName(tag).item(0)?.textContent?.trim()

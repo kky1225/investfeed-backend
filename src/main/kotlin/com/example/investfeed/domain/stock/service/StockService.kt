@@ -12,6 +12,8 @@ import com.example.investfeed.kiwoom.chart.dto.stock.req.*
 import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartDay
 import com.example.investfeed.kiwoom.price.dto.res.KiwoomStockTradeInfoRes
 import com.example.investfeed.kiwoom.chart.enum.StockChartType
+import com.example.investfeed.kiwoom.etf.client.EtfClient
+import com.example.investfeed.kiwoom.etf.dto.req.KiwoomEtfTimeTrendReq
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeDayReq
 import com.example.investfeed.kiwoom.price.dto.req.KiwoomStockProgramTradeMinuteReq
@@ -39,15 +41,17 @@ class StockService(
     private val shortSellingClient: ShortSellingClient,
     private val stockDividendService: StockDividendService,
     private val stockMasterRepository: StockMasterRepository,
+    private val etfClient: EtfClient,
 ) {
     private val log = KotlinLogging.logger {}
+    private val MARKET_CODE_ETF = "8"
 
     private fun normalizeMarketName(marketName: String?): String? =
         if (marketName == "거래소") "코스피" else marketName
 
     /**
      * 종목 상세. 서로 다른 TR 8건(기본정보·종목정보·거래정보·투자자·차트·투자자차트·프로그램매매·VI)은 독립이라 동시에 요청하고,
-     * 다른 응답에 의존하는 호출(시간외 단일가=종목정보, 공매도=프로그램매매 날짜, 배당=시장구분)만 뒤에서 순차로 부른다.
+     * 다른 응답에 의존하는 호출(시간외 단일가=종목정보, 공매도=프로그램매매 날짜, 배당=시장구분, ETF 괴리율=시장구분)만 뒤에서 부른다.
      * 코루틴 경계: 요청 스레드에서 runBlocking — SecurityContext·JPA 세션이 그대로 보인다.
      */
     fun getStock(
@@ -76,6 +80,7 @@ class StockService(
 
         val kiwoomStockDefaultInfoRes = defaultInfoDeferred.await()
         val kiwoomStockInfoRes = infoDeferred.await()
+        val etfDisptyDeferred = if (kiwoomStockInfoRes.marketCode == MARKET_CODE_ETF) async { fetchEtfDisptyRt(stkCd) } else null
         val kiwoomStockTradeInfoRes = tradeInfoDeferred.await()
         val kiwoomStockInvestor = investorDeferred.await()
 
@@ -110,6 +115,7 @@ class StockService(
                 marketCode = kiwoomStockInfoRes.marketCode,
                 marketName = normalizeMarketName(kiwoomStockInfoRes.marketName),
                 upName = kiwoomStockInfoRes.upName,
+                disptyRt = etfDisptyDeferred?.await(),
             ).apply {
                 if (MarketTimeUtil.isCallAuction()) {
                     val pric = kiwoomStockDefaultInfoRes.exp_cntr_pric
@@ -345,6 +351,20 @@ class StockService(
             }
         }
         return chartListRes to kiwoomDayChartList
+    }
+
+    private suspend fun fetchEtfDisptyRt(stkCd: String): String? {
+        return try {
+            etfClient.etfTimeTrend(req = KiwoomEtfTimeTrendReq(stk_cd = stkCd.substringBefore("_")))
+                .etftisl_trnsn
+                ?.firstOrNull { !it.navetf.isNullOrBlank() }
+                ?.navetf
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn { "getStock etfTimeTrend Error: stkCd=$stkCd, ${e.message}" }
+            null
+        }
     }
 
     private suspend fun fetchViList(stkCd: String): List<StockVi> {

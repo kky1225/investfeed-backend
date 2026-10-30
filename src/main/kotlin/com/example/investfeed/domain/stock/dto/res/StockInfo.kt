@@ -29,6 +29,7 @@ data class StockInfo(
     var marketCode: String? = null, // 시장구분코드
     var marketName: String? = null, // 시장명
     var upName: String? = null, // 업종명
+    var disptyRt: String? = null, // ETF 괴리율 (시장가 vs NAV, %, 부호 포함). ETF(시장구분 8)만, 그 외 null
     var expCntrPric: String? = null, // 예상체결가
     var expCntrFluRt: String? = null, // 예상체결가 등락률
     var expCntrPreSig: String? = null, // 예상체결가 대비기호

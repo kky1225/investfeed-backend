@@ -118,6 +118,10 @@ object AlertTemplateRenderer {
         if (assetCode.endsWith("_US")) "$" + DecimalFormat("#,##0.00##", DecimalFormatSymbols(Locale.US)).format(v)
         else DecimalFormat("#,##0.###", DecimalFormatSymbols(Locale.US)).format(v) + "원"
 
+    /** 미국 장외 급
+     * 등락은 기준이 직전 정규장 종가라 장구분을 앞에 붙인다: "애프터마켓 -5% 도달" (2026-10-29) */
+    private fun sessionPrefix(h: HoldingAlertHit): String = h.sessionLabel?.let { "$it " }.orEmpty()
+
     /** 알림함과 같은 문구: "+5% 도달 (72,300원)" · "상한가 도달" · "52주 신고가 달성 (75,000원)" */
     private fun hitLabel(h: HoldingAlertHit, colored: Boolean): String {
         val price = h.price?.let { " (${alertPrice(it, h.assetCode)})" } ?: ""
@@ -126,8 +130,8 @@ object AlertTemplateRenderer {
             return if (colored) colored(text, signed) else text
         }
         return when (h.direction) {
-            Direction.UP -> "${threshold(h.threshold)} 도달$price"
-            Direction.DOWN -> "${threshold(-h.threshold)} 도달$price"
+            Direction.UP -> "${sessionPrefix(h)}${threshold(h.threshold)} 도달$price"
+            Direction.DOWN -> "${sessionPrefix(h)}${threshold(-h.threshold)} 도달$price"
             Direction.UPPER_LIMIT -> "상한가 도달"
             Direction.LOWER_LIMIT -> "하한가 도달"
             Direction.HIGH_52W -> "52주 신고가 달성$price"
@@ -149,8 +153,8 @@ object AlertTemplateRenderer {
 
     /** 시세 카드 모양용 알림 문구 — 가격은 카드에 크게 따로 보이므로 괄호 금액 없이 ("+5% 도달", "상한가 도달", "52주 신고가 달성") */
     private fun bareLabel(h: HoldingAlertHit): String = when (h.direction) {
-        Direction.UP -> "${rate(h.threshold, 0)} 도달"
-        Direction.DOWN -> "${rate(-h.threshold, 0)} 도달"
+        Direction.UP -> "${sessionPrefix(h)}${rate(h.threshold, 0)} 도달"
+        Direction.DOWN -> "${sessionPrefix(h)}${rate(-h.threshold, 0)} 도달"
         Direction.UPPER_LIMIT -> "상한가 도달"
         Direction.LOWER_LIMIT -> "하한가 도달"
         Direction.HIGH_52W -> "52주 신고가 달성"

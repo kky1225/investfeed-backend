@@ -36,11 +36,15 @@ object ChatLogLabel {
         "get_calendar" to "경제 일정",
         "get_recommend_list" to "추천 종목",
         "search_news" to "뉴스 검색",
+        "get_my_watchlist" to "내 관심종목",
         "show_my_portfolio" to "내 계좌 요약",
         "show_my_holding" to "내 보유 종목",
         "show_my_pnl" to "내 실현손익",
+        "show_my_goals" to "내 투자 목표",
         "show_briefing" to "브리핑 다시 보기",
         "create_price_alert" to "목표가 알림 등록",
+        "delete_price_alert" to "목표가 알림 삭제",
+        "update_my_goal" to "투자 목표 변경",
     )
 
     /** 거절: 사유 코드가 곧 "어떤 요청이었는지"를 나타내므로 요청 내용과 거절 이유로 나눠 보여준다 */

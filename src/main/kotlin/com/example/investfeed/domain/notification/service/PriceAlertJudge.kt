@@ -3,6 +3,7 @@ package com.example.investfeed.domain.notification.service
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import kotlin.math.abs
@@ -34,6 +35,7 @@ class PriceAlertJudge(
         thresholds: List<Double>,
         hits: MutableList<HoldingAlertHit>,
         alertDate: LocalDate = LocalDate.now(),
+        extSession: UsSessionBaseService.ExtSession? = null,   // 미국 장외만. 정규장과 따로 센다
     ): Double? {
         val setting = notificationSettingService.getSettingByMemberId(target.memberId)
         val enabled = when (direction) {
@@ -50,12 +52,12 @@ class PriceAlertJudge(
         val absFluRt = abs(fluRt)
         val pending = thresholds
             .filter { absFluRt >= it }
-            .filterNot { notificationService.isPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate) }
+            .filterNot { notificationService.isPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate, extSession) }
         val highestFired = pending.maxOrNull() ?: return null
 
-        if (!notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, highestFired, direction, fluRt, alertDate, target.curPrice)) return null
+        if (!notificationService.createPriceAlert(target.memberId, target.assetType, target.code, target.name, highestFired, direction, fluRt, alertDate, target.curPrice, extSession)) return null
         pending.filter { it < highestFired }.forEach {
-            notificationService.recordPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate)
+            notificationService.recordPriceAlertSent(target.memberId, target.assetType, target.code, it, direction, alertDate, extSession)
         }
 
         if (target.held) {
@@ -64,6 +66,7 @@ class PriceAlertJudge(
                 target.memberId, target.code, target.name, target.link, direction,
                 threshold = highestFired, triggerRate = if (is52w) null else fluRt,
                 price = if (is52w) fluRt else target.curPrice,
+                sessionLabel = extSession?.label,
             )
         }
         return highestFired

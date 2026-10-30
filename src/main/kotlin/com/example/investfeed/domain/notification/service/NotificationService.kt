@@ -7,6 +7,7 @@ import com.example.investfeed.domain.notification.entity.*
 import com.example.investfeed.domain.notification.repository.PriceTargetRepository
 import com.example.investfeed.domain.notification.repository.NotificationAlertLogRepository
 import com.example.investfeed.domain.notification.repository.NotificationRepository
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -65,13 +66,11 @@ class NotificationService(
         fluRt: Double,
         alertDate: LocalDate = LocalDate.now(),
         price: Double? = null,
+        extSession: UsSessionBaseService.ExtSession? = null,
     ): Boolean {
         val today = alertDate
 
-        val alreadySent = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
-            memberId, assetType, assetCode, threshold, direction, today
-        )
-        if (alreadySent) return false
+        if (isPriceAlertSent(memberId, assetType, assetCode, threshold, direction, today, extSession)) return false
 
         val notification = Notification(
             memberId = memberId,
@@ -83,6 +82,7 @@ class NotificationService(
             direction = direction,
             fluRt = fluRt,
             price = price,
+            session = extSession?.name,
         )
         notificationRepository.save(notification)
 
@@ -93,7 +93,8 @@ class NotificationService(
                 assetCode = assetCode,
                 threshold = threshold,
                 direction = direction,
-                alertDate = today
+                alertDate = today,
+                session = alertSession(extSession),
             )
         )
 
@@ -114,8 +115,9 @@ class NotificationService(
         threshold: Double,
         direction: Direction,
         alertDate: LocalDate = LocalDate.now(),
-    ): Boolean = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDate(
-        memberId, assetType, assetCode, threshold, direction, alertDate
+        extSession: UsSessionBaseService.ExtSession? = null,
+    ): Boolean = alertLogRepository.existsByMemberIdAndAssetTypeAndAssetCodeAndThresholdAndDirectionAndAlertDateAndSession(
+        memberId, assetType, assetCode, threshold, direction, alertDate, alertSession(extSession)
     )
 
     @Transactional
@@ -126,8 +128,9 @@ class NotificationService(
         threshold: Double,
         direction: Direction,
         alertDate: LocalDate = LocalDate.now(),
+        extSession: UsSessionBaseService.ExtSession? = null,
     ) {
-        if (isPriceAlertSent(memberId, assetType, assetCode, threshold, direction, alertDate)) return
+        if (isPriceAlertSent(memberId, assetType, assetCode, threshold, direction, alertDate, extSession)) return
         alertLogRepository.save(
             NotificationAlertLog(
                 memberId = memberId,
@@ -135,10 +138,15 @@ class NotificationService(
                 assetCode = assetCode,
                 threshold = threshold,
                 direction = direction,
-                alertDate = alertDate
+                alertDate = alertDate,
+                session = alertSession(extSession),
             )
         )
     }
+
+    /** 미국 장외 급등락은 정규장과 따로 센다 — 장외에서 -5%를 보냈어도 다음 정규장 -5%는 다시 보낸다 (2026-10-29) */
+    private fun alertSession(extSession: UsSessionBaseService.ExtSession?): AlertSession =
+        if (extSession != null) AlertSession.EXT else AlertSession.REGULAR
 
     @Transactional
     fun createPriceTargetAlert(priceTarget: PriceTarget, currentPrice: Double) {

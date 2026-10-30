@@ -44,8 +44,11 @@ src/main/resources/application-local.yml
 logs/
 
 ## CLAUDE CODE
-CLAUDE.md
 .worktreeinclude
-.claude/rules/external-api.md
+.claude/*
+!.claude/settings.json
+!.claude/rules/
+!.claude/skills/
+.claude/settings.local.json
 
 *.sql

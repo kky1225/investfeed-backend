@@ -8,7 +8,7 @@ import java.time.LocalDate
     name = "notification_alert_log",
     uniqueConstraints = [
         UniqueConstraint(
-            columnNames = ["memberId", "assetType", "assetCode", "threshold", "direction", "alertDate"]
+            columnNames = ["memberId", "assetType", "assetCode", "threshold", "direction", "alertDate", "session"]
         )
     ]
 )
@@ -35,5 +35,9 @@ class NotificationAlertLog(
     val direction: Direction,
 
     @Column(nullable = false)
-    val alertDate: LocalDate = LocalDate.now()
+    val alertDate: LocalDate = LocalDate.now(),
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    val session: AlertSession = AlertSession.REGULAR,
 )

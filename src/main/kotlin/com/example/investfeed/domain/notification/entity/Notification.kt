@@ -40,6 +40,9 @@ class Notification(
     @Column
     val price: Double? = null,
 
+    @Column
+    val session: String? = null,   // 미국 장외 급등락만: DAY / PRE / AFTER (UsSessionBaseService.ExtSession). 정규장·그 외 알림은 null
+
     @Column(nullable = false)
     var isRead: Boolean = false,
 

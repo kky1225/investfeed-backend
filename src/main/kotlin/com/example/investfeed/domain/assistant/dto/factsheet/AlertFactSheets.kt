@@ -56,6 +56,7 @@ data class HoldingAlertHit(
     val threshold: Double,                 // 이번 분에 새로 넘은 가장 높은 임계(%). 상하한가·52주는 0
     val triggerRate: Double?,              // 판정 근거 등락률 (당일 고가·저가 기준). 52주는 null
     val price: Double?,                    // 알림함과 같은 괄호 금액: 등락·상하한가=발송 시점 현재가, 52주=52주 고가·저가 (국내·코인 원, 미국 달러)
+    val sessionLabel: String? = null,      // 미국 장외 급등락만: 데이마켓 / 프리마켓 / 애프터마켓 (기준=직전 정규장 종가). 정규장은 null
 )
 
 /** 목표가 도달 — 웹 알림(TARGET_PRICE) 저장·목표가 삭제가 끝난 뒤 비서 타임라인·텔레그램용으로 모은다 (국내·코인·미국, 2026-10-27) */
