@@ -32,6 +32,7 @@ class ServiceTokenFilter(
         private val PERSONAL_TOOL_PREFIXES = listOf(
             "/internal/assistant/tools/show_",
             "/internal/assistant/tools/update_my_goal",
+            "/internal/assistant/tools/update_my_rebalancing",
         )
     }
 

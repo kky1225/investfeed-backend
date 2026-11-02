@@ -41,10 +41,12 @@ object ChatLogLabel {
         "show_my_holding" to "내 보유 종목",
         "show_my_pnl" to "내 실현손익",
         "show_my_goals" to "내 투자 목표",
+        "show_my_rebalancing" to "내 리밸런싱 현황",
         "show_briefing" to "브리핑 다시 보기",
         "create_price_alert" to "목표가 알림 등록",
         "delete_price_alert" to "목표가 알림 삭제",
         "update_my_goal" to "투자 목표 변경",
+        "update_my_rebalancing" to "리밸런싱 비중 변경",
     )
 
     /** 거절: 사유 코드가 곧 "어떤 요청이었는지"를 나타내므로 요청 내용과 거절 이유로 나눠 보여준다 */
@@ -71,6 +73,7 @@ object ChatLogLabel {
         "SIDE" to "순매수/순매도가 빠짐",
         "RANK_TYPE" to "순위 종류(거래대금·거래량·급증률)가 빠짐",
         "RANK_MARKET" to "순위 시장(국내/미국/코인)이 빠짐",
+        "REBALANCING_RATIO" to "바꿀 리밸런싱 비중이 빠짐",
     )
 
     private val BLOCK = mapOf(

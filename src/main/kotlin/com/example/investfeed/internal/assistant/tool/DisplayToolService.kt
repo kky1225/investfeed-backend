@@ -15,6 +15,8 @@ import com.example.investfeed.domain.goal.service.InvestmentGoalService
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
 import com.example.investfeed.domain.realizedpnl.service.RealizedPnlSummaryService
+import com.example.investfeed.domain.rebalancing.dto.res.RebalancingStatusRes
+import com.example.investfeed.domain.rebalancing.service.RebalancingService
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -29,6 +31,7 @@ class DisplayToolService(
     private val assistantMessageRepository: AssistantMessageRepository,
     private val cardStore: CardStore,
     private val investmentGoalService: InvestmentGoalService,
+    private val rebalancingService: RebalancingService,
 ) {
     enum class AssetClass { KR, US, CRYPTO }
 
@@ -37,6 +40,7 @@ class DisplayToolService(
         const val KIND_HOLDING = "HOLDING"
         const val KIND_PNL = "REALIZED_PNL"
         const val KIND_GOALS = "GOALS"
+        const val KIND_REBALANCING = "REBALANCING"
         private const val TOP_N = 3
     }
 
@@ -164,6 +168,13 @@ class DisplayToolService(
 
     fun myGoals(member: Member): CardRef =
         cardStore.put(member.id, KIND_GOALS, GoalsCard(LocalDateTime.now(), investmentGoalService.listGoals().goals))
+
+    /** status 가 null 이면 설정이 없다 — 카드가 웹 리밸런싱 화면으로 안내한다 */
+    data class RebalancingCard(val asOf: LocalDateTime, val status: RebalancingStatusRes?)
+
+    // 웹 리밸런싱 화면(GET /api/rebalancing)과 같은 계산. 회원은 ServiceTokenFilter 가 SecurityContext 에 넣어 둔다
+    fun myRebalancing(member: Member): CardRef =
+        cardStore.put(member.id, KIND_REBALANCING, RebalancingCard(LocalDateTime.now(), rebalancingService.getRebalancing()))
 
     data class BriefingPointer(val messageId: Long, val headline: String, val createdAt: LocalDateTime, val type: BriefingType)
 

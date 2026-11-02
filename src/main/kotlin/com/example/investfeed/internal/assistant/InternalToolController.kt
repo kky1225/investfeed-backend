@@ -15,6 +15,7 @@ import com.example.investfeed.internal.assistant.dto.req.MyWatchlistReq
 import com.example.investfeed.internal.assistant.dto.req.NewsSearchReq
 import com.example.investfeed.internal.assistant.dto.req.PriceAlertDeletePreviewReq
 import com.example.investfeed.internal.assistant.dto.req.PriceAlertPreviewReq
+import com.example.investfeed.internal.assistant.dto.req.RebalancingUpdatePreviewReq
 import com.example.investfeed.internal.assistant.dto.req.RecommendListReq
 import com.example.investfeed.internal.assistant.dto.req.SectorPerformanceReq
 import com.example.investfeed.internal.assistant.dto.req.StockInvestorFlowReq
@@ -171,6 +172,9 @@ class InternalToolController(
     @GetMapping("show_my_goals")
     fun myGoals(@AuthenticationPrincipal user: CustomUserDetails) = tool("show_my_goals") { display.myGoals(user.member) }
 
+    @GetMapping("show_my_rebalancing")
+    fun myRebalancing(@AuthenticationPrincipal user: CustomUserDetails) = tool("show_my_rebalancing") { display.myRebalancing(user.member) }
+
     @GetMapping("show_briefing")
     fun briefing(
         @AuthenticationPrincipal user: CustomUserDetails,
@@ -195,4 +199,11 @@ class InternalToolController(
         @AuthenticationPrincipal user: CustomUserDetails,
         @ModelAttribute req: GoalUpdatePreviewReq,
     ) = tool("update_my_goal") { action.previewGoalUpdate(user.member, req.type, req.targetAmount) }
+
+    // 리밸런싱 비중 변경도 2차 인증 필요 (웹 /api/rebalancing 이 2차 인증 메뉴) — ServiceTokenFilter 가 시장 토큰으로 막는다
+    @GetMapping("update_my_rebalancing/preview")
+    fun previewRebalancingUpdate(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @ModelAttribute req: RebalancingUpdatePreviewReq,
+    ) = tool("update_my_rebalancing") { action.previewRebalancingUpdate(user.member, req) }
 }

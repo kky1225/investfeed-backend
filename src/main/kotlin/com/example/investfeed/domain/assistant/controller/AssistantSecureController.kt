@@ -6,12 +6,14 @@ import com.example.investfeed.common.security.Permissions
 import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.assistant.dto.req.GoalActionReq
+import com.example.investfeed.domain.assistant.dto.req.RebalancingActionReq
 import com.example.investfeed.domain.assistant.dto.req.TimelineQueryReq
 import com.example.investfeed.domain.assistant.dto.res.AssistantTokenRes
 import com.example.investfeed.domain.assistant.dto.res.TimelinePageRes
 import com.example.investfeed.domain.assistant.service.AssistantTokenService
 import com.example.investfeed.domain.assistant.service.TimelineService
 import com.example.investfeed.domain.goal.dto.res.InvestmentGoalRes
+import com.example.investfeed.domain.rebalancing.dto.res.RebalancingSettingRes
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.internal.assistant.tool.ActionToolService
 import com.example.investfeed.internal.assistant.tool.CardStore
@@ -91,6 +93,29 @@ class AssistantSecureController(
         @PathVariable cardRef: String,
     ): ResponseEntity<ApiResponse<Nothing?>> = try {
         actionToolService.cancelGoalUpdate(user.member, cardRef)
+        ok(ResponseCode.ASSISTANT_ACTION_CANCEL, null)
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_ACTION_CANCEL.code, message = e.message ?: "취소할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
+    @PostMapping("actions/rebalancing")
+    @RequiresAction(action = Actions.UPDATE)
+    fun confirmRebalancingUpdate(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @Valid @RequestBody req: RebalancingActionReq,
+    ): ResponseEntity<ApiResponse<RebalancingSettingRes?>> = try {
+        ok(ResponseCode.ASSISTANT_REBALANCING_UPDATE, actionToolService.confirmRebalancingUpdate(user.member, req.cardRef))
+    } catch (e: ToolException) {
+        ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_REBALANCING_UPDATE.code, message = e.message ?: "변경할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)
+    }
+
+    @DeleteMapping("actions/rebalancing/{cardRef}")
+    @RequiresAction(action = Actions.DELETE)
+    fun cancelRebalancingUpdate(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable cardRef: String,
+    ): ResponseEntity<ApiResponse<Nothing?>> = try {
+        actionToolService.cancelRebalancingUpdate(user.member, cardRef)
         ok(ResponseCode.ASSISTANT_ACTION_CANCEL, null)
     } catch (e: ToolException) {
         ResponseEntity(ApiResponse(code = ResponseCode.ASSISTANT_ACTION_CANCEL.code, message = e.message ?: "취소할 수 없습니다.", result = null), HttpStatus.NOT_FOUND)

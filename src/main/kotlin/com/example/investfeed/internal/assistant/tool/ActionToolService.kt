@@ -18,6 +18,10 @@ import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.notification.service.PriceTargetService
+import com.example.investfeed.domain.rebalancing.dto.req.RebalancingSettingReq
+import com.example.investfeed.domain.rebalancing.dto.res.RebalancingSettingRes
+import com.example.investfeed.domain.rebalancing.service.RebalancingService
+import com.example.investfeed.internal.assistant.dto.req.RebalancingUpdatePreviewReq
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -35,11 +39,14 @@ class ActionToolService(
     private val investmentGoalRepository: InvestmentGoalRepository,
     private val investmentGoalService: InvestmentGoalService,
     private val timelineService: TimelineService,
+    private val rebalancingService: RebalancingService,
 ) {
     companion object {
         const val KIND_CONFIRM_PRICE_ALERT = "CONFIRM_PRICE_ALERT"
         const val KIND_CONFIRM_PRICE_ALERT_DELETE = "CONFIRM_PRICE_ALERT_DELETE"
         const val KIND_CONFIRM_GOAL = "CONFIRM_GOAL"
+        const val KIND_CONFIRM_REBALANCING = "CONFIRM_REBALANCING"
+        private val RATIO_DIRECTIONS = setOf("MIN", "MAX")
         const val ACTION_RESULT = "ACTION_RESULT"   // 확인 카드 처리 결과 답변의 subtype
     }
 
@@ -204,6 +211,109 @@ class ActionToolService(
             ?: throw ToolException("확인 카드가 만료되었거나 이미 처리되었습니다")
         cardStore.delete(cardRef)
         finish(member, cardRef, ActionStatus.CANCELED, Headline("투자 목표 변경을 취소했습니다."))
+    }
+
+    data class RebalancingUpdatePreview(val asOf: LocalDateTime, val current: RebalancingSettingRes?, val next: RebalancingSettingRes)
+
+    fun previewRebalancingUpdate(member: Member, req: RebalancingUpdatePreviewReq): CardRef {
+        if (req.isEmpty()) throw ToolException("바꿀 비중을 알려 주세요. (예: 주식 60% 이하, 현금 10% 이상, 종목 최대 20%)")
+        listOfNotNull(req.stockDirection, req.cryptoDirection, req.cashDirection)
+            .firstOrNull { it !in RATIO_DIRECTIONS }
+            ?.let { throw ToolException("비중 방향은 이상(MIN)·이하(MAX)만 있습니다: $it") }
+        listOfNotNull(req.stockRatio, req.cryptoRatio, req.cashRatio)
+            .firstOrNull { it !in 0..100 }
+            ?.let { throw ToolException("주식·코인·현금 비중은 0~100% 범위입니다") }
+        req.maxStockRatio?.takeIf { it !in 1..100 }?.let { throw ToolException("종목 최대 비중은 1~100% 범위입니다") }
+
+        val current = rebalancingService.getSetting()
+        // 아직 누르지 않은 리밸런싱 카드가 있으면 그 카드 값에 이어서 고친다 — 대기 중인 변경은 하나 (2026-11-02).
+        // 그 사이 설정이 바뀐 카드(어차피 확정이 거절됨)는 이어받지 않고 대체만 한다
+        val pending = cardStore.getPending(member.id, KIND_CONFIRM_REBALANCING)
+            ?.let { it.ref to objectMapper.convertValue(it.payload, RebalancingUpdatePreview::class.java) }
+        val base = pending?.second?.takeIf { it.current == current }?.next ?: current
+        val next = if (base != null) {
+            RebalancingSettingRes(
+                stockRatio = req.stockRatio ?: base.stockRatio,
+                stockDirection = req.stockDirection ?: base.stockDirection,
+                cryptoRatio = req.cryptoRatio ?: base.cryptoRatio,
+                cryptoDirection = req.cryptoDirection ?: base.cryptoDirection,
+                cashRatio = req.cashRatio ?: base.cashRatio,
+                cashDirection = req.cashDirection ?: base.cashDirection,
+                maxStockRatio = req.maxStockRatio ?: base.maxStockRatio,
+            )
+        } else {
+            if (req.stockRatio == null || req.cryptoRatio == null || req.cashRatio == null || req.maxStockRatio == null) {
+                throw ToolException("리밸런싱 설정이 없습니다. 새로 설정하려면 주식·코인·현금 비중과 종목 최대 비중을 모두 알려 주세요.")
+            }
+            RebalancingSettingRes(
+                stockRatio = req.stockRatio, stockDirection = req.stockDirection ?: "MAX",
+                cryptoRatio = req.cryptoRatio, cryptoDirection = req.cryptoDirection ?: "MAX",
+                cashRatio = req.cashRatio, cashDirection = req.cashDirection ?: "MIN",
+                maxStockRatio = req.maxStockRatio,
+            )
+        }
+        if (next == current) throw ToolException("이미 같은 리밸런싱 설정입니다")
+        val ref = cardStore.put(member.id, KIND_CONFIRM_REBALANCING, RebalancingUpdatePreview(LocalDateTime.now(), current, next))
+        pending?.first?.let { old ->
+            cardStore.delete(old)
+            timelineService.markActionCard(member.id, old, ActionStatus.REPLACED)
+        }
+        cardStore.setPending(member.id, KIND_CONFIRM_REBALANCING, ref.cardRef)
+        return ref
+    }
+
+    fun confirmRebalancingUpdate(member: Member, cardRef: String): RebalancingSettingRes {
+        val card = cardStore.get(member.id, cardRef)?.takeIf { it.kind == KIND_CONFIRM_REBALANCING }
+            ?: throw ToolException("확인 카드가 만료되었거나 이미 변경되었습니다")
+        val p = objectMapper.convertValue(card.payload, RebalancingUpdatePreview::class.java)
+        // 카드를 만든 뒤 설정이 바뀌었으면(웹에서 저장 등) 카드에 보이는 기존 값이 틀리므로 저장하지 않는다
+        if (rebalancingService.getSetting() != p.current) {
+            cardStore.delete(cardRef)
+            cardStore.clearPending(member.id, KIND_CONFIRM_REBALANCING, cardRef)
+            timelineService.markActionCard(member.id, cardRef, ActionStatus.EXPIRED)
+            throw ToolException("그 사이 리밸런싱 설정이 바뀌었습니다. 다시 요청해 주세요.")
+        }
+        val res = rebalancingService.saveRebalancing(
+            RebalancingSettingReq(
+                stockRatio = p.next.stockRatio, stockDirection = p.next.stockDirection,
+                cryptoRatio = p.next.cryptoRatio, cryptoDirection = p.next.cryptoDirection,
+                cashRatio = p.next.cashRatio, cashDirection = p.next.cashDirection,
+                maxStockRatio = p.next.maxStockRatio,
+            ),
+        )
+        cardStore.delete(cardRef)
+        cardStore.clearPending(member.id, KIND_CONFIRM_REBALANCING, cardRef)
+        // 비중이 들어가 개인 문장 — 2차 인증 전에는 비중 없는 문장으로 보인다
+        val done = if (p.current == null) "설정했습니다" else "변경했습니다"
+        val changes = rebalancingChanges(p.current, p.next).joinToString(", ")
+        val josa = if (changes.endsWith("이상")) "으로" else "로"   // "이상으로" / "이하로" / "20%로"
+        finish(member, cardRef, ActionStatus.CONFIRMED, Headline(
+            "리밸런싱 비중을 $changes$josa $done.", HeadlineScope.PERSONAL, "리밸런싱 비중을 $done.",
+        ))
+        return res
+    }
+
+    fun cancelRebalancingUpdate(member: Member, cardRef: String) {
+        cardStore.get(member.id, cardRef)?.takeIf { it.kind == KIND_CONFIRM_REBALANCING }
+            ?: throw ToolException("확인 카드가 만료되었거나 이미 처리되었습니다")
+        cardStore.delete(cardRef)
+        cardStore.clearPending(member.id, KIND_CONFIRM_REBALANCING, cardRef)
+        finish(member, cardRef, ActionStatus.CANCELED, Headline("리밸런싱 비중 변경을 취소했습니다."))
+    }
+
+    /** 바뀐 항목만 ("주식 60% 이하", "종목 최대 20%"). 새로 설정이면 전부 */
+    private fun rebalancingChanges(current: RebalancingSettingRes?, next: RebalancingSettingRes): List<String> {
+        fun dir(d: String) = if (d == "MIN") "이상" else "이하"
+        fun changed(a: Any?, b: Any?) = current == null || a != b
+        return listOfNotNull(
+            "주식 ${next.stockRatio}% ${dir(next.stockDirection)}"
+                .takeIf { changed(current?.stockRatio, next.stockRatio) || changed(current?.stockDirection, next.stockDirection) },
+            "코인 ${next.cryptoRatio}% ${dir(next.cryptoDirection)}"
+                .takeIf { changed(current?.cryptoRatio, next.cryptoRatio) || changed(current?.cryptoDirection, next.cryptoDirection) },
+            "현금 ${next.cashRatio}% ${dir(next.cashDirection)}"
+                .takeIf { changed(current?.cashRatio, next.cashRatio) || changed(current?.cashDirection, next.cashDirection) },
+            "종목 최대 ${next.maxStockRatio}%".takeIf { changed(current?.maxStockRatio, next.maxStockRatio) },
+        )
     }
 
     private fun goalLabel(type: GoalType) = when (type) {

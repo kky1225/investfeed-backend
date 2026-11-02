@@ -256,6 +256,7 @@ enum class ResponseCode(
     ASSISTANT_PRICE_ALERT_CREATE(message = "비서 목표가 알림 등록에 성공하셨습니다."),
     ASSISTANT_PRICE_ALERT_DELETE(message = "비서 목표가 알림 삭제에 성공하셨습니다."),
     ASSISTANT_GOAL_UPDATE(message = "비서 투자 목표 변경에 성공하셨습니다."),
+    ASSISTANT_REBALANCING_UPDATE(message = "비서 리밸런싱 비중 변경에 성공하셨습니다."),
     ASSISTANT_ACTION_CANCEL(message = "비서 확인 카드 취소에 성공하셨습니다."),
     ASSISTANT_USAGE_GET(message = "비서 사용량 조회에 성공하셨습니다."),
     ASSISTANT_USAGE_LOG_GET(message = "비서 회원별 처리 기록 조회에 성공하셨습니다."),

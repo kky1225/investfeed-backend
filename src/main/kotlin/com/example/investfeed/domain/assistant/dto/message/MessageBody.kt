@@ -63,5 +63,6 @@ data class AccountBroker(
 
 enum class MessageType { BRIEFING, ALERT, USER, ASSISTANT, SYSTEM }
 enum class HeadlineScope { PERSONAL, MARKET }
-enum class ActionStatus { CONFIRMED, CANCELED }
+// REPLACED: 이어서 말해 새 확인 카드로 바뀜 · EXPIRED: 카드를 만든 뒤 설정이 바뀌어 처리하지 않음 (리밸런싱, 2026-11-02)
+enum class ActionStatus { CONFIRMED, CANCELED, REPLACED, EXPIRED }
 enum class SectionStatus { OK, EMPTY, FAILED, LOCKED }

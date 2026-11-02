@@ -58,6 +58,9 @@ class RebalancingService(
         return calculateStatus(setting)
     }
 
+    fun getSetting(): RebalancingSettingRes? =
+        rebalancingSettingRepository.findByMemberId(getMemberId())?.let { toSettingRes(it) }
+
     fun calculateStatus(setting: RebalancingSetting): RebalancingStatusRes {
         val dashboard = assetDashboardService.getAssetDashboard()
         val totalAsset = dashboard.totalAsset
