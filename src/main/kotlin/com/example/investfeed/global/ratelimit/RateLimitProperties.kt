@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component
 class RateLimitProperties(
     @param:Value("\${external-api.rate-limit.kiwoom-interval-ms:200}")
     val kiwoomIntervalMs: Long,
+    @param:Value("\${external-api.rate-limit.kiwoom-holding-interval-ms:370}")
+    val kiwoomHoldingIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.kiwoom-mock-interval-ms:1000}")
     val kiwoomMockIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.kiwoom-per-token-interval-ms:0}")

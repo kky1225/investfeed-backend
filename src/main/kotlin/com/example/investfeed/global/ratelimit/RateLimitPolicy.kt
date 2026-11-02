@@ -18,7 +18,7 @@ class RateLimitPolicy(
         val authHash = request.headers().getFirst(HttpHeaders.AUTHORIZATION)?.hashCode() ?: 0
 
         return when (host) {
-            KIWOOM_HOST -> kiwoomRules(host, authHash, request, props.kiwoomIntervalMs)
+            KIWOOM_HOST -> kiwoomRules(host, authHash, request, kiwoomIntervalMs(request))
             KIWOOM_MOCK_HOST -> kiwoomRules(host, authHash, request, props.kiwoomMockIntervalMs)
             FRED_HOST -> listOf(RateLimitRule("fred", props.fredIntervalMs))
             UPBIT_HOST -> listOf(RateLimitRule("upbit:${upbitGroup(path)}", props.upbitIntervalMs))
@@ -26,6 +26,9 @@ class RateLimitPolicy(
             else -> emptyList()
         }
     }
+
+    private fun kiwoomIntervalMs(request: ClientRequest): Long =
+        if (request.headers().getFirst("api-id") == KIWOOM_HOLDING_API_ID) props.kiwoomHoldingIntervalMs else props.kiwoomIntervalMs
 
     private fun kiwoomRules(host: String, authHash: Int, request: ClientRequest, intervalMs: Long): List<RateLimitRule> {
         val apiId = request.headers().getFirst("api-id") ?: request.url().path
@@ -54,6 +57,7 @@ class RateLimitPolicy(
     companion object {
         private const val KIWOOM_HOST = "api.kiwoom.com"
         private const val KIWOOM_MOCK_HOST = "mockapi.kiwoom.com"
+        private const val KIWOOM_HOLDING_API_ID = "kt00018"
         private const val FRED_HOST = "api.stlouisfed.org"
         private const val UPBIT_HOST = "api.upbit.com"
         private const val TOSS_HOST = "openapi.tossinvest.com"

@@ -95,6 +95,7 @@ press-release:
 external-api:
   rate-limit:
     kiwoom-interval-ms: 220          # 공식: TR당 토큰별 초당 5건 (200은 경계값이라 네트워크 지터로 429 발생 → 10% 여유)
+    kiwoom-holding-interval-ms: 370  # 공식: kt00018 초당 3건 (2026-10-29 공문, 334ms + 10% 여유)
     kiwoom-mock-interval-ms: 1000    # 공식: 모의투자 초당 1건
     kiwoom-per-token-interval-ms: 0  # 1701(전체 한도) 발생 시 조정용 예비
     fred-interval-ms: 600            # 공식: 분당 120건 (API 키 전체). 500은 경계값 → 분당 100건으로 여유 (2026-10-22 HTML 차단 후)
