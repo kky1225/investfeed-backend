@@ -28,6 +28,10 @@ import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.TimeUnit
 import com.example.investfeed.kiwoom.auth.service.AuthClient as KiwoomAuthClient
+import com.example.investfeed.kiwoom.config.WebSocketHandler
+import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service("memberAuthService")
 class AuthService(
@@ -43,6 +47,8 @@ class AuthService(
     private val loginAttemptService: LoginAttemptService,
     private val apiKeyAttemptService: ApiKeyAttemptService,
     private val kiwoomAuthClient: KiwoomAuthClient,
+    private val kiwoomStreamClient: KiwoomStreamClient,
+    private val webSocketHandler: WebSocketHandler,
     private val tossAuthClient: TossAuthClient,
     private val cryptoHoldingClient: CryptoHoldingClient,
     private val passwordEncoder: PasswordEncoder,
@@ -312,6 +318,8 @@ class AuthService(
 
         member.lockedAt = LocalDateTime.now()
         member.lockExpiresAt = null
+
+        afterCommit { webSocketHandler.closeSessions(loginId) }
     }
 
     @Transactional
@@ -471,6 +479,7 @@ class AuthService(
             // 3) grace 에도 없으면 폐기 토큰 재사용 = 탈취 의심 → 세션 폐기
             redisTemplate.opsForValue().get(rotateKey) ?: run {
                 jwtProvider.deleteRefreshToken(loginId)
+                webSocketHandler.closeSessions(loginId)
                 log.error { "refresh token 재사용 감지 — 세션 폐기 (loginId=$loginId)" }
                 throw RefreshTokenReuseDetectedException()
             }
@@ -512,12 +521,14 @@ class AuthService(
         jwtProvider.deleteRefreshToken(loginId)
         accessToken?.let { jwtProvider.blacklistAccessToken(it) }
         invalidateSecondaryAuth(loginId)
+        afterCommit { webSocketHandler.closeSessions(loginId) }
     }
 
     fun logout(loginId: String, accessToken: String? = null) {
         jwtProvider.deleteRefreshToken(loginId)
         accessToken?.let { jwtProvider.blacklistAccessToken(it) }
         invalidateSecondaryAuth(loginId)
+        webSocketHandler.closeSessions(loginId)
     }
 
     @Transactional(readOnly = true)
@@ -581,6 +592,23 @@ class AuthService(
         }
 
         memberApiKeyRepository.delete(apiKey)
+
+        if (apiKey.broker.name == "키움증권") {
+            val appKey = apiKey.appKey
+            // 같은 키를 공유하는 계정(예: 스케줄러 계정)이 남아 있으면 연결·토큰은 유지한다
+            val shared = memberApiKeyRepository.findAllByBrokerId(apiKey.broker.id).any { it.id != apiKey.id && it.appKey == appKey }
+            afterCommit {
+                if (shared) kiwoomStreamClient.removeSubscriber(appKey, loginId) else kiwoomStreamClient.releaseKey(appKey)
+            }
+        }
+    }
+
+    private fun afterCommit(block: () -> Unit) {
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                runCatching(block).onFailure { log.error(it) { "커밋 후 실시간 연결 정리 실패" } }
+            }
+        })
     }
 
     private fun MemberApiKey.toApiKeyRes(): ApiKeyRes {

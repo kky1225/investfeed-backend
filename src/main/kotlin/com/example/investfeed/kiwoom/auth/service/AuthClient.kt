@@ -12,6 +12,7 @@ import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.kiwoom.exception.AccessTokenException
 import com.example.investfeed.kiwoom.exception.AccessTokenNotFoundException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.socket.dto.KiwoomSocketOwner
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.beans.factory.annotation.Qualifier
@@ -86,6 +87,24 @@ class AuthClient(
         val redisKey = getRedisKey(appKey)
         return redisTemplate.opsForValue().get(redisKey)
             ?: throw AccessTokenNotFoundException()
+    }
+
+    fun getCurrentSocketOwner(): KiwoomSocketOwner = getSocketOwner(getLoginIdFromSecurityContext())
+
+    fun getSocketOwner(loginId: String): KiwoomSocketOwner {
+        val (appKey, _) = resolveApiKeys(loginId)
+        return KiwoomSocketOwner(
+            keyId = shortHash(appKey),
+            loginId = loginId,
+            accessToken = redisTemplate.opsForValue().get(getRedisKey(appKey))
+                ?: throw AccessTokenNotFoundException(),
+        )
+    }
+
+    fun keyId(appKey: String): String = shortHash(appKey)
+
+    fun evictAccessToken(appKey: String) {
+        redisTemplate.delete(getRedisKey(appKey))
     }
 
     private fun refreshToken(loginId: String) {

@@ -32,6 +32,7 @@ enum class SchedulerName(
         SchedulerType.FAST, 60, "매초(09:00~15:30, 서킷브레이커 1분 유지 판정)", blockedOnHoliday = true,
         crons = listOf(SchedulerCron.CIRCUIT_BREAKER_CHECK),
     ),
+    KiwoomSocketCleanupScheduler(SchedulerType.FAST, 60, "매분(유휴 키움 소켓 정리)", crons = listOf(SchedulerCron.KIWOOM_SOCKET_CLEANUP)),
 
     // SLOW (주기)
     RecommendTodayDirectionScheduler(

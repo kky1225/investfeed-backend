@@ -33,7 +33,7 @@ class KiwoomStreamClient(
         log.debug { "실시간 등록 $groups" }
 
         socketManager.register(
-            accessToken = authClient.getCurrentAccessToken(),
+            owner = authClient.getCurrentSocketOwner(),
             groups = groups,
         )
     }
@@ -43,9 +43,19 @@ class KiwoomStreamClient(
 
         authClient.ensureAccessToken(loginId)
         socketManager.ensurePersistent(
-            accessToken = authClient.getAccessToken(loginId),
+            owner = authClient.getSocketOwner(loginId),
             stream = KiwoomStream(item = entry.items, type = entry.types),
         )
+    }
+
+    /** 삭제된 API 키의 소켓 연결과 저장된 토큰을 정리한다 */
+    fun releaseKey(appKey: String) {
+        socketManager.disconnect(authClient.keyId(appKey))
+        authClient.evictAccessToken(appKey)
+    }
+
+    fun removeSubscriber(appKey: String, loginId: String) {
+        socketManager.removeSubscriber(authClient.keyId(appKey), loginId)
     }
 
     private fun isOpen(market: StreamMarket): Boolean = when (market) {

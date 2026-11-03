@@ -8,10 +8,12 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @Configuration
 @EnableWebSocket
 class WebSocketConfig(
-    private val webSocketHandler: WebSocketHandler
+    private val webSocketHandler: WebSocketHandler,
+    private val streamHandshakeInterceptor: StreamHandshakeInterceptor,
 ): WebSocketConfigurer {
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
         registry.addHandler(webSocketHandler, "/ws")
+            .addInterceptors(streamHandshakeInterceptor)
             .setAllowedOrigins("*")
     }
 }

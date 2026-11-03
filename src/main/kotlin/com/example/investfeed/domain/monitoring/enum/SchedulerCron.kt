@@ -7,6 +7,7 @@ object SchedulerCron {
     const val INVESTOR_CLOSE_MARKET = "0 * * * * *"
     const val MARKET_MACRO_DURING = "0 * 9-15 * * MON-FRI"
     const val MARKET_MACRO_CLOSE = "0 0 16 * * MON-FRI"
+    const val KIWOOM_SOCKET_CLEANUP = "0 * * * * *"
 
     // ─────────── SLOW (주기) ───────────
     const val RECOMMEND_TODAY_DIRECTION = "0 */5 9-21 * * *"
