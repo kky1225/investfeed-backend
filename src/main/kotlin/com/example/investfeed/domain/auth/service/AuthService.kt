@@ -9,6 +9,7 @@ import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.auth.repository.RoleRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
+import com.example.investfeed.domain.notification.config.NotificationWebSocketHandler
 import com.example.investfeed.domain.permission.repository.RolePermissionRepository
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.security.JwtProvider
@@ -49,6 +50,7 @@ class AuthService(
     private val kiwoomAuthClient: KiwoomAuthClient,
     private val kiwoomStreamClient: KiwoomStreamClient,
     private val webSocketHandler: WebSocketHandler,
+    private val notificationWebSocketHandler: NotificationWebSocketHandler,
     private val tossAuthClient: TossAuthClient,
     private val cryptoHoldingClient: CryptoHoldingClient,
     private val passwordEncoder: PasswordEncoder,
@@ -83,12 +85,7 @@ class AuthService(
 
         if (!passwordEncoder.matches(req.password, member.password)) {
             val result = loginAttemptService.handleFailedLogin(member.loginId)
-            if (result.locked) {
-                if (result.lockDurationSeconds == null) {
-                    throw AccountPermanentlyLockedException()
-                }
-                throw AccountLockedByFailureException(result.lockDurationSeconds)
-            }
+            result.lockDurationSeconds?.let { throw AccountLockedByFailureException(it) }
             throw InvalidCredentialsException()
         }
 
@@ -142,19 +139,18 @@ class AuthService(
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
 
+        if (member.isSuspended()) throw AccountPermanentlyLockedException()
+
         val secret = member.totpSecret
             ?: redisTemplate.opsForValue().get("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
             ?: throw TotpNotSetupException()
 
         if (!totpService.verifyCode(secret, code)) {
             val result = totpAttemptService.handleFailedTotp(loginId)
-            if (result.locked) {
+            result.lockDurationSeconds?.let {
                 redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
                 redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
-                if (result.lockDurationSeconds == null) {
-                    throw AccountPermanentlyLockedException()
-                }
-                throw AccountLockedByFailureException(result.lockDurationSeconds)
+                throw AccountLockedByFailureException(it)
             }
             throw InvalidTotpCodeException(result.remainingAttempts)
         }
@@ -280,7 +276,7 @@ class AuthService(
             failedTotpAttempts = failedTotpAttempts,
             lockedAt = lockedAt,
             lockExpiresAt = lockExpiresAt,
-            permanentLock = lockedAt != null && lockExpiresAt == null,
+            permanentLock = isSuspended(),
             totpEnabled = totpSecret != null,
             secondaryPasswordEnabled = secondaryPassword != null,
             apiKeyLocked = apiKeyLocked,
@@ -319,7 +315,10 @@ class AuthService(
         member.lockedAt = LocalDateTime.now()
         member.lockExpiresAt = null
 
-        afterCommit { webSocketHandler.closeSessions(loginId) }
+        afterCommit {
+            logout(loginId)
+            notificationWebSocketHandler.closeSessions(member.id)
+        }
     }
 
     @Transactional
@@ -458,6 +457,9 @@ class AuthService(
         val loginId = jwtProvider.getLoginId(refreshToken)
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+
+        // 정지 시 refresh 토큰이 지워져 있으므로 아래 재사용 감지로 빠져 탈취 의심 로그가 남기 전에 막는다
+        if (member.isSuspended()) throw AccountPermanentlyLockedException()
 
         val rotateKey = "${RedisKeyPrefix.REFRESH_ROTATE.prefix}$refreshToken"
         val current = jwtProvider.getStoredRefreshToken(loginId)

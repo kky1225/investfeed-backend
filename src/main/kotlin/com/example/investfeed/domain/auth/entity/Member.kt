@@ -59,4 +59,7 @@ class Member(
 
     @Column(nullable = false)
     var apiKeyLocked: Boolean = false
-)
+) {
+    /** 관리자 잠금(정지) 여부. 자동 잠금은 항상 해제 시각이 있으므로 해제 시각 없는 잠금은 관리자 잠금뿐이다 */
+    fun isSuspended(): Boolean = lockedAt != null && lockExpiresAt == null
+}

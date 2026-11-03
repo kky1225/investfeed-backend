@@ -52,7 +52,10 @@ class ServiceTokenFilter(
                 return reject(response, "secondary auth required", HttpServletResponse.SC_FORBIDDEN)
             }
             val memberId = claims.subject.toLongOrNull() ?: return reject(response, "sub must be memberId")
-            memberRepository.findById(memberId).orElse(null) ?: return reject(response, "unknown member")
+            val found = memberRepository.findById(memberId).orElse(null) ?: return reject(response, "unknown member")
+            // 비서 토큰은 이미 발급된 뒤 5분간 유효하므로 정지 계정의 도구 호출은 여기서 막는다
+            if (found.isSuspended()) return reject(response, "account suspended")
+            found
         } catch (e: Exception) {
             log.warn { "서비스 토큰 검증 실패: ${e.javaClass.simpleName}: ${e.message}" }
             return reject(response, "invalid service token")

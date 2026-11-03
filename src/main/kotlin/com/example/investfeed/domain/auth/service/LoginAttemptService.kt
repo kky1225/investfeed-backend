@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.auth.service
 
-import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -24,47 +23,33 @@ class LoginAttemptService(
     }
 
     data class LoginAttemptResult(
-        val locked: Boolean,
-        val lockDurationSeconds: Long? // null이면 영구잠금, 양수면 잠금 시간(초)
+        val lockDurationSeconds: Long? // null이면 잠기지 않음, 양수면 잠금 시간(초)
     )
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleFailedLogin(loginId: String): LoginAttemptResult {
         val member = memberRepository.findByLoginId(loginId)
-            .orElse(null) ?: return LoginAttemptResult(false, null)
+            .orElse(null) ?: return LoginAttemptResult(null)
 
         member.failedLoginAttempts++
 
-        val lockMinutes = getLockDurationMinutes(member.failedLoginAttempts, member.role)
+        val lockMinutes = getLockDurationMinutes(member.failedLoginAttempts)
 
         if (lockMinutes != null) {
             val now = LocalDateTime.now()
             member.lockedAt = now
-            member.lockExpiresAt = if (lockMinutes < 0) null else now.plusMinutes(lockMinutes)
-            log.warn { "계정 잠금: loginId=${member.loginId}, 실패횟수=${member.failedLoginAttempts}, 해제시각=${member.lockExpiresAt ?: "영구"}" }
+            member.lockExpiresAt = now.plusMinutes(lockMinutes)
+            log.warn { "계정 잠금: loginId=${member.loginId}, 실패횟수=${member.failedLoginAttempts}, 해제시각=${member.lockExpiresAt}" }
         }
 
-        return LoginAttemptResult(
-            locked = lockMinutes != null,
-            lockDurationSeconds = lockMinutes?.let { if (it < 0) null else it * 60 }
-        )
+        return LoginAttemptResult(lockDurationSeconds = lockMinutes?.let { it * 60 })
     }
 
-    private fun getLockDurationMinutes(attempts: Int, role: Role): Long? {
-        if (role.code == "ADMIN") {
-            return when {
-                attempts >= LOCK_STAGE_3_ATTEMPTS -> LOCK_STAGE_3_MINUTES
-                attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
-                attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
-                else -> null
-            }
-        }
-
-        return when {
-            attempts >= LOCK_STAGE_3_ATTEMPTS -> -1L // 영구 잠금
-            attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
-            attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
-            else -> null
-        }
+    // 아이디만 알면 누구나 실패를 쌓을 수 있으므로 자동 잠금은 항상 시간이 지나면 풀린다. 영구 정지는 관리자만 할 수 있다
+    private fun getLockDurationMinutes(attempts: Int): Long? = when {
+        attempts >= LOCK_STAGE_3_ATTEMPTS -> LOCK_STAGE_3_MINUTES
+        attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
+        attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
+        else -> null
     }
 }

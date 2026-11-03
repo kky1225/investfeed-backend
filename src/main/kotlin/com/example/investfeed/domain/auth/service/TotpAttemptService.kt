@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.auth.service
 
-import com.example.investfeed.domain.auth.entity.Role
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -24,35 +23,32 @@ class TotpAttemptService(
     }
 
     data class TotpAttemptResult(
-        val locked: Boolean,
-        val lockDurationSeconds: Long?, // null이면 영구잠금, 양수면 잠금 시간(초)
+        val lockDurationSeconds: Long?, // null이면 잠기지 않음, 양수면 잠금 시간(초)
         val remainingAttempts: Int?     // 다음 잠금까지 남은 횟수, 잠금 발동 시 null
     )
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleFailedTotp(loginId: String): TotpAttemptResult {
         val member = memberRepository.findByLoginId(loginId)
-            .orElse(null) ?: return TotpAttemptResult(false, null, null)
+            .orElse(null) ?: return TotpAttemptResult(null, null)
 
         member.failedTotpAttempts++
 
-        val lockMinutes = getLockDurationMinutes(member.failedTotpAttempts, member.role)
+        val lockMinutes = getLockDurationMinutes(member.failedTotpAttempts)
 
         if (lockMinutes != null) {
             val now = LocalDateTime.now()
             member.lockedAt = now
-            member.lockExpiresAt = if (lockMinutes < 0) null else now.plusMinutes(lockMinutes)
-            log.warn { "TOTP 실패 계정 잠금: loginId=${member.loginId}, 실패횟수=${member.failedTotpAttempts}, 해제시각=${member.lockExpiresAt ?: "영구"}" }
+            member.lockExpiresAt = now.plusMinutes(lockMinutes)
+            log.warn { "TOTP 실패 계정 잠금: loginId=${member.loginId}, 실패횟수=${member.failedTotpAttempts}, 해제시각=${member.lockExpiresAt}" }
 
             return TotpAttemptResult(
-                locked = true,
-                lockDurationSeconds = if (lockMinutes < 0) null else lockMinutes * 60,
+                lockDurationSeconds = lockMinutes * 60,
                 remainingAttempts = null
             )
         }
 
         return TotpAttemptResult(
-            locked = false,
             lockDurationSeconds = null,
             remainingAttempts = remainingUntilNextLock(member.failedTotpAttempts)
         )
@@ -66,22 +62,12 @@ class TotpAttemptService(
         }
     }
 
-    private fun getLockDurationMinutes(attempts: Int, role: Role): Long? {
-        if (role.code == "ADMIN") {
-            return when {
-                attempts >= LOCK_STAGE_3_ATTEMPTS -> LOCK_STAGE_3_MINUTES
-                attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
-                attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
-                else -> null
-            }
-        }
-
-        return when {
-            attempts >= LOCK_STAGE_3_ATTEMPTS -> -1L // 영구 잠금
-            attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
-            attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
-            else -> null
-        }
+    // 자동 잠금은 항상 시간이 지나면 풀린다. 영구 정지는 관리자만 할 수 있다
+    private fun getLockDurationMinutes(attempts: Int): Long? = when {
+        attempts >= LOCK_STAGE_3_ATTEMPTS -> LOCK_STAGE_3_MINUTES
+        attempts >= LOCK_STAGE_2_ATTEMPTS -> LOCK_STAGE_2_MINUTES
+        attempts >= LOCK_STAGE_1_ATTEMPTS -> LOCK_STAGE_1_MINUTES
+        else -> null
     }
 
     private fun remainingUntilNextLock(attempts: Int): Int? {

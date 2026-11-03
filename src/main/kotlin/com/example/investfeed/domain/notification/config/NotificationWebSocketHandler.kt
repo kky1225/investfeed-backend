@@ -46,6 +46,13 @@ class NotificationWebSocketHandler : TextWebSocketHandler() {
         }
     }
 
+    fun closeSessions(memberId: Long) {
+        userSessions[memberId]?.forEach { session ->
+            runCatching { session.close(CloseStatus.NORMAL) }
+                .onFailure { log.error { "알림 세션 종료 실패: memberId=$memberId, sessionId=${session.id}, ${it.message}" } }
+        }
+    }
+
     private fun memberIdOf(session: WebSocketSession): Long? =
         session.attributes[NotificationHandshakeInterceptor.MEMBER_ID] as? Long
 }

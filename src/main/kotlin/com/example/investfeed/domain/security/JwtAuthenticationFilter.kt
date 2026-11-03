@@ -21,7 +21,10 @@ class JwtAuthenticationFilter(
 
         if (token != null && jwtProvider.validateToken(token) && !jwtProvider.isBlacklisted(token)) {
             val authentication = jwtProvider.getAuthentication(token)
-            SecurityContextHolder.getContext().authentication = authentication
+            // 관리자가 정지한 계정은 access 토큰이 남아 있어도 인증하지 않는다
+            if (!(authentication.principal as CustomUserDetails).member.isSuspended()) {
+                SecurityContextHolder.getContext().authentication = authentication
+            }
         }
 
         filterChain.doFilter(request, response)

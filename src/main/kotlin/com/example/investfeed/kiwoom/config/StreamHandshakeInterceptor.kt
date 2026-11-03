@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.config
 
+import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.domain.security.JwtProvider
 import mu.KotlinLogging
 import org.springframework.http.server.ServerHttpRequest
@@ -49,7 +50,9 @@ class StreamHandshakeInterceptor(
                 .find { it.startsWith("$ACCESS_TOKEN_COOKIE=") }
                 ?.substringAfter("$ACCESS_TOKEN_COOKIE=")
                 ?.takeIf { jwtProvider.validateToken(it) && !jwtProvider.isBlacklisted(it) }
-                ?.let { jwtProvider.getLoginId(it) }
+                ?.let { (jwtProvider.getAuthentication(it).principal as CustomUserDetails).member }
+                ?.takeUnless { it.isSuspended() }
+                ?.loginId
         } catch (e: Exception) {
             log.error(e) { "실시간 WebSocket 계정 식별 실패" }
             null
