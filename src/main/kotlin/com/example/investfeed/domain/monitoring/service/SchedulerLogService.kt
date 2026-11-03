@@ -15,6 +15,7 @@ enum class SchedulerType { FAST, SLOW }
 class SchedulerLogService(
     private val schedulerStatusRepository: SchedulerStatusRepository,
     private val recordWriter: SchedulerRecordWriter,
+    private val failureAlertService: SchedulerFailureAlertService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -69,6 +70,9 @@ class SchedulerLogService(
             runCatching {
                 recordWriter.appendLog(scheduler, startedAt, finishedAt, durationMs, "FAILED", message)
             }.onFailure { log.error { "scheduler_log 실패 INSERT 실패 ($name): ${it.message}" } }
+
+            runCatching { failureAlertService.notifyFailure(scheduler, message) }
+                .onFailure { log.error { "스케줄러 실패 알림 오류 ($name): ${it.message}" } }
 
             throw e
         } finally {

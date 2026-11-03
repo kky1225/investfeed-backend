@@ -289,4 +289,26 @@ class NotificationService(
             log.warn { "API Key 만료 WebSocket 알림 전송 실패: ${e.message}" }
         }
     }
+
+    @Transactional
+    fun createSchedulerFailureAlert(memberId: Long, schedulerName: String, title: String) {
+        val notification = Notification(
+            memberId = memberId,
+            type = NotificationType.SCHEDULER,
+            assetType = AssetType.TOTAL,
+            assetCode = "SCHEDULER_$schedulerName",
+            assetName = title,
+            threshold = 0.0,
+            direction = Direction.SCHEDULER_FAILED,
+            fluRt = 0.0,
+        )
+        notificationRepository.save(notification)
+
+        try {
+            val res = NotificationRes.from(notification, linkResolver.link(notification))
+            notificationWebSocketHandler.sendToUser(memberId, objectMapper.writeValueAsString(res))
+        } catch (e: Exception) {
+            log.warn { "스케줄러 실패 WebSocket 알림 전송 실패: ${e.message}" }
+        }
+    }
 }
