@@ -13,6 +13,7 @@ import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.circuitbreaker.dto.CircuitBreakerFiredEvent
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.crawler.NaverMarketIndexCrawler
+import com.example.investfeed.domain.notification.service.AlertExclusionService
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -35,6 +36,7 @@ class IndexAlertService(
     private val alertRepository: AssistantIndexAlertRepository,
     private val assistantSettingService: AssistantSettingService,
     private val memberRepository: MemberRepository,
+    private val alertExclusionService: AlertExclusionService,
     private val timelineService: TimelineService,
     private val telegramNotifier: TelegramNotifier,
     private val objectMapper: ObjectMapper,
@@ -186,8 +188,9 @@ class IndexAlertService(
         val finalBody = body.copy(refs = mapOf("alertId" to entity.id))
         val telegramText = AlertTemplateRenderer.renderIndexAlertTelegram(fact, card)
         var posted = 0
+        val excluded = alertExclusionService.excludedMemberIds()
         memberRepository.findAll()
-            .filter { recipient(assistantSettingService.findOrDefault(it.id)) }
+            .filter { it.id !in excluded && recipient(assistantSettingService.findOrDefault(it.id)) }
             .forEach { member ->
                 runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
                     .onSuccess {

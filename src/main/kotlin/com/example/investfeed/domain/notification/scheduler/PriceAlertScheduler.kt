@@ -17,6 +17,7 @@ import com.example.investfeed.domain.notification.entity.PriceTargetDirection
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.notification.service.AlertExclusionService
 import com.example.investfeed.domain.notification.service.AlertTarget
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.PriceAlertJudge
@@ -54,6 +55,7 @@ class PriceAlertScheduler(
     private val notificationService: NotificationService,
     private val notificationSettingService: com.example.investfeed.domain.notification.service.NotificationSettingService,
     private val judge: PriceAlertJudge,
+    private val alertExclusionService: AlertExclusionService,
     private val priceTargetRepository: com.example.investfeed.domain.notification.repository.PriceTargetRepository,
     private val holidayService: HolidayService,
     private val memberHoldingRepository: MemberHoldingRepository,
@@ -85,6 +87,7 @@ class PriceAlertScheduler(
     @Scheduled(cron = SchedulerCron.PRICE_ALERT, scheduler = "fastScheduler")
     fun checkPriceAlerts() {
         schedulerLogService.execute(SchedulerName.PriceAlertScheduler) {
+            val excluded = alertExclusionService.excludedMemberIds()
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
@@ -96,20 +99,20 @@ class PriceAlertScheduler(
 
             val start = System.currentTimeMillis()
             val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
-            val holdings = memberHoldingRepository.findAll()
+            val holdings = memberHoldingRepository.findAll().filterNot { it.memberId in excluded }
             val holdingHits = mutableListOf<HoldingAlertHit>()
             val targetHits = mutableListOf<PriceTargetHit>()
             var stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>? = null
             var tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>? = null
 
             try {
-                stockDataMap = checkStockAlerts(holdings.filter { it.stkCd.endsWith(KR_SUFFIX) }, holdingHits)
+                stockDataMap = checkStockAlerts(holdings.filter { it.stkCd.endsWith(KR_SUFFIX) }, holdingHits, excluded)
             } catch (e: Exception) {
                 log.error(e) { "주식 가격 알림 체크 실패" }
             }
 
             try {
-                tickerMap = checkCryptoAlerts(holdings.filter { it.stkCd.startsWith(CRYPTO_PREFIX) }, holdingHits)
+                tickerMap = checkCryptoAlerts(holdings.filter { it.stkCd.startsWith(CRYPTO_PREFIX) }, holdingHits, excluded)
             } catch (e: Exception) {
                 log.error(e) { "암호화폐 가격 알림 체크 실패" }
             }
@@ -121,19 +124,19 @@ class PriceAlertScheduler(
             }
 
             try {
-                checkStockPriceTargets(stockDataMap ?: emptyMap(), targetHits)
+                checkStockPriceTargets(stockDataMap ?: emptyMap(), targetHits, excluded)
             } catch (e: Exception) {
                 log.error(e) { "주식 목표가 알림 체크 실패" }
             }
 
             try {
-                checkCryptoPriceTargets(tickerMap ?: emptyMap(), targetHits)
+                checkCryptoPriceTargets(tickerMap ?: emptyMap(), targetHits, excluded)
             } catch (e: Exception) {
                 log.error(e) { "암호화폐 목표가 알림 체크 실패" }
             }
 
             try {
-                usPriceTargetChecker.check(targetHits, now)
+                usPriceTargetChecker.check(targetHits, now, excluded)
             } catch (e: Exception) {
                 log.error(e) { "미국 주식 목표가 알림 체크 실패" }
             }
@@ -160,6 +163,7 @@ class PriceAlertScheduler(
     private fun checkStockAlerts(
         krHoldings: List<MemberHolding>,
         hits: MutableList<HoldingAlertHit>,
+        excluded: Set<Long>,
     ): Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest> {
         if (holidayService.isHoliday()) {
             return emptyMap()
@@ -169,7 +173,7 @@ class PriceAlertScheduler(
             return emptyMap()
         }
 
-        val groups = watchlistGroupRepository.findAll()
+        val groups = watchlistGroupRepository.findAll().filterNot { it.memberId in excluded }
         val groupToMember = groups.associate { it.id to it.memberId }
         val watchlist = if (groups.isEmpty()) emptyList() else watchlistItemRepository.findByGroupIdIn(groups.map { it.id })
             .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.stkCd, item.stkNm) } }
@@ -236,8 +240,9 @@ class PriceAlertScheduler(
     private fun checkCryptoAlerts(
         cryptoHoldings: List<MemberHolding>,
         hits: MutableList<HoldingAlertHit>,
+        excluded: Set<Long>,
     ): Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes> {
-        val groups = cryptoWatchlistGroupRepository.findAll()
+        val groups = cryptoWatchlistGroupRepository.findAll().filterNot { it.memberId in excluded }
         val groupToMember = groups.associate { it.id to it.memberId }
         val watchlist = if (groups.isEmpty()) emptyList() else cryptoWatchlistItemRepository.findByGroupIdIn(groups.map { it.id })
             .mapNotNull { item -> groupToMember[item.groupId]?.let { MemberAsset(it, item.market, item.koreanName) } }
@@ -268,8 +273,9 @@ class PriceAlertScheduler(
         return tickerMap
     }
 
-    private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>, hits: MutableList<PriceTargetHit>) {
-        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK).filterNot { it.assetCode.endsWith(UsHoldingAlertChecker.US_SUFFIX) }   // 미국은 UsPriceTargetChecker
+    private fun checkStockPriceTargets(stockDataMap: Map<String, com.example.investfeed.kiwoom.stock.dto.res.KiwoomStockInterest>, hits: MutableList<PriceTargetHit>, excluded: Set<Long>) {
+        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK)
+            .filterNot { it.assetCode.endsWith(UsHoldingAlertChecker.US_SUFFIX) || it.memberId in excluded }   // 미국은 UsPriceTargetChecker
         if (targets.isEmpty()) return
 
         val missingCodes = targets.map { it.assetCode }.filter { it !in stockDataMap }.distinct()
@@ -302,8 +308,8 @@ class PriceAlertScheduler(
         }
     }
 
-    private fun checkCryptoPriceTargets(tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>, hits: MutableList<PriceTargetHit>) {
-        val targets = priceTargetRepository.findByAssetType(AssetType.CRYPTO)
+    private fun checkCryptoPriceTargets(tickerMap: Map<String?, com.example.investfeed.upbit.ticker.dto.res.UpbitTickerRes>, hits: MutableList<PriceTargetHit>, excluded: Set<Long>) {
+        val targets = priceTargetRepository.findByAssetType(AssetType.CRYPTO).filterNot { it.memberId in excluded }
         if (targets.isEmpty()) return
 
         // tickerMap에 없는 종목은 별도 조회

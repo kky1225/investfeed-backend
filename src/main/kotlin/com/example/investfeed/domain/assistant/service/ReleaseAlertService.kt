@@ -6,6 +6,7 @@ import com.example.investfeed.domain.assistant.repository.AssistantReleaseAlertR
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.calendar.dto.res.CalendarEvent
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
+import com.example.investfeed.domain.notification.service.AlertExclusionService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.dao.DataIntegrityViolationException
@@ -50,6 +51,7 @@ class ReleaseAlertService(
     private val releaseRepository: AssistantReleaseAlertRepository,
     private val assistantSettingService: AssistantSettingService,
     private val memberRepository: MemberRepository,
+    private val alertExclusionService: AlertExclusionService,
     private val timelineService: TimelineService,
     private val telegramNotifier: TelegramNotifier,
     private val objectMapper: ObjectMapper,
@@ -93,8 +95,9 @@ class ReleaseAlertService(
             if (suppressed) { suppressedCount++; return@forEach }
             val finalBody = body.copy(refs = mapOf("alertId" to entity.id))
             val telegramText = AlertTemplateRenderer.renderReleaseTelegram(fact, target)
+            val excluded = alertExclusionService.excludedMemberIds()
             memberRepository.findAll()
-                .filter { assistantSettingService.findOrDefault(it.id).releaseAlertEnabled }
+                .filter { it.id !in excluded && assistantSettingService.findOrDefault(it.id).releaseAlertEnabled }
                 .forEach { member ->
                     runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
                         .onSuccess {

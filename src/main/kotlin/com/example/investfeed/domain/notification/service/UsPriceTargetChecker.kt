@@ -32,9 +32,10 @@ class UsPriceTargetChecker(
         private val DAY_MARKET_CLOSE_KST: LocalTime = LocalTime.of(18, 0)
     }
 
-    fun check(hits: MutableList<PriceTargetHit>, now: LocalDateTime) {
+    fun check(hits: MutableList<PriceTargetHit>, now: LocalDateTime, excluded: Set<Long>) {
         if (!isTradingWindow(now)) return
-        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK).filter { it.assetCode.endsWith(UsHoldingAlertChecker.US_SUFFIX) }
+        val targets = priceTargetRepository.findByAssetType(AssetType.STOCK)
+            .filter { it.assetCode.endsWith(UsHoldingAlertChecker.US_SUFFIX) && it.memberId !in excluded }
         if (targets.isEmpty()) return
 
         val byTicker = targets.groupBy { it.assetCode.removeSuffix(UsHoldingAlertChecker.US_SUFFIX) }
