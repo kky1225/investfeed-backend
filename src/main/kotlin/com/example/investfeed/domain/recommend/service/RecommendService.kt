@@ -46,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.sqrt
@@ -64,6 +65,7 @@ class RecommendService(
     private val stockChartClient: StockChartClient,
     private val stockPickRepository: StockPickRepository,
     private val stockPickHistoryRepository: StockPickHistoryRepository,
+    private val stockPickWriter: StockPickWriter,
     private val memberRepository: MemberRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val brokerRepository: BrokerRepository,
@@ -78,17 +80,26 @@ class RecommendService(
 ) {
     private val log = KotlinLogging.logger {}
 
-    @Transactional
     fun runRecommendStock() {
         schedulerLogService.execute(SchedulerName.RecommendScheduler) {
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                runBlocking { doRecommendStock() }   // 코루틴 경계: 트랜잭션·SecurityContext 가 묶인 이 스레드에서만 실행
+                runBlocking { doRecommendStock() }   // 코루틴 경계: SecurityContext 가 묶인 이 스레드에서만 실행
+            } catch (e: Exception) {
+                clearPicksAfterFailure(e)
+                throw e
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
+    }
+
+    /** 실패한 배치의 지난 추천으로 다음 날 모의투자가 신규 진입하지 않도록 목록을 비운다 */
+    private fun clearPicksAfterFailure(cause: Exception) {
+        runCatching { stockPickWriter.clearCurrent() }
+            .onSuccess { log.error(cause) { "추천 배치 실패 — 추천 목록을 비움: ${cause.message}" } }
+            .onFailure { log.error(it) { "추천 배치 실패 후 추천 목록 비우기 실패 — 지난 추천이 남아 있음: ${cause.message}" } }
     }
 
     @Transactional
@@ -179,6 +190,7 @@ class RecommendService(
         }
 
         val (riskMap, marketTypeMap) = fetchStockMetadataMaps()
+        check(riskMap.isNotEmpty()) { "종목 메타데이터 조회 실패 — 위험 플래그 없이 추천을 저장하지 않음" }
 
         // ka10066 은 연속조회(next-key) 체인이라 순차. 32페이지 안팎.
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
@@ -195,8 +207,7 @@ class RecommendService(
             throw IllegalStateException(
                 "RecommendScheduler 핵심 API(investorTradeCloseMarket) 실패 — " +
                     "return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, " +
-                    "return_msg=${kiwoomInvestorTradeCloseMarketRes.return_msg}. " +
-                    "stock_pick 갱신을 롤백하여 직전 거래일 데이터 보존."
+                    "return_msg=${kiwoomInvestorTradeCloseMarketRes.return_msg}"
             )
         }
 
@@ -216,22 +227,23 @@ class RecommendService(
         val targets = buyCandidates.mapNotNull { c -> c.stk_cd?.let { cd -> c.stk_nm?.let { nm -> Triple(cd, nm, Position.BUY) } } } +
             sellCandidates.mapNotNull { c -> c.stk_cd?.let { cd -> c.stk_nm?.let { nm -> Triple(cd, nm, Position.SELL) } } }
 
+        val fetchFailures = AtomicInteger()
         val processed: List<ProcessedPick> = targets
             .mapConcurrently(RECOMMEND_CONCURRENCY) { (stkCd, stkNm, position) ->
-                processCandidate(stkCd, stkNm, position, riskMap, marketTypeMap)
+                processCandidate(stkCd, stkNm, position, riskMap, marketTypeMap, onFetchFailed = { fetchFailures.incrementAndGet() })
             }
             .filterNotNull()
 
-        // 현재용 테이블 갱신
-        stockPickRepository.deleteAll()
-        stockPickRepository.saveAll(processed.map { it.toCurrentEntity() })
+        // 조회 실패와 시그널 미달은 둘 다 null 이라 결과만으로는 구분되지 않아 따로 센다
+        check(!exceedsFetchFailureLimit(fetchFailures.get(), targets.size)) {
+            "추천 후보 조회 실패 과다 — 실패 ${fetchFailures.get()}건 / 후보 ${targets.size}건"
+        }
 
-        // 이력용 테이블 — 같은 날 재실행 시 "오늘분"을 최신 실행분으로 교체(stk_cd·일자당 1건).
-        stockPickHistoryRepository.deleteByPickDateBetween(
-            now.toLocalDate().atStartOfDay(),
-            now.toLocalDate().atTime(23, 59, 59),
+        stockPickWriter.replace(
+            picks = processed.map { it.toCurrentEntity() },
+            history = processed.map { it.toHistoryEntity(now) },
+            pickDay = now.toLocalDate(),
         )
-        stockPickHistoryRepository.saveAll(processed.map { it.toHistoryEntity(now) })
 
         val counts = processed.groupingBy { it.type }.eachCount()
         log.info {
@@ -254,8 +266,12 @@ class RecommendService(
         prefetched: List<KiwoomStockInvestor>? = null,
         prefetchedDefaultInfo: KiwoomStockDefaultInfoRes? = null,
         prefetchedPriceMetrics: PriceMetrics? = null,
+        onFetchFailed: () -> Unit = {},
     ): ProcessedPick? {
-        val items = prefetched ?: fetchInvestorSeries(stkCd, "$stkNm($stkCd) $position") ?: return null
+        val items = prefetched ?: fetchInvestorSeries(stkCd, "$stkNm($stkCd) $position") ?: run {
+            onFetchFailed()
+            return null
+        }
 
         val window = items.take(RECENT_WINDOW + PRIOR_WINDOW)
         val penfndValues = window.map { it.penfnd_etc?.toLongOrNull() ?: 0L }
@@ -282,6 +298,7 @@ class RecommendService(
 
         // ka10001 은 시총(컷 판정)과 52주 고저(가격 지표) 둘 다에 쓰이므로 한 번만 조회해 공유한다.
         val defaultInfo = prefetchedDefaultInfo ?: fetchDefaultInfo(stkCd)
+        if (defaultInfo == null) onFetchFailed()
         val marketCap = defaultInfo?.mac?.toLongOrNull()
 
         if (marketCap == null || marketCap == 0L) {
@@ -1081,6 +1098,12 @@ class RecommendService(
         private const val TOP_N = 100
         /** 후보/종목 단위 동시 처리 상한 — TR 간격은 제한기가 보장하므로 큐를 채울 만큼만 */
         private const val RECOMMEND_CONCURRENCY = 8
+        /** 후보 조회 실패가 이 비율을 넘으면 추천을 저장하지 않고 배치를 실패 처리 */
+        private const val MAX_FETCH_FAILURE_RATIO = 0.2
+
+        internal fun exceedsFetchFailureLimit(failed: Int, total: Int): Boolean =
+            total > 0 && failed.toDouble() / total > MAX_FETCH_FAILURE_RATIO
+
         private const val RECENT_WINDOW = 2  // idx 0+1 = 당일+전일
         private const val PRIOR_WINDOW = 10  // idx 2~11
         private const val K_SIGNAL = 1.5          // 연기금 시그널 통과 임계 (평균/평균)
