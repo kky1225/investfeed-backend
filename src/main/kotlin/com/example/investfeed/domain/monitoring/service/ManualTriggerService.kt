@@ -8,6 +8,7 @@ import com.example.investfeed.domain.index.scheduler.IndexInvestorDailyScheduler
 import com.example.investfeed.domain.watchlist.scheduler.WatchlistSyncScheduler
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
+import com.example.investfeed.domain.monitoring.scheduler.ApiCallStatRollupScheduler
 import com.example.investfeed.domain.monitoring.scheduler.SchedulerLogCleanupScheduler
 import com.example.investfeed.domain.notification.scheduler.ApiKeyExpiryScheduler
 import com.example.investfeed.domain.assistant.scheduler.AssistantAlertScheduler
@@ -43,6 +44,7 @@ class ManualTriggerService(
     private val indexInvestorDailyScheduler: IndexInvestorDailyScheduler,
     private val apiKeyExpiryScheduler: ApiKeyExpiryScheduler,
     private val schedulerLogCleanupScheduler: SchedulerLogCleanupScheduler,
+    private val apiCallStatRollupScheduler: ApiCallStatRollupScheduler,
     private val watchlistSyncScheduler: WatchlistSyncScheduler,
     private val stockMasterSyncScheduler: StockMasterSyncScheduler,
     private val holdingGradeService: HoldingGradeService,
@@ -67,6 +69,7 @@ class ManualTriggerService(
             "IndexInvestorDailyScheduler"  to { indexInvestorDailyScheduler.collectDaily() },
             "ApiKeyExpiryScheduler"        to { apiKeyExpiryScheduler.checkApiKeyExpiry() },
             "SchedulerLogCleanupScheduler" to { schedulerLogCleanupScheduler.cleanup() },
+            "ApiCallStatRollupScheduler"   to { apiCallStatRollupScheduler.rollup() },
             "WatchlistSyncScheduler"        to { watchlistSyncScheduler.syncAllStkNm() },
             "StockMasterSyncScheduler"     to { stockMasterSyncScheduler.syncStockMaster() },
             "HoldingGradeScheduler"        to { holdingGradeService.runHoldingGrade() },

@@ -7,6 +7,7 @@ import com.example.investfeed.domain.marketindex.exception.MarketIndexApiExcepti
 import com.example.investfeed.domain.marketindex.exception.MarketIndexResponseException
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -49,6 +50,7 @@ class NaverMarketIndexCrawler(
             apiCallCounterService.increment(ApiProvider.NAVER_CRAWL)
             Mono.just(req)
         })
+        .filter(ApiCallMetricsFilter(ApiProvider.NAVER_CRAWL, apiCallCounterService))
         .build()
 
     companion object {

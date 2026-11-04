@@ -29,6 +29,8 @@ class StockDividendClient(
     private val DIVIDEND_PATH = "/1160100/GetStocDiviInfoService_V2/getDiviInfo_V2"
 
     fun getDividendInfo(pageNo: Int, numOfRows: Int = 5000): Pair<List<DividendApiItem>, Int> {
+        val startedAt = System.nanoTime()
+        var failed = true
         try {
             apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_DIVIDEND)
 
@@ -60,6 +62,7 @@ class StockDividendClient(
             val items = body.items?.item ?: emptyList()
             val totalCount = body.totalCount ?: 0
 
+            failed = false
             return Pair(items, totalCount)
         } catch (e: StockDividendApiException) {
             throw e
@@ -69,6 +72,8 @@ class StockDividendClient(
             log.error { "getDividendInfo Error: ${e.message}" }
 
             throw RuntimeException(e.message)
+        } finally {
+            apiCallCounterService.recordResult(ApiProvider.PUBLIC_DATA_DIVIDEND, failed, (System.nanoTime() - startedAt) / 1_000_000)
         }
     }
 }

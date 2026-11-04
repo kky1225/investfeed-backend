@@ -22,6 +22,8 @@ class EtfDividendClient(
     private val BASE_URL = "https://search-etf.com/backend/get_all_dividends.php"
 
     fun getDividendInfo(stkCd: String): List<EtfDividendApiItem> {
+        val startedAt = System.nanoTime()
+        var failed = true
         try {
             apiCallCounterService.increment(ApiProvider.SEARCH_ETF)
 
@@ -47,6 +49,7 @@ class EtfDividendClient(
                 throw EtfDividendResponseException()
             }
 
+            failed = false
             return response.dividends ?: emptyList()
         } catch (e: EtfDividendApiException) {
             throw e
@@ -56,6 +59,8 @@ class EtfDividendClient(
             log.error { "getDividendInfo Error: ${e.message}" }
 
             throw RuntimeException(e.message)
+        } finally {
+            apiCallCounterService.recordResult(ApiProvider.SEARCH_ETF, failed, (System.nanoTime() - startedAt) / 1_000_000)
         }
     }
 }

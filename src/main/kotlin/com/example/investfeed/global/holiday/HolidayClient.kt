@@ -39,6 +39,8 @@ class HolidayClient(
     data class HolidayInfo(val date: String, val name: String)
 
     fun getHolidayInfos(year: Int): List<HolidayInfo> {
+        val startedAt = System.nanoTime()
+        var failed = true
         try {
             apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_HOLIDAY)
 
@@ -71,6 +73,7 @@ class HolidayClient(
                 throw IllegalStateException("공휴일 API 응답 누락: ${year}년 totalCount=$totalCount, 수신=${items.size} (numOfRows=$NUM_OF_ROWS)")
             }
 
+            failed = false
             return items
                 .filter { it.isHoliday == "Y" && it.locdate != null }
                 .map { HolidayInfo(date = it.locdate.toString(), name = it.dateName ?: "공휴일") }
@@ -82,6 +85,8 @@ class HolidayClient(
             log.warn { "getHolidayInfos Error: ${e.message}" }
 
             throw RuntimeException(e.message)
+        } finally {
+            apiCallCounterService.recordResult(ApiProvider.PUBLIC_DATA_HOLIDAY, failed, (System.nanoTime() - startedAt) / 1_000_000)
         }
     }
 }

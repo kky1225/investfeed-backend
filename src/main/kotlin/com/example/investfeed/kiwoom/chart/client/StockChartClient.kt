@@ -1,6 +1,8 @@
 package com.example.investfeed.kiwoom.chart.client
 
 import com.example.investfeed.common.util.logHttpError
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.*
@@ -22,9 +24,11 @@ class StockChartClient(
     private val DEFAULT_URL: String,
     @Qualifier("kiwoomWebClient")
     private val kiwoomWebClient: WebClient,
-    private val authClient: AuthClient
+    private val authClient: AuthClient,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
+    private val recordQuotaRetry = { apiCallCounterService.recordRetry(ApiProvider.KIWOOM, failureRecorded = true) }
 
     @KiwoomToken
     suspend fun chartMinuteList(
@@ -68,7 +72,7 @@ class StockChartClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = withQuotaRetry("ka10081", { it.return_code }) { kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10081", { it.return_code }, onRetry = recordQuotaRetry) { kiwoomWebClient.post()
                 .uri("$DEFAULT_URL/api/dostk/chart")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10081")

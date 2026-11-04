@@ -2,6 +2,7 @@ package com.example.investfeed.toss.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import com.example.investfeed.global.ratelimit.TossRateLimitRetryFilter
@@ -30,6 +31,7 @@ class TossConfig(
                 Mono.just(req)
             })
             .filter(rateLimitExchangeFilter)
+            .filter(ApiCallMetricsFilter(ApiProvider.TOSS, apiCallCounterService))
             .filter(tossRateLimitRetryFilter)
             .build()
     }

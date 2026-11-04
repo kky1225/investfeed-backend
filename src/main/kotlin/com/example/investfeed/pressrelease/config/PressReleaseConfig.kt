@@ -2,6 +2,7 @@ package com.example.investfeed.pressrelease.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
@@ -24,6 +25,7 @@ class PressReleaseConfig(
                 apiCallCounterService.increment(ApiProvider.PRESS_RELEASE)
                 Mono.just(req)
             })
+            .filter(ApiCallMetricsFilter(ApiProvider.PRESS_RELEASE, apiCallCounterService))
             .build()
     }
 }

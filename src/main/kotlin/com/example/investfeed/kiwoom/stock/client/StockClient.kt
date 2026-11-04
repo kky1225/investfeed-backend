@@ -1,6 +1,8 @@
 package com.example.investfeed.kiwoom.stock.client
 
 import com.example.investfeed.common.util.logHttpError
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.dto.req.StockJumpListReq
 import com.example.investfeed.domain.stock.dto.req.StockNewPriceListReq
@@ -43,8 +45,10 @@ class StockClient(
     @Qualifier("kiwoomWebClient")
     private val kiwoomWebClient: WebClient,
     private val authClient: AuthClient,
+    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
+    private val recordQuotaRetry = { apiCallCounterService.recordRetry(ApiProvider.KIWOOM, failureRecorded = true) }
     private final val STOCK_URL = "/api/dostk/stkinfo"
     private final val STOCK_INTEREST_MAX_CODES = 100
 
@@ -55,7 +59,7 @@ class StockClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = withQuotaRetry("ka10099", { it.return_code }) { kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10099", { it.return_code }, onRetry = recordQuotaRetry) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10099")
@@ -90,7 +94,7 @@ class StockClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = withQuotaRetry("ka10001", { it.return_code }) { kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10001", { it.return_code }, onRetry = recordQuotaRetry) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10001")
@@ -195,7 +199,7 @@ class StockClient(
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
-            val res = withQuotaRetry("ka10059", { it.return_code }) { kiwoomWebClient.post()
+            val res = withQuotaRetry("ka10059", { it.return_code }, onRetry = recordQuotaRetry) { kiwoomWebClient.post()
                 .uri(DEFAULT_URL + STOCK_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .header("api-id", "ka10059")

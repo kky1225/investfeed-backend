@@ -3,6 +3,7 @@ package com.example.investfeed.naver.news.client
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.naver.news.dto.res.NaverNewsRes
 import com.example.investfeed.naver.news.exception.NaverNewsApiException
@@ -32,6 +33,7 @@ class NaverNewsClient(
             apiCallCounterService.increment(ApiProvider.NAVER_NEWS)
             Mono.just(req)
         })
+        .filter(ApiCallMetricsFilter(ApiProvider.NAVER_NEWS, apiCallCounterService))
         .build()
 
     fun searchNews(query: String, display: Int = 20, start: Int = 1, sort: String = "date"): NaverNewsRes {

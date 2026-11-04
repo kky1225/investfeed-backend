@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.lang.management.ManagementFactory
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 import javax.management.ObjectName
@@ -39,6 +40,7 @@ class MonitoringService(
     private val redisTemplate: StringRedisTemplate,
     private val entityManager: EntityManager,
     private val apiCallCounterService: ApiCallCounterService,
+    private val apiCallDailyStatRepository: ApiCallDailyStatRepository,
     private val holidayService: HolidayService,
     private val schedulerCycleEvaluator: SchedulerCycleEvaluator,
     @Qualifier("fastScheduler") private val fastScheduler: ThreadPoolTaskScheduler,
@@ -103,19 +105,29 @@ class MonitoringService(
     // ─────────── 외부 API 호출 통계 ───────────
 
     fun getApiCallStats(): ApiCallStatsRes {
+        val today = LocalDate.now()
+        val stored = apiCallDailyStatRepository.findAllByStatDateIn((1L..6L).map { today.minusDays(it) })
+            .associateBy { it.statDate to it.provider }
         val items = ApiProvider.entries.map { provider ->
             val recent = apiCallCounterService.getRecent7Days(provider)
-            val today = recent.lastOrNull()?.second ?: 0L
+            val todayStat = recent.lastOrNull()
+            val todayCount = todayStat?.callCount ?: 0L
             val ratio = provider.dailyLimit?.let { limit ->
-                if (limit > 0) today.toDouble() / limit.toDouble() else null
+                if (limit > 0) todayCount.toDouble() / limit.toDouble() else null
             }
             ApiCallStatsItemRes(
                 provider = provider.name,
                 label = provider.label,
-                todayCount = today,
+                todayCount = todayCount,
                 dailyLimit = provider.dailyLimit,
                 usageRatio = ratio,
-                recent7Days = recent.map { (date, count) -> DailyCallCount(date.toString(), count) },
+                todayFailed = todayStat?.failed ?: 0L,
+                todayRetried = todayStat?.retried ?: 0L,
+                todayAvgLatencyMs = todayStat?.avgLatencyMs,
+                todayMaxLatencyMs = todayStat?.maxLatencyMs,
+                recent7Days = recent.map { day ->
+                    DailyCallCount.of(day.date, day.callCount, day.failed, stored[day.date to provider.name])
+                },
             )
         }
         return ApiCallStatsRes(items)

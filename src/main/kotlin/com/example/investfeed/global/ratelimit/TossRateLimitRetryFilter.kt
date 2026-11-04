@@ -1,5 +1,7 @@
 package com.example.investfeed.global.ratelimit
 
+import com.example.investfeed.domain.monitoring.enum.ApiProvider
+import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import mu.KotlinLogging
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Component
@@ -16,6 +18,7 @@ class TossRateLimitRetryFilter(
     private val limiter: MinIntervalRateLimiter,
     private val policy: RateLimitPolicy,
     private val props: RateLimitProperties,
+    private val apiCallCounterService: ApiCallCounterService,
 ) : ExchangeFilterFunction {
 
     private val log = KotlinLogging.logger {}
@@ -36,6 +39,7 @@ class TossRateLimitRetryFilter(
                 val waitMs = headers.getFirst(HEADER_RETRY_AFTER)?.toDoubleOrNull()?.let { (it * 1000).toLong() }
                     ?: backoffMs(attemptNo)
                 log.warn { "토스 429 수신 — ${waitMs}ms 후 재시도(${attemptNo + 1}/${props.toss429MaxRetry}): path=$path" }
+                apiCallCounterService.recordRetry(ApiProvider.TOSS)
                 response.releaseBody()
                     .then(Mono.delay(Duration.ofMillis(waitMs)))
                     .then(Mono.defer { attempt(request, next, attemptNo + 1) })

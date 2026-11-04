@@ -2,6 +2,7 @@ package com.example.investfeed.fred.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import org.springframework.beans.factory.annotation.Value
@@ -33,6 +34,7 @@ class FredConfig(
                 Mono.just(req)
             })
             .filter(rateLimitExchangeFilter)
+            .filter(ApiCallMetricsFilter(ApiProvider.FRED, apiCallCounterService))
             .build()
     }
 }

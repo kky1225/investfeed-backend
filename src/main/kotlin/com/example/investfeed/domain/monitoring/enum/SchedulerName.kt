@@ -55,6 +55,7 @@ enum class SchedulerName(
         SchedulerType.SLOW, 120, "매일 00:10", blockedOnHoliday = true, holidayOffsetDays = -1,
         crons = listOf(SchedulerCron.INDEX_DAILY_CLOSE),
     ),
+    ApiCallStatRollupScheduler(SchedulerType.SLOW, 60, "매일 00:00", crons = listOf(SchedulerCron.API_CALL_STAT_ROLLUP)),
     SchedulerLogCleanupScheduler(SchedulerType.SLOW, 60, "매일 04:00", crons = listOf(SchedulerCron.SCHEDULER_LOG_CLEANUP)),
     StockMasterSyncScheduler(SchedulerType.SLOW, 600, "매일 05:00", crons = listOf(SchedulerCron.STOCK_MASTER_SYNC)),
     WatchlistSyncScheduler(SchedulerType.SLOW, 600, "매일 05:15", crons = listOf(SchedulerCron.WATCHLIST_SYNC)),

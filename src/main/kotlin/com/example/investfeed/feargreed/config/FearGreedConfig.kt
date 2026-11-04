@@ -2,6 +2,7 @@ package com.example.investfeed.feargreed.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -30,6 +31,7 @@ class FearGreedConfig(
                 apiCallCounterService.increment(ApiProvider.FEAR_GREED)
                 Mono.just(req)
             })
+            .filter(ApiCallMetricsFilter(ApiProvider.FEAR_GREED, apiCallCounterService))
             .build()
     }
 }

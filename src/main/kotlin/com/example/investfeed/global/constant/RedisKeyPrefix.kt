@@ -32,5 +32,6 @@ enum class RedisKeyPrefix(
     REFRESH_ROTATE("RTROT:", "JWT refresh token 재발급 유예 매핑"),
     BLACKLIST("BL:", "JWT access token 블랙리스트"),
     API_CALL("api_call:", "외부 API 일별 호출 카운터"),
+    API_CALL_HEALTH("api_call_health:", "외부 API 일별 실패·재시도·응답 시간"),
     ASSISTANT("ASSISTANT:", "AI 비서 캐시 (카드·체크포인트·알림 상태)"),
 }

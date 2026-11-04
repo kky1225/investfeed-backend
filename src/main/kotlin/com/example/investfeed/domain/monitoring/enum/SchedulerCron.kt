@@ -26,6 +26,7 @@ object SchedulerCron {
     const val HOLDING_SYNC = "0 0 0 * * *"
     const val HOLIDAY_REFRESH = "0 5 0 * * *"
     const val INDEX_DAILY_CLOSE = "0 10 0 * * *"
+    const val API_CALL_STAT_ROLLUP = "0 0 0 * * *"
     const val SCHEDULER_LOG_CLEANUP = "0 0 4 * * *"
     const val STOCK_MASTER_SYNC = "0 0 5 * * *"
     const val WATCHLIST_SYNC = "0 15 5 * * *"
