@@ -53,9 +53,9 @@ class NotificationHandshakeInterceptor(
                 ?.substringAfter("accessToken=")
                 ?: return null
 
-            if (!jwtProvider.validateToken(token)) return null
+            val claims = jwtProvider.parseAccessClaims(token) ?: return null
 
-            val userDetails = jwtProvider.getAuthentication(token).principal as CustomUserDetails
+            val userDetails = jwtProvider.getAuthentication(claims).principal as CustomUserDetails
             userDetails.member.takeUnless { it.isSuspended() }?.id
         } catch (e: Exception) {
             log.debug { "알림 WebSocket 토큰 파싱 실패: ${e.message}" }

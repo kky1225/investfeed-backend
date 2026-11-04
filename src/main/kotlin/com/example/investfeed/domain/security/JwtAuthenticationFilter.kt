@@ -19,8 +19,12 @@ class JwtAuthenticationFilter(
     ) {
         val token = request.cookies?.find { it.name == "accessToken" }?.value
 
-        if (token != null && jwtProvider.validateToken(token) && !jwtProvider.isBlacklisted(token)) {
-            val authentication = jwtProvider.getAuthentication(token)
+        val claims = token?.let { value ->
+            jwtProvider.parseAccessClaims(value)?.takeUnless { jwtProvider.isBlacklisted(value) }
+        }
+
+        if (claims != null) {
+            val authentication = jwtProvider.getAuthentication(claims)
             // 관리자가 정지한 계정은 access 토큰이 남아 있어도 인증하지 않는다
             if (!(authentication.principal as CustomUserDetails).member.isSuspended()) {
                 SecurityContextHolder.getContext().authentication = authentication

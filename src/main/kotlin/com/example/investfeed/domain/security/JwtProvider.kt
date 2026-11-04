@@ -69,18 +69,17 @@ class JwtProvider(
     fun getStoredRefreshToken(loginId: String): String? =
         redisTemplate.opsForValue().get("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
 
-    fun getAuthentication(token: String): Authentication {
-        val loginId = getClaims(token).subject
-        val userDetails = userDetailsService.loadUserByUsername(loginId)
+    fun getAuthentication(claims: Claims): Authentication {
+        val userDetails = userDetailsService.loadUserByUsername(claims.subject)
         return UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
     }
 
-    fun validateToken(token: String): Boolean {
+    /** access 토큰을 읽어 내용을 돌려준다. 유효하지 않으면 null. 이후 처리는 토큰을 다시 읽지 않고 이 값을 쓴다 */
+    fun parseAccessClaims(token: String): Claims? {
         return try {
-            val claims = getClaims(token)
-            !claims.expiration.before(Date()) && claims["type"] == "access"
+            getClaims(token).takeIf { !it.expiration.before(Date()) && it["type"] == "access" }
         } catch (e: Exception) {
-            false
+            null
         }
     }
 

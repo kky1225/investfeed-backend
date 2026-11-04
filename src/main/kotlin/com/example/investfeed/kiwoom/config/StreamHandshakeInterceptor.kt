@@ -49,7 +49,7 @@ class StreamHandshakeInterceptor(
                 .map { it.trim() }
                 .find { it.startsWith("$ACCESS_TOKEN_COOKIE=") }
                 ?.substringAfter("$ACCESS_TOKEN_COOKIE=")
-                ?.takeIf { jwtProvider.validateToken(it) && !jwtProvider.isBlacklisted(it) }
+                ?.let { token -> jwtProvider.parseAccessClaims(token)?.takeUnless { jwtProvider.isBlacklisted(token) } }
                 ?.let { (jwtProvider.getAuthentication(it).principal as CustomUserDetails).member }
                 ?.takeUnless { it.isSuspended() }
                 ?.loginId
