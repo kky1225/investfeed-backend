@@ -4,6 +4,7 @@ import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
+import com.example.investfeed.global.ratelimit.KiwoomRateLimitRetryFilter
 import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
@@ -16,6 +17,7 @@ import reactor.core.publisher.Mono
 class KiwoomConfig(
     private val apiCallCounterService: ApiCallCounterService,
     private val rateLimitExchangeFilter: RateLimitExchangeFilter,
+    private val kiwoomRateLimitRetryFilter: KiwoomRateLimitRetryFilter,
 ) {
 
     @Bean
@@ -30,6 +32,7 @@ class KiwoomConfig(
             })
             .filter(rateLimitExchangeFilter)
             .filter(ApiCallMetricsFilter(ApiProvider.KIWOOM, apiCallCounterService, ApiCallMetricsFilter.Companion::isKiwoomFailureBody))
+            .filter(kiwoomRateLimitRetryFilter)
             .build()
     }
 }

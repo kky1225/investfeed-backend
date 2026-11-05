@@ -89,6 +89,9 @@ class ApiCallCounterService(
         }
     }
 
+    /** 응답 처리 스레드(netty)에서 호출할 때 사용 */
+    fun incrementAsync(provider: ApiProvider) = writeAsync(provider) { increment(provider) }
+
     /** 화면 조회용. 6일 전부터 오늘까지 오래된 날짜 순. Redis 오류 시 모든 값을 0 으로 돌려준다 */
     fun getRecent7Days(provider: ApiProvider): List<ApiCallDailySnapshot> {
         val today = LocalDate.now()
