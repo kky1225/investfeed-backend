@@ -6,7 +6,9 @@ import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import com.example.investfeed.global.ratelimit.TossRateLimitRetryFilter
+import com.example.investfeed.global.token.RejectedTokenFilter
 import org.springframework.context.annotation.Bean
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction
@@ -18,6 +20,7 @@ class TossConfig(
     private val apiCallCounterService: ApiCallCounterService,
     private val rateLimitExchangeFilter: RateLimitExchangeFilter,
     private val tossRateLimitRetryFilter: TossRateLimitRetryFilter,
+    private val redisTemplate: StringRedisTemplate,
 ) {
 
     @Bean
@@ -33,6 +36,7 @@ class TossConfig(
             .filter(rateLimitExchangeFilter)
             .filter(ApiCallMetricsFilter(ApiProvider.TOSS, apiCallCounterService))
             .filter(tossRateLimitRetryFilter)
+            .filter(RejectedTokenFilter.toss(redisTemplate))
             .build()
     }
 }
