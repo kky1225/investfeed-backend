@@ -450,11 +450,8 @@ class AuthService(
             throw RefreshTokenMissingException()
         }
 
-        if (!jwtProvider.isRefreshTokenSignatureValid(refreshToken)) {
-            throw RefreshTokenInvalidException()
-        }
-
-        val loginId = jwtProvider.getLoginId(refreshToken)
+        val loginId = jwtProvider.parseRefreshClaims(refreshToken)?.subject
+            ?: throw RefreshTokenInvalidException()
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
 

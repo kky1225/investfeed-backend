@@ -75,24 +75,18 @@ class JwtProvider(
     }
 
     /** access 토큰을 읽어 내용을 돌려준다. 유효하지 않으면 null. 이후 처리는 토큰을 다시 읽지 않고 이 값을 쓴다 */
-    fun parseAccessClaims(token: String): Claims? {
+    fun parseAccessClaims(token: String): Claims? = parseClaims(token, "access")
+
+    /** refresh 토큰을 읽어 내용을 돌려준다. 유효하지 않으면 null. 이후 처리는 토큰을 다시 읽지 않고 이 값을 쓴다 */
+    fun parseRefreshClaims(token: String): Claims? = parseClaims(token, "refresh")
+
+    private fun parseClaims(token: String, type: String): Claims? {
         return try {
-            getClaims(token).takeIf { !it.expiration.before(Date()) && it["type"] == "access" }
+            getClaims(token).takeIf { !it.expiration.before(Date()) && it["type"] == type }
         } catch (e: Exception) {
             null
         }
     }
-
-    fun isRefreshTokenSignatureValid(refreshToken: String): Boolean {
-        return try {
-            val claims = getClaims(refreshToken)
-            !claims.expiration.before(Date()) && claims["type"] == "refresh"
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    fun getLoginId(token: String): String = getClaims(token).subject
 
     fun deleteRefreshToken(loginId: String) {
         redisTemplate.delete("${RedisKeyPrefix.REFRESH_TOKEN.prefix}$loginId")
