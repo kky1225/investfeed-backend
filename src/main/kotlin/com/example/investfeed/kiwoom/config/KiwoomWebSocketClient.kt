@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit
 class KiwoomWebSocketClient(
     private val accessToken: String,
     private val onRealTime: (String) -> Unit,
+    private val onClosed: (KiwoomWebSocketClient) -> Unit,
 ) : WebSocketClient(URI(URL)) {
     private val log = KotlinLogging.logger {}
 
@@ -62,6 +63,7 @@ class KiwoomWebSocketClient(
         // 키움은 같은 계정으로 새 연결이 열리면 기존 연결을 "Bye"로 끊는다. 원인 추적에 필요해 WARN 으로 남긴다.
         log.warn { "소켓 종료 : code=$code, reason=$reason, remote=$remote" }
         loginLatch.countDown()
+        onClosed(this)
     }
 
     override fun onError(e: Exception?) {

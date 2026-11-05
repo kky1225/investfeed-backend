@@ -12,6 +12,14 @@ import java.util.concurrent.CopyOnWriteArraySet
 class WebSocketHandler: TextWebSocketHandler() {
     private val log = KotlinLogging.logger {}
 
+    companion object {
+        // 시세가 없어도 연결이 살아 있음을 화면에 알린다. 프론트 reconnectingSocket.ts 와 값을 맞출 것
+        private const val HEARTBEAT = """{"trnm":"PING"}"""
+
+        // 로그아웃·계정 잠금처럼 일부러 끊는 경우. 프론트는 이 코드일 때만 재연결하지 않는다
+        private val LOGGED_OUT = CloseStatus(4001, "logged out")
+    }
+
     private val sessions = CopyOnWriteArraySet<WebSocketSession>()
 
     override fun afterConnectionEstablished(
@@ -41,9 +49,16 @@ class WebSocketHandler: TextWebSocketHandler() {
 
     fun hasSession(loginIds: Set<String>): Boolean = sessions.any { it.isOpen && it.loginId() in loginIds }
 
-    fun closeSessions(loginId: String) {
-        sessions.filter { it.loginId() == loginId }.forEach { session ->
-            runCatching { session.close(CloseStatus.NORMAL) }
+    fun sendHeartbeat() = broadcast(HEARTBEAT)
+
+    fun closeSessions(loginId: String) = close(sessions.filter { it.loginId() == loginId }, LOGGED_OUT)
+
+    /** 키움 연결이 끊긴 계정의 세션을 닫아, 화면이 다시 등록하면서 키움 연결도 새로 맺게 한다 */
+    fun requestReconnect(loginIds: Set<String>) = close(sessions.filter { it.loginId() in loginIds }, CloseStatus.SERVICE_RESTARTED)
+
+    private fun close(targets: Collection<WebSocketSession>, status: CloseStatus) {
+        targets.forEach { session ->
+            runCatching { session.close(status) }
                 .onFailure { log.error { "실시간 세션 종료 실패 : sessionId=${session.id}, ${it.message}" } }
             sessions.remove(session)
         }

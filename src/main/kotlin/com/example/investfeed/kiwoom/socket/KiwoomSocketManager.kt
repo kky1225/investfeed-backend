@@ -71,7 +71,7 @@ class KiwoomSocketManager(
     }
 
     private fun connectionOf(keyId: String): KiwoomSocketConnection = connections.computeIfAbsent(keyId) {
-        KiwoomSocketConnection(objectMapper, webSocketHandler::sendTo, ::dispatchPersistentTick)
+        KiwoomSocketConnection(objectMapper, webSocketHandler::sendTo, ::dispatchPersistentTick, webSocketHandler::requestReconnect)
     }
 
     private fun dispatchPersistentTick(entry: JsonNode) {

@@ -21,6 +21,7 @@ class KiwoomSocketConnection(
     private val objectMapper: ObjectMapper,
     private val deliver: (loginIds: Set<String>, message: String) -> Unit,
     private val onPersistentTick: (entry: JsonNode) -> Unit,
+    private val onDisconnected: (loginIds: Set<String>) -> Unit,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -145,7 +146,7 @@ class KiwoomSocketConnection(
         registered.clear()
         persistentSent = false
 
-        val fresh = KiwoomWebSocketClient(accessToken) { onRealTime(it) }
+        val fresh = KiwoomWebSocketClient(accessToken, ::onRealTime, ::handleClosed)
 
         if (!fresh.connectBlocking(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)) {
             log.error { "키움 소켓 연결 실패" }
@@ -162,6 +163,22 @@ class KiwoomSocketConnection(
 
         client = fresh
         return fresh
+    }
+
+    /**
+     * 키움 소켓이 닫히면 불린다. 우리가 닫거나 교체한 연결이면 client 가 이미 달라 무시한다.
+     * 키움 쪽에서 끊은 경우에만 상태를 비우고, 보던 계정의 화면에 재연결을 요청한다.
+     */
+    private fun handleClosed(closed: KiwoomWebSocketClient) {
+        val viewers = synchronized(lock) {
+            if (client !== closed) return
+            client = null
+            registered.clear()
+            persistentSent = false
+            idleSince = null
+            subscribers.toSet().also { subscribers.clear() }
+        }
+        if (viewers.isNotEmpty()) onDisconnected(viewers)
     }
 
     private fun onRealTime(message: String) {
