@@ -106,7 +106,7 @@ external-api:
     toss-market-data-chart-interval-ms: 50 # 공식: MARKET_DATA_CHART 그룹 초당 20회
     toss-auth-interval-ms: 200       # 공식: AUTH 그룹 초당 5회
     log-delays-over-ms: 0            # 이 값 초과 대기 시 debug 로그 (0=끔)
-    toss-429-max-retry: 3            # 토스 429 수신 시 Retry-After(없으면 1s→2s→4s+jitter) 대기 후 재시도 횟수
+    toss-429-max-retry: 1            # 토스 429 수신 시 Retry-After(없으면 1s+jitter) 대기 후 재시도 횟수
 
 assistant:
   jwt:

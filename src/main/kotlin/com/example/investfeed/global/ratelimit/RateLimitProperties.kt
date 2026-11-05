@@ -29,6 +29,6 @@ class RateLimitProperties(
     val tossAuthIntervalMs: Long,
     @param:Value("\${external-api.rate-limit.log-delays-over-ms:0}")
     val logDelaysOverMs: Long,
-    @param:Value("\${external-api.rate-limit.toss-429-max-retry:3}")
+    @param:Value("\${external-api.rate-limit.toss-429-max-retry:1}")
     val toss429MaxRetry: Int,
 )
