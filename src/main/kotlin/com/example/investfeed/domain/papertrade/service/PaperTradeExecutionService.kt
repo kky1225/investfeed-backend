@@ -11,6 +11,7 @@ import com.example.investfeed.domain.recommend.service.RecommendService
 import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
+import com.example.investfeed.kiwoom.exception.OrderResultUnknownException
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.order.client.KiwoomOrderClient
@@ -18,6 +19,7 @@ import com.example.investfeed.kiwoom.order.client.MockAccountClient
 import com.example.investfeed.kiwoom.order.dto.req.KiwoomCancelOrderReq
 import com.example.investfeed.kiwoom.order.dto.req.KiwoomOrderReq
 import com.example.investfeed.kiwoom.order.dto.req.KiwoomPendingOrderReq
+import com.example.investfeed.kiwoom.order.dto.req.KiwoomTradeFillsReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -25,6 +27,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.runBlocking
 
 @Service
@@ -53,6 +56,7 @@ class PaperTradeExecutionService(
         private const val SECOND_PHASE_RETRY_MS = 30_000L // 시가 단일가 임의연장(~30초) + 반영 지연 감안
         private const val PHASE_FIRST = 1                 // paper_fill.phase — 08:50 1차
         private const val PHASE_SECOND = 2                // paper_fill.phase — 09:01 2차 (잔여 차감 기준)
+        private const val CONFIRMED_BY_HISTORY_NOTE = "응답 없음, 주문 내역으로 확인"
     }
 
     private data class HeldPos(val qty: Long, val price: Long)
@@ -173,18 +177,18 @@ class PaperTradeExecutionService(
             if (i > 0) Thread.sleep(ORDER_PACING_MS)
             try {
                 val req = KiwoomOrderReq(dmst_stex_tp = "KRX", stk_cd = c.stkCd, ord_qty = c.qty.toString())
-                val res = if (c.side == TrancheSide.BUY)
-                    kiwoomOrderClient.placeBuyOrder(req) else kiwoomOrderClient.placeSellOrder(req)
+                val placed = placeOrder(req, c.side, today)
+                val note = c.recoveryOrigin
+                    ?.let { "현금회수 매도($it, 사이징가=${c.price}, ${c.cycleIndex}회차)" }
+                    ?: "시장가 동시호가 제출(등급=${ctx.gradeLabel(c.stkCd, c.grade)}, 사이징가=${c.price}, ${c.cycleIndex}회차)"
                 paperFillRepository.save(
                     PaperFill(
                         stkCd = c.stkCd, side = c.side.name, fillDate = today,
-                        quantity = c.qty, price = c.price, kiwoomOrderNo = res.ord_no,
+                        quantity = c.qty, price = c.price, kiwoomOrderNo = placed.orderNo,
                         cycleIndex = c.cycleIndex, grade = c.grade,
                         newEntry = if (c.side == TrancheSide.BUY) c.stkCd !in ctx.holdings else null,
                         phase = PHASE_FIRST,
-                        note = c.recoveryOrigin
-                            ?.let { "현금회수 매도($it, 사이징가=${c.price}, ${c.cycleIndex}회차)" }
-                            ?: "시장가 동시호가 제출(등급=${ctx.gradeLabel(c.stkCd, c.grade)}, 사이징가=${c.price}, ${c.cycleIndex}회차)",
+                        note = if (placed.confirmedByHistory) "$note — $CONFIRMED_BY_HISTORY_NOTE" else note,
                     )
                 )
                 ok++
@@ -442,14 +446,15 @@ class PaperTradeExecutionService(
                 Thread.sleep(ORDER_PACING_MS)
                 try {
                     val req = KiwoomOrderReq(dmst_stex_tp = "KRX", stk_cd = s.stkCd, ord_qty = affordable.toString())
-                    val res = kiwoomOrderClient.placeBuyOrder(req)
+                    val placed = placeOrder(req, TrancheSide.BUY, today)
+                    val note = "시장가 2차 발행(등급=${s.grade}, 사이징가=${s.price}, 시도 ${attempt}회차)"
                     paperFillRepository.save(
                         PaperFill(
                             stkCd = s.stkCd, side = "BUY", fillDate = today,
-                            quantity = affordable, price = s.price, kiwoomOrderNo = res.ord_no,
+                            quantity = affordable, price = s.price, kiwoomOrderNo = placed.orderNo,
                             cycleIndex = s.cycleIndex, grade = s.grade,
                             newEntry = s.newEntry, phase = PHASE_SECOND,
-                            note = "시장가 2차 발행(등급=${s.grade}, 사이징가=${s.price}, 시도 ${attempt}회차)",
+                            note = if (placed.confirmedByHistory) "$note — $CONFIRMED_BY_HISTORY_NOTE" else note,
                         )
                     )
                     cash -= affordable * s.price
@@ -568,6 +573,54 @@ class PaperTradeExecutionService(
             emptySet()
         }
     }
+
+    private data class PlacedOrder(val orderNo: String?, val confirmedByHistory: Boolean)
+
+    /**
+     * 주문을 낸다. 응답 없이 끝났으면(시간 초과 등) 키움이 접수했을 수 있어, 실패로 확정하기 전에 주문 내역을 확인한다.
+     * 내역에 있으면 그 주문번호로 성공 처리하고, 없거나 확인 조회도 실패하면 예외를 던진다.
+     */
+    private fun placeOrder(req: KiwoomOrderReq, side: TrancheSide, today: LocalDate): PlacedOrder {
+        try {
+            val res = if (side == TrancheSide.BUY) kiwoomOrderClient.placeBuyOrder(req) else kiwoomOrderClient.placeSellOrder(req)
+            return PlacedOrder(res.ord_no, confirmedByHistory = false)
+        } catch (e: OrderResultUnknownException) {
+            val orderNo = try {
+                findUnrecordedOrderNo(req, side, today)
+            } catch (ce: Exception) {
+                throw IllegalStateException("응답 없음, 주문 내역 확인 실패: ${ce.message}", ce)
+            } ?: throw IllegalStateException("응답 없음, 주문 내역에 없음", e)
+            log.warn { "응답 없이 끝난 주문을 주문 내역으로 확인: ${req.stk_cd} $side ${req.ord_qty}주 ord_no=$orderNo" }
+            return PlacedOrder(orderNo, confirmedByHistory = true)
+        }
+    }
+
+    /**
+     * 키움 주문에는 중복 방지 키가 없어, 오늘 같은 종목·매수/매도·수량의 원주문 중 paper_fill 에 아직 없는 주문번호를 찾는다.
+     * 동시호가 주문은 09:00 전까지 미체결이라 체결만(qry_tp=4)이 아니라 주문순(qry_tp=1)으로 조회한다.
+     */
+    private fun findUnrecordedOrderNo(req: KiwoomOrderReq, side: TrancheSide, today: LocalDate): String? {
+        val recorded = paperFillRepository.findByFillDate(today)
+            .mapNotNull { it.kiwoomOrderNo?.let(::normOrdNo) }
+            .toSet()
+        val res = mockAccountClient.tradeFills(
+            KiwoomTradeFillsReq(
+                ord_dt = today.format(DateTimeFormatter.BASIC_ISO_DATE),
+                qry_tp = "1",                                          // 주문순 (미체결 포함)
+                sell_tp = if (side == TrancheSide.SELL) "1" else "2",  // 1:매도, 2:매수
+                stk_cd = req.stk_cd,
+            )
+        )
+        val qty = req.ord_qty.toLong()
+        return res?.acnt_ord_cntr_prps_dtl.orEmpty()
+            .filter { normCd(it.stk_cd) == req.stk_cd && parseAmt(it.ord_qty) == qty }
+            .filter { parseAmt(it.ori_ord) == 0L && it.mdfy_cncl.isNullOrBlank() }   // 정정·취소 주문 제외
+            .mapNotNull { it.ord_no }
+            .lastOrNull { normOrdNo(it) !in recorded }
+    }
+
+    /** 키움 주문번호 비교용 — 앞자리 0 제거. AdminPaperTradeService 와 동일. */
+    private fun normOrdNo(raw: String): String = raw.trim().trimStart('0').ifEmpty { "0" }
 
     /** 키움 종목코드 정규화 — "A005930"/"005930_AL" → "005930". HoldingGradeService 와 동일. */
     private fun normCd(raw: String?): String? =

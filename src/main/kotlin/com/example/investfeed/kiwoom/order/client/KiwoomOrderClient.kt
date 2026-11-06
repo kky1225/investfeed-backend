@@ -6,6 +6,7 @@ import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.exception.BuyOrderException
 import com.example.investfeed.kiwoom.exception.CancelOrderException
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
+import com.example.investfeed.kiwoom.exception.OrderResultUnknownException
 import com.example.investfeed.kiwoom.exception.PendingOrderException
 import com.example.investfeed.kiwoom.exception.SellOrderException
 import com.example.investfeed.kiwoom.order.dto.req.KiwoomCancelOrderReq
@@ -57,7 +58,7 @@ class KiwoomOrderClient(
             throw e
         } catch (e: Exception) {
             log.warn { "placeBuyOrder Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            throw OrderResultUnknownException()
         }
     }
 
@@ -86,7 +87,7 @@ class KiwoomOrderClient(
             throw e
         } catch (e: Exception) {
             log.warn { "placeSellOrder Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            throw OrderResultUnknownException()
         }
     }
 
