@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import java.time.Duration
 
 @Component
 class TelegramConfig(
@@ -13,10 +14,15 @@ class TelegramConfig(
     private val apiUrl: String,
 ) {
 
+    companion object {
+        // getUpdates 를 timeout=0(즉시 응답)으로 호출하므로 오래 기다릴 이유가 없다
+        private val RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(10)
+    }
+
     @Bean
     fun telegramWebClient(): WebClient {
         return WebClient.builder()
-            .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
+            .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient(RESPONSE_TIMEOUT)))
             .baseUrl(apiUrl)
             .defaultHeader("Content-Type", "application/json")
             .defaultHeader("Accept", "application/json")

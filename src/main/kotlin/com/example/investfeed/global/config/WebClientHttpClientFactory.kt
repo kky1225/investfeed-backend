@@ -9,8 +9,9 @@ import java.time.Duration
 /**
  * 외부 API 호출용 Reactor Netty HttpClient 공통 팩토리.
  *
- * 모든 WebClient 빈이 동일한 connect/response timeout + connection pool 설정을 갖도록 중앙 집중 관리한다.
+ * 모든 WebClient 빈이 동일한 connect timeout + connection pool 설정을 갖도록 중앙 집중 관리한다.
  *
+ * - response timeout: 기본값은 화면(axios)이 포기하는 20초에 맞춘다. 그보다 더 기다려도 화면은 이미 오류를 표시한 뒤다.
  * - connection pool 유휴 관리: 외부 서버(Naver, Kiwoom 등)가 먼저 idle 연결을 끊는 경우
  *   클라이언트가 stale 연결을 재사용하려다 "Connection prematurely closed BEFORE response"
  *   에러가 주기적으로 발생한다. maxIdleTime 을 일반적 서버 keep-alive(30~60s) 보다 짧게 잡고
@@ -19,7 +20,7 @@ import java.time.Duration
 object WebClientHttpClientFactory {
 
     private const val CONNECT_TIMEOUT_MS = 5_000
-    private val RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(60)
+    private val DEFAULT_RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(20)
 
     private val connectionProvider: ConnectionProvider = ConnectionProvider.builder("investfeed-shared")
         .maxIdleTime(Duration.ofSeconds(20))          // 20초 유휴 → 자동 종료
@@ -30,10 +31,10 @@ object WebClientHttpClientFactory {
         .pendingAcquireTimeout(Duration.ofSeconds(5)) // 연결 대기 5초
         .build()
 
-    fun createDefaultHttpClient(): HttpClient {
+    fun createDefaultHttpClient(responseTimeout: Duration = DEFAULT_RESPONSE_TIMEOUT): HttpClient {
         return HttpClient.create(connectionProvider)
             .resolver(DefaultAddressResolverGroup.INSTANCE)   // JDK/시스템 리졸버 — Netty 기본 비동기 리졸버의 cold/혼잡 간헐 실패 회피
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS)
-            .responseTimeout(RESPONSE_TIMEOUT)
+            .responseTimeout(responseTimeout)
     }
 }
