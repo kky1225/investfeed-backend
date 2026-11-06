@@ -73,6 +73,14 @@ class KiwoomSocketConnection(
         }
     }
 
+    /** 화면이 등록할 항목이 없을 때 이전 화면 등록을 해지한다. 연결과 상시 항목은 유지한다 */
+    fun clearScreen() {
+        synchronized(lock) {
+            val current = client?.takeIf { it.isOpen && it.loginSucceeded } ?: return
+            registered.keys.toList().forEach { removeGroup(current, it) }
+        }
+    }
+
     fun ensurePersistent(owner: KiwoomSocketOwner, stream: KiwoomStream) {
         synchronized(lock) {
             persistent = stream

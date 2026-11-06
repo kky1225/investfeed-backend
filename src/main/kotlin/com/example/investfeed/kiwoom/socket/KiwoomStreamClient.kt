@@ -22,7 +22,8 @@ class KiwoomStreamClient(
     fun register(vararg entries: StreamEntry) {
         val openEntries = entries.filter { it.items.isNotEmpty() && isOpen(it.market) }
 
-        if (openEntries.isEmpty()) return
+        // 등록할 항목이 없으면 이전 화면 등록이 남지 않게 해지만 한다 (연결은 유지)
+        if (openEntries.isEmpty()) return socketManager.clearScreen(authClient.getCurrentSocketOwner().keyId)
 
         val groups = StreamMarket.entries.map { it.grpNo }.distinct().associateWith { grpNo ->
             openEntries

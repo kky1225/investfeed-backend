@@ -41,6 +41,11 @@ class KiwoomSocketManager(
         connectionOf(owner.keyId).register(owner, groups)
     }
 
+    /** 화면 등록만 해지한다. 연결이 없으면 새로 만들지 않는다 */
+    fun clearScreen(keyId: String) {
+        connections[keyId]?.clearScreen()
+    }
+
     fun ensurePersistent(owner: KiwoomSocketOwner, stream: KiwoomStream) {
         connectionOf(owner.keyId).ensurePersistent(owner, stream)
     }
