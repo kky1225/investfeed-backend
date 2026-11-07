@@ -18,6 +18,7 @@ import com.example.investfeed.kiwoom.holding.client.HoldingClient
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomDepositReq
 import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
@@ -38,6 +39,7 @@ import kotlin.coroutines.cancellation.CancellationException
 @Service
 class HoldingService(
     private val kiwoomStreamClient: KiwoomStreamClient,
+    private val tossStreamClient: TossStreamClient,
     private val holdingClient: HoldingClient,
     private val usHoldingClient: UsHoldingClient,
     private val memberHoldingSyncService: MemberHoldingSyncService,
@@ -230,7 +232,8 @@ class HoldingService(
     }
 
     fun streamHoldings(req: HoldingStreamReq) {
-        val (usCodes, krCodes) = req.items.partition { it.endsWith(US_SUFFIX) }
+        val (allUsCodes, krCodes) = req.items.partition { it.endsWith(US_SUFFIX) }
+        val usCodes = if (tossStreamClient.register(allUsCodes.map { it.removeSuffix(US_SUFFIX) })) emptyList() else allUsCodes
 
         kiwoomStreamClient.register(
             StreamEntry(

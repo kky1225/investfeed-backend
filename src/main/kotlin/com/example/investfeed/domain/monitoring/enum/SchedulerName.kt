@@ -33,8 +33,8 @@ enum class SchedulerName(
         crons = listOf(SchedulerCron.CIRCUIT_BREAKER_CHECK),
     ),
     KiwoomSocketCleanupScheduler(SchedulerType.FAST, 60, "매분(유휴 키움 소켓 정리)", crons = listOf(SchedulerCron.KIWOOM_SOCKET_CLEANUP)),
+    TossSocketCleanupScheduler(SchedulerType.FAST, 60, "매분(유휴 토스 소켓 정리)", crons = listOf(SchedulerCron.TOSS_SOCKET_CLEANUP)),
     StreamHeartbeatScheduler(SchedulerType.FAST, 60, "30초 (실시간 소켓 하트비트)", crons = listOf(SchedulerCron.STREAM_HEARTBEAT)),
-
     // SLOW (주기)
     RecommendTodayDirectionScheduler(
         SchedulerType.SLOW, 120, "매 5분(09:00~21:55)", blockedOnHoliday = true,

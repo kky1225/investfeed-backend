@@ -15,6 +15,7 @@ import com.example.investfeed.domain.watchlist.repository.WatchlistItemRepositor
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.domain.us.stock.service.UsEtfService
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
@@ -32,6 +33,7 @@ import kotlinx.coroutines.runBlocking
 @Transactional
 class WatchlistService(
     private val kiwoomStreamClient: KiwoomStreamClient,
+    private val tossStreamClient: TossStreamClient,
     private val groupRepository: WatchlistGroupRepository,
     private val itemRepository: WatchlistItemRepository,
     private val stockClient: StockClient,
@@ -199,7 +201,8 @@ class WatchlistService(
         require(group.memberId == memberId) { "접근 권한이 없습니다." }
 
         val items = itemRepository.findByGroupIdOrderByDisplayOrderAsc(groupId)
-        val (usItems, krItems) = items.partition { it.stexTp != null }
+        val (allUsItems, krItems) = items.partition { it.stexTp != null }
+        val usItems = if (tossStreamClient.register(allUsItems.map { it.stkCd })) emptyList() else allUsItems
 
         kiwoomStreamClient.register(
             StreamEntry(

@@ -12,6 +12,7 @@ import com.example.investfeed.domain.us.stock.dto.res.UsStockSearchItem
 import com.example.investfeed.domain.us.stock.entity.UsStockMaster
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class UsStockInfoService(
     private val kiwoomStreamClient: KiwoomStreamClient,
+    private val tossStreamClient: TossStreamClient,
     private val usStockClient: UsStockClient,
     private val usStockChartClient: UsStockChartClient,
     private val usStockMasterRepository: UsStockMasterRepository,
@@ -195,10 +197,11 @@ class UsStockInfoService(
         )
 
     fun streamUsStock(stkCd: String, stexTp: String) {
+        val byToss = tossStreamClient.register(listOf(stkCd))
         kiwoomStreamClient.register(
             StreamEntry(
                 market = StreamMarket.US,
-                items = listOf(KiwoomUsStreamItem(jmcode = stkCd, stex_tp = stexTp)),
+                items = if (byToss) emptyList() else listOf(KiwoomUsStreamItem(jmcode = stkCd, stex_tp = stexTp)),
                 types = listOf("FE")
             )
         )

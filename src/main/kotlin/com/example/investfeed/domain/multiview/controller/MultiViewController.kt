@@ -13,6 +13,7 @@ import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.service.CryptoService
 import com.example.investfeed.domain.multiview.dto.req.MultiViewStreamReq
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/multi-view")
 class MultiViewController(
     private val kiwoomStreamClient: KiwoomStreamClient,
+    private val tossStreamClient: TossStreamClient,
     private val stockService: StockService,
     private val cryptoService: CryptoService,
     private val commodityService: CommodityService,
@@ -111,6 +113,7 @@ class MultiViewController(
     fun streamMultiViewStocks(
         @RequestBody req: MultiViewStockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
+        val usItems = if (tossStreamClient.register(req.usItems.map { it.stkCd })) emptyList() else req.usItems
         kiwoomStreamClient.register(
             StreamEntry(
                 market = StreamMarket.NXT,
@@ -119,7 +122,7 @@ class MultiViewController(
             ),
             StreamEntry(
                 market = StreamMarket.US,
-                items = req.usItems.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
+                items = usItems.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
                 types = listOf("FE")
             )
         )

@@ -68,6 +68,28 @@ class UsSessionBaseService(
         }
     }
 
+    /**
+     * 토스 실시간 전일대비 기준 종가. 거래일(데이마켓 시작 ~ 애프터마켓 종료)마다 직전 영업일 정규장 종가를 쓴다.
+     * 토스 연동 회원 문맥에서만 부른다 (그 회원 토큰으로 받는다)
+     */
+    suspend fun streamCloses(tickers: Collection<String>): Map<String, Double> {
+        val now = Instant.now()
+        val cal = calendar(now) ?: return emptyMap()
+        val days = listOfNotNull(cal.previousBusinessDay, cal.today, cal.nextBusinessDay).mapNotNull { day ->
+            val date = day.date?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@mapNotNull null
+            val start = listOfNotNull(day.dayMarket, day.preMarket, day.regularMarket, day.afterMarket).mapNotNull { it.start() }.minOrNull()
+                ?: return@mapNotNull null   // 휴장일
+            date to start
+        }
+        val i = days.indexOfLast { (_, start) -> !start.isAfter(now) }
+        if (i < 1) return emptyMap()
+        val baseDate = days[i - 1].first
+
+        return coroutineScope {
+            tickers.distinct().map { t -> async { regularClose(t, baseDate, cacheable = true)?.let { t to it } } }.awaitAll()
+        }.filterNotNull().toMap()
+    }
+
     private suspend fun currentSession(now: Instant = Instant.now()): CurrentSession? {
         val cal = calendar(now) ?: return null
         val days = listOfNotNull(cal.previousBusinessDay, cal.today, cal.nextBusinessDay)

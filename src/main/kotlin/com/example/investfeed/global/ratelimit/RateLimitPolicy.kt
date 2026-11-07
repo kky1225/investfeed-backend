@@ -48,8 +48,7 @@ class RateLimitPolicy(
             path.startsWith("/api/v1/accounts") -> "ACCOUNT" to props.tossAccountIntervalMs
             path.startsWith("/api/v1/holdings") || path.startsWith("/api/v1/buying-power") -> "ASSET" to props.tossAssetIntervalMs
             path.startsWith("/api/v1/exchange-rate") || path.startsWith("/api/v1/market-calendar") -> "MARKET_INFO" to props.tossMarketInfoIntervalMs
-            path.startsWith("/api/v1/candles") -> "MARKET_DATA_CHART" to props.tossMarketDataChartIntervalMs
-            else -> return null
+            path.startsWith("/api/v1/candles") -> "MARKET_DATA_CHART" to props.tossMarketDataChartIntervalMs            else -> return null
         }
         return RateLimitRule("toss:$authHash:$group", interval)
     }

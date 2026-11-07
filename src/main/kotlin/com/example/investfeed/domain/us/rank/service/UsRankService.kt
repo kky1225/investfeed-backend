@@ -6,6 +6,7 @@ import com.example.investfeed.domain.us.rank.dto.res.UsRankListItem
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListRes
 import com.example.investfeed.domain.us.stock.service.UsEtfService
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
+import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service
 @Service
 class UsRankService(
     private val kiwoomStreamClient: KiwoomStreamClient,
+    private val tossStreamClient: TossStreamClient,
     private val usRankClient: UsRankClient,
     private val usEtfService: UsEtfService,
 ) {
@@ -132,10 +134,11 @@ class UsRankService(
     fun streamUsStocks(
         req: UsStockStreamReq
     ) {
+        val usItems = if (tossStreamClient.register(req.items.map { it.stkCd })) emptyList() else req.items
         kiwoomStreamClient.register(
             StreamEntry(
                 market = StreamMarket.US,
-                items = req.items.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
+                items = usItems.map { KiwoomUsStreamItem(jmcode = it.stkCd, stex_tp = it.stexTp) },
                 types = listOf("FE")
             )
         )
