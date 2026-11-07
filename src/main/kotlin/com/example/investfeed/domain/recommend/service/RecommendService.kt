@@ -1096,6 +1096,8 @@ class RecommendService(
 
     companion object {
         private const val TOP_N = 100
+        /** 추천 배치 실행 시각(시) — SchedulerCron.RECOMMEND */
+        private const val RECOMMEND_HOUR = 22
         /** 후보/종목 단위 동시 처리 상한 — TR 간격은 제한기가 보장하므로 큐를 채울 만큼만 */
         private const val RECOMMEND_CONCURRENCY = 8
         /** 후보 조회 실패가 이 비율을 넘으면 추천을 저장하지 않고 배치를 실패 처리 */
@@ -1409,7 +1411,17 @@ class RecommendService(
             }
         }
 
-        return RecommendListRes(recommendList = recommendList, avoidList = avoidList, holdList = holdList)
+        return RecommendListRes(
+            recommendList = recommendList, avoidList = avoidList, holdList = holdList,
+            pickedDate = stockPickHistoryRepository.findMaxPickDate()?.toLocalDate(),
+            stale = !isPickCurrent(),
+        )
+    }
+
+    /** 직전 거래일 22:00 이후 추천 배치가 성공했으면 지금 추천. 모의투자 08:50 매매 보류 판정과 같은 기준 */
+    private fun isPickCurrent(): Boolean {
+        val priorTradingDay = holidayService.lastTradingDay(LocalDate.now().minusDays(1))
+        return schedulerLogService.isSucceededSince(SchedulerName.RecommendScheduler, priorTradingDay.atTime(RECOMMEND_HOUR, 0))
     }
 
     /**
