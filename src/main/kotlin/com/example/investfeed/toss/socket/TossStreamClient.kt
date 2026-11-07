@@ -30,12 +30,12 @@ class TossStreamClient(
         private const val TRADE_NAME = "미국체결"
     }
 
-    // 계정 → 종목별 전일대비 기준 종가
+    // 계정 → 종목별 전일대비 기준 종가. 다음 등록이 덮어쓰므로 유휴 정리 때는 지우지 않는다 (정리 직후 들어온 등록 값을 지우지 않도록)
     private val closes = ConcurrentHashMap<String, Map<String, Double>>()
 
     /** 정리 스케줄러(매분): 화면 소켓이 5분간 없는 회원의 토스 연결을 끊는다 */
     fun releaseIdleConnections() {
-        tossSocketManager.releaseIdleConnections().forEach { closes.remove(it) }
+        tossSocketManager.releaseIdleConnections()
     }
 
     /**

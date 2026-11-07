@@ -68,18 +68,25 @@ class TossSocketManager(
         connection.symbols = emptySet()
     }
 
-    /** 화면 이동마다 브라우저 세션이 닫혔다 열리므로 [IDLE_TIMEOUT] 동안 그 회원의 화면 소켓이 없을 때만 끊는다. 끊은 회원을 돌려준다 */
-    fun releaseIdleConnections(now: Instant = Instant.now()): Set<String> =
-        connections.entries.filter { (loginId, connection) ->
-            if (webSocketHandler.hasSession(setOf(loginId))) {
-                connection.idleSince = null
-                return@filter false
-            }
-            val since = connection.idleSince ?: now.also { connection.idleSince = it }
-            Duration.between(since, now) >= IDLE_TIMEOUT
-        }.map { it.key }.onEach(::disconnect).toSet()
+    /**
+     * 화면 이동마다 브라우저 세션이 닫혔다 열리므로 [IDLE_TIMEOUT] 동안 그 회원의 화면 소켓이 없을 때만 끊는다.
+     * 판단부터 끊기까지 회원별 잠금 안에서 해, 그 사이 들어온 화면 등록의 연결을 끊지 않는다 (키움과 같은 방식)
+     */
+    fun releaseIdleConnections(now: Instant = Instant.now()) {
+        connections.keys.forEach { loginId -> synchronized(lock(loginId)) { releaseIfIdle(loginId, now) } }
+    }
 
-    private fun disconnect(loginId: String) = synchronized(lock(loginId)) {
+    private fun releaseIfIdle(loginId: String, now: Instant) {
+        val connection = connections[loginId] ?: return
+
+        if (webSocketHandler.hasSession(setOf(loginId))) {
+            connection.idleSince = null
+            return
+        }
+
+        val since = connection.idleSince ?: now.also { connection.idleSince = it }
+        if (Duration.between(since, now) < IDLE_TIMEOUT) return
+
         connections.remove(loginId)?.client?.close()
     }
 
