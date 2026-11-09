@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.monitoring.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerFireStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
@@ -37,7 +38,7 @@ class SchedulerCycleEvaluator(
     ): SchedulerFireStatus {
         val expressions = scheduler.crons.mapNotNull { expr ->
             runCatching { CronExpression.parse(expr) }
-                .onFailure { log.error { "cron 파싱 실패 (${scheduler.name}): $expr — ${it.message}" } }
+                .onFailure { log.failure(it) { "cron 파싱 실패 (${scheduler.name}): $expr" } }
                 .getOrNull()
         }
         if (expressions.isEmpty()) return SchedulerFireStatus.NONE

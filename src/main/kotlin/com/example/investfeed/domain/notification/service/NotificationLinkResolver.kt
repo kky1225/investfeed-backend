@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.notification.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Notification
 import com.example.investfeed.domain.notification.entity.NotificationType
@@ -23,7 +24,7 @@ class NotificationLinkResolver(
         val tickers = notifications.filter { isUs(it) }.map { it.assetCode.removeSuffix(UsHoldingAlertChecker.US_SUFFIX) }.distinct()
         val stexByTicker = if (tickers.isEmpty()) emptyMap() else runCatching {
             usStockMasterRepository.findByStkCdIn(tickers).groupBy { it.stkCd }.mapValues { (_, rows) -> rows.first().stexTp }
-        }.onFailure { log.error(it) { "알림 경로용 미국 거래소 구분 조회 실패: $tickers" } }.getOrDefault(emptyMap())
+        }.onFailure { log.failure(it) { "알림 경로용 미국 거래소 구분 조회 실패: $tickers" } }.getOrDefault(emptyMap())
 
         return notifications.mapNotNull { n -> link(n, stexByTicker)?.let { n.id to it } }.toMap()
     }

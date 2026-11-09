@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.notification.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
 import com.example.investfeed.domain.assistant.dto.factsheet.PriceTargetHit
 import com.example.investfeed.domain.assistant.service.HoldingAlertService
@@ -92,7 +93,7 @@ class PriceAlertScheduler(
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
-                log.error(e) { "스케줄러 토큰 발급 실패" }
+                log.failure(e) { "스케줄러 토큰 발급 실패" }
                 SecurityContextHolder.clearContext()
                 return@execute
             }
@@ -108,51 +109,51 @@ class PriceAlertScheduler(
             try {
                 stockDataMap = checkStockAlerts(holdings.filter { it.stkCd.endsWith(KR_SUFFIX) }, holdingHits, excluded)
             } catch (e: Exception) {
-                log.error(e) { "주식 가격 알림 체크 실패" }
+                log.failure(e) { "주식 가격 알림 체크 실패" }
             }
 
             try {
                 tickerMap = checkCryptoAlerts(holdings.filter { it.stkCd.startsWith(CRYPTO_PREFIX) }, holdingHits, excluded)
             } catch (e: Exception) {
-                log.error(e) { "암호화폐 가격 알림 체크 실패" }
+                log.failure(e) { "암호화폐 가격 알림 체크 실패" }
             }
 
             try {
                 usHoldingAlertChecker.check(holdings.filter { it.stkCd.endsWith(UsHoldingAlertChecker.US_SUFFIX) }, holdingHits, now)
             } catch (e: Exception) {
-                log.error(e) { "미국 주식 보유 알림 체크 실패" }
+                log.failure(e) { "미국 주식 보유 알림 체크 실패" }
             }
 
             try {
                 checkStockPriceTargets(stockDataMap ?: emptyMap(), targetHits, excluded)
             } catch (e: Exception) {
-                log.error(e) { "주식 목표가 알림 체크 실패" }
+                log.failure(e) { "주식 목표가 알림 체크 실패" }
             }
 
             try {
                 checkCryptoPriceTargets(tickerMap ?: emptyMap(), targetHits, excluded)
             } catch (e: Exception) {
-                log.error(e) { "암호화폐 목표가 알림 체크 실패" }
+                log.failure(e) { "암호화폐 목표가 알림 체크 실패" }
             }
 
             try {
                 usPriceTargetChecker.check(targetHits, now, excluded)
             } catch (e: Exception) {
-                log.error(e) { "미국 주식 목표가 알림 체크 실패" }
+                log.failure(e) { "미국 주식 목표가 알림 체크 실패" }
             }
 
             try {
                 val posted = holdingAlertService.publish(holdingHits, now)
                 if (posted > 0) log.info { "보유 종목 급등락 비서 게시: ${posted}건 (hit ${holdingHits.size})" }
             } catch (e: Exception) {
-                log.error(e) { "보유 종목 급등락 비서 게시 실패" }
+                log.failure(e) { "보유 종목 급등락 비서 게시 실패" }
             }
 
             try {
                 val posted = priceTargetAlertService.publish(targetHits, now)
                 if (posted > 0) log.info { "목표가 도달 비서 게시: ${posted}건 (hit ${targetHits.size})" }
             } catch (e: Exception) {
-                log.error(e) { "목표가 도달 비서 게시 실패" }
+                log.failure(e) { "목표가 도달 비서 게시 실패" }
             }
 
             SecurityContextHolder.clearContext()
@@ -231,7 +232,7 @@ class PriceAlertScheduler(
                 if (item.code in newLowCodes) judge.judge(t, Direction.LOW_52W, price(stockData?.low_pric) ?: 0.0, PriceAlertJudge.SINGLE, hits)
             }
         } catch (e: Exception) {
-            log.warn { "250일 신고저가 체크 실패: ${e.message}" }
+            log.failure(e) { "250일 신고저가 체크 실패" }
         }
 
         return stockDataMap
@@ -285,7 +286,7 @@ class PriceAlertScheduler(
                 val res = runBlocking { stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = stkCdParam)) }
                 res.atn_stk_infr?.associateBy { it.stk_cd ?: "" } ?: emptyMap()
             } catch (e: Exception) {
-                log.warn { "목표가 주식 현재가 조회 실패: ${e.message}" }
+                log.failure(e) { "목표가 주식 현재가 조회 실패" }
                 emptyMap()
             }
         } else emptyMap()
@@ -319,7 +320,7 @@ class PriceAlertScheduler(
                 tickerClient.getTickers(missingMarkets.joinToString(","))
                     .associateBy { it.market }
             } catch (e: Exception) {
-                log.warn { "목표가 코인 현재가 조회 실패: ${e.message}" }
+                log.failure(e) { "목표가 코인 현재가 조회 실패" }
                 emptyMap()
             }
         } else emptyMap()

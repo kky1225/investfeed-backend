@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.monitoring.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.entity.SchedulerLog
 import com.example.investfeed.domain.monitoring.repository.ErrorLogRepository
 import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepository
@@ -76,7 +77,7 @@ class SchedulerShutdownRecoveryHandler(
                         errorMessage = relatedError?.message,
                     )
                 )
-            }.onFailure { log.error { "[shutdown-recovery] scheduler_log INSERT 실패 (${s.schedulerName}): ${it.message}" } }
+            }.onFailure { log.failure(it) { "[shutdown-recovery] scheduler_log INSERT 실패 (${s.schedulerName})" } }
 
             log.info { "[shutdown-recovery] ${s.schedulerName} INTERRUPTED 기록. 연결된 error_log: ${relatedError?.id}" }
         }

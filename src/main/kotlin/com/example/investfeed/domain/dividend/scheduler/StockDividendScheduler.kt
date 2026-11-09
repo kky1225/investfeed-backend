@@ -18,13 +18,8 @@ class StockDividendScheduler(
     @Scheduled(cron = SchedulerCron.STOCK_DIVIDEND, scheduler = "slowScheduler")
     fun collectDaily() {
         schedulerLogService.execute(SchedulerName.StockDividendScheduler) {
-            try {
-                stockDividendService.collectDailyDividends()
-                log.info { "배당 정보 일별 수집 스케줄러 완료" }
-            } catch (e: Exception) {
-                log.error { "배당 정보 일별 수집 스케줄러 실패: ${e.message}" }
-                throw e
-            }
+            stockDividendService.collectDailyDividends()
+            log.info { "배당 정보 일별 수집 스케줄러 완료" }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.service.TelegramCommandService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
@@ -57,7 +58,7 @@ class TelegramUpdatePoller(
         }
         updates.forEach { update ->
             runCatching { telegramCommandService.handle(update) }
-                .onFailure { log.error(it) { "텔레그램 업데이트 처리 실패: update_id=${update.update_id}" } }
+                .onFailure { log.failure(it) { "텔레그램 업데이트 처리 실패: update_id=${update.update_id}" } }
             redisTemplate.opsForValue().set(offsetKey, (update.update_id + 1).toString())
         }
     }

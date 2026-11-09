@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.stock.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
@@ -60,7 +61,7 @@ class StockMasterSyncScheduler(
         try {
             authClient.accessToken()
         } catch (e: Exception) {
-            log.error(e) { "스케줄러 토큰 발급 실패" }
+            log.failure(e) { "스케줄러 토큰 발급 실패" }
             SecurityContextHolder.clearContext()
             return
         }
@@ -70,7 +71,7 @@ class StockMasterSyncScheduler(
                 val count = stockMasterSyncService.syncAll()
                 log.info { "국내 종목 마스터 적재 완료: ${count}건" }
             } catch (e: Exception) {
-                log.error(e) { "국내 종목 마스터 적재 실패" }
+                log.failure(e) { "국내 종목 마스터 적재 실패" }
             }
         }
 
@@ -79,7 +80,7 @@ class StockMasterSyncScheduler(
                 val count = usStockInfoService.syncAll()
                 log.info { "미국 종목 마스터 적재 완료: ${count}건" }
             } catch (e: Exception) {
-                log.error(e) { "미국 종목 마스터 적재 실패" }
+                log.failure(e) { "미국 종목 마스터 적재 실패" }
             }
         }
 

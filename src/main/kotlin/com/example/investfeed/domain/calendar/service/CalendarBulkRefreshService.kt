@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.calendar.service
 
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.scheduling.TaskScheduler
@@ -98,7 +99,7 @@ class CalendarBulkRefreshService(
                         economicCalendarService.refreshEvents(year, month)
                         processed++
                     } catch (e: Exception) {
-                        log.warn { "[bulk-refresh] $year-$month 재생성 실패: ${e.message}" }
+                        log.failure(e) { "[bulk-refresh] $year-$month 재생성 실패" }
                         failed++
                     }
 
@@ -117,7 +118,7 @@ class CalendarBulkRefreshService(
             }
             log.info { "[bulk-refresh] 완료: 성공 $processed / 실패 $failed" }
         } catch (e: Exception) {
-            log.error { "[bulk-refresh] 전체 실패: ${e.message}" }
+            log.failure(e) { "[bulk-refresh] 전체 실패" }
             status.updateAndGet {
                 it.copy(
                     running = false,

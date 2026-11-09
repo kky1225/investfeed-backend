@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.stock.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -57,9 +59,9 @@ class UsStockClient(
         }catch (e: UsStockInfoException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "usStockInfo Error" }
+            log.apiFailure(e) { "usStockInfo Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -117,9 +119,9 @@ class UsStockClient(
         } catch (e: UsStockInfoListException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usStockInfoList Error" }
+            log.apiFailure(e) { "usStockInfoList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

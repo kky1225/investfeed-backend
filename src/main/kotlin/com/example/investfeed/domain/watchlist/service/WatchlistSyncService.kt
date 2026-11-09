@@ -4,6 +4,7 @@ import com.example.investfeed.domain.watchlist.repository.WatchlistItemRepositor
 import com.example.investfeed.domain.us.stock.service.UsStockInfoService
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -49,7 +50,7 @@ class WatchlistSyncService(
                     }
                 }
             } catch (e: Exception) {
-                log.warn { "관심종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}, ${e.message}" }
+                log.failure(e) { "관심종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}" }
             }
         }
 
@@ -63,7 +64,7 @@ class WatchlistSyncService(
                     updatedCount++
                 }
             } catch (e: Exception) {
-                log.warn { "미국 관심종목 stkNm 동기화 실패: stkCd=${item.stkCd}, ${e.message}" }
+                log.failure(e) { "미국 관심종목 stkNm 동기화 실패: stkCd=${item.stkCd}" }
             }
         }
 

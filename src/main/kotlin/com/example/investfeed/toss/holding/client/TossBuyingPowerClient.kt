@@ -1,5 +1,7 @@
 package com.example.investfeed.toss.holding.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.annotation.TossToken
 import com.example.investfeed.toss.auth.service.TossAuthClient
@@ -41,8 +43,8 @@ class TossBuyingPowerClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "toss getBuyingPower Error: currency=$currency, ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "toss getBuyingPower Error: currency=$currency" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

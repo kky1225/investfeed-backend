@@ -40,16 +40,11 @@ class CircuitBreakerScheduler(
         if (holidayService.isHoliday() || !MarketTimeUtil.isKrxOpen()) return
 
         schedulerLogService.execute(SchedulerName.CircuitBreakerSubscribeScheduler) {
-            try {
-                kiwoomStreamClient.registerPersistent(schedulerLoginId, indexStream)
-                val stats = circuitBreakerService.drainTickStats()
-                    .joinToString(", ") { "${it.indexCode} ${it.ticks}건 최대간격 ${it.maxGapSec}초" }
-                    .ifEmpty { "수신 없음" }
-                log.info { "CircuitBreakerSubscribeScheduler 0J $stats" }
-            } catch (e: Exception) {
-                log.error(e) { "CircuitBreakerSubscribeScheduler 실패" }
-                throw e
-            }
+            kiwoomStreamClient.registerPersistent(schedulerLoginId, indexStream)
+            val stats = circuitBreakerService.drainTickStats()
+                .joinToString(", ") { "${it.indexCode} ${it.ticks}건 최대간격 ${it.maxGapSec}초" }
+                .ifEmpty { "수신 없음" }
+            log.info { "CircuitBreakerSubscribeScheduler 0J $stats" }
         }
     }
 
@@ -64,9 +59,6 @@ class CircuitBreakerScheduler(
             SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(schedulerLoginId, null, emptyList())
             try {
                 circuitBreakerService.check(LocalDateTime.now())
-            } catch (e: Exception) {
-                log.error(e) { "CircuitBreakerCheckScheduler 실패" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
             }

@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.shortselling.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -56,9 +58,9 @@ class ShortSellingClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "stockShortSelling Error" }
+            log.apiFailure(e) { "stockShortSelling Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

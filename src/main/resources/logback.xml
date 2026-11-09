@@ -25,6 +25,8 @@
     </appender>
 
     <logger name="com.example.investfeed" level="DEBUG"/>
+    <!-- SQL 오류는 예외 메시지에 그대로 담겨 받은 쪽이 1건 남긴다. Hibernate 자체 error 는 끈다 (실패 1건에 error 1건) -->
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

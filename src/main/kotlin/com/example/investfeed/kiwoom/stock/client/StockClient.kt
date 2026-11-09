@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.stock.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
@@ -81,9 +83,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "stockInfoList Error" }
+            log.apiFailure(e) { "stockInfoList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -116,9 +118,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockInfo Error" }
+            log.apiFailure(e) { "stockDefaultInfo Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -151,9 +153,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "viList Error: ${e.message}" }
+            log.apiFailure(e) { "viList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -186,9 +188,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockInfo Error" }
+            log.apiFailure(e) { "stockInfo Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -221,9 +223,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockInvestor Error" }
+            log.apiFailure(e) { "stockInvestor Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -256,9 +258,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockTradeDailyList Error" }
+            log.apiFailure(e) { "stockTradeDailyList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -291,9 +293,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockJumpList Error" }
+            log.apiFailure(e) { "stockJumpList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -326,9 +328,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockNewPriceList Error" }
+            log.apiFailure(e) { "stockNewPriceList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -361,9 +363,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectCodeList Error" }
+            log.apiFailure(e) { "sectCodeList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -411,9 +413,9 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockInterest Error" }
+            log.apiFailure(e) { "stockInterest Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -446,8 +448,8 @@ class StockClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "newHighLow Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "newHighLow Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

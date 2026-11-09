@@ -1,5 +1,7 @@
 package com.example.investfeed.upbit.market.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.upbit.market.dto.res.UpbitMarketRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
@@ -37,8 +39,8 @@ class MarketClient(
             cacheTimestamp = now
             return cachedMarkets
         } catch (e: Exception) {
-            log.error { "upbit getMarketAll Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getMarketAll Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 

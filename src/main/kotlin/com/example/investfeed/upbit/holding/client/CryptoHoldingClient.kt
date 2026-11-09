@@ -1,5 +1,7 @@
 package com.example.investfeed.upbit.holding.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.upbit.holding.dto.res.UpbitAccountRes
 import io.jsonwebtoken.Jwts
@@ -39,11 +41,11 @@ class CryptoHoldingClient(
                 throw InvalidApiKeyException()
             }
 
-            log.error { "upbit getAccounts Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getAccounts Error" }
+            throw ExternalApiFailureException(e)
         } catch (e: Exception) {
-            log.error { "upbit getAccounts Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getAccounts Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -60,7 +62,11 @@ class CryptoHoldingClient(
             if (e.statusCode == HttpStatus.UNAUTHORIZED) {
                 throw InvalidApiKeyException()
             }
-            throw e
+            log.apiFailure(e) { "upbit validateApiKey Error" }
+            throw ExternalApiFailureException(e)
+        } catch (e: Exception) {
+            log.apiFailure(e) { "upbit validateApiKey Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 

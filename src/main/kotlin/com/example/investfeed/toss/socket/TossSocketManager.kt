@@ -104,7 +104,8 @@ class TossSocketManager(
         )
 
         if (!client.connectBlocking(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-            log.error { "토스 실시간 연결 실패 : loginId=$loginId" }
+            // 연결 전 onError 는 warn 만 남기므로 연결 실패 error 는 여기 1건
+            log.error { "토스 실시간 연결 실패 : loginId=$loginId" + (client.connectError?.let { ", ${it.javaClass.simpleName}: ${it.message}" } ?: "") }
             client.close()
             return null
         }

@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.order.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomMockToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -66,8 +68,8 @@ class MockAccountClient(
         } catch (e: DepositException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "mock deposit Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "mock deposit Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -95,8 +97,8 @@ class MockAccountClient(
         } catch (e: HoldingListException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "mock holdingList Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "mock holdingList Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -124,8 +126,8 @@ class MockAccountClient(
         } catch (e: RealizedPnlException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "mock realizedPnl Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "mock realizedPnl Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -158,8 +160,8 @@ class MockAccountClient(
         } catch (e: TradeFillsException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "mock tradeFills Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "mock tradeFills Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

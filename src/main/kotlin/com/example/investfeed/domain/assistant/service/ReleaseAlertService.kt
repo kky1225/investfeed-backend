@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.ReleaseFact
 import com.example.investfeed.domain.assistant.entity.AssistantReleaseAlert
 import com.example.investfeed.domain.assistant.repository.AssistantReleaseAlertRepository
@@ -65,7 +66,7 @@ class ReleaseAlertService(
         val months = listOf(YearMonth.from(today), YearMonth.from(today).minusMonths(1))
         val events = months.flatMap { ym ->
             runCatching { economicCalendarService.listEvents(ym.year, ym.monthValue).events }
-                .onFailure { log.error(it) { "발표 알림 캘린더 조회 실패: $ym" } }.getOrDefault(emptyList())
+                .onFailure { log.failure(it) { "발표 알림 캘린더 조회 실패: $ym" } }.getOrDefault(emptyList())
         }
         val seed = releaseRepository.count() == 0L
         var saved = 0; var suppressedCount = 0; var posted = 0
@@ -102,9 +103,9 @@ class ReleaseAlertService(
                     runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
                         .onSuccess {
                             runCatching { telegramNotifier.notify(member.id, telegramText) }
-                                .onFailure { log.error(it) { "발표 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
+                                .onFailure { log.failure(it) { "발표 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
                         }
-                        .onFailure { log.error(it) { "발표 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
+                        .onFailure { log.failure(it) { "발표 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
                 }
         }
         return RunResult(events.size, saved, suppressedCount, posted, seed)
@@ -121,7 +122,7 @@ class ReleaseAlertService(
             .filter { (k, _) -> k < key }
             .maxByOrNull { (k, _) -> k }?.second ?: return@runCatching null
         EconomicCalendarService.formatEventValue(point.value, history.unit)
-    }.onFailure { log.error(it) { "발표 알림 전월 값 조회 실패: ${target.name}" } }.getOrNull()
+    }.onFailure { log.failure(it) { "발표 알림 전월 값 조회 실패: ${target.name}" } }.getOrNull()
 
     /** 이력 포인트 날짜는 YYYY-MM-DD / YYYYMM / YYYYMMDD / YYYYQn 이 섞여 있어 8자리 키로 맞춘다 */
     private fun normalizeDateKey(raw: String): String? {

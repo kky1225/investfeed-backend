@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.notification.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
 import com.example.investfeed.domain.assistant.service.UsMarketCalendarService
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
@@ -144,7 +145,7 @@ class UsHoldingAlertChecker(
                 val base = try {
                     withMemberContext(loginId) { runBlocking { usSessionBaseService.currentBases(tickers) } }
                 } catch (e: Exception) {
-                    log.error(e) { "미국 장외 기준 종가 조회 실패: member=$memberId" }
+                    log.failure(e) { "미국 장외 기준 종가 조회 실패: member=$memberId" }
                     null
                 }
                 base?.let { memberId to it }
@@ -172,7 +173,7 @@ class UsHoldingAlertChecker(
     private fun stockInfo(stexTp: String, ticker: String): KiwoomUsStockInfoRes? = try {
         usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = stexTp, stk_cd = ticker))
     } catch (e: Exception) {
-        log.warn { "미국 보유 종목 시세 조회 실패: $ticker ${e.message}" }
+        log.failure(e) { "미국 보유 종목 시세 조회 실패: $ticker" }
         null
     }
 

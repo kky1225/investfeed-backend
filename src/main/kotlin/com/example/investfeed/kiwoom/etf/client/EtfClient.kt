@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.etf.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
@@ -61,9 +63,9 @@ class EtfClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "etfTimeTrend Error" }
+            log.apiFailure(e) { "etfTimeTrend Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

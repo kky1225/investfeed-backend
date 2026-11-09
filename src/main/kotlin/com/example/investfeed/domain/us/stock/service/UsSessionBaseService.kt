@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.us.stock.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.toss.auth.service.TossAuthClient
@@ -115,7 +116,7 @@ class UsSessionBaseService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error(e) { "토스 미국 장 운영 정보 조회 실패" }
+            log.failure(e) { "토스 미국 장 운영 정보 조회 실패" }
             null
         }
     }
@@ -129,7 +130,7 @@ class UsSessionBaseService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error(e) { "토스 일봉 조회 실패: $ticker" }
+            log.failure(e) { "토스 일봉 조회 실패: $ticker" }
             return null   // 호출 실패는 저장하지 않고 다음에 다시 묻는다
         }
         val close = candles

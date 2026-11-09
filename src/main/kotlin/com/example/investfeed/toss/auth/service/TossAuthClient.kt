@@ -1,5 +1,9 @@
 package com.example.investfeed.toss.auth.service
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
@@ -74,9 +78,12 @@ class TossAuthClient(
             if (accessToken.isNullOrEmpty()) {
                 refreshToken(loginId)
             }
+        } catch (e: InvestFeedException) {
+            throw e
         } catch (e: Exception) {
-            log.warn { "tossAccessToken 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            // Redis 오류 등 아직 기록되지 않은 예외만 남는다
+            log.failure(e) { "tossAccessToken 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -106,7 +113,7 @@ class TossAuthClient(
 
             val token = res?.access_token
             if (token.isNullOrBlank()) {
-                log.warn { "tossAccessToken failed: access_token 없음, loginId=$loginId" }
+                log.error { "tossAccessToken failed: access_token 없음, loginId=$loginId" }
                 throw TossAccessTokenException()
             }
 
@@ -117,8 +124,9 @@ class TossAuthClient(
         } catch (e: TossAccessTokenException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "tossRefreshToken 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            // 토큰 발급은 onStatus 가 없어 HTTP 오류(WebClientResponseException)는 여기서 error 1건
+            log.apiFailure(e) { "tossRefreshToken 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -137,7 +145,11 @@ class TossAuthClient(
             if (e.statusCode == HttpStatus.UNAUTHORIZED || e.statusCode == HttpStatus.BAD_REQUEST) {
                 throw InvalidApiKeyException()
             }
-            throw e
+            log.error { "토스 키 검증 HTTP 오류: status=${e.statusCode}" }
+            throw ExternalApiFailureException(e)
+        } catch (e: Exception) {
+            log.apiFailure(e) { "토스 키 검증 실패" }
+            throw ExternalApiFailureException(e)
         }
     }
 

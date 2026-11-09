@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.calendar.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.pressrelease.client.PressReleaseClient
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -68,7 +69,7 @@ class OfficialReleaseService(
 
     private fun cached(key: String, load: () -> String?): String? {
         cache[key]?.takeIf { it.value != null || it.fetchedAt.isAfter(Instant.now().minus(MISS_TTL)) }?.let { return it.value }
-        val value = runCatching(load).onFailure { log.error(it) { "공식 보도자료 확인 실패: $key" } }.getOrNull()
+        val value = runCatching(load).onFailure { log.failure(it) { "공식 보도자료 확인 실패: $key" } }.getOrNull()
         cache[key] = Cached(value, Instant.now())
         return value
     }

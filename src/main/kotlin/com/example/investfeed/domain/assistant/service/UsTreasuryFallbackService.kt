@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.fred.client.FredClient
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -32,7 +33,7 @@ class UsTreasuryFallbackService(
                 }
                 .sortedBy { it.first }
         } catch (e: Exception) {
-            log.error(e) { "FRED $fredId 조회 실패 ($from~$to)" }
+            log.failure(e) { "FRED $fredId 조회 실패 ($from~$to)" }
             emptyList()
         }
     }

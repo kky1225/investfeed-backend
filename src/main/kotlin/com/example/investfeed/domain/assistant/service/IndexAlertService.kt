@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.AlertDirection
 import com.example.investfeed.domain.assistant.dto.factsheet.AlertTrigger
 import com.example.investfeed.domain.assistant.dto.factsheet.IndexAlertCardFact
@@ -80,7 +81,7 @@ class IndexAlertService(
     fun runUs(now: LocalDateTime, usTradeDate: LocalDate): RunResult {
         val quotes = US_TYPES.mapNotNull { (code, type) ->
             runCatching { crawler.fetchIndexOhlc(type) }
-                .onFailure { log.error(it) { "미국 지수 고저가 조회 실패: $code" } }
+                .onFailure { log.failure(it) { "미국 지수 고저가 조회 실패: $code" } }
                 .getOrNull()
                 ?.takeIf { it.tradeDate == usTradeDate && it.prevClose != null && it.prevClose > 0 }
                 ?.let { IndexQuote(code, it.tradeDate, it.close, it.prevClose!!, it.high, it.low) }
@@ -99,7 +100,7 @@ class IndexAlertService(
                     val low = TemplateFormat.parse(res.low_pric)?.let { abs(it) } ?: return@runCatching null
                     val prev = prevClose(cur, TemplateFormat.parse(res.pred_pre), TemplateFormat.parse(res.flu_rt)) ?: return@runCatching null
                     IndexQuote(code, date, cur, prev, high, low)
-                }.onFailure { log.error(it) { "국내 지수 현재가 조회 실패: $code" } }.getOrNull()
+                }.onFailure { log.failure(it) { "국내 지수 현재가 조회 실패: $code" } }.getOrNull()
             }
         }.awaitAll().filterNotNull()
     }
@@ -118,7 +119,7 @@ class IndexAlertService(
             val fact = judge(q, now, kr) ?: return@forEach
             fired += fact
             posted += runCatching { publish(fact, kr) }
-                .onFailure { log.error(it) { "지수 알림 게시 실패: ${q.indexCode} ${fact.trigger}" } }
+                .onFailure { log.failure(it) { "지수 알림 게시 실패: ${q.indexCode} ${fact.trigger}" } }
                 .getOrDefault(0)
         }
         return RunResult(quotes, fired, posted)
@@ -150,7 +151,7 @@ class IndexAlertService(
         val quote = IndexQuote(ev.indexCode, ev.tradeDate, ev.triggerValue, e.prevClose, maxOf(e.high, ev.triggerValue), minOf(e.low, ev.triggerValue))
         val fact = IndexAlertFact(quote, AlertTrigger.CB, AlertDirection.DOWN, ev.triggerRate, stage = ev.stage, firedAt = ev.startedAt)
         runCatching { publish(fact, kr = true) }
-            .onFailure { log.error(it) { "서킷브레이커 알림 게시 실패: ${ev.indexCode} ${ev.stage}단계" } }
+            .onFailure { log.failure(it) { "서킷브레이커 알림 게시 실패: ${ev.indexCode} ${ev.stage}단계" } }
     }
 
     private fun judgeWarn(q: IndexQuote, s: AlertStateService.IndexAlertState, now: LocalDateTime): IndexAlertFact? {
@@ -168,7 +169,7 @@ class IndexAlertService(
     private fun publish(fact: IndexAlertFact, kr: Boolean): Int {
         val card = runCatching {
             if (kr) marketFactSheetService.collectKrIndexAlert(fact.quote.indexCode) else marketFactSheetService.collectUsIndexAlert()
-        }.onFailure { log.error(it) { "알림 카드 데이터 수집 실패: ${fact.quote.indexCode}" } }.getOrNull()
+        }.onFailure { log.failure(it) { "알림 카드 데이터 수집 실패: ${fact.quote.indexCode}" } }.getOrNull()
             .let { withJudgedQuote(it, fact.quote) }
         val body = AlertTemplateRenderer.renderIndexAlert(fact, card)
         val entity = alertRepository.save(
@@ -195,9 +196,9 @@ class IndexAlertService(
                 runCatching { timelineService.postMessage(member.id, finalBody, refAlertId = entity.id); posted++ }
                     .onSuccess {
                         runCatching { telegramNotifier.notify(member.id, telegramText) }
-                            .onFailure { log.error(it) { "지수 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
+                            .onFailure { log.failure(it) { "지수 알림 텔레그램 발송 실패: member=${member.loginId} alertId=${entity.id}" } }
                     }
-                    .onFailure { log.error(it) { "지수 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
+                    .onFailure { log.failure(it) { "지수 알림 회원 게시 실패: member=${member.loginId} alertId=${entity.id}" } }
             }
         return posted
     }

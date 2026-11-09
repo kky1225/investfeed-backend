@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.gold.req.KiwoomGoldChartDayReq
@@ -66,9 +68,9 @@ class GoldChartClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldChartMinuteList Error" }
+            log.apiFailure(e) { "goldChartMinuteList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -101,9 +103,9 @@ class GoldChartClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldChartDayList Error" }
+            log.apiFailure(e) { "goldChartDayList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -136,9 +138,9 @@ class GoldChartClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldChartWeekList Error" }
+            log.apiFailure(e) { "goldChartWeekList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -171,9 +173,9 @@ class GoldChartClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldChartMonthList Error" }
+            log.apiFailure(e) { "goldChartMonthList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.calendar.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.calendar.dto.res.*
 import com.example.investfeed.domain.calendar.entity.CalendarEventEntity
 import com.example.investfeed.domain.calendar.repository.CalendarEventRepository
@@ -149,7 +150,7 @@ class EconomicCalendarService(
         runCatching {
             val indicators = fetchIndicators()
             cacheIndicators("${CACHE_PREFIX}indicators", indicators.copy(lastUpdated = updatedAt))
-        }.onFailure { log.error { "일정 동기화 - 지표 카드 갱신 실패: ${it.message}" } }
+        }.onFailure { log.failure(it) { "일정 동기화 - 지표 카드 갱신 실패" } }
 
         // 이벤트 갱신 (현재 -FREEZE_GRACE_MONTHS ~ +2)
         // release_dates 는 월별 반복 조회 대신 전 구간을 릴리즈당 1회로 통합 조회해 재사용한다.
@@ -161,7 +162,7 @@ class EconomicCalendarService(
                 val events = fetchApiEvents(target.year, target.monthValue, prefetchedReleaseDates)
                 val result = CalendarEventsRes(events = events.sortedBy { it.date }, lastUpdated = updatedAt)
                 cacheEvents("${CACHE_PREFIX}events:${target.year}:${target.monthValue}", result)
-            }.onFailure { log.error { "일정 동기화 - ${target.year}-${target.monthValue} 이벤트 갱신 실패: ${it.message}" } }
+            }.onFailure { log.failure(it) { "일정 동기화 - ${target.year}-${target.monthValue} 이벤트 갱신 실패" } }
         }
     }
 
@@ -190,7 +191,7 @@ class EconomicCalendarService(
                 ).release_dates?.mapNotNull { it.date } ?: return@runCatching null
                 releaseId to dates
             }.onFailure {
-                log.warn { "release_dates 통합 조회 실패 - 월 단위 조회로 폴백 (releaseId=$releaseId): ${it.message}" }
+                log.failure(it) { "release_dates 통합 조회 실패 - 월 단위 조회로 폴백 (releaseId=$releaseId)" }
             }.getOrNull()
         }.toMap()
     }
@@ -211,7 +212,7 @@ class EconomicCalendarService(
     private fun cacheIndicators(key: String, res: EconomicIndicatorsRes) {
         runCatching {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(res), CACHE_TTL, TimeUnit.MINUTES)
-        }.onFailure { log.warn { "지표 캐시 저장 실패: ${it.message}" } }
+        }.onFailure { log.failure(it) { "지표 캐시 저장 실패" } }
     }
 
     private fun fetchIndicators(): EconomicIndicatorsRes {
@@ -375,7 +376,7 @@ class EconomicCalendarService(
         if (result != null) {
             runCatching {
                 redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result), CACHE_TTL, TimeUnit.MINUTES)
-            }.onFailure { log.warn { "히스토리 캐시 저장 실패: ${it.message}" } }
+            }.onFailure { log.failure(it) { "히스토리 캐시 저장 실패" } }
         }
         return result
     }
@@ -671,7 +672,7 @@ class EconomicCalendarService(
         // 아직 freeze 안 됨 → API 호출 후 freeze + 응답
         val apiEvents = fetchApiEvents(year, month)
         runCatching { freezeMonth(year, month, apiEvents) }
-            .onFailure { log.warn { "freeze 실패 ($year-$month): ${it.message}" } }
+            .onFailure { log.failure(it) { "freeze 실패 ($year-$month)" } }
 
         val updatedAt = LocalDateTime.now().format(DATETIME_FMT)
         val apiResult = CalendarEventsRes(events = apiEvents.sortedBy { it.date }, lastUpdated = updatedAt)
@@ -702,7 +703,7 @@ class EconomicCalendarService(
     private fun cacheEvents(key: String, res: CalendarEventsRes) {
         runCatching {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(res), CACHE_TTL, TimeUnit.MINUTES)
-        }.onFailure { log.warn { "캘린더 캐시 저장 실패: ${it.message}" } }
+        }.onFailure { log.failure(it) { "캘린더 캐시 저장 실패" } }
     }
 
     private fun mergeManualEvents(apiResult: CalendarEventsRes, year: Int, month: Int): CalendarEventsRes {
@@ -888,7 +889,7 @@ class EconomicCalendarService(
                             ))
                         }
                     }
-                }.onFailure { log.warn { "FRED ${series.seriesId} 조회 실패: ${it.message}" } }
+                }.onFailure { log.failure(it) { "FRED ${series.seriesId} 조회 실패" } }
             }
 
             // 3) 미래 예정일을 각 시리즈별로 이벤트 생성 (value=null)
@@ -1005,7 +1006,7 @@ class EconomicCalendarService(
             ecosClient.getStatistics(def.tableCode, def.frequency, startTime, refTime, def.itemCode)
                 .statisticSearch?.row?.let { indexToYoY(it) }
                 ?.firstOrNull { it.date == refTime }
-        }.onFailure { log.error { "한국 CPI 값 조회 실패 ($refTime): ${it.message}" } }
+        }.onFailure { log.failure(it) { "한국 CPI 값 조회 실패 ($refTime)" } }
             .getOrNull() ?: return event
 
         val displayValue = formatEventValue(yoy.value, def.unit) ?: return event

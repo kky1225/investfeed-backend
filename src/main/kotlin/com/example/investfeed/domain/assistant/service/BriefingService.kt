@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.CoinDailyFactSheet
 import com.example.investfeed.domain.assistant.dto.factsheet.KrCloseFactSheet
 import com.example.investfeed.domain.assistant.dto.factsheet.KrHoldingsFactSheet
@@ -154,7 +155,7 @@ class BriefingService(
                 timelineService.postMessage(member.id, body, refBriefingId = shared.id, refPersonalBriefingId = personalEntity?.id)
                 posted++
             } catch (e: Exception) {
-                log.error(e) { "브리핑 회원 게시 실패: type=$type member=${member.loginId}" }
+                log.failure(e) { "브리핑 회원 게시 실패: type=$type member=${member.loginId}" }
             }
         }
         return posted to skipped
@@ -162,7 +163,7 @@ class BriefingService(
 
     private fun buildPersonalSheet(member: Member, type: BriefingType, date: LocalDate): PersonalFactSheet? =
         runCatching { personalBriefingService.buildPersonalSheet(member, type, date) }
-            .onFailure { log.error(it) { "개인 파트 생성 실패: type=$type member=${member.loginId}" } }
+            .onFailure { log.failure(it) { "개인 파트 생성 실패: type=$type member=${member.loginId}" } }
             .getOrNull()
 
     private fun findRecipients(type: BriefingType): List<Member> =

@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.sect.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -58,9 +60,9 @@ class UsSectClient(
         } catch (e: UsSectPerformanceListException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usSectPerformanceList Error" }
+            log.apiFailure(e) { "usSectPerformanceList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -118,9 +120,9 @@ class UsSectClient(
         } catch (e: UsSectStockListException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usSectStockList Error" }
+            log.apiFailure(e) { "usSectStockList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

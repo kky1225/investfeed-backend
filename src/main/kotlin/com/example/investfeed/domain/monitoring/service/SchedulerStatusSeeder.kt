@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.monitoring.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
@@ -33,7 +34,7 @@ class SchedulerStatusSeeder(
             seed()
         } catch (e: Exception) {
             // 기동 실패 격리: Seeder 실패해도 앱은 정상 기동
-            log.error(e) { "[startup] SchedulerStatusSeeder 실패: ${e.message}" }
+            log.failure(e) { "[startup] SchedulerStatusSeeder 실패" }
         }
     }
 

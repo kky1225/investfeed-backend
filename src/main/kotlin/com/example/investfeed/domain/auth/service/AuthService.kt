@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.auth.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.auth.dto.req.*
 import com.example.investfeed.domain.auth.dto.res.*
 import com.example.investfeed.domain.auth.entity.Member
@@ -605,7 +606,7 @@ class AuthService(
     private fun afterCommit(block: () -> Unit) {
         TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
             override fun afterCommit() {
-                runCatching(block).onFailure { log.error(it) { "커밋 후 실시간 연결 정리 실패" } }
+                runCatching(block).onFailure { log.failure(it) { "커밋 후 실시간 연결 정리 실패" } }
             }
         })
     }

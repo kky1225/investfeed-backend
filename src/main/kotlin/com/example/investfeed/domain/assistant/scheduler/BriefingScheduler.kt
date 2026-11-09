@@ -87,12 +87,6 @@ class BriefingScheduler(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-            } catch (e: Exception) {
-                log.error(e) { "스케줄러 키움 토큰 발급 실패 ($name)" }
-                SecurityContextHolder.clearContext()
-                throw e
-            }
-            try {
                 val result = briefingService.generateAndPublish(type, now)
                 log.info { "$name 완료: date=${result.targetDate} briefingId=${result.briefingId} posted=${result.posted} skipped=${result.skipped}" }
             } finally {

@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.ecos.client.EcosClient
 import mu.KotlinLogging
@@ -55,7 +56,7 @@ class KrTreasuryFallbackService(
                 }
                 .sortedBy { it.first }
         } catch (e: Exception) {
-            log.error(e) { "ECOS $TABLE_CODE/$itemCode 조회 실패 (~$upTo)" }
+            log.failure(e) { "ECOS $TABLE_CODE/$itemCode 조회 실패 (~$upTo)" }
             null
         }
     }
@@ -75,7 +76,7 @@ class KrTreasuryFallbackService(
             val (date, value) = obs.lastOrNull() ?: return null
             Close(date, value, obs.getOrNull(obs.size - 2)?.let { (value - it.second) * 100 })
         } catch (e: Exception) {
-            log.error(e) { "ECOS $TABLE_CODE/$itemCode 조회 실패 (~$tradeDate)" }
+            log.failure(e) { "ECOS $TABLE_CODE/$itemCode 조회 실패 (~$tradeDate)" }
             null
         }
     }

@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.theme.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -84,9 +86,9 @@ class ThemeClient(
         }catch(e: ThemeGroupListException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "themeGroupList Error" }
+            log.apiFailure(e) { "themeGroupList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -118,9 +120,9 @@ class ThemeClient(
         }catch(e: ThemeGroupStockListException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "themeGroupStockList Error" }
+            log.apiFailure(e) { "themeGroupStockList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

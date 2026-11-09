@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.rebalancing.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.notification.entity.AssetType
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.entity.NotificationType
@@ -48,7 +49,7 @@ class RebalancingAlertScheduler(
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
-                log.error(e) { "리밸런싱 스케줄러 토큰 발급 실패" }
+                log.failure(e) { "리밸런싱 스케줄러 토큰 발급 실패" }
                 SecurityContextHolder.clearContext()
                 return@execute
             }
@@ -114,12 +115,9 @@ class RebalancingAlertScheduler(
                         sendWebSocket(setting.memberId, notification)
                     }
                 } catch (e: Exception) {
-                    log.warn { "리밸런싱 체크 실패 (memberId=${setting.memberId}): ${e.message}" }
+                    log.failure(e) { "리밸런싱 체크 실패 (memberId=${setting.memberId})" }
                 }
             }
-            } catch (e: Exception) {
-                log.error { "RebalancingAlertScheduler 실행 실패: ${e.message}" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
                 log.info { "RebalancingAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }

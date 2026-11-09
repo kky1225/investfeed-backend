@@ -1,5 +1,7 @@
 package com.example.investfeed.feargreed.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.feargreed.dto.res.FearGreedApiRes
 import com.example.investfeed.feargreed.exception.FearGreedApiException
@@ -27,6 +29,7 @@ class FearGreedClient(
                 .block()
 
             if (res?.data == null) {
+                log.error { "Fear&Greed API 응답 오류: limit=$limit" }
                 throw FearGreedResponseException()
             }
 
@@ -38,9 +41,9 @@ class FearGreedClient(
         } catch (e: FearGreedResponseException) {
             throw e
         } catch (e: Exception) {
-            log.error { "getFearGreedIndex Error: ${e.message}" }
+            log.apiFailure(e) { "getFearGreedIndex Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

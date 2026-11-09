@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.chart.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -100,9 +102,9 @@ class UsStockChartClient(
         } catch (e: UsStockChartException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usStockChart Error : apiId=$apiId" }
+            log.apiFailure(e) { "usStockChart Error : apiId=$apiId" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

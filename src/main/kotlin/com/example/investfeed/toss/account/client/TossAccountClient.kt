@@ -1,5 +1,7 @@
 package com.example.investfeed.toss.account.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.account.dto.res.TossAccount
 import com.example.investfeed.toss.account.dto.res.TossAccountListRes
@@ -38,7 +40,10 @@ class TossAccountClient(
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
                 .awaitBodyOrNull<TossAccountListRes>()
 
-            return res?.result ?: throw TossAccountListException()
+            return res?.result ?: run {
+                log.error { "토스 API 응답 오류: api=getAccounts" }
+                throw TossAccountListException()
+            }
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossAccountListException) {
@@ -46,8 +51,8 @@ class TossAccountClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "toss getAccounts Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "toss getAccounts Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

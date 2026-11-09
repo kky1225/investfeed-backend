@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.*
 import com.example.investfeed.domain.auth.entity.Member
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
@@ -63,7 +64,7 @@ class PersonalBriefingService(
             usBrokers = stock.mapNotNull { (mb, res) -> toUsHoldingsFact(mb, res) },
             usdKrw = marketIndexService.getMarketIndex(MarketIndexType.USD_KRW)?.price?.let { TemplateFormat.parse(it) },
             coinExchanges = fetchCryptoHoldings(member, date),
-            realized = runCatching { fetchRealizedProfit(member.id) }.onFailure { log.error(it) { "실현손익 조회 실패 memberId=${member.id}" } }.getOrNull(),
+            realized = runCatching { fetchRealizedProfit(member.id) }.onFailure { log.failure(it) { "실현손익 조회 실패 memberId=${member.id}" } }.getOrNull(),
         )
     }
 
@@ -72,7 +73,7 @@ class PersonalBriefingService(
         return PersonalFactSheet(
             memberId = member.id,
             krBrokers = stock.map { (mb, res) -> toKrHoldingsFact(mb, res) },
-            realized = runCatching { fetchRealizedProfit(member.id) }.onFailure { log.error(it) { "실현손익 조회 실패 memberId=${member.id}" } }.getOrNull(),
+            realized = runCatching { fetchRealizedProfit(member.id) }.onFailure { log.failure(it) { "실현손익 조회 실패 memberId=${member.id}" } }.getOrNull(),
         )
     }
 
@@ -95,7 +96,7 @@ class PersonalBriefingService(
                         BrokerType.API -> runBlocking { if (mb.broker.name == TOSS) tossHoldingService.listTossHoldingsSuspend() else holdingService.listHoldingsSuspend() }
                         BrokerType.MANUAL -> manualToHoldingList(mb)
                     }
-                }.onFailure { log.error(it) { "보유 조회 실패 member=${member.loginId} broker=${mb.broker.name}" } }.getOrNull()
+                }.onFailure { log.failure(it) { "보유 조회 실패 member=${member.loginId} broker=${mb.broker.name}" } }.getOrNull()
             }
 
     private fun manualToHoldingList(mb: MemberBroker): HoldingListRes {
@@ -156,7 +157,7 @@ class PersonalBriefingService(
             val ticker = h.usStkCd ?: h.stkCd.substringBefore("_")
             val evalUsd = TemplateFormat.parse(h.evltAmtUsd)
             val dayRate = runCatching { TemplateFormat.parse(usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = h.stexTp!!, stk_cd = ticker)).flu_rt) }
-                .onFailure { log.error(it) { "미국 종목 시세 조회 실패 $ticker" } }.getOrNull()
+                .onFailure { log.failure(it) { "미국 종목 시세 조회 실패 $ticker" } }.getOrNull()
             val dayChange = if (dayRate != null && evalUsd != null && (1 + dayRate / 100) > 0) evalUsd - evalUsd / (1 + dayRate / 100) else null
             HoldingFact(code = ticker, name = h.stkNm.ifBlank { ticker }, link = "/us-stock/detail/${h.stexTp}/$ticker", dayRate = dayRate, dayChange = dayChange, totalRate = TemplateFormat.parse(h.prftRt), eval = evalUsd,
                 curPrc = TemplateFormat.parse(h.curPrcUsd), evalProfit = TemplateFormat.parse(h.evltvPrftUsd), qty = TemplateFormat.parse(h.rmndQty), purPrice = TemplateFormat.parse(h.purPricUsd))
@@ -189,7 +190,7 @@ class PersonalBriefingService(
                     val eval = items.sumOf { it.eval ?: 0.0 }
                     val dayChange = items.mapNotNull { it.dayChange }.takeIf { it.isNotEmpty() }?.sum()
                     BrokerHoldingsFact(mb.broker.name, "KRW", eval, dayChange, dayChange?.let { c -> (eval - c).takeIf { it > 0 }?.let { c / it * 100 } }, TemplateFormat.parse(res.totPrftRt), items)
-                }.onFailure { log.error(it) { "코인 보유 조회 실패 member=${member.loginId} broker=${mb.broker.name}" } }
+                }.onFailure { log.failure(it) { "코인 보유 조회 실패 member=${member.loginId} broker=${mb.broker.name}" } }
                     .getOrElse { BrokerHoldingsFact(mb.broker.name, "KRW", 0.0, null, null, null, emptyList(), failed = true) }
             }
 

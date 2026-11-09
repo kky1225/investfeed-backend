@@ -3,7 +3,6 @@ package com.example.investfeed.domain.marketindex.crawler
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
-import com.example.investfeed.domain.marketindex.exception.MarketIndexApiException
 import com.example.investfeed.domain.marketindex.exception.MarketIndexResponseException
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
@@ -210,51 +209,84 @@ class NaverMarketIndexCrawler(
     fun crawl(): List<MarketIndexRes> = runBlocking { crawlSuspend() }
 
     private suspend fun crawlSuspend(): List<MarketIndexRes> {
-        val result = mutableListOf<MarketIndexRes>()
         val now = LocalDateTime.now()
 
         val worldApis = WORLD_INDEX_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }
         val domesticApis = DOMESTIC_INDEX_PATHS.map { (type, path) -> type to "$naverMobileUrl$path" }
 
-        result.addAll(fetchAll(worldApis + domesticApis) { type, body -> parseJsonIndex(type, body, now) })
-        result.addAll(fetchAll(EXCHANGE_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseExchangeDetail(type, body, now) })
-        result.addAll(fetchAll(POLLING_PATHS.map { (type, path) -> type to "$naverPcUrl$path" }) { type, body -> parsePollingIndex(type, body, now) })
-        result.addAll(fetchAll(BOND_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseBondDetail(type, body, now) })
+        val results = fetchAll(worldApis + domesticApis) { type, body -> parseJsonIndex(type, body, now) } +
+            fetchAll(EXCHANGE_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseExchangeDetail(type, body, now) } +
+            fetchAll(POLLING_PATHS.map { (type, path) -> type to "$naverPcUrl$path" }) { type, body -> parsePollingIndex(type, body, now) } +
+            fetchAll(BOND_PATHS.map { (type, path) -> type to "$naverApiUrl$path" }) { type, body -> parseBondDetail(type, body, now) }
 
-        return result
+        // 네이버 장애면 21건이 한꺼번에 실패하므로 연결·HTTP 실패는 한 번 실행에 error 1건으로 묶는다 (해석 실패는 항목마다 이미 error)
+        val requestFailed = results.mapNotNull { (type, r) -> (r as? FetchResult.RequestFailed)?.let { type to it.reason } }
+        if (requestFailed.isNotEmpty()) {
+            log.error {
+                "시장지표 ${results.size}개 중 ${requestFailed.size}개 조회 실패: " +
+                    "${requestFailed.map { it.first.displayName }}: ${requestFailed.first().second}"
+            }
+        }
+
+        return results.mapNotNull { (_, r) -> (r as? FetchResult.Success<MarketIndexRes>)?.value }
     }
 
-    /** 각 URL 을 동시에 조회해 파싱한다. 실패한 항목만 로그 후 제외하고 나머지는 그대로 반환한다. */
+    /** 각 URL 을 동시에 조회해 파싱한다. 결과는 항목별 성공·실패 그대로 돌려준다 */
     private suspend fun fetchAll(
         targets: List<Pair<MarketIndexType, String>>,
         parse: (MarketIndexType, String) -> MarketIndexRes,
-    ): List<MarketIndexRes> = coroutineScope {
-        targets.map { (type, url) -> async { fetchOne(type, url, parse) } }.awaitAll().filterNotNull()
+    ): List<Pair<MarketIndexType, FetchResult<MarketIndexRes>>> = coroutineScope {
+        targets.map { (type, url) -> async { type to fetch(type, url, parse) } }.awaitAll()
     }
 
+    /** 단건 조회. 실패 1건에 error 1건 (연결·HTTP 실패는 여기서, 해석 실패는 [fetch] 에서) */
     private suspend fun <T> fetchOne(
         type: MarketIndexType,
         url: String,
         parse: (MarketIndexType, String) -> T,
-    ): T? {
-        return try {
-            val body = webClient.get()
+    ): T? = when (val r = fetch(type, url, parse)) {
+        is FetchResult.Success -> r.value
+        is FetchResult.RequestFailed -> null.also { log.error { "[${type.displayName}] fetch Error: ${r.reason}" } }
+        FetchResult.ParseFailed -> null
+    }
+
+    private sealed interface FetchResult<out T> {
+        data class Success<T>(val value: T) : FetchResult<T>
+        /** 연결·HTTP 실패. warn 만 남긴 상태라 호출부가 error 를 남긴다 */
+        data class RequestFailed(val reason: String) : FetchResult<Nothing>
+        /** 응답 해석 실패. error 를 이미 남겼다 */
+        data object ParseFailed : FetchResult<Nothing>
+    }
+
+    /**
+     * 조회 후 파싱한다. 연결·HTTP 실패는 필터·logHttpError 가 warn 으로만 남기고 사유를 돌려준다
+     * (RETRY_PENDING_ATTR 는 재시도가 아니라 "error 는 호출부가 남긴다"는 뜻으로 쓴다).
+     */
+    private suspend fun <T> fetch(
+        type: MarketIndexType,
+        url: String,
+        parse: (MarketIndexType, String) -> T,
+    ): FetchResult<T> {
+        val body = try {
+            webClient.get()
                 .uri(url)
+                .attribute(ApiCallMetricsFilter.RETRY_PENDING_ATTR, true)
                 .retrieve()
-                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수"); Mono.error(MarketIndexApiException()) })
+                .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수", asWarn = true); res.createException() })
                 .awaitBody<String>()
-            parse(type, body)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: MarketIndexApiException) {
-            log.error { "[${type.displayName}] fetch Error (API): ${e.message}" }
-            null
-        } catch (e: MarketIndexResponseException) {
-            log.error { "[${type.displayName}] fetch Error (Response): ${e.message}" }
-            null
         } catch (e: Exception) {
-            log.error { "[${type.displayName}] fetch Error: ${e.message}" }
-            null
+            return FetchResult.RequestFailed("${e.javaClass.simpleName}: ${e.message}")
+        }
+
+        return try {
+            FetchResult.Success(parse(type, body))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.error { "[${type.displayName}] 응답 해석 실패: ${e.javaClass.simpleName}: ${e.message}, body=${body.take(200)}" }
+            FetchResult.ParseFailed
         }
     }
 

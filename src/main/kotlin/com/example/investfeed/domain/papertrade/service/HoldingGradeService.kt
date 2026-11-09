@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.papertrade.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.entity.HoldingGrade
@@ -131,7 +132,7 @@ class HoldingGradeService(
                 )
                 saved++
             } catch (e: Exception) {
-                log.error(e) { "HoldingGradeScheduler 평가 실패 stkCd=${h.stkCd}" }
+                log.failure(e) { "HoldingGradeScheduler 평가 실패 stkCd=${h.stkCd}" }
             }
         }
         log.info {
@@ -139,22 +140,18 @@ class HoldingGradeService(
         }
     }
 
+    /** 조회 실패는 잡지 않는다 → 평가 중단(FAILED), 기록은 SchedulerLogService.execute 가 1건 남긴다 */
     private fun fetchHeldHoldings(): List<HeldStock> {
-        return try {
-            val res = mockAccountClient.holdingList(
-                KiwoomHoldingReq(qry_tp = "2", dmst_stex_tp = "KRX")
-            )
-            res?.acnt_evlt_remn_indv_tot.orEmpty()
-                .filter { (it.rmnd_qty?.toLongOrNull() ?: 0L) > 0L }
-                .mapNotNull { h ->
-                    val rawCd = h.stk_cd ?: return@mapNotNull null
-                    val stkCd = rawCd.substringBefore("_").trimStart('A', 'a').ifBlank { return@mapNotNull null }
-                    HeldStock(stkCd = stkCd, stkNm = h.stk_nm ?: stkCd)
-                }
-        } catch (e: Exception) {
-            log.error(e) { "HoldingGradeScheduler: 모의계좌 보유 조회 실패 — 평가 중단(FAILED), 익일 매매 보류" }
-            throw e
-        }
+        val res = mockAccountClient.holdingList(
+            KiwoomHoldingReq(qry_tp = "2", dmst_stex_tp = "KRX")
+        )
+        return res?.acnt_evlt_remn_indv_tot.orEmpty()
+            .filter { (it.rmnd_qty?.toLongOrNull() ?: 0L) > 0L }
+            .mapNotNull { h ->
+                val rawCd = h.stk_cd ?: return@mapNotNull null
+                val stkCd = rawCd.substringBefore("_").trimStart('A', 'a').ifBlank { return@mapNotNull null }
+                HeldStock(stkCd = stkCd, stkNm = h.stk_nm ?: stkCd)
+            }
     }
 
     private fun setSchedulerSecurityContext() {

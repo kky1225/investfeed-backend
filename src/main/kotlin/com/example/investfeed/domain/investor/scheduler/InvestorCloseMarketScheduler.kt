@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.investor.scheduler
 
 import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.investor.service.InvestorService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
@@ -43,7 +44,7 @@ class InvestorCloseMarketScheduler(
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
-                log.error(e) { "InvestorCloseMarketScheduler 토큰 발급 실패" }
+                log.failure(e) { "InvestorCloseMarketScheduler 토큰 발급 실패" }
                 SecurityContextHolder.clearContext()
                 return@execute
             }
@@ -51,7 +52,7 @@ class InvestorCloseMarketScheduler(
             try {
                 investorService.refreshCloseMarketCache()
             } catch (e: Exception) {
-                log.error(e) { "InvestorCloseMarketScheduler 캐시 갱신 실패" }
+                log.failure(e) { "InvestorCloseMarketScheduler 캐시 갱신 실패" }
             } finally {
                 SecurityContextHolder.clearContext()
             }

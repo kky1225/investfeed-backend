@@ -4,6 +4,7 @@ import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.global.config.WebClientHttpClientFactory
+import com.example.investfeed.global.ratelimit.FredRetryFilter
 import com.example.investfeed.global.ratelimit.RateLimitExchangeFilter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -19,6 +20,7 @@ class FredConfig(
     private val defaultUrl: String,
     private val apiCallCounterService: ApiCallCounterService,
     private val rateLimitExchangeFilter: RateLimitExchangeFilter,
+    private val fredRetryFilter: FredRetryFilter,
 ) {
 
     @Bean
@@ -35,6 +37,7 @@ class FredConfig(
             })
             .filter(rateLimitExchangeFilter)
             .filter(ApiCallMetricsFilter(ApiProvider.FRED, apiCallCounterService))
+            .filter(fredRetryFilter)
             .build()
     }
 }

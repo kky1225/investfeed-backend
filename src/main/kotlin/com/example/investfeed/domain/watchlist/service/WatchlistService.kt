@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.watchlist.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.watchlist.dto.req.AddItemReq
 import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.domain.watchlist.dto.req.CreateGroupReq
@@ -127,7 +128,7 @@ class WatchlistService(
                     }
                 }
             } catch (e: Exception) {
-                log.error { "국내 관심종목 시세 조회 실패 : ${e.message}" }
+                log.failure(e) { "국내 관심종목 시세 조회 실패" }
             }
         }
 
@@ -155,7 +156,7 @@ class WatchlistService(
         return try {
             usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = stexTp, stk_cd = stkCd))
         } catch (e: Exception) {
-            log.error { "미국 관심종목 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "미국 관심종목 시세 조회 실패 : stkCd=$stkCd" }
             null
         }
     }

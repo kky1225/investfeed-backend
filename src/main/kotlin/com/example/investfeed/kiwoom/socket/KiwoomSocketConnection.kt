@@ -156,14 +156,16 @@ class KiwoomSocketConnection(
 
         val fresh = KiwoomWebSocketClient(accessToken, ::onRealTime, ::handleClosed)
 
+        // 연결 오류(onError)·로그인 거부는 KiwoomWebSocketClient 가 원인과 함께 error 로 남긴다.
+        // 여기서는 그 기록이 없는 경우(시간 초과 등)만 error, 있으면 warn (실패 1건에 error 1건)
         if (!fresh.connectBlocking(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-            log.error { "키움 소켓 연결 실패" }
+            if (fresh.failureLogged) log.warn { "키움 소켓 연결 실패" } else log.error { "키움 소켓 연결 실패 (${CONNECT_TIMEOUT_SEC}초 내 응답 없음)" }
             client = null
             return null
         }
 
         if (!fresh.awaitLogin(LOGIN_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-            log.error { "키움 소켓 로그인 실패" }
+            if (fresh.failureLogged) log.warn { "키움 소켓 로그인 실패" } else log.error { "키움 소켓 로그인 실패 (${LOGIN_TIMEOUT_SEC}초 내 응답 없음 또는 연결 종료)" }
             fresh.close()
             client = null
             return null

@@ -1,5 +1,8 @@
 package com.example.investfeed.kiwoom.auth.service
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
@@ -76,9 +79,12 @@ class AuthClient(
             if (accessToken.isNullOrEmpty()) {
                 refreshToken(loginId)
             }
+        } catch (e: InvestFeedException) {
+            // refreshToken·logHttpError 가 이미 기록한 실패 (잠금 대기 후 재귀 호출에서 올라온 것 포함) → 그대로 전달
+            throw e
         } catch (e: Exception) {
-            log.warn { "accessToken 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "accessToken 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -153,8 +159,8 @@ class AuthClient(
         } catch (e: AccessTokenException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "refreshToken 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "refreshToken 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -199,9 +205,13 @@ class AuthClient(
             if (accessToken.isNullOrEmpty()) {
                 refreshTokenMock(loginId)
             }
+        } catch (e: InvestFeedException) {
+            // refreshTokenMock·logHttpError 가 이미 기록한 실패 (잠금 대기 후 재귀 호출에서 올라온 것 포함) → 그대로 전달
+            throw e
         } catch (e: Exception) {
-            log.warn { "accessTokenMock 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            // 모의 키 미설정(RuntimeException)·Redis 오류 등 아직 기록되지 않은 실패는 여기서 error 1건
+            log.apiFailure(e) { "accessTokenMock 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -248,8 +258,8 @@ class AuthClient(
         } catch (e: AccessTokenException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "refreshTokenMock 실패 (loginId=$loginId): ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "refreshTokenMock 실패 (loginId=$loginId)" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -267,7 +277,7 @@ class AuthClient(
             .block()
 
         if (res?.return_code != 0) {
-            log.error { "키움 API 응답 오류: api=validateApiKey, return_code=${res?.return_code}, return_msg=${res?.return_msg}" }
+            log.warn { "키움 API 응답 오류: api=validateApiKey, return_code=${res?.return_code}, return_msg=${res?.return_msg}" }
             throw InvalidApiKeyException()
         }
     }

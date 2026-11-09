@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
@@ -59,9 +61,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "chartMinuteList Error" }
+            log.apiFailure(e) { "chartMinuteList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -94,9 +96,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "chartDayList Error" }
+            log.apiFailure(e) { "chartDayList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -129,9 +131,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "chartWeekList Error" }
+            log.apiFailure(e) { "chartWeekList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -164,9 +166,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "chartMonthList Error" }
+            log.apiFailure(e) { "chartMonthList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -199,9 +201,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "chartYearList Error" }
+            log.apiFailure(e) { "chartYearList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -234,9 +236,9 @@ class StockChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockChartInvestor Error" }
+            log.apiFailure(e) { "stockChartInvestor Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

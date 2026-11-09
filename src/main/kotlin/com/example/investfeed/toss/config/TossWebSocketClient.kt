@@ -30,7 +30,18 @@ class TossWebSocketClient(
         connectionLostTimeout = PING_INTERVAL_SEC
     }
 
-    override fun onOpen(handshake: ServerHandshake?) = Unit
+    /** 연결이 한 번이라도 열렸는지. 열리기 전 오류는 연결 실패라 [TossSocketManager] 가 error 1건을 남긴다 */
+    @Volatile
+    private var opened = false
+
+    /** 연결 전 마지막 오류. 연결 실패 error 로그에 원인으로 붙인다 */
+    @Volatile
+    var connectError: Exception? = null
+        private set
+
+    override fun onOpen(handshake: ServerHandshake?) {
+        opened = true
+    }
 
     fun declare(symbols: Collection<String>) {
         val body = if (symbols.isEmpty()) emptyList() else listOf(mapOf("type" to TRADE_TYPE, "codes" to symbols.toList()))
@@ -66,6 +77,11 @@ class TossWebSocketClient(
     }
 
     override fun onError(ex: Exception?) {
-        log.error { "토스 실시간 연결 오류 : ${ex?.message}" }
+        if (opened) {
+            log.error { "토스 실시간 연결 오류 : ${ex?.message}" }
+        } else {
+            connectError = ex
+            log.warn { "토스 실시간 연결 중 오류 : ${ex?.message}" }
+        }
     }
 }

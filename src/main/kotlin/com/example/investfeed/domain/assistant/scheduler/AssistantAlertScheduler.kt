@@ -67,9 +67,6 @@ class AssistantAlertScheduler(
                 authClient.accessToken()
                 val result = indexAlertService.runKr(now)
                 log.info { "AssistantIndexAlertKrScheduler ${indexAlertService.summarize(result)}" }
-            } catch (e: Exception) {
-                log.error(e) { "AssistantIndexAlertKrScheduler 실패" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -94,13 +91,8 @@ class AssistantAlertScheduler(
 
     private fun executeUs(now: LocalDateTime, usDate: LocalDate) {
         schedulerLogService.execute(SchedulerName.AssistantIndexAlertUsScheduler) {
-            try {
-                val result = indexAlertService.runUs(now, usDate)
-                log.info { "AssistantIndexAlertUsScheduler ${indexAlertService.summarize(result)}" }
-            } catch (e: Exception) {
-                log.error(e) { "AssistantIndexAlertUsScheduler 실패" }
-                throw e
-            }
+            val result = indexAlertService.runUs(now, usDate)
+            log.info { "AssistantIndexAlertUsScheduler ${indexAlertService.summarize(result)}" }
         }
     }
 

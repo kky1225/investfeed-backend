@@ -1,5 +1,7 @@
 package com.example.investfeed.pressrelease.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.pressrelease.dto.res.PressReleaseItem
 import com.example.investfeed.pressrelease.exception.PressReleaseApiException
@@ -40,10 +42,10 @@ class PressReleaseClient(
     }
 
     /** 한국은행 보도자료(전체) — 통화정책방향 결정문, GDP 속보·잠정 보도자료 포함. 최근 100건 */
-    fun getBokPressReleases(): List<PressReleaseItem> = parseRss(fetch(bokRssUrl, "BOK RSS"))
+    fun getBokPressReleases(): List<PressReleaseItem> = parseRss(fetch(bokRssUrl, "BOK RSS"), "BOK RSS")
 
     /** 연준 Monetary Policy 보도자료 — FOMC 성명은 제목만 오고 본문은 link 페이지에 있다 */
-    fun getFedMonetaryReleases(): List<PressReleaseItem> = parseRss(fetch(fedMonetaryRssUrl, "Fed RSS"))
+    fun getFedMonetaryReleases(): List<PressReleaseItem> = parseRss(fetch(fedMonetaryRssUrl, "Fed RSS"), "Fed RSS")
 
     /** 연준 보도자료 페이지 본문 텍스트. 피드의 link 를 따라가므로 연준 도메인만 허용한다 */
     fun getFedPageText(url: String): String {
@@ -61,6 +63,7 @@ class PressReleaseClient(
                 .block()
 
             if (res.isNullOrBlank()) {
+                log.error { "PressRelease 응답 없음 ($label)" }
                 throw PressReleaseResponseException()
             }
 
@@ -72,19 +75,24 @@ class PressReleaseClient(
         } catch (e: PressReleaseResponseException) {
             throw e
         } catch (e: Exception) {
-            log.error { "PressRelease fetch Error ($label): ${e.message}" }
+            log.apiFailure(e) { "PressRelease fetch Error ($label)" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
-    private fun parseRss(xml: String): List<PressReleaseItem> {
+    private fun parseRss(xml: String, label: String): List<PressReleaseItem> {
         val factory = DocumentBuilderFactory.newInstance().apply {
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             isExpandEntityReferences = false
         }
         // 연준 피드는 UTF-8 BOM 으로 시작하는데 문자열 디코딩 후에도 남아 파서가 첫 글자에서 실패한다 (2026-10-29)
-        val items = factory.newDocumentBuilder().parse(InputSource(StringReader(xml.removePrefix("﻿")))).getElementsByTagName("item")
+        val items = try {
+            factory.newDocumentBuilder().parse(InputSource(StringReader(xml.removePrefix("﻿")))).getElementsByTagName("item")
+        } catch (e: Exception) {
+            log.error(e) { "PressRelease RSS 해석 실패 ($label): ${xml.take(200)}" }
+            throw PressReleaseResponseException()
+        }
         return (0 until items.length).mapNotNull { i ->
             val item = items.item(i) as? Element ?: return@mapNotNull null
             fun text(tag: String) = item.getElementsByTagName(tag).item(0)?.textContent?.trim()

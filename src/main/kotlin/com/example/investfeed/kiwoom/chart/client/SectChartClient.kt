@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.chart.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
@@ -71,9 +73,9 @@ class SectChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectChartMinuteList Error" }
+            log.apiFailure(e) { "sectChartMinuteList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -106,9 +108,9 @@ class SectChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectChartDayList Error" }
+            log.apiFailure(e) { "sectChartDayList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -141,9 +143,9 @@ class SectChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectChartWeekList Error" }
+            log.apiFailure(e) { "sectChartWeekList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -176,9 +178,9 @@ class SectChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectChartMonthList Error" }
+            log.apiFailure(e) { "sectChartMonthList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -211,9 +213,9 @@ class SectChartClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectChartYearList Error" }
+            log.apiFailure(e) { "sectChartYearList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

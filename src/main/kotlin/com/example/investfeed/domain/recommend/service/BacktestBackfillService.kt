@@ -10,6 +10,7 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.chart.client.StockChartClient
 import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartDayReq
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -133,7 +134,7 @@ class BacktestBackfillService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
+            log.failure(e) { "BacktestBackfill 종목 처리 실패 stkCd=$stkCd" }
             emptyList()
         }
     }

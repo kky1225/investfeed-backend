@@ -1,5 +1,6 @@
 package com.example.investfeed.global.holiday
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
@@ -50,7 +51,7 @@ class HolidayService(
             schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
                 syncHolidays()
             }
-        }.onFailure { log.error { "공휴일 초기 적재 실패: ${it.message}" } }
+        }.onFailure { log.failure(it) { "공휴일 초기 적재 실패" } }
     }
 
     fun isHoliday(): Boolean = isHoliday(LocalDate.now())

@@ -5,6 +5,7 @@ import com.example.investfeed.domain.news.dto.res.NewsListRes
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.naver.news.client.NaverNewsClient
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
@@ -35,7 +36,7 @@ class NewsService(
             return try {
                 objectMapper.readValue(cached, NewsListRes::class.java)
             } catch (e: Exception) {
-                log.warn { "뉴스 캐시 파싱 실패: ${e.message}" }
+                log.failure(e) { "뉴스 캐시 파싱 실패" }
                 fetchAndCache(query, page, cacheKey)
             }
         }
@@ -54,7 +55,7 @@ class NewsService(
             val simItems = try {
                 fetchTitleMatched(query, fetchSize, start, sort = "sim")
             } catch (e: Exception) {
-                log.warn { "뉴스 정확도순 보충 조회 실패: ${e.message}" }
+                log.failure(e) { "뉴스 정확도순 보충 조회 실패" }
                 emptyList()
             }
             val seenLinks = dateItems.map { it.link }.toMutableSet()
@@ -74,7 +75,7 @@ class NewsService(
             val json = objectMapper.writeValueAsString(result)
             redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL, TimeUnit.MINUTES)
         } catch (e: Exception) {
-            log.warn { "뉴스 캐시 저장 실패: ${e.message}" }
+            log.failure(e) { "뉴스 캐시 저장 실패" }
         }
 
         return result

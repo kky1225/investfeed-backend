@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.rank.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -84,9 +86,9 @@ class UsRankClient(
         }catch (e: UsStockTradeValueListException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "usStockTradeValueList Error" }
+            log.apiFailure(e) { "usStockTradeValueList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -144,9 +146,9 @@ class UsRankClient(
         }catch(e: UsStockTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.warn { "usStockTradeVolumeList Error" }
+            log.apiFailure(e) { "usStockTradeVolumeList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -204,9 +206,9 @@ class UsRankClient(
         }catch(e: UsSurgeTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.warn { "usStockSurgeTradeVolumeList Error" }
+            log.apiFailure(e) { "usStockSurgeTradeVolumeList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

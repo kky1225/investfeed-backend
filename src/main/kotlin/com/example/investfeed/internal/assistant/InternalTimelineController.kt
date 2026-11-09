@@ -1,5 +1,6 @@
 package com.example.investfeed.internal.assistant
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.req.TurnSaveReq
 import com.example.investfeed.domain.assistant.service.AssistantTurnService
 import com.example.investfeed.domain.security.CustomUserDetails
@@ -26,7 +27,7 @@ class InternalTimelineController(
     ): ToolResponse<AssistantTurnService.TurnSaveRes> = try {
         ToolResponse.ok(assistantTurnService.saveTurn(user.member.id, req))
     } catch (e: Exception) {
-        log.error(e) { "비서 턴 저장 실패: requestId=${req.requestId}" }
+        log.failure(e) { "비서 턴 저장 실패: requestId=${req.requestId}" }
         ToolResponse.fail("턴 저장에 실패했습니다: ${e.javaClass.simpleName}")
     }
 }

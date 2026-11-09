@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.PriceTargetHit
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -21,8 +22,8 @@ class PriceTargetAlertService(
                 timelineService.postMessage(memberId, body)
                 posted++
                 runCatching { telegramNotifier.notify(memberId, AlertTemplateRenderer.renderPriceTargetAlertTelegram(memberHits)) }
-                    .onFailure { log.error(it) { "목표가 도달 텔레그램 발송 실패: member=$memberId" } }
-            }.onFailure { log.error(it) { "목표가 도달 비서 게시 실패: member=$memberId ${memberHits.map { h -> h.assetCode }}" } }
+                    .onFailure { log.failure(it) { "목표가 도달 텔레그램 발송 실패: member=$memberId" } }
+            }.onFailure { log.failure(it) { "목표가 도달 비서 게시 실패: member=$memberId ${memberHits.map { h -> h.assetCode }}" } }
         }
         return posted
     }

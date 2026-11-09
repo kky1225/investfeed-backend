@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.sect.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -58,9 +60,9 @@ class SectClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectInvestor Error" }
+            log.apiFailure(e) { "sectInvestor Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -78,6 +80,7 @@ class SectClient(
                 .bodyValue(req)
                 .awaitExchangeOrNull<KiwoomSectPriceNowRes> { res ->
                     if (res.statusCode().isError) {
+                        res.logHttpError("키움")
                         throw KiwoomApiException()
                     }
 
@@ -99,9 +102,9 @@ class SectClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "sectNowPrice Error" }
+            log.apiFailure(e) { "sectNowPrice Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -161,9 +164,9 @@ class SectClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectPrice Error" }
+            log.apiFailure(e) { "sectPrice Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -196,9 +199,9 @@ class SectClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectIndexList Error" }
+            log.apiFailure(e) { "sectIndexList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -231,9 +234,9 @@ class SectClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "sectIndexDailyList Error" }
+            log.apiFailure(e) { "sectIndexDailyList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

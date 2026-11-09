@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.investor.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -59,9 +61,9 @@ class InvestorClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "investorTradeDaily Error" }
+            log.apiFailure(e) { "investorTradeDaily Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -94,9 +96,9 @@ class InvestorClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "investorTradeOrganize Error" }
+            log.apiFailure(e) { "investorTradeOrganize Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -129,9 +131,9 @@ class InvestorClient(
         } catch (e: CancellationException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "investorTradeRankList Error" }
+            log.apiFailure(e) { "investorTradeRankList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -162,9 +164,9 @@ class InvestorClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldInvestor Error" }
+            log.apiFailure(e) { "goldInvestor Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

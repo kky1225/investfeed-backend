@@ -1,5 +1,7 @@
 package com.example.investfeed.domain.index.service
 
+import com.example.investfeed.common.exception.LoggedFailureException
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerService
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import com.example.investfeed.common.util.DateUtil
@@ -566,13 +568,14 @@ class IndexService(
                 }
 
             } catch (e: Exception) {
-                log.warn { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date, ${e.message}" }
+                log.failure(e) { "지수 투자자 일별 데이터 수집 실패: indsCd=${indexType.indsCd}, date=$date" }
                 failures += "${indexType.indsCd}(${e.message})"
             }
         }
 
         if (failures.isNotEmpty()) {
-            throw IllegalStateException("지수 투자자 일별 데이터 수집 실패 (date=$date): ${failures.joinToString(", ")}")
+            // 지수별 실패는 위에서 기록했으므로 기록된 실패로 던진다
+            throw LoggedFailureException("지수 투자자 일별 데이터 수집 실패 (date=$date): ${failures.joinToString(", ")}")
         }
     }
 
@@ -624,7 +627,7 @@ class IndexService(
                     inserted++
                 }
             } catch (e: Exception) {
-                log.error(e) { "지수 종가 수집 실패 inds_cd=$indsCd" }
+                log.failure(e) { "지수 종가 수집 실패 inds_cd=$indsCd" }
             }
         }
         log.info { "index_daily_close 수집 완료 — base_dt=$baseDt, 신규 적재=$inserted" }
@@ -650,7 +653,7 @@ class IndexService(
             } finally {
                 SecurityContextHolder.clearContext()
             }
-        }.onFailure { log.warn(it) { "index_daily_close 기동 backfill 실패 (무시)" } }
+        }.onFailure { log.failure(it) { "index_daily_close 기동 backfill 실패 (무시)" } }
     }
 
     private fun setSchedulerSecurityContext() {

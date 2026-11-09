@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.rank.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -53,9 +55,9 @@ class RankClient(
         }catch (e: StockTradeValueListException) {
             throw e
         }catch (e: Exception) {
-            log.warn { "stockTradeValueList Error" }
+            log.apiFailure(e) { "stockTradeValueList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -87,9 +89,9 @@ class RankClient(
         }catch(e: StockTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.warn { "stockTradeVolumeList Error" }
+            log.apiFailure(e) { "stockTradeVolumeList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -121,9 +123,9 @@ class RankClient(
         }catch(e: StockSurgeTradeVolumeListException){
             throw e
         }catch (e: Exception) {
-            log.warn { "stockSurgeTradeVolumeList Error" }
+            log.apiFailure(e) { "stockSurgeTradeVolumeList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -155,9 +157,9 @@ class RankClient(
         } catch(e: InvestorTradeDailyException){
             throw e
         } catch (e: Exception) {
-            log.warn { "investorTradeDaily Error" }
+            log.apiFailure(e) { "investorTradeDaily Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -215,9 +217,9 @@ class RankClient(
         } catch(e: InvestorTradeException){
             throw e
         } catch (e: Exception) {
-            log.warn { "investorTrade Error" }
+            log.apiFailure(e) { "investorTrade Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

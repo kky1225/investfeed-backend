@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.exchange.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -53,9 +55,9 @@ class UsExchangeClient(
         } catch (e: UsExchangeRateException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usExchangeRate Error : exchTp=${req.exch_tp}" }
+            log.apiFailure(e) { "usExchangeRate Error : exchTp=${req.exch_tp}" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

@@ -28,6 +28,7 @@ import com.example.investfeed.kiwoom.us.holding.client.UsHoldingClient
 import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsDepositReq
 import com.example.investfeed.kiwoom.us.holding.dto.req.KiwoomUsHoldingReq
 import com.example.investfeed.kiwoom.us.holding.dto.res.KiwoomUsHoldingRes
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -118,7 +119,11 @@ class HoldingService(
 
         val depositRes = depositDeferred.await()
 
-        val balance = depositRes.d2_entra ?: throw DepositException()
+        // DepositException 은 기록을 마친 실패로 취급되므로 던지기 전에 error 1건을 남긴다
+        val balance = depositRes.d2_entra ?: run {
+            log.error { "키움 예수금 응답에 d2_entra 없음" }
+            throw DepositException()
+        }
         val usRes = usHoldingDeferred.await()
         val usHoldingList = usSessionBaseService.withSessionBase(toUsHoldingItems(usRes))
         val usdDeposit = usdDepositDeferred.await()
@@ -159,7 +164,7 @@ class HoldingService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "해외 외화예수금 조회 실패 — 달러 표시를 생략합니다: ${e.message}" }
+            log.failure(e) { "해외 외화예수금 조회 실패 — 달러 표시를 생략합니다" }
             null
         }
     }
@@ -219,7 +224,7 @@ class HoldingService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "보유종목 기준가 조회 실패 — 일간수익이 부정확할 수 있습니다: ${e.message}" }
+            log.failure(e) { "보유종목 기준가 조회 실패 — 일간수익이 부정확할 수 있습니다" }
             emptyMap()
         }
     }

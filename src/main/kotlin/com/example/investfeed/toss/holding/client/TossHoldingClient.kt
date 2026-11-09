@@ -1,5 +1,7 @@
 package com.example.investfeed.toss.holding.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.annotation.TossToken
 import com.example.investfeed.toss.auth.service.TossAuthClient
@@ -39,7 +41,10 @@ class TossHoldingClient(
                 .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossApiException() })
                 .awaitBodyOrNull<TossHoldingRes>()
 
-            return res?.result ?: throw TossHoldingListException()
+            return res?.result ?: run {
+                log.error { "토스 API 응답 오류: api=getHoldings" }
+                throw TossHoldingListException()
+            }
         } catch (e: TossApiException) {
             throw e
         } catch (e: TossHoldingListException) {
@@ -47,8 +52,8 @@ class TossHoldingClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "toss getHoldings Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "toss getHoldings Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

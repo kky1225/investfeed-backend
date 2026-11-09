@@ -45,7 +45,8 @@ class TelegramNotifier(
                 false
             }
             is TelegramClient.SendResult.Failed -> {
-                log.error { "텔레그램 발송 실패: member=$memberId ${r.reason}" }
+                // TelegramClient 가 이미 기록했다 (장애 중 첫 실패만 error)
+                log.warn { "텔레그램 발송 실패: member=$memberId ${r.reason}" }
                 false
             }
         }

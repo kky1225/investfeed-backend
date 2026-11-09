@@ -25,6 +25,11 @@ class KiwoomWebSocketClient(
     var loginSucceeded = false
         private set
 
+    // 이 연결에서 이미 error 로 남긴 실패가 있는지. 연결 쪽(KiwoomSocketConnection)이 같은 실패를 다시 error 로 남기지 않게 한다
+    @Volatile
+    var failureLogged = false
+        private set
+
     override fun onOpen(handshake: ServerHandshake?) {
         send(jacksonObjectMapper().writeValueAsString(LoginStreamReq(token = accessToken)))
     }
@@ -42,6 +47,7 @@ class KiwoomWebSocketClient(
                     loginSucceeded = rootNode.get("return_code")?.asInt() == 0
                     if (!loginSucceeded) {
                         log.error { "소켓 로그인 실패 : ${rootNode.get("return_msg")?.asText()}" }
+                        failureLogged = true
                     }
                     loginLatch.countDown()
                 }
@@ -68,6 +74,7 @@ class KiwoomWebSocketClient(
 
     override fun onError(e: Exception?) {
         log.error { "소켓 오류 : $e" }
+        failureLogged = true
     }
 
     /** 로그인 응답까지 대기. 성공해야 등록 전문을 보낼 수 있다. */

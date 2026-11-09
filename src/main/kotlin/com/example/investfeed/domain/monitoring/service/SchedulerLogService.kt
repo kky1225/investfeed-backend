@@ -3,6 +3,9 @@ package com.example.investfeed.domain.monitoring.service
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.logging.ApplicationShutdownState
 import com.example.investfeed.domain.monitoring.repository.SchedulerStatusRepository
+import com.example.investfeed.common.exception.AlreadyLogged
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.slf4j.MDC
 import org.springframework.stereotype.Service
@@ -10,6 +13,10 @@ import java.time.Duration
 import java.time.LocalDateTime
 
 enum class SchedulerType { FAST, SLOW }
+
+/** SchedulerLogService 가 실패 기록을 마친 뒤 던지는 예외. 원래 예외는 cause */
+class SchedulerExecutionException(schedulerName: String, cause: Throwable) :
+    InvestFeedException(code = "SCHEDULER_9999", message = "$schedulerName 실행 실패: ${cause.message}", cause = cause), AlreadyLogged
 
 @Service
 class SchedulerLogService(
@@ -62,7 +69,11 @@ class SchedulerLogService(
 
             val finishedAt = LocalDateTime.now()
             val durationMs = Duration.between(startedAt, finishedAt).toMillis()
-            val message = e.message?.take(2000)
+            // 스케줄러 실패는 여기서 1건만 남긴다. 이미 기록된 외부 API 실패면 warn
+            log.failure(e) { "$name 실행 실패" }
+
+            val message = listOfNotNull(e.message, e.cause?.message?.takeIf { it != e.message })
+                .joinToString(" / ").take(2000).ifEmpty { null }
 
             runCatching { recordWriter.upsertFailure(scheduler, finishedAt, message) }
                 .onFailure { log.error { "scheduler_status 실패 UPSERT 실패 ($name): ${it.message}" } }
@@ -74,7 +85,8 @@ class SchedulerLogService(
             runCatching { failureAlertService.notifyFailure(scheduler, message) }
                 .onFailure { log.error { "스케줄러 실패 알림 오류 ($name): ${it.message}" } }
 
-            throw e
+            // 기록을 마쳤다는 표시로 감싸서 던진다 → Spring 스케줄러 오류 처리기가 다시 error 로 남기지 않는다
+            throw SchedulerExecutionException(name, e)
         } finally {
             MDC.remove(MDC_SCHEDULER_NAME)
         }

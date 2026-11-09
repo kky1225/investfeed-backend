@@ -19,6 +19,7 @@ import com.example.investfeed.toss.holding.TossSymbolMapper
 import com.example.investfeed.toss.holding.client.TossBuyingPowerClient
 import com.example.investfeed.toss.holding.client.TossHoldingClient
 import com.example.investfeed.toss.holding.dto.res.TossHoldingItem
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -216,7 +217,8 @@ class TossHoldingService(
         val amount = tossBuyingPowerClient.getBuyingPower(accountSeq, CURRENCY_KRW)?.result?.cashBuyingPower
         val parsed = amount?.toDoubleOrNull()
         if (parsed == null) {
-            log.warn { "토스 원화 주문가능금액 조회 실패 — 현금 금액을 확정할 수 없어 조회를 중단합니다." }
+            // 이 예외는 기록을 마친 실패로 취급되므로 여기서 error 1건을 남긴다
+            log.error { "토스 원화 주문가능금액 조회 실패 — 현금 금액을 확정할 수 없어 조회를 중단합니다. amount=$amount" }
             throw TossBuyingPowerException()
         }
         return parsed.toLong()
@@ -228,7 +230,7 @@ class TossHoldingService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "토스 달러 주문가능금액 조회 실패 — 표시를 생략합니다: ${e.message}" }
+            log.failure(e) { "토스 달러 주문가능금액 조회 실패 — 표시를 생략합니다" }
             null
         }
     }
@@ -237,7 +239,8 @@ class TossHoldingService(
         val result = tossExchangeRateClient.getRate("USD", "KRW")?.result
         val rate = result?.midRate?.toDoubleOrNull() ?: result?.rate?.toDoubleOrNull()
         if (rate == null || rate <= 0.0) {
-            log.warn { "토스 USD/KRW 환율 조회 실패 — 원화 환산 불가로 보유종목 조회를 중단합니다." }
+            // 이 예외는 기록을 마친 실패로 취급되므로 여기서 error 1건을 남긴다
+            log.error { "토스 USD/KRW 환율 조회 실패 — 원화 환산 불가로 보유종목 조회를 중단합니다. result=$result" }
             throw TossExchangeRateException()
         }
         return rate

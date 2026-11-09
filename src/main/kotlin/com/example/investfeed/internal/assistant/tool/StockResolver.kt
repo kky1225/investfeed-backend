@@ -1,5 +1,6 @@
 package com.example.investfeed.internal.assistant.tool
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.repository.AssistantStockAliasRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
@@ -143,7 +144,7 @@ class StockResolver(
         val list = runCatching {
             stockMasterRepository.findAll().map { Named(ResolvedStock(it.stkCd, it.stkNm, StockMarket.KR), listOf(norm(it.stkNm))) } +
                 usStockMasterRepository.findAll().map { m -> Named(us(m), listOfNotNull(m.stkNm, m.stkEnm, m.stkCd).map(::norm)) }
-        }.onFailure { log.error(it) { "종목 마스터 조회 실패 (비슷한 종목 후보)" } }
+        }.onFailure { log.failure(it) { "종목 마스터 조회 실패 (비슷한 종목 후보)" } }
             .getOrDefault(cached?.second ?: emptyList())
         masterCache = Instant.now() to list
         return list
@@ -172,7 +173,7 @@ class StockResolver(
         val cached = coinCache
         if (cached != null && cached.first.plus(COIN_CACHE_TTL).isAfter(Instant.now())) return cached.second
         val list = runCatching { marketClient.getKrwMarkets().map { Coin(it.market, it.korean_name, it.market.removePrefix("KRW-")) } }
-            .onFailure { log.error(it) { "업비트 마켓 목록 조회 실패 (종목 해석)" } }
+            .onFailure { log.failure(it) { "업비트 마켓 목록 조회 실패 (종목 해석)" } }
             .getOrDefault(cached?.second ?: emptyList())
         coinCache = Instant.now() to list
         return list

@@ -20,6 +20,10 @@ class UpbitWebSocketClient(
     private val objectMapper = jacksonObjectMapper()
     private val kstFormatter = DateTimeFormatter.ofPattern("yyyyMMdd HHmmss").withZone(ZoneId.of("Asia/Seoul"))
 
+    /** 이 연결에서 메시지 처리 실패를 이미 error 로 남겼는지 (메시지는 단일 읽기 스레드에서 처리됨) */
+    @Volatile
+    private var messageErrorLogged = false
+
     override fun onOpen(handshakedata: ServerHandshake?) {
         log.info { "[Upbit WebSocket] 연결 성공" }
 
@@ -76,7 +80,13 @@ class UpbitWebSocketClient(
                 webSocketHandler.broadcast(broadcastData)
             }
         } catch (e: Exception) {
-
+            // 메시지마다 호출되므로 형식이 바뀐 스트림이면 초당 수십 건이 된다. 연결당 첫 건만 error, 이후는 warn
+            if (messageErrorLogged) {
+                log.warn { "[Upbit WebSocket] 메시지 처리 실패: ${e.javaClass.simpleName}: ${e.message}" }
+            } else {
+                messageErrorLogged = true
+                log.error(e) { "[Upbit WebSocket] 메시지 처리 실패 (이 연결의 이후 실패는 warn): ${message.take(200)}" }
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.socket
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.kiwoom.config.WebSocketHandler
 import com.example.investfeed.kiwoom.socket.dto.KiwoomSocketOwner
 import com.example.investfeed.kiwoom.socket.dto.KiwoomStream
@@ -62,7 +63,10 @@ class KiwoomSocketManager(
         connections[keyId]?.removeSubscriber(loginId)
     }
 
-    /** 한 연결의 실패가 다른 연결 정리를 막지 않도록 끝까지 돌고, 실패는 모니터링에 남도록 다시 던진다 */
+    /**
+     * 한 연결의 실패가 다른 연결 정리를 막지 않도록 끝까지 돌고, 실패는 모니터링(스케줄러 실행 기록)에 남도록 다시 던진다.
+     * 연결별 실패는 여기서 error 로 남겼으므로, 다시 던질 때는 기록된 실패(InvestFeedException)로 감싸 스케줄러가 warn 으로만 남기게 한다
+     */
     fun releaseIdleConnections() {
         val now = LocalDateTime.now()
         connections.values
@@ -72,7 +76,7 @@ class KiwoomSocketManager(
                     .exceptionOrNull()
             }
             .firstOrNull()
-            ?.let { throw it }
+            ?.let { throw ExternalApiFailureException(it, "유휴 키움 소켓 정리에 실패하였습니다.") }
     }
 
     private fun connectionOf(keyId: String): KiwoomSocketConnection = connections.computeIfAbsent(keyId) {

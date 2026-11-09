@@ -1,5 +1,7 @@
 package com.example.investfeed.upbit.candle.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.upbit.candle.dto.res.UpbitCandleDayRes
 import com.example.investfeed.upbit.candle.dto.res.UpbitCandleMinuteRes
 import com.example.investfeed.upbit.candle.dto.res.UpbitCandleWeekMonthRes
@@ -9,6 +11,10 @@ import org.springframework.core.ParameterizedTypeReference
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
+/**
+ * 업비트 클라이언트는 onStatus 를 두지 않는다.
+ * HTTP 오류는 WebClientResponseException 으로 catch 에 들어와 apiFailure 가 error 1건을 남긴다.
+ */
 @Service
 class CandleClient(
     @Qualifier("upbitWebClient")
@@ -33,8 +39,8 @@ class CandleClient(
 
             return res ?: emptyList()
         } catch (e: Exception) {
-            log.error { "upbit getCandlesMinutes Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getCandlesMinutes Error: unit=$unit, market=$market" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -54,8 +60,8 @@ class CandleClient(
 
             return res ?: emptyList()
         } catch (e: Exception) {
-            log.error { "upbit getCandlesDays Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getCandlesDays Error: market=$market" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -75,8 +81,8 @@ class CandleClient(
 
             return res ?: emptyList()
         } catch (e: Exception) {
-            log.error { "upbit getCandlesWeeks Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getCandlesWeeks Error: market=$market" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -96,8 +102,8 @@ class CandleClient(
 
             return res ?: emptyList()
         } catch (e: Exception) {
-            log.error { "upbit getCandlesYears Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getCandlesYears Error: market=$market" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -117,8 +123,8 @@ class CandleClient(
 
             return res ?: emptyList()
         } catch (e: Exception) {
-            log.error { "upbit getCandlesMonths Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "upbit getCandlesMonths Error: market=$market" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

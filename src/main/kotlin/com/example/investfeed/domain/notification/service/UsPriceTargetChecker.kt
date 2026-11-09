@@ -8,6 +8,7 @@ import com.example.investfeed.domain.notification.repository.PriceTargetReposito
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
 import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.DayOfWeek
@@ -46,7 +47,7 @@ class UsPriceTargetChecker(
             val res = try {
                 usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = stexTp, stk_cd = ticker))
             } catch (e: Exception) {
-                log.warn { "미국 목표가 현재가 조회 실패: $ticker ${e.message}" }
+                log.failure(e) { "미국 목표가 현재가 조회 실패: $ticker" }
                 return@forEach
             }
             val curPrc = res.cur_prc?.toDoubleOrNull()?.let { abs(it) }?.takeIf { it > 0 } ?: return@forEach

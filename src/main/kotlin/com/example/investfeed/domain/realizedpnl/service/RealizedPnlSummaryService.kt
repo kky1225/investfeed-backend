@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.realizedpnl.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.holding.entity.MarketType
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.realizedpnl.dto.req.RealizedPnlSyncReq
@@ -37,7 +38,7 @@ class RealizedPnlSummaryService(
                 )
             }
         val kiwoom = runCatching { stockRealizedPnlService.syncStockRealizedPnls(RealizedPnlSyncReq(year, month)).items }
-            .onFailure { log.error(it) { "키움 실현손익 조회 실패 memberId=$memberId $year-${month ?: "전체"}" } }
+            .onFailure { log.failure(it) { "키움 실현손익 조회 실패 memberId=$memberId $year-${month ?: "전체"}" } }
             .getOrDefault(emptyList())
         return manual + kiwoom
     }

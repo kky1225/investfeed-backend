@@ -38,7 +38,8 @@
 ## Kotlin 코드 스타일
 - 컬렉션 처리는 Kotlin 컬렉션 함수 사용 (map, filter, flatMap 등). Java Stream 사용 금지
 - 최신 Kotlin 문법 적용 (data class, sealed class, scope function 등)
-- error 발생 시 log.error로 로그 남기기
+- 실패 1건에 error 로그 1건: 처음 알아챈 곳(외부 API는 호출 클래스·공통 필터)만 log.error, 넘겨받은 catch는 log.failure(e)(AlreadyLogged 표시가 있으면 warn), 외부 API 호출 클래스의 마지막 catch는 log.apiFailure(e) + ExternalApiFailureException (common/util/ErrorLogging.kt)
+- catch는 두 가지만: 받아서 끝내고 계속 진행하는 catch는 log.failure(e), 위로 올릴 실패는 catch를 두지 않음(기록하고 다시 던지기 금지 — SchedulerLogService.execute·ExceptionAdviceController가 1건 기록)
 - 성공 로그는 스케줄러(@Scheduled) 내부에서만 남기기
 - domain 패키지의 controller는 요청/응답을 DTO 타입으로 구현
 - domain 패키지 외에 외부 API 패키지에서는 상황에 맞게 DTO, parameter 타입 허용

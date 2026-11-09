@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.circuitbreaker.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.service.TemplateFormat
 import com.example.investfeed.domain.circuitbreaker.dto.CircuitBreakerFiredEvent
 import com.example.investfeed.domain.circuitbreaker.dto.res.CircuitBreakerRes
@@ -128,7 +129,7 @@ class CircuitBreakerService(
                     startedAt = firedAt, endedAt = if (stage < 3) firedAt.plus(HALT) else null,
                 )
             )
-        }.onFailure { log.error(it) { "서킷브레이커 발동 저장 실패: $code ${stage}단계 $firedAt" } }.getOrNull() ?: return null
+        }.onFailure { log.failure(it) { "서킷브레이커 발동 저장 실패: $code ${stage}단계 $firedAt" } }.getOrNull() ?: return null
         events += event
         return CircuitBreakerFiredEvent(event, t.prevClose, t.high, t.low)
     }

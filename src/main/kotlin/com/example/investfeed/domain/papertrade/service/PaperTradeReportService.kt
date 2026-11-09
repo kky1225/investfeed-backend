@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.papertrade.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.index.repository.IndexDailyCloseRepository
 import com.example.investfeed.domain.papertrade.dto.res.PaperTradeReportRes
 import com.example.investfeed.domain.papertrade.repository.PaperFillRepository
@@ -58,7 +59,7 @@ class PaperTradeReportService(
                     null
                 }
         } catch (e: Exception) {
-            log.error(e) { "모의계좌 NAV 조회 실패" }
+            log.failure(e) { "모의계좌 NAV 조회 실패" }
             null
         }
         val totalReturnPct = currentNav?.let { calc.pctReturn(START_NAV.toDouble(), it.toDouble()) }
@@ -97,7 +98,7 @@ class PaperTradeReportService(
                 SecurityContextHolder.getContext().authentication = orig
             }
         }.onFailure {
-            log.warn(it) { "sectPriceNow 호출 실패 inds_cd=$indsCd — DB 최신값으로 폴백" }
+            log.failure(it) { "sectPriceNow 호출 실패 inds_cd=$indsCd — DB 최신값으로 폴백" }
         }.getOrNull()
 
         val latest = rawCurPrc?.replace(Regex("[^0-9.]"), "")?.toBigDecimalOrNull()?.toDouble()

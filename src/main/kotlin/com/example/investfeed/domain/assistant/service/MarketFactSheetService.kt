@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.*
 import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerService
 import com.example.investfeed.domain.crypto.service.CryptoService
@@ -262,7 +263,7 @@ class MarketFactSheetService(
     private fun marketFlow(info: IndexInfo, streakIndsCd: String?): MarketFlowFact {
         val foreign = TemplateFormat.parseLong(info.frgnrNetprps)
         val history = streakIndsCd?.let { cd ->
-            runCatching { indexService.getIndexInvestorDailyList(cd) }.onFailure { log.error(it) { "지수 투자자 일별 조회 실패 ($cd)" } }.getOrDefault(emptyList())
+            runCatching { indexService.getIndexInvestorDailyList(cd) }.onFailure { log.failure(it) { "지수 투자자 일별 조회 실패 ($cd)" } }.getOrDefault(emptyList())
         }.orEmpty()
         return MarketFlowFact(
             foreign = foreign,
@@ -366,5 +367,5 @@ class MarketFactSheetService(
     }
 
     private fun <T> fetchOrNull(label: String, block: () -> T?): T? =
-        runCatching(block).onFailure { log.error(it) { "브리핑 팩트시트 조회 실패: $label" } }.getOrNull()
+        runCatching(block).onFailure { log.failure(it) { "브리핑 팩트시트 조회 실패: $label" } }.getOrNull()
 }

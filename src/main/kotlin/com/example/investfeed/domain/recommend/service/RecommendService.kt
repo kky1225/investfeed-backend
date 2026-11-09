@@ -4,6 +4,7 @@ import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.common.util.DateUtil
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
@@ -97,9 +98,10 @@ class RecommendService(
 
     /** 실패한 배치의 지난 추천으로 다음 날 모의투자가 신규 진입하지 않도록 목록을 비운다 */
     private fun clearPicksAfterFailure(cause: Exception) {
+        // 배치 실패 자체는 SchedulerLogService.execute 가 1건 기록한다
         runCatching { stockPickWriter.clearCurrent() }
-            .onSuccess { log.error(cause) { "추천 배치 실패 — 추천 목록을 비움: ${cause.message}" } }
-            .onFailure { log.error(it) { "추천 배치 실패 후 추천 목록 비우기 실패 — 지난 추천이 남아 있음: ${cause.message}" } }
+            .onSuccess { log.warn { "추천 배치 실패 — 추천 목록을 비움: ${cause.message}" } }
+            .onFailure { log.failure(it) { "추천 배치 실패 후 추천 목록 비우기 실패 — 지난 추천이 남아 있음: ${cause.message}" } }
     }
 
     @Transactional
@@ -158,7 +160,7 @@ class RecommendService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
+            log.failure(e) { "todayDirection 갱신 실패 stkCd=${pick.stkCd}" }
             pick.todayDirection = null
             null
         }
@@ -190,7 +192,7 @@ class RecommendService(
         }
 
         val (riskMap, marketTypeMap) = fetchStockMetadataMaps()
-        check(riskMap.isNotEmpty()) { "종목 메타데이터 조회 실패 — 위험 플래그 없이 추천을 저장하지 않음" }
+        check(riskMap.isNotEmpty()) { "종목 메타데이터 조회 결과 없음 — 위험 플래그 없이 추천을 저장하지 않음" }
 
         // ka10066 은 연속조회(next-key) 체인이라 순차. 32페이지 안팎.
         val kiwoomInvestorTradeCloseMarketRes = priceClient.investorTradeCloseMarket(
@@ -203,7 +205,7 @@ class RecommendService(
         )
 
         if (kiwoomInvestorTradeCloseMarketRes.return_code != 0) {
-            log.error { "키움 API 응답 오류: api=doRecommendStock, return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, return_msg=${kiwoomInvestorTradeCloseMarketRes.return_msg}" }
+            // 기록은 SchedulerLogService.execute 가 이 예외로 1건 남긴다
             throw IllegalStateException(
                 "RecommendScheduler 핵심 API(investorTradeCloseMarket) 실패 — " +
                     "return_code=${kiwoomInvestorTradeCloseMarketRes.return_code}, " +
@@ -377,7 +379,7 @@ class RecommendService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
+            log.failure(e) { "stockDefaultInfo 호출 실패 stkCd=$stkCd" }
             null
         }
     }
@@ -396,7 +398,7 @@ class RecommendService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
+            log.failure(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
             null
         }
     }
@@ -485,7 +487,7 @@ class RecommendService(
                 closeAboveMa20 = closeAboveMa20,
             )
         } catch (e: Exception) {
-            log.warn(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
+            log.failure(e) { "가격 지표 계산 실패 stkCd=$stkCd" }
             PriceMetrics.UNKNOWN
         }
     }
@@ -543,33 +545,39 @@ class RecommendService(
     }
 
     internal fun buildStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> =
-        runBlocking { fetchStockMetadataMaps() }
+        runBlocking { fetchStockMetadataMapsOrEmpty() }
 
-    private suspend fun fetchStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
+    /** 보유 평가용: 조회 실패 시 빈 맵으로 계속 진행 */
+    private suspend fun fetchStockMetadataMapsOrEmpty(): Pair<Map<String, RiskFlags>, Map<String, String>> {
         return try {
-            val (kospi, kosdaq) = coroutineScope {
-                val kospiDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList() }
-                val kosdaqDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList() }
-                kospiDeferred.await() to kosdaqDeferred.await()
-            }
-            val combined = kospi + kosdaq
-            val riskMap = combined
-                .filter { !it.code.isNullOrBlank() }
-                .associate { it.code!! to RiskFlags.from(it) }
-            val marketTypeMap =
-                kospi.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSPI" } +
-                    kosdaq.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSDAQ" }
-            log.info {
-                "종목 메타데이터 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, " +
-                    "riskDistinct=${riskMap.size}, marketTypeDistinct=${marketTypeMap.size}"
-            }
-            riskMap to marketTypeMap
+            fetchStockMetadataMaps()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error(e) { "종목 메타데이터 맵 구축 실패 - 빈 맵 반환" }
+            log.failure(e) { "종목 메타데이터 맵 구축 실패 - 빈 맵 반환" }
             emptyMap<String, RiskFlags>() to emptyMap()
         }
+    }
+
+    /** 조회 실패는 그대로 던진다. 추천 배치는 실패를 SchedulerLogService 가 1건 기록하도록 넘긴다 */
+    private suspend fun fetchStockMetadataMaps(): Pair<Map<String, RiskFlags>, Map<String, String>> {
+        val (kospi, kosdaq) = coroutineScope {
+            val kospiDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "0")).list ?: emptyList() }
+            val kosdaqDeferred = async { stockClient.stockInfoList(StockInfoListReq(mrkt_tp = "10")).list ?: emptyList() }
+            kospiDeferred.await() to kosdaqDeferred.await()
+        }
+        val combined = kospi + kosdaq
+        val riskMap = combined
+            .filter { !it.code.isNullOrBlank() }
+            .associate { it.code!! to RiskFlags.from(it) }
+        val marketTypeMap =
+            kospi.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSPI" } +
+                kosdaq.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSDAQ" }
+        log.info {
+            "종목 메타데이터 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, " +
+                "riskDistinct=${riskMap.size}, marketTypeDistinct=${marketTypeMap.size}"
+        }
+        return riskMap to marketTypeMap
     }
 
     internal data class RiskFlags(
@@ -717,7 +725,7 @@ class RecommendService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn(e) { "stockInvestor 호출 실패 stkCd=$stkCd ($logTag)" }
+            log.failure(e) { "stockInvestor 호출 실패 stkCd=$stkCd ($logTag)" }
             return null
         }
         if (investorRes.return_code != 0) {
@@ -1559,7 +1567,7 @@ class RecommendService(
         evalDate: LocalDate,
     ): HoldingEvalResult {
         val setting = RecommendSetting(memberId = 0L)
-        val (riskMap, marketTypeMap) = meta ?: fetchStockMetadataMaps()
+        val (riskMap, marketTypeMap) = meta ?: fetchStockMetadataMapsOrEmpty()
         // 종목당 필요한 TR 3개(ka10059 시계열 · ka10001 기본정보 · ka10081 일봉)는 서로 독립 — 한 번에 조회해
         // BUY/SELL 양방향 판정과 HOLD 경로의 가격 지표가 공유한다 (양방향 컷 시에도 시계열·지표를 잃지 않는다).
         val (series, defaultInfo, chartRows) = coroutineScope {

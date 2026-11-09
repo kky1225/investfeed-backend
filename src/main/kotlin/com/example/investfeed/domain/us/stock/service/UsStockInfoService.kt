@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.us.stock.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.us.stock.dto.req.UsStockChartType
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
 import com.example.investfeed.domain.us.stock.dto.res.UsSessionBase
@@ -143,7 +144,7 @@ class UsStockInfoService(
                     )
                 }
         } catch (e: Exception) {
-            log.error { "미국 주식 일별 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "미국 주식 일별 시세 조회 실패 : stkCd=$stkCd" }
             emptyList()
         }
 

@@ -1,5 +1,6 @@
 package com.example.investfeed.global.token
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import mu.KotlinLogging
 import org.springframework.core.io.buffer.DataBuffer
@@ -54,7 +55,7 @@ class RejectedTokenFilter private constructor(
     private fun evictAsync(authorization: String) {
         Schedulers.boundedElastic().schedule {
             runCatching { evict(authorization) }
-                .onFailure { log.error { "$label 거부 토큰 삭제 실패: ${it.javaClass.simpleName}: ${it.message}" } }
+                .onFailure { log.failure(it) { "$label 거부 토큰 삭제 실패" } }
         }
     }
 

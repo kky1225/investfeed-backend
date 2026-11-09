@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.papertrade.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.entity.PaperFill
@@ -193,7 +194,7 @@ class PaperTradeExecutionService(
                 )
                 ok++
             } catch (e: Exception) {
-                log.error(e) { "주문 실패 ${c.stkCd} ${c.side} ${c.qty}" }
+                log.failure(e) { "주문 실패 ${c.stkCd} ${c.side} ${c.qty}" }
                 paperFillRepository.save(
                     PaperFill(
                         stkCd = c.stkCd, side = "REJ", fillDate = today,
@@ -462,7 +463,7 @@ class PaperTradeExecutionService(
                     val rest = s.qty - affordable
                     if (rest >= 1L) unfilled += s.copy(qty = rest)
                 } catch (e: Exception) {
-                    log.error(e) { "2차 매수 실패 ${s.stkCd} ${affordable}주" }
+                    log.failure(e) { "2차 매수 실패 ${s.stkCd} ${affordable}주" }
                     paperFillRepository.save(
                         PaperFill(
                             // REJ 도 phase=2 로 기록 → 잔여 차감에 포함되어 재시작 후에도 재시도하지 않음(기존 정책 유지)
@@ -569,7 +570,7 @@ class PaperTradeExecutionService(
                 .mapNotNull { normCd(it.code) }
                 .toSet()
         } catch (e: Exception) {
-            log.error(e) { "거래정지 조회 실패 — 빈 집합(fail-open), 미체결→다음날 취소로 자연 처리" }
+            log.failure(e) { "거래정지 조회 실패 — 빈 집합(fail-open), 미체결→다음날 취소로 자연 처리" }
             emptySet()
         }
     }
@@ -675,12 +676,12 @@ class PaperTradeExecutionService(
                     )
                     cancelled++
                 } catch (e: Exception) {
-                    log.error(e) { "미체결 취소 실패 ord_no=$ordNo stk_cd=$stkCd" }
+                    log.failure(e) { "미체결 취소 실패 ord_no=$ordNo stk_cd=$stkCd" }
                 }
             }
             log.info { "PaperTradeExecScheduler: 전날 미체결 ${pending.size}건 중 $cancelled 건 취소" }
         } catch (e: Exception) {
-            log.error(e) { "미체결 조회/취소 단계 실패 — 빈 것으로 간주하고 다음 단계 진행" }
+            log.failure(e) { "미체결 조회/취소 단계 실패 — 빈 것으로 간주하고 다음 단계 진행" }
         }
     }
 

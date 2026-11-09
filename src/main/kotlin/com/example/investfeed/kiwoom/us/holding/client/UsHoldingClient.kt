@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.us.holding.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -59,9 +61,9 @@ class UsHoldingClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usHoldingList Error: ${e.message}" }
+            log.apiFailure(e) { "usHoldingList Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -95,9 +97,9 @@ class UsHoldingClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "usDeposit Error: ${e.message}" }
+            log.apiFailure(e) { "usDeposit Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

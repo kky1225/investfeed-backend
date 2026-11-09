@@ -71,7 +71,8 @@ class WebSocketHandler: TextWebSocketHandler() {
             try {
                 synchronized(session) { session.sendMessage(payload) }
             } catch (e: Exception) {
-                log.error { "실시간 전송 실패 : sessionId=${session.id}, ${e.message}" }
+                // 브라우저가 닫히거나 네트워크가 끊긴 세션에 보낼 때 나는 일상 오류라 warn. 세션은 정리한다
+                log.warn { "실시간 전송 실패 : sessionId=${session.id}, ${e.message}" }
                 sessions.remove(session)
                 runCatching { session.close(CloseStatus.SESSION_NOT_RELIABLE) }
             }

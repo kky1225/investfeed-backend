@@ -20,6 +20,7 @@ import com.example.investfeed.toss.holding.TossSymbolMapper
 import com.example.investfeed.toss.holding.client.TossHoldingClient
 import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
 import com.example.investfeed.upbit.market.client.MarketClient
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -109,7 +110,7 @@ class HoldingSyncScheduler(
                     sendAuthFailedNotification(apiKey, kiwoomBroker)
                 } else {
                     otherFailCount++
-                    log.warn { "키움 보유종목 동기화 실패(기타): loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}, ${e.javaClass.simpleName}: ${e.message}" }
+                    log.failure(e) { "키움 보유종목 동기화 실패(기타): loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
                 }
             }
         }
@@ -117,11 +118,12 @@ class HoldingSyncScheduler(
         val total = kiwoomApiKeys.size
         log.info { "키움 보유종목 동기화 완료: 성공 $successCount / 인증실패 $authFailCount / 기타실패 $otherFailCount (총 $total)" }
 
+        // 회원별 실패는 위에서 건별로 기록했으므로 집계는 warn
         if (total > 0 && otherFailCount.toDouble() / total >= OTHER_FAILURE_THRESHOLD) {
-            log.error { "키움 보유종목 동기화 기타실패율 임계치 초과 ($otherFailCount/$total) — 키움 API 장애 의심" }
+            log.warn { "키움 보유종목 동기화 기타실패율 임계치 초과 ($otherFailCount/$total) — 키움 API 장애 의심" }
         }
         if (total > 0 && authFailCount == total) {
-            log.error { "키움 보유종목 동기화 전원 인증 실패 ($total 명) — 키움 API 응답 확인 권장" }
+            log.warn { "키움 보유종목 동기화 전원 인증 실패 ($total 명) — 키움 API 응답 확인 권장" }
         }
     }
 
@@ -156,7 +158,7 @@ class HoldingSyncScheduler(
                 }
             } catch (e: Exception) {
                 failCount++
-                log.warn { "토스 보유종목 동기화 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}, ${e.javaClass.simpleName}: ${e.message}" }
+                log.failure(e) { "토스 보유종목 동기화 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
             }
         }
 
@@ -172,7 +174,7 @@ class HoldingSyncScheduler(
         val marketNames = try {
             marketClient.getKrwMarkets().associate { it.market.removePrefix("KRW-") to it.korean_name }
         } catch (e: Exception) {
-            log.warn { "업비트 마켓 목록 조회 실패, 코인 보유 동기화 건너뜀: ${e.message}" }
+            log.failure(e) { "업비트 마켓 목록 조회 실패, 코인 보유 동기화 건너뜀" }
             return
         }
 
@@ -205,7 +207,7 @@ class HoldingSyncScheduler(
                 sendAuthFailedNotification(apiKey, upbitBroker)
             } catch (e: Exception) {
                 otherFailCount++
-                log.warn { "업비트 보유코인 동기화 실패(기타): loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}, ${e.javaClass.simpleName}: ${e.message}" }
+                log.failure(e) { "업비트 보유코인 동기화 실패(기타): loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
             }
         }
 
@@ -230,7 +232,7 @@ class HoldingSyncScheduler(
                 daysLeft = 0
             )
         } catch (e: Exception) {
-            log.warn { "API Key 인증 실패 알림 발송 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}, ${e.message}" }
+            log.failure(e) { "API Key 인증 실패 알림 발송 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
         }
     }
 

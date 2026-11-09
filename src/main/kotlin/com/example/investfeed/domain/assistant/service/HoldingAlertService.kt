@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -21,8 +22,8 @@ class HoldingAlertService(
                 timelineService.postMessage(memberId, body)
                 posted++
                 runCatching { telegramNotifier.notify(memberId, AlertTemplateRenderer.renderHoldingAlertTelegram(memberHits)) }
-                    .onFailure { log.error(it) { "보유 종목 알림 텔레그램 발송 실패: member=$memberId" } }
-            }.onFailure { log.error(it) { "보유 종목 알림 게시 실패: member=$memberId ${memberHits.map { h -> h.assetCode }}" } }
+                    .onFailure { log.failure(it) { "보유 종목 알림 텔레그램 발송 실패: member=$memberId" } }
+            }.onFailure { log.failure(it) { "보유 종목 알림 게시 실패: member=$memberId ${memberHits.map { h -> h.assetCode }}" } }
         }
         return posted
     }

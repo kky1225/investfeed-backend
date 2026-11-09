@@ -1,5 +1,6 @@
 package com.example.investfeed.internal.assistant
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.security.CustomUserDetails
 import com.example.investfeed.internal.assistant.dto.req.BriefingToolReq
 import com.example.investfeed.internal.assistant.dto.req.CalendarToolReq
@@ -63,7 +64,7 @@ class InternalToolController(
     } catch (e: ToolException) {
         ToolResponse.fail(e.message ?: "도구 오류", e.candidates, e.query)
     } catch (e: Exception) {
-        log.error(e) { "비서 도구 실패: $name" }
+        log.failure(e) { "비서 도구 실패: $name" }
         ToolResponse.fail("$name 조회에 실패했습니다: ${e.javaClass.simpleName}")
     }
 

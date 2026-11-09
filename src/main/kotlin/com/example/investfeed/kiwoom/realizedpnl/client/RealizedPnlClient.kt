@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.realizedpnl.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -51,8 +53,8 @@ class RealizedPnlClient(
         } catch (e: RealizedPnlException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "realizedPnl Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "realizedPnl Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

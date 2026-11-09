@@ -1,6 +1,9 @@
 package com.example.investfeed.global.config
 
+import com.example.investfeed.common.util.failure
+import mu.KotlinLogging
 import org.springframework.context.annotation.Bean
+import org.springframework.util.ErrorHandler
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
@@ -20,11 +23,19 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
  */
 @Configuration
 class SchedulerConfig {
+    private val log = KotlinLogging.logger {}
+
+    /**
+     * 작업 밖으로 나온 예외 처리. 기본 처리기는 모든 예외를 error 로 다시 남겨
+     * SchedulerLogService 가 이미 남긴 실패가 2건이 된다 → 이미 기록된 실패는 warn
+     */
+    private val errorHandler = ErrorHandler { t -> log.failure(t) { "스케줄 작업 실패" } }
 
     @Bean("fastScheduler")
     fun fastScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
         scheduler.poolSize = 10
+        scheduler.setErrorHandler(errorHandler)
         scheduler.setThreadNamePrefix("fast-scheduler-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
         scheduler.setAwaitTerminationSeconds(30)
@@ -37,6 +48,7 @@ class SchedulerConfig {
     fun slowScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
         scheduler.poolSize = 8
+        scheduler.setErrorHandler(errorHandler)
         scheduler.setThreadNamePrefix("slow-scheduler-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
         scheduler.setAwaitTerminationSeconds(30)

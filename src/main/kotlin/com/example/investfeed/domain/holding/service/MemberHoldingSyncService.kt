@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.holding.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.holding.entity.Broker
 import com.example.investfeed.domain.holding.entity.BrokerType
 import com.example.investfeed.domain.holding.entity.MemberHolding
@@ -96,7 +97,7 @@ class MemberHoldingSyncService(
                     }
                 }
             } catch (e: Exception) {
-                log.error { "수동 보유종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}, ${e.message}" }
+                log.failure(e) { "수동 보유종목 stkNm 동기화 청크 실패: chunk size=${chunk.size}" }
             }
         }
 

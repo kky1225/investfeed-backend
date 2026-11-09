@@ -1,5 +1,7 @@
 package com.example.investfeed.toss.market.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.toss.annotation.TossToken
 import com.example.investfeed.toss.auth.service.TossAuthClient
@@ -51,8 +53,8 @@ class TossMarketClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "toss dailyCandles Error: symbol=$symbol, ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "toss dailyCandles Error: symbol=$symbol" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -80,8 +82,8 @@ class TossMarketClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "toss usMarketCalendar Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "toss usMarketCalendar Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

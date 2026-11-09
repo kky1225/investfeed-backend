@@ -15,6 +15,7 @@ import com.example.investfeed.domain.auth.exception.PreAuthTokenInvalidException
 import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
 import com.example.investfeed.domain.auth.exception.RefreshTokenReuseDetectedException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordLockedException
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -31,7 +32,7 @@ class ExceptionAdviceController {
 
     @ExceptionHandler(Exception::class)
     fun exception(e: Exception): ResponseEntity<ApiResponse<Nothing?>> {
-        log.error { "exception $e" }
+        log.failure(e) { "exception $e" }
 
         return ResponseEntity(
             ApiResponse(code = "SERVER_9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
@@ -40,7 +41,7 @@ class ExceptionAdviceController {
 
     @ExceptionHandler(RuntimeException::class)
     fun runtimeException(e: Exception): ResponseEntity<ApiResponse<Nothing?>> {
-        log.error { "runtimeException $e" }
+        log.failure(e) { "runtimeException $e" }
 
         return ResponseEntity(
             ApiResponse(code = "SERVER_9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR

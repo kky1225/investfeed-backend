@@ -7,6 +7,7 @@ import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.notification.entity.Direction
 import com.example.investfeed.domain.notification.service.NotificationService
 import com.example.investfeed.domain.notification.service.NotificationSettingService
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -53,7 +54,7 @@ class ApiKeyExpiryScheduler(
                         daysLeft = daysLeft
                     )
                 } catch (e: Exception) {
-                    log.warn { "API Key 만료 체크 실패 (apiKeyId=${apiKey.id}): ${e.message}" }
+                    log.failure(e) { "API Key 만료 체크 실패 (apiKeyId=${apiKey.id})" }
                 }
             }
             log.info { "ApiKeyExpiryScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }

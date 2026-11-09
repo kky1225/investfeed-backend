@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
@@ -28,7 +29,7 @@ class AlertStateService(
     fun get(indexCode: String, date: LocalDate): IndexAlertState =
         redisTemplate.opsForValue().get(key(indexCode, date))
             ?.let { runCatching { objectMapper.readValue(it, IndexAlertState::class.java) }
-                .onFailure { e -> log.error(e) { "알림 상태 역직렬화 실패: $indexCode $date" } }.getOrNull() }
+                .onFailure { e -> log.failure(e) { "알림 상태 역직렬화 실패: $indexCode $date" } }.getOrNull() }
             ?: IndexAlertState()
 
     fun save(indexCode: String, date: LocalDate, state: IndexAlertState) {

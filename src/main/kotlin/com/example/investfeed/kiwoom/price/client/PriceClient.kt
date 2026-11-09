@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.price.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -58,9 +60,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "stockTradeInfo Error" }
+            log.apiFailure(e) { "stockTradeInfo Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -93,9 +95,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldPriceNow Error: ${e.message}" }
+            log.apiFailure(e) { "goldPriceNow Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -128,9 +130,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "goldPriceNowMinute Error" }
+            log.apiFailure(e) { "goldPriceNowMinute Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -189,9 +191,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "investorTradeOpenMarket Error" }
+            log.apiFailure(e) { "investorTradeOpenMarket Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -251,9 +253,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "investorTradeOpenMarket Error" }
+            log.apiFailure(e) { "investorTradeCloseMarket Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -286,9 +288,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "programTrade Error" }
+            log.apiFailure(e) { "programTrade Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -351,9 +353,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "stockProgramTradeDay Error" }
+            log.apiFailure(e) { "stockProgramTradeDay Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -385,9 +387,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "indexProgramTradeDay Error" }
+            log.apiFailure(e) { "indexProgramTradeDay Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -447,9 +449,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "stockProgramTradeMinute Error" }
+            log.apiFailure(e) { "stockProgramTradeMinute Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -509,9 +511,9 @@ class PriceClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "indexProgramTradeMinute Error" }
+            log.apiFailure(e) { "indexProgramTradeMinute Error" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }

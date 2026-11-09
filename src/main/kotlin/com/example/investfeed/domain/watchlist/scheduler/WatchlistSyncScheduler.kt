@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.watchlist.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.holding.service.MemberHoldingSyncService
 import com.example.investfeed.domain.watchlist.service.WatchlistSyncService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
@@ -34,7 +35,7 @@ class WatchlistSyncScheduler(
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
-                log.error(e) { "스케줄러 토큰 발급 실패" }
+                log.failure(e) { "스케줄러 토큰 발급 실패" }
                 SecurityContextHolder.clearContext()
                 return@execute
             }
@@ -42,13 +43,13 @@ class WatchlistSyncScheduler(
             try {
                 watchlistSyncService.syncAllStkNm()
             } catch (e: Exception) {
-                log.error(e) { "관심종목 stkNm 동기화 실패" }
+                log.failure(e) { "관심종목 stkNm 동기화 실패" }
             }
 
             try {
                 memberHoldingSyncService.syncAllManualStkNm()
             } catch (e: Exception) {
-                log.error(e) { "수동 보유종목 stkNm 동기화 실패" }
+                log.failure(e) { "수동 보유종목 stkNm 동기화 실패" }
             }
 
             SecurityContextHolder.clearContext()

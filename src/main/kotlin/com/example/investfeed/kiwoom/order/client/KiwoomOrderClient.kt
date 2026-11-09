@@ -1,5 +1,7 @@
 package com.example.investfeed.kiwoom.order.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.kiwoom.annotation.KiwoomMockToken
 import com.example.investfeed.kiwoom.auth.service.AuthClient
@@ -57,8 +59,8 @@ class KiwoomOrderClient(
         } catch (e: BuyOrderException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "placeBuyOrder Error: ${e.message}" }
-            throw OrderResultUnknownException()
+            log.apiFailure(e) { "placeBuyOrder Error" }
+            throw OrderResultUnknownException(e)
         }
     }
 
@@ -86,8 +88,8 @@ class KiwoomOrderClient(
         } catch (e: SellOrderException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "placeSellOrder Error: ${e.message}" }
-            throw OrderResultUnknownException()
+            log.apiFailure(e) { "placeSellOrder Error" }
+            throw OrderResultUnknownException(e)
         }
     }
 
@@ -115,8 +117,8 @@ class KiwoomOrderClient(
         } catch (e: CancelOrderException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "cancelOrder Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "cancelOrder Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 
@@ -144,8 +146,8 @@ class KiwoomOrderClient(
         } catch (e: PendingOrderException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "pendingOrders Error: ${e.message}" }
-            throw RuntimeException(e.message)
+            log.apiFailure(e) { "pendingOrders Error" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

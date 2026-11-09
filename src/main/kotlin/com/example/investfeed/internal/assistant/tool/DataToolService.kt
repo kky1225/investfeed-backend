@@ -1,5 +1,6 @@
 package com.example.investfeed.internal.assistant.tool
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.service.MarketFactSheetService
 import com.example.investfeed.domain.assistant.service.TemplateFormat
 import com.example.investfeed.domain.assistant.dto.message.Section
@@ -352,7 +353,7 @@ class DataToolService(
 
     private fun sessionQuote(code: String, price: Double): SessionQuote? =
         runCatching { runBlocking { usSessionBaseService.currentBases(listOf(code)) } }
-            .onFailure { log.error(it) { "미국 장구분 기준 종가 조회 실패 $code" } }.getOrNull()
+            .onFailure { log.failure(it) { "미국 장구분 기준 종가 조회 실패 $code" } }.getOrNull()
             ?.let { b ->
                 b.closes[code]?.let { close ->
                     SessionQuote(b.session.label, close, TemplateFormat.monthDay(b.baseDate), price - close, (price / close - 1) * 100)
@@ -361,7 +362,7 @@ class DataToolService(
 
     private fun usTickBasis(stexTp: String, code: String): String? =
         runCatching { usStockChartClient.usStockLatestTick(KiwoomUsStockChartReq(stex_tp = stexTp, stk_cd = code)) }
-            .onFailure { log.error(it) { "미국 최근 체결 조회 실패 $code" } }.getOrNull()
+            .onFailure { log.failure(it) { "미국 최근 체결 조회 실패 $code" } }.getOrNull()
             ?.let { usMarketCalendarService.tickBasis(it.cntr_tm, it.bus_dt) }
 
     private fun currentQuote(s: ResolvedStock): StockQuote = when (s.market) {
@@ -369,7 +370,7 @@ class DataToolService(
             val info = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = s.code)).atn_stk_infr?.firstOrNull()
                 ?: throw ToolException("${s.name} 시세 조회에 실패했습니다")
             val def = runCatching { stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = s.code)) }
-                .onFailure { log.error(it) { "종목 기본정보 조회 실패 ${s.code}" } }.getOrNull()
+                .onFailure { log.failure(it) { "종목 기본정보 조회 실패 ${s.code}" } }.getOrNull()
             fun p(v: String?) = TemplateFormat.parse(v)?.let { abs(it) }
             StockQuote(
                 s.code, s.name, s.market, s.link, "KRW",
@@ -467,7 +468,7 @@ class DataToolService(
         val out = mutableListOf<CalendarItem>()
         while (!ym.isAfter(end)) {
             val events = runCatching { economicCalendarService.listEvents(ym.year, ym.monthValue).events }
-                .onFailure { log.error(it) { "캘린더 조회 실패 $ym" } }.getOrDefault(emptyList())
+                .onFailure { log.failure(it) { "캘린더 조회 실패 $ym" } }.getOrDefault(emptyList())
             out += events
                 .filter { runCatching { LocalDate.parse(it.date) }.getOrNull()?.let { d -> !d.isBefore(from) && !d.isAfter(to) } ?: false }
                 .filter { keyword.isNullOrBlank() || it.name.contains(keyword, ignoreCase = true) }

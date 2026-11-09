@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.stock.service
 
 import com.example.investfeed.common.util.DateUtil
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.dividend.service.StockDividendService
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
@@ -237,7 +238,7 @@ class StockService(
                 )
             }
         } catch (e: Exception) {
-            log.error { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd" }
             emptyList()
         }
 
@@ -362,7 +363,7 @@ class StockService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "getStock etfTimeTrend Error: stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "getStock etfTimeTrend Error: stkCd=$stkCd" }
             null
         }
     }
@@ -393,7 +394,7 @@ class StockService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "getStock viList Error: stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "getStock viList Error: stkCd=$stkCd" }
             emptyList()
         }
     }
@@ -406,7 +407,7 @@ class StockService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd, ${e.message}" }
+            log.failure(e) { "국내 주식 일별 시세 조회 실패 : stkCd=$stkCd" }
             null
         }
     }

@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.goal.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.domain.goal.entity.GoalType
@@ -42,7 +43,7 @@ class GoalAlertScheduler(
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
-                log.error(e) { "목표 스케줄러 토큰 발급 실패" }
+                log.failure(e) { "목표 스케줄러 토큰 발급 실패" }
                 SecurityContextHolder.clearContext()
                 return@execute
             }
@@ -93,13 +94,10 @@ class GoalAlertScheduler(
                             }
                         }
                     } catch (e: Exception) {
-                        log.warn { "목표 체크 실패 (memberId=$memberId, goalId=${goal.id}): ${e.message}" }
+                        log.failure(e) { "목표 체크 실패 (memberId=$memberId, goalId=${goal.id})" }
                     }
                 }
             }
-            } catch (e: Exception) {
-                log.error { "GoalAlertScheduler 실행 실패: ${e.message}" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
                 log.info { "GoalAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }

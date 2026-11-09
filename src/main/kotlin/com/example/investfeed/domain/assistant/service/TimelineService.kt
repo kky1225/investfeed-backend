@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.assistant.service
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.message.ActionStatus
 import com.example.investfeed.domain.assistant.dto.message.Headline
 import com.example.investfeed.domain.assistant.dto.message.TurnCard
@@ -135,7 +136,7 @@ class TimelineService(
     /** Python 비서의 대화 세션 키 (app/chat/session.py KEY_PREFIX) */
     private fun clearChatSession(memberId: Long) {
         runCatching { redisTemplate.delete("${RedisKeyPrefix.ASSISTANT.prefix}CHAT:$memberId") }
-            .onFailure { log.error(it) { "비서 대화 세션 초기화 실패 memberId=$memberId" } }
+            .onFailure { log.failure(it) { "비서 대화 세션 초기화 실패 memberId=$memberId" } }
     }
 
     fun isPosted(memberId: Long, briefingId: Long): Boolean =
@@ -144,7 +145,7 @@ class TimelineService(
     private fun toRes(entity: AssistantMessage, includePersonal: Boolean): TimelineMessageRes {
         val body = runCatching { objectMapper.readValue<MessageBody>(entity.body) }
             .getOrElse { e ->
-                log.error(e) { "assistant_message body 역직렬화 실패: id=${entity.id}" }
+                log.failure(e) { "assistant_message body 역직렬화 실패: id=${entity.id}" }
                 MessageBody(
                     type = MessageType.SYSTEM,
                     headline = Headline(text = "메시지를 표시할 수 없습니다"),

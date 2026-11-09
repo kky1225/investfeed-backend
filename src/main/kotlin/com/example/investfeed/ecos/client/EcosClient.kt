@@ -1,5 +1,8 @@
 package com.example.investfeed.ecos.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.ecos.dto.res.EcosStatRes
 import com.example.investfeed.ecos.exception.EcosApiException
 import com.example.investfeed.ecos.exception.EcosStatisticsException
@@ -49,21 +52,18 @@ class EcosClient(
                 .block()
 
             if (res?.statisticSearch == null) {
+                log.error { "ECOS API 응답 오류: tableCode=$tableCode, frequency=$frequency" }
                 throw EcosStatisticsException()
             }
 
             log.info { "ECOS getStatistics: tableCode=$tableCode, frequency=$frequency" }
 
             return res
-        } catch (e: EcosApiException) {
-            // WebClient 가 예외에 덧붙인 요청 URL(API 키 포함)을 버리기 위해 새로 만든다
-            throw EcosApiException()
-        } catch (e: EcosStatisticsException) {
+        } catch (e: InvestFeedException) {
             throw e
         } catch (e: Exception) {
-            log.error { "getStatistics Error: ${e.message}" }
-
-            throw RuntimeException(e.message)
+            log.apiFailure(e, secretInUrl = true) { "getStatistics Error: tableCode=$tableCode, frequency=$frequency" }
+            throw ExternalApiFailureException()
         }
     }
 }

@@ -8,6 +8,7 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.sect.client.SectClient
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -42,9 +43,6 @@ class MarketMacroScheduler(
             try {
                 authClient.accessToken()
                 doPoll()
-            } catch (e: Exception) {
-                log.error(e) { "MarketMacroScheduler 실패" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -70,7 +68,7 @@ class MarketMacroScheduler(
                 val snapshot = MarketMacroSnapshot.from(type.name, first)
                 marketMacroCacheService.saveSnapshot(snapshot)
             }.onFailure {
-                log.warn(it) { "MarketMacro polling failed: $type" }
+                log.failure(it) { "MarketMacro polling failed: $type" }
             }
         }
     }

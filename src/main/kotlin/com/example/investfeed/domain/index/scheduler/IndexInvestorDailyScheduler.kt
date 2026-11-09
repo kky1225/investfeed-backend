@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.index.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.index.repository.IndexInvestorDailyRepository
 import com.example.investfeed.domain.index.service.IndexService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
@@ -50,9 +51,6 @@ class IndexInvestorDailyScheduler(
                 authClient.accessToken()
                 val filled = catchupMissing()
                 log.info { "지수 투자자 일별 데이터 수집 완료: ${filled}일치" }
-            } catch (e: Exception) {
-                log.error { "지수 투자자 일별 데이터 수집 스케줄러 실패: ${e.message}" }
-                throw e
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -77,7 +75,7 @@ class IndexInvestorDailyScheduler(
                     SecurityContextHolder.clearContext()
                 }
             }
-        }.onFailure { log.error { "지수 투자자 일별 데이터 보정 실패: ${it.message}" } }
+        }.onFailure { log.failure(it) { "지수 투자자 일별 데이터 보정 실패" } }
     }
 
     private fun catchupMissing(): Int {
@@ -108,7 +106,7 @@ class IndexInvestorDailyScheduler(
                         indexService.collectIndexInvestorDaily(dt)
                         filled++
                     } catch (e: Exception) {
-                        log.warn { "지수 투자자 일별 데이터 보정 실패 ($dt): ${e.message}" }
+                        log.failure(e) { "지수 투자자 일별 데이터 보정 실패 ($dt)" }
                     }
                 }
             }
@@ -133,7 +131,7 @@ class IndexInvestorDailyScheduler(
                     collected++
                 } catch (e: Exception) {
                     failed++
-                    log.warn { "지수 투자자 일별 초기 시드 실패 ($dt): ${e.message}" }
+                    log.failure(e) { "지수 투자자 일별 초기 시드 실패 ($dt)" }
                 }
             }
             current = current.minusDays(1)

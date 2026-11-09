@@ -1,5 +1,8 @@
 package com.example.investfeed.fred.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.fred.dto.res.FredReleaseDatesRes
 import com.example.investfeed.fred.dto.res.FredSeriesRes
 import com.example.investfeed.fred.dto.res.FredVintageDatesRes
@@ -16,6 +19,10 @@ import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 
+/**
+ * 일시 장애 재시도는 FredRetryFilter 가 한다. 여기서는 마지막 결과만 보고 실패 1건에 error 1건을 남긴다.
+ * 로그에 URL 을 남기지 않는다 (URL 에 API 키가 들어 있어 logHttpError 를 쓰지 않는다).
+ */
 @Service
 class FredClient(
     @Qualifier("fredWebClient")
@@ -37,9 +44,9 @@ class FredClient(
     /**
      * 점검·장애·차단 때 FRED(앞단 Akamai)는 200 OK 로 JSON 대신 HTML 페이지를 준다(2026-10-22 00:00~13:32).
      * 그대로 역직렬화하면 "200 OK … Content type 'text/html' not supported" 로만 남아 원인이 안 보이므로
-     * 본문을 먼저 확인하고, 사유를 알 수 있게 헤더·제목·본문 텍스트를 메시지에, 원문 HTML 은 파일 로그(warn)에 남긴다
+     * 본문을 먼저 확인하고, 사유를 알 수 있게 헤더·제목·본문 텍스트를 error 에, 원문 HTML 은 파일 로그(warn)에 남긴다
      */
-    private inline fun <reified T> parseJson(res: ResponseEntity<String>?): T? {
+    private inline fun <reified T> parseJson(api: String, res: ResponseEntity<String>?): T? {
         val body = res?.body
         if (body.isNullOrBlank()) return null
         if (body.trimStart().startsWith("<")) {
@@ -48,12 +55,22 @@ class FredClient(
                 .entries.joinToString(", ") { "${it.key}=${it.value}" }
             val title = HTML_TITLE.find(body)?.groupValues?.get(1)?.replace(WS, " ")?.trim().orEmpty()
             val text = body.replace(SCRIPT_STYLE, " ").replace(TAG, " ").replace(WS, " ").trim().take(500)
-            log.warn { "FRED HTML 응답 원문: status=${res.statusCode}, headers=[$headers], body=${body.take(3000)}" }
-            throw FredHtmlResponseException("status=${res.statusCode}, headers=[$headers], title=$title, text=$text")
+            val summary = "status=${res.statusCode}, headers=[$headers], title=$title, text=$text"
+            log.warn { "FRED HTML 응답 원문: api=$api, body=${body.take(3000)}" }
+            log.error { "FRED 가 JSON 대신 HTML 을 반환: api=$api, $summary" }
+            throw FredHtmlResponseException(summary)
         }
         return objectMapper.readValue(body, T::class.java)
     }
 
+    /** HTTP 오류 응답. 재시도는 필터가 끝냈으므로 여기서 error 1건 */
+    private fun WebClient.ResponseSpec.onFredError(api: String): WebClient.ResponseSpec =
+        onStatus({ it.isError }, { res ->
+            res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
+                log.error { "FRED API HTTP 오류: api=$api, status=${res.statusCode()}, body=${body.take(500)}" }
+                FredApiException()
+            }
+        })
 
     /**
      * FRED 시리즈 관측값 조회
@@ -71,54 +88,39 @@ class FredClient(
         realtimeEnd: String? = null,
         units: String? = null,
     ): FredSeriesRes {
-        var lastError: Exception? = null
-        repeat(3) { attempt ->
-            try {
-                val res = fredWebClient.get()
-                    .uri { uriBuilder ->
-                        uriBuilder.path("/fred/series/observations")
-                            .queryParam("series_id", seriesId)
-                            .queryParam("api_key", apiKey)
-                            .queryParam("file_type", "json")
-                        if (observationStart != null) uriBuilder.queryParam("observation_start", observationStart)
-                        if (observationEnd != null) uriBuilder.queryParam("observation_end", observationEnd)
-                        if (frequency != null) uriBuilder.queryParam("frequency", frequency)
-                        if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
-                        if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
-                        if (units != null) uriBuilder.queryParam("units", units)
-                        uriBuilder.build()
-                    }
-                    .retrieve()
-                    .onStatus({ it.isError }, { res ->
-                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
-                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
-                            FredApiException()
-                        }
-                    })
-                    .toEntity(String::class.java)
-                    .block()
-                    .let { parseJson<FredSeriesRes>(it) }
-
-                if (res?.observations == null) {
-                    throw FredSeriesObservationsException()
+        try {
+            val res = fredWebClient.get()
+                .uri { uriBuilder ->
+                    uriBuilder.path("/fred/series/observations")
+                        .queryParam("series_id", seriesId)
+                        .queryParam("api_key", apiKey)
+                        .queryParam("file_type", "json")
+                    if (observationStart != null) uriBuilder.queryParam("observation_start", observationStart)
+                    if (observationEnd != null) uriBuilder.queryParam("observation_end", observationEnd)
+                    if (frequency != null) uriBuilder.queryParam("frequency", frequency)
+                    if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
+                    if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
+                    if (units != null) uriBuilder.queryParam("units", units)
+                    uriBuilder.build()
                 }
+                .retrieve()
+                .onFredError("getSeriesObservations")
+                .toEntity(String::class.java)
+                .block()
+                .let { parseJson<FredSeriesRes>("getSeriesObservations", it) }
 
-                return res
-            } catch (e: FredApiException) {
-                lastError = e
-                log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
-            } catch (e: FredSeriesObservationsException) {
-                throw e
-            } catch (e: Exception) {
-                lastError = e
-                log.warn { "getSeriesObservations attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            if (res?.observations == null) {
+                log.error { "FRED API 응답 오류: api=getSeriesObservations, seriesId=$seriesId" }
+                throw FredSeriesObservationsException()
             }
-        }
 
-        if (lastError is FredApiException) throw lastError as FredApiException
-        throw RuntimeException(lastError?.message)
+            return res
+        } catch (e: InvestFeedException) {
+            throw e
+        } catch (e: Exception) {
+            log.apiFailure(e, secretInUrl = true) { "getSeriesObservations 실패 (seriesId=$seriesId)" }
+            throw ExternalApiFailureException()
+        }
     }
 
     /**
@@ -131,53 +133,38 @@ class FredClient(
         sortOrder: String = "asc",
         includeReleaseDatesWithNoData: Boolean = false,
     ): FredReleaseDatesRes {
-        var lastError: Exception? = null
-        repeat(3) { attempt ->
-            try {
-                val res = fredWebClient.get()
-                    .uri { uriBuilder ->
-                        uriBuilder.path("/fred/release/dates")
-                            .queryParam("release_id", releaseId)
-                            .queryParam("api_key", apiKey)
-                            .queryParam("file_type", "json")
-                            .queryParam("include_release_dates_with_no_data", includeReleaseDatesWithNoData)
-                            .queryParam("sort_order", sortOrder)
-                            .queryParam("limit", 10000)
-                        if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
-                        if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
-                        uriBuilder.build()
-                    }
-                    .retrieve()
-                    .onStatus({ it.isError }, { res ->
-                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
-                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
-                            FredApiException()
-                        }
-                    })
-                    .toEntity(String::class.java)
-                    .block()
-                    .let { parseJson<FredReleaseDatesRes>(it) }
-
-                if (res?.release_dates == null) {
-                    throw FredReleaseDatesException()
+        try {
+            val res = fredWebClient.get()
+                .uri { uriBuilder ->
+                    uriBuilder.path("/fred/release/dates")
+                        .queryParam("release_id", releaseId)
+                        .queryParam("api_key", apiKey)
+                        .queryParam("file_type", "json")
+                        .queryParam("include_release_dates_with_no_data", includeReleaseDatesWithNoData)
+                        .queryParam("sort_order", sortOrder)
+                        .queryParam("limit", 10000)
+                    if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
+                    if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
+                    uriBuilder.build()
                 }
+                .retrieve()
+                .onFredError("getReleaseDatesByReleaseId")
+                .toEntity(String::class.java)
+                .block()
+                .let { parseJson<FredReleaseDatesRes>("getReleaseDatesByReleaseId", it) }
 
-                return res
-            } catch (e: FredApiException) {
-                lastError = e
-                log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
-            } catch (e: FredReleaseDatesException) {
-                throw e
-            } catch (e: Exception) {
-                lastError = e
-                log.warn { "getReleaseDatesByReleaseId attempt=${attempt + 1} 실패 (releaseId=$releaseId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            if (res?.release_dates == null) {
+                log.error { "FRED API 응답 오류: api=getReleaseDatesByReleaseId, releaseId=$releaseId" }
+                throw FredReleaseDatesException()
             }
-        }
 
-        if (lastError is FredApiException) throw lastError as FredApiException
-        throw RuntimeException(lastError?.message)
+            return res
+        } catch (e: InvestFeedException) {
+            throw e
+        } catch (e: Exception) {
+            log.apiFailure(e, secretInUrl = true) { "getReleaseDatesByReleaseId 실패 (releaseId=$releaseId)" }
+            throw ExternalApiFailureException()
+        }
     }
 
     fun getSeriesVintageDates(
@@ -185,50 +172,35 @@ class FredClient(
         realtimeStart: String? = null,
         realtimeEnd: String? = null,
     ): FredVintageDatesRes {
-        var lastError: Exception? = null
-        repeat(3) { attempt ->
-            try {
-                val res = fredWebClient.get()
-                    .uri { uriBuilder ->
-                        uriBuilder.path("/fred/series/vintagedates")
-                            .queryParam("series_id", seriesId)
-                            .queryParam("api_key", apiKey)
-                            .queryParam("file_type", "json")
-                            .queryParam("limit", 10000)
-                        if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
-                        if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
-                        uriBuilder.build()
-                    }
-                    .retrieve()
-                    .onStatus({ it.isError }, { res ->
-                        res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
-                            log.warn { "FRED API HTTP error: status=${res.statusCode()}, body=${body.take(500)}" }
-                            FredApiException()
-                        }
-                    })
-                    .toEntity(String::class.java)
-                    .block()
-                    .let { parseJson<FredVintageDatesRes>(it) }
-
-                if (res?.vintage_dates == null) {
-                    throw FredVintageDatesException()
+        try {
+            val res = fredWebClient.get()
+                .uri { uriBuilder ->
+                    uriBuilder.path("/fred/series/vintagedates")
+                        .queryParam("series_id", seriesId)
+                        .queryParam("api_key", apiKey)
+                        .queryParam("file_type", "json")
+                        .queryParam("limit", 10000)
+                    if (realtimeStart != null) uriBuilder.queryParam("realtime_start", realtimeStart)
+                    if (realtimeEnd != null) uriBuilder.queryParam("realtime_end", realtimeEnd)
+                    uriBuilder.build()
                 }
+                .retrieve()
+                .onFredError("getSeriesVintageDates")
+                .toEntity(String::class.java)
+                .block()
+                .let { parseJson<FredVintageDatesRes>("getSeriesVintageDates", it) }
 
-                return res
-            } catch (e: FredApiException) {
-                lastError = e
-                log.warn { "getSeriesVintageDates attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
-            } catch (e: FredVintageDatesException) {
-                throw e
-            } catch (e: Exception) {
-                lastError = e
-                log.warn { "getSeriesVintageDates attempt=${attempt + 1} 실패 (seriesId=$seriesId): ${e.message}" }
-                if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            if (res?.vintage_dates == null) {
+                log.error { "FRED API 응답 오류: api=getSeriesVintageDates, seriesId=$seriesId" }
+                throw FredVintageDatesException()
             }
-        }
 
-        if (lastError is FredApiException) throw lastError as FredApiException
-        throw RuntimeException(lastError?.message)
+            return res
+        } catch (e: InvestFeedException) {
+            throw e
+        } catch (e: Exception) {
+            log.apiFailure(e, secretInUrl = true) { "getSeriesVintageDates 실패 (seriesId=$seriesId)" }
+            throw ExternalApiFailureException()
+        }
     }
 }

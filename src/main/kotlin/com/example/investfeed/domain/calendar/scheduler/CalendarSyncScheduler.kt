@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.calendar.scheduler
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.service.ReleaseAlertService
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
@@ -40,9 +41,6 @@ class CalendarSyncScheduler(
             val start = System.currentTimeMillis()
             try {
                 economicCalendarService.syncCurrentData()
-            } catch (e: Exception) {
-                log.error { "CalendarSyncScheduler 실행 실패: ${e.message}" }
-                throw e
             } finally {
                 log.info { "CalendarSyncScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
             }
@@ -53,6 +51,6 @@ class CalendarSyncScheduler(
     private fun detectReleases() {
         runCatching { releaseAlertService.run() }
             .onSuccess { r -> log.info { "발표 알림 감지 완료: scanned=${r.scanned} saved=${r.saved} suppressed=${r.suppressed} posted=${r.posted}${if (r.seed) " (seed)" else ""}" } }
-            .onFailure { log.error(it) { "발표 알림 감지 실패" } }
+            .onFailure { log.failure(it) { "발표 알림 감지 실패" } }
     }
 }

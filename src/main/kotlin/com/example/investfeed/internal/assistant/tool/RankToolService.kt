@@ -1,5 +1,6 @@
 package com.example.investfeed.internal.assistant.tool
 
+import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.service.TemplateFormat
 import com.example.investfeed.domain.assistant.service.UsMarketCalendarService
 import com.example.investfeed.domain.crypto.service.CryptoService
@@ -82,7 +83,7 @@ class RankToolService(
     /** 미국 최근 체결이 속한 거래일·장구분 (SPY 기준 — 데이마켓·프리·정규·애프터 모두 거래가 많다). 실패하면 null → 달력 기준 */
     private fun usLatestSession(): Pair<LocalDate, UsMarketCalendarService.UsSession>? =
         runCatching { usStockChartClient.usStockLatestTick(KiwoomUsStockChartReq(stex_tp = "NY", stk_cd = US_SESSION_TICKER)) }
-            .onFailure { log.error(it) { "미국 최근 체결 조회 실패 $US_SESSION_TICKER" } }.getOrNull()
+            .onFailure { log.failure(it) { "미국 최근 체결 조회 실패 $US_SESSION_TICKER" } }.getOrNull()
             ?.let { usMarketCalendarService.tickSession(it.cntr_tm, it.bus_dt) }
 
     private fun krSession(now: LocalDateTime = LocalDateTime.now()): Session {

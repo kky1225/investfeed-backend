@@ -1,5 +1,7 @@
 package com.example.investfeed.naver.news.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
 import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
@@ -55,6 +57,7 @@ class NaverNewsClient(
                 .block()
 
             if (res?.items == null) {
+                log.error { "네이버 뉴스 API 응답 오류: query=$query" }
                 throw NaverNewsSearchException()
             }
 
@@ -64,9 +67,9 @@ class NaverNewsClient(
         } catch (e: NaverNewsSearchException) {
             throw e
         } catch (e: Exception) {
-            log.error { "searchNews Error: ${e.message}" }
+            log.apiFailure(e) { "searchNews Error: query=$query" }
 
-            throw RuntimeException(e.message)
+            throw ExternalApiFailureException(e)
         }
     }
 }
