@@ -1,66 +1,56 @@
 package com.example.investfeed.domain.dividend.client
 
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.EtfDividendApiResponse
 import com.example.investfeed.domain.dividend.exception.EtfDividendApiException
 import com.example.investfeed.domain.dividend.exception.EtfDividendResponseException
-import com.example.investfeed.domain.monitoring.enum.ApiProvider
-import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
-import java.net.HttpURLConnection
-import java.net.URI
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.awaitBodyOrNull
+import kotlin.coroutines.cancellation.CancellationException
 
 @Component
 class EtfDividendClient(
+    @Qualifier("etfDividendWebClient")
+    private val etfDividendWebClient: WebClient,
     private val objectMapper: ObjectMapper,
-    private val apiCallCounterService: ApiCallCounterService,
 ) {
     private val log = KotlinLogging.logger {}
 
-    private val BASE_URL = "https://search-etf.com/backend/get_all_dividends.php"
-
-    fun getDividendInfo(stkCd: String): List<EtfDividendApiItem> {
-        val startedAt = System.nanoTime()
-        var failed = true
+    /** 본문은 JSON 인데 Content-Type 이 text/html 로 와서 문자열로 받아 직접 변환한다 */
+    suspend fun getDividendInfo(stkCd: String): List<EtfDividendApiItem> {
         try {
-            apiCallCounterService.increment(ApiProvider.SEARCH_ETF)
-
-            val connection = URI("$BASE_URL?stock_code=$stkCd").toURL().openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-            connection.setRequestProperty("Referer", "https://search-etf.com/$stkCd")
-
-            val statusCode = connection.responseCode
-            if (statusCode !in 200..299) {
-                connection.disconnect()
-                throw EtfDividendApiException()
-            }
-
-            val raw = connection.inputStream.bufferedReader().use { it.readText() }
-            connection.disconnect()
+            val raw = etfDividendWebClient.get()
+                .uri { it.path("/backend/get_all_dividends.php").queryParam("stock_code", stkCd).build() }
+                .header(HttpHeaders.REFERER, "https://search-etf.com/$stkCd")
+                .retrieve()
+                .onStatus({ it.isError }, { res -> res.logHttpError("ETF 분배금"); throw EtfDividendApiException() })
+                .awaitBodyOrNull<String>()
+                .orEmpty()
 
             val response = objectMapper.readValue(raw, EtfDividendApiResponse::class.java)
 
             if (response.status != "success") {
+                log.error { "ETF 분배금 API 응답 오류: status=${response.status}, stkCd=$stkCd" }
                 throw EtfDividendResponseException()
             }
 
-            failed = false
             return response.dividends ?: emptyList()
-        } catch (e: EtfDividendApiException) {
+        } catch (e: InvestFeedException) {
             throw e
-        } catch (e: EtfDividendResponseException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.error { "getDividendInfo Error: ${e.message}" }
-
-            throw RuntimeException(e.message)
-        } finally {
-            apiCallCounterService.recordResult(ApiProvider.SEARCH_ETF, failed, (System.nanoTime() - startedAt) / 1_000_000)
+            log.apiFailure(e) { "getDividendInfo Error: stkCd=$stkCd" }
+            throw ExternalApiFailureException(e)
         }
     }
 }

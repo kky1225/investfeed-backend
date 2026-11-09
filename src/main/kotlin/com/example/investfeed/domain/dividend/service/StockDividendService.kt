@@ -6,6 +6,7 @@ import com.example.investfeed.domain.dividend.client.dto.DividendApiItem
 import com.example.investfeed.domain.dividend.dto.res.StockDividendRes
 import com.example.investfeed.domain.dividend.entity.StockDividend
 import com.example.investfeed.domain.dividend.repository.StockDividendRepository
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -52,7 +53,7 @@ class StockDividendService(
         log.info { "배당 정보 일별 수집: ${totalPages}페이지 조회, $saved 건 저장" }
     }
 
-    fun collectEtfDividends(stkCd: String): Int {
+    suspend fun collectEtfDividends(stkCd: String): Int {
         val today = today()
         val minDvdnBasDt = minDvdnBasDt()
         val existingDates = stockDividendRepository
@@ -81,13 +82,13 @@ class StockDividendService(
                 )
                 count++
             } catch (e: Exception) {
-                log.warn(e) { "ETF 분배금 저장 실패: stkCd=$stkCd, date=${item.date}" }
+                log.failure(e) { "ETF 분배금 저장 실패: stkCd=$stkCd, date=${item.date}" }
             }
         }
         return count
     }
 
-    fun getDividendList(stkCd: String, marketCode: String? = null): List<StockDividendRes> {
+    suspend fun getDividendList(stkCd: String, marketCode: String? = null): List<StockDividendRes> {
         val cleanStkCd = stkCd.substringBefore("_")
 
         // marketCode가 8이면 ETF → createdDt 기준 1일 1회 수집
@@ -162,7 +163,7 @@ class StockDividendService(
                 )
                 count++
             } catch (e: Exception) {
-                log.warn(e) { "배당 정보 저장 실패: isinCd=${item.isinCd}" }
+                log.failure(e) { "배당 정보 저장 실패: isinCd=${item.isinCd}" }
             }
         }
         return count

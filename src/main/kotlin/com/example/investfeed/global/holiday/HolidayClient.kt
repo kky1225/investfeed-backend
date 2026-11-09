@@ -1,7 +1,8 @@
 package com.example.investfeed.global.holiday
 
-import com.example.investfeed.domain.monitoring.enum.ApiProvider
-import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
+import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.global.holiday.dto.HolidayApiResponse
 import com.example.investfeed.global.holiday.exception.HolidayApiException
 import com.example.investfeed.global.holiday.exception.HolidayInfoException
@@ -9,9 +10,10 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.net.HttpURLConnection
+import org.springframework.web.reactive.function.client.WebClient
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -22,7 +24,8 @@ class HolidayClient(
     private val DEFAULT_URL: String,
     @param:Value("\${data-go-kr.service-key}")
     private val serviceKey: String,
-    private val apiCallCounterService: ApiCallCounterService,
+    @Qualifier("holidayWebClient")
+    private val holidayWebClient: WebClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -39,30 +42,27 @@ class HolidayClient(
     data class HolidayInfo(val date: String, val name: String)
 
     fun getHolidayInfos(year: Int): List<HolidayInfo> {
-        val startedAt = System.nanoTime()
-        var failed = true
         try {
-            apiCallCounterService.increment(ApiProvider.PUBLIC_DATA_HOLIDAY)
-
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
-            val urlStr = "$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&numOfRows=$NUM_OF_ROWS&_type=json"
-            val connection = URI(urlStr).toURL().openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
+            val uri = URI("$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&numOfRows=$NUM_OF_ROWS&_type=json")
 
-            if (connection.responseCode !in 200..299) {
-                connection.disconnect()
-                throw HolidayApiException()
-            }
-
-            val raw = connection.inputStream.bufferedReader().use { it.readText() }
-            connection.disconnect()
+            // URL 에 서비스 키가 있어 logHttpError(URL 포함) 대신 상태만 남긴다
+            val raw = holidayWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .onStatus({ it.isError }, { res ->
+                    log.error { "공휴일 API HTTP 오류: status=${res.statusCode()}, year=$year" }
+                    throw HolidayApiException()
+                })
+                .bodyToMono(String::class.java)
+                .block()
+                .orEmpty()
 
             val response = objectMapper.readValue(raw, HolidayApiResponse::class.java)
 
             val resultCode = response.response?.header?.resultCode
             if (resultCode != "00") {
+                log.error { "공휴일 API 응답 오류: resultCode=$resultCode, resultMsg=${response.response?.header?.resultMsg}, year=$year" }
                 throw HolidayInfoException()
             }
 
@@ -70,23 +70,18 @@ class HolidayClient(
 
             val totalCount = response.response.body?.totalCount
             if (totalCount != null && totalCount > items.size) {
-                throw IllegalStateException("공휴일 API 응답 누락: ${year}년 totalCount=$totalCount, 수신=${items.size} (numOfRows=$NUM_OF_ROWS)")
+                log.error { "공휴일 API 응답 누락: ${year}년 totalCount=$totalCount, 수신=${items.size} (numOfRows=$NUM_OF_ROWS)" }
+                throw HolidayInfoException()
             }
 
-            failed = false
             return items
                 .filter { it.isHoliday == "Y" && it.locdate != null }
                 .map { HolidayInfo(date = it.locdate.toString(), name = it.dateName ?: "공휴일") }
-        } catch (e: HolidayApiException) {
-            throw e
-        } catch (e: HolidayInfoException) {
+        } catch (e: InvestFeedException) {
             throw e
         } catch (e: Exception) {
-            log.warn { "getHolidayInfos Error: ${e.message}" }
-
-            throw RuntimeException(e.message)
-        } finally {
-            apiCallCounterService.recordResult(ApiProvider.PUBLIC_DATA_HOLIDAY, failed, (System.nanoTime() - startedAt) / 1_000_000)
+            log.apiFailure(e, secretInUrl = true) { "getHolidayInfos Error: year=$year" }
+            throw ExternalApiFailureException()
         }
     }
 }
