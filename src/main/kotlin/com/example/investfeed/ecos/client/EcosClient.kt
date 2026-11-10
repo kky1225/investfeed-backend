@@ -3,6 +3,7 @@ package com.example.investfeed.ecos.client
 import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.ecos.dto.res.EcosStatRes
 import com.example.investfeed.ecos.exception.EcosApiException
 import com.example.investfeed.ecos.exception.EcosStatisticsException
@@ -43,11 +44,7 @@ class EcosClient(
             val res = ecosWebClient.get()
                 .uri(uri)
                 .retrieve()
-                .onStatus({ it.isError }, { res ->
-                    // URL 경로에 API 키가 있어 logHttpError 를 쓰지 않는다
-                    log.error { "ECOS API HTTP 오류: status=${res.statusCode()}, tableCode=$tableCode, frequency=$frequency" }
-                    throw EcosApiException()
-                })
+                .onStatus({ it.isError }, { res -> res.logHttpError("ECOS", secrets = listOf(apiKey)); throw EcosApiException() })
                 .bodyToMono<EcosStatRes>()
                 .block()
 

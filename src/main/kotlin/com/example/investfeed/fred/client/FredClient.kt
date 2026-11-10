@@ -3,6 +3,7 @@ package com.example.investfeed.fred.client
 import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.fred.dto.res.FredReleaseDatesRes
 import com.example.investfeed.fred.dto.res.FredSeriesRes
 import com.example.investfeed.fred.dto.res.FredVintageDatesRes
@@ -21,7 +22,7 @@ import org.springframework.web.reactive.function.client.WebClient
 
 /**
  * 일시 장애 재시도는 FredRetryFilter 가 한다. 여기서는 마지막 결과만 보고 실패 1건에 error 1건을 남긴다.
- * 로그에 URL 을 남기지 않는다 (URL 에 API 키가 들어 있어 logHttpError 를 쓰지 않는다).
+ * URL 쿼리에 API 키가 있어 logHttpError 는 secrets 로 가리고, 마지막 catch 는 apiFailure(secretInUrl) 를 쓴다.
  */
 @Service
 class FredClient(
@@ -63,15 +64,6 @@ class FredClient(
         return objectMapper.readValue(body, T::class.java)
     }
 
-    /** HTTP 오류 응답. 재시도는 필터가 끝냈으므로 여기서 error 1건 */
-    private fun WebClient.ResponseSpec.onFredError(api: String): WebClient.ResponseSpec =
-        onStatus({ it.isError }, { res ->
-            res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
-                log.error { "FRED API HTTP 오류: api=$api, status=${res.statusCode()}, body=${body.take(500)}" }
-                FredApiException()
-            }
-        })
-
     /**
      * FRED 시리즈 관측값 조회
      * @param seriesId 시리즈 ID (예: FEDFUNDS, GDP, CPIAUCSL)
@@ -104,7 +96,7 @@ class FredClient(
                     uriBuilder.build()
                 }
                 .retrieve()
-                .onFredError("getSeriesObservations")
+                .onStatus({ it.isError }, { res -> res.logHttpError("FRED", secrets = listOf(apiKey)); throw FredApiException() })
                 .toEntity(String::class.java)
                 .block()
                 .let { parseJson<FredSeriesRes>("getSeriesObservations", it) }
@@ -148,7 +140,7 @@ class FredClient(
                     uriBuilder.build()
                 }
                 .retrieve()
-                .onFredError("getReleaseDatesByReleaseId")
+                .onStatus({ it.isError }, { res -> res.logHttpError("FRED", secrets = listOf(apiKey)); throw FredApiException() })
                 .toEntity(String::class.java)
                 .block()
                 .let { parseJson<FredReleaseDatesRes>("getReleaseDatesByReleaseId", it) }
@@ -185,7 +177,7 @@ class FredClient(
                     uriBuilder.build()
                 }
                 .retrieve()
-                .onFredError("getSeriesVintageDates")
+                .onStatus({ it.isError }, { res -> res.logHttpError("FRED", secrets = listOf(apiKey)); throw FredApiException() })
                 .toEntity(String::class.java)
                 .block()
                 .let { parseJson<FredVintageDatesRes>("getSeriesVintageDates", it) }

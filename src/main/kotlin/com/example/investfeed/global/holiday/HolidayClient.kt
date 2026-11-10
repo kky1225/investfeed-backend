@@ -3,6 +3,7 @@ package com.example.investfeed.global.holiday
 import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.global.holiday.dto.HolidayApiResponse
 import com.example.investfeed.global.holiday.exception.HolidayApiException
 import com.example.investfeed.global.holiday.exception.HolidayInfoException
@@ -46,14 +47,10 @@ class HolidayClient(
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
             val uri = URI("$DEFAULT_URL$HOLIDAY_PATH?serviceKey=$encodedKey&solYear=$year&numOfRows=$NUM_OF_ROWS&_type=json")
 
-            // URL 에 서비스 키가 있어 logHttpError(URL 포함) 대신 상태만 남긴다
             val raw = holidayWebClient.get()
                 .uri(uri)
                 .retrieve()
-                .onStatus({ it.isError }, { res ->
-                    log.error { "공휴일 API HTTP 오류: status=${res.statusCode()}, year=$year" }
-                    throw HolidayApiException()
-                })
+                .onStatus({ it.isError }, { res -> res.logHttpError("공휴일", secrets = listOf(encodedKey)); throw HolidayApiException() })
                 .bodyToMono(String::class.java)
                 .block()
                 .orEmpty()

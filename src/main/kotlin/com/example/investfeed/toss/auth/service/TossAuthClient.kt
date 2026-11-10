@@ -4,6 +4,7 @@ import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
 import com.example.investfeed.common.util.failure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.auth.exception.ApiKeyNotFoundException
 import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.domain.auth.repository.MemberApiKeyRepository
@@ -25,7 +26,6 @@ import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.WebClientResponseException
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.security.MessageDigest
 import java.time.Duration
@@ -121,10 +121,13 @@ class TossAuthClient(
                 ?.let { Duration.ofSeconds((it - TTL_SAFETY_SECONDS).coerceAtLeast(60)) }
                 ?: DEFAULT_TTL
             redisTemplate.opsForValue().set(redisKey, token, ttl)
-        } catch (e: TossAccessTokenException) {
+        } catch (e: TossTokenRejectedException) {
+            // body·Basic 두 방식 모두 거부 → 등록된 키가 더 이상 유효하지 않다
+            log.error { "tossRefreshToken 거부 (loginId=$loginId): status=${e.status}" }
+            throw TossAccessTokenException()
+        } catch (e: InvestFeedException) {
             throw e
         } catch (e: Exception) {
-            // 토큰 발급은 onStatus 가 없어 HTTP 오류(WebClientResponseException)는 여기서 error 1건
             log.apiFailure(e) { "tossRefreshToken 실패 (loginId=$loginId)" }
             throw ExternalApiFailureException(e)
         }
@@ -138,31 +141,27 @@ class TossAuthClient(
                 log.warn { "토스 키 검증 실패: 200 응답이지만 access_token 미발급" }
                 throw InvalidApiKeyException()
             }
-        } catch (e: InvalidApiKeyException) {
+        } catch (e: TossTokenRejectedException) {
+            // 회원이 잘못 입력한 키라 warn
+            log.warn { "토스 키 검증 실패: status=${e.status}" }
+            throw InvalidApiKeyException()
+        } catch (e: InvestFeedException) {
             throw e
-        } catch (e: WebClientResponseException) {
-            log.warn { "토스 키 검증 실패: status=${e.statusCode}, body=${e.responseBodyAsString}" }
-            if (e.statusCode == HttpStatus.UNAUTHORIZED || e.statusCode == HttpStatus.BAD_REQUEST) {
-                throw InvalidApiKeyException()
-            }
-            log.error { "토스 키 검증 HTTP 오류: status=${e.statusCode}" }
-            throw ExternalApiFailureException(e)
         } catch (e: Exception) {
             log.apiFailure(e) { "토스 키 검증 실패" }
             throw ExternalApiFailureException(e)
         }
     }
 
+    /** 키 거부(401·400). 방식을 바꿔 다시 시도하거나 호출부가 키 문제로 처리하므로 여기서는 기록하지 않는다 */
+    private class TossTokenRejectedException(val status: Int) : RuntimeException("status=$status")
+
     private fun requestToken(clientId: String, clientSecret: String): TossAccessTokenRes? {
         return try {
             postToken(clientId, clientSecret, useBasic = false)
-        } catch (e: WebClientResponseException) {
-            if (e.statusCode == HttpStatus.UNAUTHORIZED || e.statusCode == HttpStatus.BAD_REQUEST) {
-                log.warn { "토스 토큰 body 방식 실패(${e.statusCode}), Basic 방식 재시도" }
-                postToken(clientId, clientSecret, useBasic = true)
-            } else {
-                throw e
-            }
+        } catch (e: TossTokenRejectedException) {
+            log.warn { "토스 토큰 body 방식 실패(${e.status}), Basic 방식 재시도" }
+            postToken(clientId, clientSecret, useBasic = true)
         }
     }
 
@@ -184,6 +183,10 @@ class TossAuthClient(
 
         return spec.body(BodyInserters.fromFormData(form))
             .retrieve()
+            .onStatus({ it == HttpStatus.UNAUTHORIZED || it == HttpStatus.BAD_REQUEST }, { res ->
+                throw TossTokenRejectedException(res.statusCode().value())
+            })
+            .onStatus({ it.isError }, { res -> res.logHttpError("토스"); throw TossAccessTokenException() })
             .bodyToMono<TossAccessTokenRes>()
             .block()
     }

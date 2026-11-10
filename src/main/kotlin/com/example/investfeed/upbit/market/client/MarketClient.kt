@@ -1,7 +1,10 @@
 package com.example.investfeed.upbit.market.client
 
 import com.example.investfeed.common.exception.ExternalApiFailureException
+import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
+import com.example.investfeed.upbit.exception.UpbitApiException
 import com.example.investfeed.upbit.market.dto.res.UpbitMarketRes
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
@@ -30,6 +33,7 @@ class MarketClient(
             val res = upbitWebClient.get()
                 .uri("/v1/market/all?is_details=true")
                 .retrieve()
+                .onStatus({ it.isError }, { res -> res.logHttpError("업비트"); throw UpbitApiException() })
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitMarketRes>>() {})
                 .block()
 
@@ -38,6 +42,8 @@ class MarketClient(
             cachedMarkets = res ?: emptyList()
             cacheTimestamp = now
             return cachedMarkets
+        } catch (e: InvestFeedException) {
+            throw e
         } catch (e: Exception) {
             log.apiFailure(e) { "upbit getMarketAll Error" }
             throw ExternalApiFailureException(e)

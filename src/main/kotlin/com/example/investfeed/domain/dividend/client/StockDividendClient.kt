@@ -3,6 +3,7 @@ package com.example.investfeed.domain.dividend.client
 import com.example.investfeed.common.exception.ExternalApiFailureException
 import com.example.investfeed.common.exception.InvestFeedException
 import com.example.investfeed.common.util.apiFailure
+import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.dividend.client.dto.DividendApiItem
 import com.example.investfeed.domain.dividend.client.dto.DividendApiResponse
 import com.example.investfeed.domain.dividend.exception.StockDividendApiException
@@ -36,16 +37,10 @@ class StockDividendClient(
             val encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
             val uri = URI("$defaultUrl$DIVIDEND_PATH?serviceKey=$encodedKey&pageNo=$pageNo&numOfRows=$numOfRows&resultType=json")
 
-            // URL 에 서비스 키가 있어 logHttpError(URL 포함) 대신 상태·본문만 남긴다
             val raw = stockDividendWebClient.get()
                 .uri(uri)
                 .retrieve()
-                .onStatus({ it.isError }, { res ->
-                    res.bodyToMono(String::class.java).defaultIfEmpty("(no body)").map { body ->
-                        log.error { "주식 배당 API HTTP 오류: status=${res.statusCode()}, pageNo=$pageNo, body=${body.take(500)}" }
-                        StockDividendApiException()
-                    }
-                })
+                .onStatus({ it.isError }, { res -> res.logHttpError("주식 배당", secrets = listOf(encodedKey)); throw StockDividendApiException() })
                 .bodyToMono(String::class.java)
                 .block()
                 .orEmpty()
