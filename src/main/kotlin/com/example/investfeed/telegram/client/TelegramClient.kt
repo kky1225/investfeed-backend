@@ -1,5 +1,6 @@
 package com.example.investfeed.telegram.client
 
+import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
 import com.example.investfeed.telegram.dto.TelegramBotCommand
 import com.example.investfeed.telegram.dto.TelegramGetUpdatesReq
 import com.example.investfeed.telegram.dto.TelegramMessage
@@ -39,7 +40,7 @@ class TelegramClient(
     fun sendText(chatId: Long, text: String): SendResult = send(TelegramSendMessageReq(chat_id = chatId, text = text))
 
     /*
-     * 텔레그램 WebClient 에는 공통 필터가 없어 실패는 여기서 기록한다.
+     * 실패는 여기서 기록한다 (요청에 CALLER_LOGS_ERROR_ATTR 를 붙여 공통 필터는 연결 실패를 warn 으로만 남긴다).
      * 알림은 회원마다 보내고 setMyCommands 는 실패하는 동안 폴링마다 다시 부르므로,
      * 장애가 이어지는 동안은 첫 실패만 error, 이후는 성공할 때까지 warn (실패 1건에 error 1건이 장애 1건에 error 1건이 되도록)
      */
@@ -65,6 +66,7 @@ class TelegramClient(
         return try {
             val res = telegramWebClient.post()
                 .uri("/bot$botToken/sendMessage")
+                .attribute(ApiCallMetricsFilter.CALLER_LOGS_ERROR_ATTR, true)
                 .bodyValue(req)
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<TelegramResponse<TelegramMessage>>() {})
@@ -93,6 +95,7 @@ class TelegramClient(
         return try {
             val res = telegramWebClient.post()
                 .uri("/bot$botToken/setMyCommands")
+                .attribute(ApiCallMetricsFilter.CALLER_LOGS_ERROR_ATTR, true)
                 .bodyValue(TelegramSetMyCommandsReq(commands))
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<TelegramResponse<Boolean>>() {})
@@ -115,6 +118,7 @@ class TelegramClient(
         return try {
             telegramWebClient.post()
                 .uri("/bot$botToken/getUpdates")
+                .attribute(ApiCallMetricsFilter.CALLER_LOGS_ERROR_ATTR, true)
                 .bodyValue(TelegramGetUpdatesReq(offset = offset))
                 .retrieve()
                 .bodyToMono(object : ParameterizedTypeReference<TelegramResponse<List<TelegramUpdate>>>() {})

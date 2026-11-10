@@ -1,37 +1,23 @@
 package com.example.investfeed.ecos.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
-import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
-import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
-import com.example.investfeed.global.config.WebClientHttpClientFactory
+import com.example.investfeed.global.config.ExternalWebClientFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
-import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Mono
 
 @Component
 class EcosConfig(
     @param:Value("\${ecos.default-url}")
     private val defaultUrl: String,
-    private val apiCallCounterService: ApiCallCounterService,
+    private val externalWebClientFactory: ExternalWebClientFactory,
 ) {
 
     @Bean
-    fun ecosWebClient(): WebClient {
-        return WebClient.builder()
-            .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
-            .baseUrl(defaultUrl)
-            .defaultHeader("Content-Type", "application/json")
-            .defaultHeader("Accept", "application/json")
-            .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
-            .filter(ExchangeFilterFunction.ofRequestProcessor { req ->
-                apiCallCounterService.increment(ApiProvider.ECOS)
-                Mono.just(req)
-            })
-            .filter(ApiCallMetricsFilter(ApiProvider.ECOS, apiCallCounterService))
-            .build()
-    }
+    fun ecosWebClient(): WebClient = externalWebClientFactory.create(
+        provider = ApiProvider.ECOS,
+        baseUrl = defaultUrl,
+        headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
+    )
 }

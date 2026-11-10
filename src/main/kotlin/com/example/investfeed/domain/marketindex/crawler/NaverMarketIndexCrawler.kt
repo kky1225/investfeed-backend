@@ -4,24 +4,19 @@ import com.example.investfeed.common.util.logHttpError
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.dto.res.MarketIndexRes
 import com.example.investfeed.domain.marketindex.exception.MarketIndexResponseException
-import com.example.investfeed.domain.monitoring.enum.ApiProvider
-import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
 import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
-import com.example.investfeed.global.config.WebClientHttpClientFactory
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import reactor.core.publisher.Mono
 import kotlin.coroutines.cancellation.CancellationException
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -37,20 +32,10 @@ class NaverMarketIndexCrawler(
     @param:Value("\${naver-stock.polling-url:https://polling.finance.naver.com}")
     private val naverPollingUrl: String,
     private val objectMapper: ObjectMapper,
-    private val apiCallCounterService: ApiCallCounterService,
+    @Qualifier("naverCrawlWebClient")
+    private val webClient: WebClient,
 ) {
     private val log = KotlinLogging.logger {}
-
-    private val webClient = WebClient.builder()
-        .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
-        .defaultHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
-        .filter(ExchangeFilterFunction.ofRequestProcessor { req ->
-            apiCallCounterService.increment(ApiProvider.NAVER_CRAWL)
-            Mono.just(req)
-        })
-        .filter(ApiCallMetricsFilter(ApiProvider.NAVER_CRAWL, apiCallCounterService))
-        .build()
 
     companion object {
         private val WORLD_INDEX_PATHS = mapOf(
@@ -260,7 +245,7 @@ class NaverMarketIndexCrawler(
 
     /**
      * 조회 후 파싱한다. 연결·HTTP 실패는 필터·logHttpError 가 warn 으로만 남기고 사유를 돌려준다
-     * (RETRY_PENDING_ATTR 는 재시도가 아니라 "error 는 호출부가 남긴다"는 뜻으로 쓴다).
+     * (error 는 crawl·fetchOne 이 묶어서 남긴다 → CALLER_LOGS_ERROR_ATTR).
      */
     private suspend fun <T> fetch(
         type: MarketIndexType,
@@ -270,7 +255,7 @@ class NaverMarketIndexCrawler(
         val body = try {
             webClient.get()
                 .uri(url)
-                .attribute(ApiCallMetricsFilter.RETRY_PENDING_ATTR, true)
+                .attribute(ApiCallMetricsFilter.CALLER_LOGS_ERROR_ATTR, true)
                 .retrieve()
                 .onStatus({ it.isError }, { res -> res.logHttpError("네이버 지수", asWarn = true); res.createException() })
                 .awaitBody<String>()

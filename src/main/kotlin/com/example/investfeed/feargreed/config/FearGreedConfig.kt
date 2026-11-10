@@ -1,37 +1,23 @@
 package com.example.investfeed.feargreed.config
 
 import com.example.investfeed.domain.monitoring.enum.ApiProvider
-import com.example.investfeed.domain.monitoring.service.ApiCallCounterService
-import com.example.investfeed.domain.monitoring.service.ApiCallMetricsFilter
-import com.example.investfeed.global.config.WebClientHttpClientFactory
+import com.example.investfeed.global.config.ExternalWebClientFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
-import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Mono
 
 @Component
 class FearGreedConfig(
     @param:Value("\${fear-greed.default-url}")
     private val defaultUrl: String,
-    private val apiCallCounterService: ApiCallCounterService,
+    private val externalWebClientFactory: ExternalWebClientFactory,
 ) {
 
     @Bean
-    fun fearGreedWebClient(): WebClient {
-        return WebClient.builder()
-            .clientConnector(ReactorClientHttpConnector(WebClientHttpClientFactory.createDefaultHttpClient()))
-            .baseUrl(defaultUrl)
-            .defaultHeader("Content-Type", "application/json")
-            .defaultHeader("Accept", "application/json")
-            .codecs { config -> config.defaultCodecs().maxInMemorySize(5 * 1024 * 1024) }
-            .filter(ExchangeFilterFunction.ofRequestProcessor { req ->
-                apiCallCounterService.increment(ApiProvider.FEAR_GREED)
-                Mono.just(req)
-            })
-            .filter(ApiCallMetricsFilter(ApiProvider.FEAR_GREED, apiCallCounterService))
-            .build()
-    }
+    fun fearGreedWebClient(): WebClient = externalWebClientFactory.create(
+        provider = ApiProvider.FEAR_GREED,
+        baseUrl = defaultUrl,
+        headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
+    )
 }

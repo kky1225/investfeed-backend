@@ -30,8 +30,11 @@ class ApiCallMetricsFilter(
         private val RETURN_CODE = Regex("\"return_code\"\\s*:\\s*(-?\\d+)")
         private val EMPTY_BODY = ByteArray(0)
 
-        /** 요청 attribute: true 면 뒤에 재시도가 남은 시도라 연결 실패를 warn 으로 남긴다 */
-        const val RETRY_PENDING_ATTR = "apiCallMetrics.retryPending"
+        /**
+         * 요청 attribute: true 면 연결 실패를 warn 으로만 남긴다 — error 는 호출 클래스가 묶어서 남기는 경우
+         * (네이버 시장지표는 실행당 1건, 텔레그램은 장애당 1건)
+         */
+        const val CALLER_LOGS_ERROR_ATTR = "apiCallMetrics.callerLogsError"
 
         /** 키움은 업무 오류(한도 초과, 토큰 오류 등)도 HTTP 200 에 return_code 로 내려준다 */
         internal fun isKiwoomFailureBody(body: ByteArray): Boolean {
@@ -50,8 +53,7 @@ class ApiCallMetricsFilter(
                 val cause = NestedExceptionUtils.getMostSpecificCause(e)
                 val apiId = request.headers().getFirst("api-id")?.let { ", api-id=$it" } ?: ""
                 val message = "${provider.label} API 호출 실패$apiId, ${latencyMs}ms: ${cause.javaClass.simpleName}: ${cause.message}"
-                // 재시도할 요청은 마지막 시도만 error 로 남긴다 (실패 1건에 error 1건)
-                if (request.attribute(RETRY_PENDING_ATTR).orElse(false) == true) log.warn { message } else log.error { message }
+                if (request.attribute(CALLER_LOGS_ERROR_ATTR).orElse(false) == true) log.warn { message } else log.error { message }
             }
     }
 
