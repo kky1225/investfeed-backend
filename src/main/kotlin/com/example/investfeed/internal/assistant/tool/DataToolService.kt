@@ -558,7 +558,8 @@ class DataToolService(
                 .filter { keyword.isNullOrBlank() || it.name.contains(keyword, ignoreCase = true) }
                 .filter { type == null || it.type in type.eventTypes }
                 .filter { country == null || it.country == country.name }
-                .map { CalendarItem(it.date, it.name, it.country, it.type, it.value) }
+                // 안내(note: 전월비 대체·미발표)를 값 뒤에 — 경제 일정 화면과 같은 표기
+                .map { CalendarItem(it.date, it.name, it.country, it.type, listOfNotNull(it.value, it.note).joinToString(" ").ifBlank { null }) }
             ym = ym.plusMonths(1)
         }
         return out.sortedBy { it.date }.take(MAX_CALENDAR)

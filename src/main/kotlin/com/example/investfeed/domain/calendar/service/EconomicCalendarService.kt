@@ -40,6 +40,15 @@ class EconomicCalendarService(
     private val CACHE_PREFIX = RedisKeyPrefix.ECONOMIC_CALENDAR.prefix
     private val CACHE_TTL = 24L * 60L
     private val FREEZE_GRACE_MONTHS = 1L
+
+    // 전년동월비 일정 이름 "2026-10 소비자물가지수(전년동월비)" → 관측연도·월·지표명
+    private val YOY_EVENT_NAME = Regex("""^(\d{4})-(\d{2}) (.+\(전년동월비\))$""")
+
+    // 발표 기관이 집계하지 않은 관측월 (지표명 → yyyy-MM). BLS 2025-10 셧다운. 근원 PCE(BEA)는 2025-10 값이 있어 제외
+    private val UNCOLLECTED_MONTHS = mapOf("소비자물가지수(전년동월비)" to setOf("2025-10"))
+
+    // 전년비 시리즈 → 같은 지표의 계절조정 시리즈 (공식 전월비 산출용). 전년비를 낼 수 없는 달에만 쓴다
+    private val MOM_FALLBACK_SERIES = mapOf("CPIAUCNS" to "CPIAUCSL")
     private val DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
@@ -566,6 +575,21 @@ class EconomicCalendarService(
     /** 등락률 소수 첫째 자리. 0 에 가까운 음수가 "-0.0" 으로 찍히지 않게 한다 (전월비는 0 근처 값이 잦음) */
     private fun formatRate1(v: Double): String = String.format("%.1f", v).let { if (it == "-0.0") "0.0" else it }
 
+    /**
+     * 전년비를 낼 수 없을 때 대신 보일 공식 전월비. 공식 전월비는 계절조정 지수 기준이라 대응 시리즈로 계산한다
+     * (CPI: CPIAUCNS 전년비 ↔ CPIAUCSL 전월비, 2026-10 = 337.476/336.298 → 0.4%, BLS 발표치와 일치). 대응 시리즈가 없으면 null
+     */
+    private fun fallbackMom(seriesId: String, obsDate: String, releaseDate: String, obsStart: String, realtimeEnd: String?): String? {
+        val momSeries = MOM_FALLBACK_SERIES[seriesId] ?: return null
+        val prevObs = shiftObsDateMinus1(obsDate) ?: return null
+        val vintages = fredClient.getSeriesObservations(momSeries, observationStart = obsStart, realtimeStart = obsStart, realtimeEnd = realtimeEnd)
+            ?.observations?.filter { it.value != "." && it.realtime_start != null && it.date != null && it.value != null }
+            ?.groupBy { it.date!! } ?: return null
+        val cur = vintageValueAt(vintages[obsDate], releaseDate) ?: return null
+        val prev = vintageValueAt(vintages[prevObs], releaseDate)?.takeIf { it != 0.0 } ?: return null
+        return formatRate1((cur / prev - 1.0) * 100.0)
+    }
+
     /** FRED 관측 date(YYYY-MM-DD) → 1개월 전 같은 월(YYYY-MM-DD) */
     private fun shiftObsDateMinus1(obsDate: String): String? = runCatching {
         val d = LocalDate.parse(obsDate)
@@ -637,7 +661,26 @@ class EconomicCalendarService(
         calendarEventRepository.delete(entity)
     }
 
-    fun listEvents(year: Int, month: Int): CalendarEventsRes {
+    fun listEvents(year: Int, month: Int): CalendarEventsRes =
+        loadEvents(year, month).let { res -> res.copy(events = res.events.map(::withUnpublishedNote)) }
+
+    /**
+     * 공식 기관이 공표하지 않은 전년동월비에 안내를 붙인다.
+     * BLS 는 2025-10 을 셧다운(예산 공백)으로 집계하지 않아, 그달을 기준으로 하는 2026-10 CPI 12개월 변화율을 공표하지 않았다
+     * (2026-11-10 BLS CPI 발표문 확인). 이때 값에는 공식 전월비가 들어 있다(fallbackMom) → "전월비" 안내로 지표가 바뀐 걸 알린다.
+     * 전월비도 못 구하면 값은 빈 채 "미발표" 안내만. DB 확정 행에는 note 가 없어 읽을 때마다 여기서 붙인다 (2026-11-11)
+     */
+    private fun withUnpublishedNote(e: CalendarEvent): CalendarEvent {
+        if (e.source != "FRED" || e.isFuture) return e
+        val m = YOY_EVENT_NAME.matchEntire(e.name) ?: return e
+        val (year, month, indicator) = m.destructured
+        val base = "${year.toInt() - 1}-$month"
+        if (UNCOLLECTED_MONTHS[indicator]?.contains(base) != true) return e
+        // 짧게 "미발표"로 끝낸다 — 이유(작년 같은 달 자료 없음)까지 붙이면 너무 길다 (2026-11-11 사용자 지시)
+        return e.copy(note = if (e.value.isNullOrBlank()) "미발표" else "전월비 · 전년비 미발표")
+    }
+
+    private fun loadEvents(year: Int, month: Int): CalendarEventsRes {
         val target = YearMonth.of(year, month)
         val threshold = YearMonth.now().minusMonths(FREEZE_GRACE_MONTHS)
         val isPast = target.isBefore(threshold)
@@ -855,7 +898,14 @@ class EconomicCalendarService(
                                     // 전년 값은 최초 vintage 가 아니라 발표일 시점에 유효했던(개정 반영) vintage 를 써야 발표치와 일치한다
                                     val prevObs = shiftObsDateMinus12(obsDate)
                                     val prev = prevObs?.let { vintageValueAt(vintagesByObs[it], releaseDateStr) }
-                                    if (prev != null && prev != 0.0) String.format("%.1f", (curVal / prev - 1.0) * 100.0) else null
+                                    when {
+                                        prev != null && prev != 0.0 -> String.format("%.1f", (curVal / prev - 1.0) * 100.0)
+                                        // 작년 같은 달이 미집계(예: BLS 2025-10)면 공식 발표에도 전년비가 없다 → 공식 전월비로 대체.
+                                        // 표시 안내("전월비")는 withUnpublishedNote 가 붙인다 (2026-11-11 사용자 지시)
+                                        prevObs != null && vintagesByObs[prevObs] == null && !isFuture ->
+                                            fallbackMom(series.seriesId, obsDate, releaseDateStr, obsStartStr, monthEndRealtimeStr)
+                                        else -> null
+                                    }
                                 }
                                 series.seriesId in FRED_PCH_SERIES -> {
                                     // 전월 값은 발표일 시점의 개정값 기준 (공식 발표 전월비와 일치)

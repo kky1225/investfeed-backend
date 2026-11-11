@@ -78,8 +78,10 @@ class ReleaseAlertService(
             if (releaseRepository.existsByCountryAndEventDateAndEventName(e.country, eventDate, e.name)) return@forEach
 
             val suppressed = seed || !target.isFresh(eventDate, today)
-            val prev = if (suppressed) null else prevValue(target, eventDate, e.name)
-            val fact = ReleaseFact(target.name, e.country, eventDate, e.name, value, prev, now)
+            // 대체 지표(전년비 대신 전월비 등, note 있음)면 이력의 직전 값과 지표가 달라 비교값을 붙이지 않고 안내를 값 뒤에 붙인다 (2026-11-11)
+            val prev = if (suppressed || e.note != null) null else prevValue(target, eventDate, e.name)
+            val shown = e.note?.let { "$value · $it" } ?: value
+            val fact = ReleaseFact(target.name, e.country, eventDate, e.name, shown, prev, now)
             val body = AlertTemplateRenderer.renderRelease(fact, target)
             val entity = try {
                 releaseRepository.save(
