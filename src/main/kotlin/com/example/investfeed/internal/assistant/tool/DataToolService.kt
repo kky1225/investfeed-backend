@@ -6,6 +6,8 @@ import com.example.investfeed.domain.assistant.service.TemplateFormat
 import com.example.investfeed.domain.assistant.dto.message.Section
 import com.example.investfeed.domain.assistant.service.BriefingTemplateRenderer
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
+import com.example.investfeed.domain.dividend.dto.res.StockDividendRes
+import com.example.investfeed.domain.dividend.service.StockDividendService
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
 import com.example.investfeed.domain.news.service.NewsService
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
@@ -17,8 +19,11 @@ import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeDayReq
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeRankListReq
+import com.example.investfeed.kiwoom.etf.client.EtfClient
+import com.example.investfeed.kiwoom.etf.dto.req.KiwoomEtfTimeTrendReq
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomDefaultStockInfoReq
+import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInfoReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInterestReq
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomStockInvestorReq
 import com.example.investfeed.kiwoom.us.stock.client.UsStockClient
@@ -30,6 +35,7 @@ import com.example.investfeed.kiwoom.chart.dto.stock.req.KiwoomStockChartDayReq
 import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
 import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
 import com.example.investfeed.upbit.candle.client.CandleClient
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
@@ -61,6 +67,8 @@ class DataToolService(
     private val candleClient: CandleClient,
     private val investorService: InvestorService,
     private val usSessionBaseService: UsSessionBaseService,
+    private val stockDividendService: StockDividendService,
+    private val etfClient: EtfClient,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -74,6 +82,9 @@ class DataToolService(
         val STREAK_DAYS_RANGE = 2..20
         val RANK_PERIODS = listOf(1, 3, 5, 10, 20)
         private val YYYYMMDD: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+        private val HH_MM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        private const val MARKET_CODE_ETF = "8"   // ka10100 marketCode — 종목 상세(StockService)와 같은 판정
+        private val KR_DETAIL_TIME_FROM: LocalTime = LocalTime.of(8, 0)   // 종목 상세가 시각을 보이기 시작하는 시각 (그 전은 장마감)
         private val KR_OPEN: LocalTime = LocalTime.of(9, 0)
         private val KR_CLOSE: LocalTime = LocalTime.of(15, 30)
         private val KR_FLOW_FINAL: LocalTime = LocalTime.of(20, 0)   // 투자자 수급 확정 시각 (그 전 당일 수급은 잠정)
@@ -228,7 +239,23 @@ class DataToolService(
         val title: String = name,   // 카드 제목(상세형). 비교 표는 name(목록형)
         val basis: String? = null,  // 기준 표기 "10/15(수) 종가"·"10/17(금) 장중"·"현지 10/15(수) 종가". 코인 실시간은 null
         val session: SessionQuote? = null,  // 미국 데이·프리·애프터마켓 등락률 (토스 연동 회원만). 없으면 키움 값만 보인다
+        val profile: StockProfile? = null,  // 종목 기본 정보 (현재 시세만. 날짜 지정 시세·코인은 null)
     )
+
+    /**
+     * 종목 상세 화면과 같은 값 (2026-11-11). 시가총액 단위: 국내 억원(ka10001 mac), 미국 천 USD.
+     * PER·PBR·EPS·ROE·배당은 국내만 — 미국 시세 응답에 없다.
+     */
+    data class StockProfile(
+        val sector: String?,
+        val marketCap: Double?,
+        val per: Double? = null, val pbr: Double? = null, val eps: Double? = null, val roe: Double? = null,
+        val dividendYield: Double? = null,      // 작년 주당 배당금 합 / 현재가 (%) — 국내 종목 상세 배당수익률과 같은 식
+        val lastDividend: LastDividend? = null, // 금액이 정해진 가장 최근 배당 (기준일 내림차순)
+        val disparityRate: Double? = null,      // ETF 괴리율 (%, 부호 포함) — 국내 ETF 만
+    )
+
+    data class LastDividend(val baseDate: String?, val kind: String?, val amount: Double?, val payDate: String?)
 
     data class SessionQuote(val label: String, val regularClose: Double, val regularCloseDate: String, val changeAmount: Double, val changeRate: Double)
 
@@ -341,7 +368,7 @@ class DataToolService(
 
     private fun quote(s: ResolvedStock): StockQuote = currentQuote(s).let { q ->
         when (s.market) {
-            StockMarket.KR -> krSession().let { q.copy(basis = "${TemplateFormat.monthDay(it.date)} ${if (it.open) "장중" else "기준"}") }
+            StockMarket.KR -> q.copy(basis = krQuoteBasis())
             StockMarket.US -> q.copy(
                 basis = usTickBasis(s.stexTp ?: "ND", s.code)
                     ?: usSession().let { "현지 ${TemplateFormat.monthDay(it.date)} ${if (it.open) "장중" else "기준"}" },
@@ -349,6 +376,17 @@ class DataToolService(
             )
             StockMarket.CRYPTO -> q
         }
+    }
+
+    /**
+     * 국내 종목 상세 날짜 줄과 같은 규칙 (StockDetail.tsx): 오늘 08:00~20:00 이면 "11/11(수) 16:57",
+     * 그 밖(20시 이후·개장 전·휴장일)은 직전 거래일 "11/10(화) 장마감" (2026-11-11)
+     */
+    private fun krQuoteBasis(now: LocalDateTime = LocalDateTime.now()): String {
+        val s = krSession(now)
+        val t = now.toLocalTime()
+        val live = s.date == now.toLocalDate() && !t.isBefore(KR_DETAIL_TIME_FROM) && t.isBefore(KR_FLOW_FINAL)
+        return "${TemplateFormat.monthDay(s.date)} ${if (live) now.format(HH_MM) else "장마감"}"
     }
 
     private fun sessionQuote(code: String, price: Double): SessionQuote? =
@@ -365,18 +403,59 @@ class DataToolService(
             .onFailure { log.failure(it) { "미국 최근 체결 조회 실패 $code" } }.getOrNull()
             ?.let { usMarketCalendarService.tickBasis(it.cntr_tm, it.bus_dt) }
 
+    /** 국내 종목 상세(StockDetail.tsx dividendYield)와 같은 식: 작년 기준일 배당금 합 / 현재가, 소수 2자리 */
+    private fun dividendYield(dividends: List<StockDividendRes>, price: Double): Double? {
+        val lastYear = (LocalDate.now().year - 1).toString()
+        val amount = dividends.filter { it.dvdnBasDt?.take(4) == lastYear }.sumOf { TemplateFormat.parse(it.stckGenrDvdnAmt) ?: 0.0 }
+        return if (amount > 0 && price > 0) Math.round(amount / price * 10000) / 100.0 else null
+    }
+
     private fun currentQuote(s: ResolvedStock): StockQuote = when (s.market) {
         StockMarket.KR -> runBlocking {
+            // 기본정보(ka10001)·종목정보(ka10100)는 시세와 따로 받아 실패해도 시세 카드는 보인다
+            val defDeferred = async {
+                runCatching { stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = s.code)) }
+                    .onFailure { log.failure(it) { "종목 기본정보 조회 실패 ${s.code}" } }.getOrNull()
+            }
+            val stockInfoDeferred = async {
+                runCatching { stockClient.stockInfo(KiwoomStockInfoReq(stk_cd = s.code.substringBefore("_"))) }
+                    .onFailure { log.failure(it) { "종목 정보 조회 실패 ${s.code}" } }.getOrNull()
+            }
             val info = stockClient.stockInterest(KiwoomStockInterestReq(stk_cd = s.code)).atn_stk_infr?.firstOrNull()
                 ?: throw ToolException("${s.name} 시세 조회에 실패했습니다")
-            val def = runCatching { stockClient.stockDefaultInfo(KiwoomDefaultStockInfoReq(stk_cd = s.code)) }
-                .onFailure { log.failure(it) { "종목 기본정보 조회 실패 ${s.code}" } }.getOrNull()
+            val def = defDeferred.await()
+            val stockInfo = stockInfoDeferred.await()
             fun p(v: String?) = TemplateFormat.parse(v)?.let { abs(it) }
+            val price = p(info.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다")
+            val etf = stockInfo?.marketCode == MARKET_CODE_ETF
+            // ETF 괴리율: 종목 상세와 같은 ka40003 최신 navetf (ETF 만)
+            val disparityDeferred = if (etf) async {
+                runCatching { etfClient.etfTimeTrend(KiwoomEtfTimeTrendReq(stk_cd = s.code.substringBefore("_"))) }
+                    .onFailure { log.failure(it) { "ETF 괴리율 조회 실패 ${s.code}" } }.getOrNull()
+                    ?.etftisl_trnsn?.firstOrNull { !it.navetf.isNullOrBlank() }?.navetf
+            } else null
+            val dividends = runCatching { stockDividendService.getDividendList(s.code, stockInfo?.marketCode) }
+                .onFailure { log.failure(it) { "배당 내역 조회 실패 ${s.code}" } }.getOrDefault(emptyList())
+            // PER·PBR·EPS·ROE 는 주식에만 있는 지표 — ETF 는 비운다
+            fun stockOnly(v: String?) = if (etf) null else TemplateFormat.parse(v)
             StockQuote(
                 s.code, s.name, s.market, s.link, "KRW",
-                price = p(info.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다"),
+                price = price,
                 changeRate = TemplateFormat.parse(info.flu_rt), changeAmount = TemplateFormat.parse(info.pred_pre), volume = p(info.trde_qty),
                 high = p(info.high_pric), low = p(info.low_pric), high52w = p(def?._250hgst), low52w = p(def?._250lwst), title = s.title,
+                profile = StockProfile(
+                    sector = stockInfo?.upName?.takeIf { it.isNotBlank() },
+                    marketCap = p(def?.mac),
+                    per = stockOnly(def?.per), pbr = stockOnly(def?.pbr),
+                    eps = stockOnly(def?.eps), roe = stockOnly(def?.roe),
+                    disparityRate = TemplateFormat.parse(disparityDeferred?.await()),
+                    dividendYield = dividendYield(dividends, price),
+                    // 금액 미확정 배당(기준일만 있고 주당 0원)은 건너뛴다 — 예: 삼성전자 9/30 기준일 공시 직후
+                    lastDividend = dividends.firstNotNullOfOrNull { d ->
+                        TemplateFormat.parse(d.stckGenrDvdnAmt)?.takeIf { it > 0 }
+                            ?.let { LastDividend(d.dvdnBasDt, d.stckDvdnRcdNm, it, d.cashDvdnPayDt) }
+                    },
+                ),
             )
         }
         StockMarket.US -> {
@@ -387,6 +466,11 @@ class DataToolService(
                 price = p(r.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다"),
                 changeRate = TemplateFormat.parse(r.flu_rt), changeAmount = TemplateFormat.parse(r.pred_pre), volume = p(r.acc_trde_qty),
                 high = p(r.high_pric), low = p(r.low_pric), high52w = p(r.wk52_hgst_pric), low52w = p(r.wk52_lwst_pric), title = s.title,
+                // 미국 상세 화면과 같은 표기: 업종 "대분류 / 소분류", 시가총액 천 USD
+                profile = StockProfile(
+                    sector = listOfNotNull(r.lg_inds_cd, r.sm_inds_cd).filter { it.isNotBlank() }.joinToString(" / ").ifBlank { null },
+                    marketCap = p(r.mac),
+                ),
             )
         }
         StockMarket.CRYPTO -> {
