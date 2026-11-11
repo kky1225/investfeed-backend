@@ -19,10 +19,9 @@ class RecommendScheduler(
 
     @Scheduled(cron = SchedulerCron.RECOMMEND, scheduler = "slowScheduler")
     fun scheduledRecommendStock() {
-        log.info { "RecommendScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.RecommendScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "RecommendScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.RecommendScheduler, "휴일")
             return
         }
         if (schedulerLogService.isRunning(SchedulerName.RecommendTodayDirectionScheduler)) {
@@ -34,10 +33,9 @@ class RecommendScheduler(
 
     @Scheduled(cron = SchedulerCron.RECOMMEND_TODAY_DIRECTION, scheduler = "slowScheduler")
     fun scheduledRefreshTodayDirection() {
-        log.info { "RecommendTodayDirectionScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.RecommendTodayDirectionScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "RecommendTodayDirectionScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.RecommendTodayDirectionScheduler, "휴일")
             return
         }
         if (schedulerLogService.isRunning(SchedulerName.RecommendScheduler)) {

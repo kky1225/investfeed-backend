@@ -77,7 +77,7 @@ class CalendarBulkRefreshService(
         ))
 
         taskScheduler.schedule({ execute(yearFrom, yearTo) }, Instant.now())
-        log.info { "[bulk-refresh] 시작: $yearFrom-$yearTo (총 $totalMonths 개월)" }
+        log.debug { "[bulk-refresh] 시작: $yearFrom-$yearTo (총 $totalMonths 개월)" }
     }
 
     private fun execute(yearFrom: Int, yearTo: Int) {

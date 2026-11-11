@@ -7,7 +7,6 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
-import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -28,7 +27,6 @@ class AssistantAlertScheduler(
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String,
 ) {
-    private val log = KotlinLogging.logger {}
 
     companion object {
         val KR_OPEN: LocalTime = LocalTime.of(9, 0)
@@ -51,10 +49,13 @@ class AssistantAlertScheduler(
     private fun runKr() {
         val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
         schedulerLogService.markFired(SchedulerName.AssistantIndexAlertKrScheduler)
-        if (holidayService.isHoliday(now.toLocalDate())) return
+        if (holidayService.isHoliday(now.toLocalDate())) {
+            schedulerLogService.skip(SchedulerName.AssistantIndexAlertKrScheduler, "휴일")
+            return
+        }
         val t = now.toLocalTime()
         if (t.isBefore(KR_OPEN) || t.isAfter(KR_CLOSE)) {
-            log.info { "AssistantIndexAlertKrScheduler skipped: 국내 세션 밖 ($t)" }
+            schedulerLogService.skip(SchedulerName.AssistantIndexAlertKrScheduler, "국내 세션 밖 ($t)")
             return
         }
         executeKr(now)
@@ -65,8 +66,7 @@ class AssistantAlertScheduler(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                val result = indexAlertService.runKr(now)
-                log.info { "AssistantIndexAlertKrScheduler ${indexAlertService.summarize(result)}" }
+                report(indexAlertService.summarize(indexAlertService.runKr(now)))
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -80,7 +80,7 @@ class AssistantAlertScheduler(
         val usDate = ny.toLocalDate()
         val nyTime = ny.toLocalTime()
         if (!usMarketCalendarService.isUsTradingDay(usDate) || nyTime.isBefore(US_OPEN_ET) || nyTime.isAfter(usMarketCalendarService.closeTimeEt(usDate))) {
-            log.info { "AssistantIndexAlertUsScheduler skipped: 미국 세션 밖 (ET $usDate $nyTime)" }
+            schedulerLogService.skip(SchedulerName.AssistantIndexAlertUsScheduler, "미국 세션 밖 (ET $usDate $nyTime)")
             return
         }
         executeUs(now, usDate)
@@ -91,8 +91,7 @@ class AssistantAlertScheduler(
 
     private fun executeUs(now: LocalDateTime, usDate: LocalDate) {
         schedulerLogService.execute(SchedulerName.AssistantIndexAlertUsScheduler) {
-            val result = indexAlertService.runUs(now, usDate)
-            log.info { "AssistantIndexAlertUsScheduler ${indexAlertService.summarize(result)}" }
+            report(indexAlertService.summarize(indexAlertService.runUs(now, usDate)))
         }
     }
 

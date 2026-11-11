@@ -9,7 +9,6 @@ import com.example.investfeed.domain.holding.dto.req.HoldingReorderReq
 import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingListRes
 import com.example.investfeed.domain.holding.service.CryptoHoldingService
-import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -20,7 +19,6 @@ import org.springframework.web.bind.annotation.*
 class CryptoHoldingController(
     private val cryptoHoldingService: CryptoHoldingService
 ) {
-    private val log = KotlinLogging.logger {}
 
     @GetMapping
     @RequiresAction(action = Actions.READ)

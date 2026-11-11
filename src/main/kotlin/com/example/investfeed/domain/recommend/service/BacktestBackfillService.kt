@@ -45,10 +45,9 @@ class BacktestBackfillService(
 
     @Scheduled(cron = SchedulerCron.BACKTEST_BACKFILL, scheduler = "slowScheduler")
     fun scheduledBackfill() {
-        log.info { "BacktestBackfillScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.BacktestBackfillScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "BacktestBackfillScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.BacktestBackfillScheduler, "휴일")
             return
         }
         runBackfill()
@@ -59,22 +58,20 @@ class BacktestBackfillService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                runBlocking { doBackfill() }
+                report(runBlocking { doBackfill() })
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private suspend fun doBackfill() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private suspend fun doBackfill(): String {
         val lastClosed = lastClosedTradingDay()
         val lastClosedKey = lastClosed.format(YYYYMMDD)
 
         val candidates = stockPickHistoryRepository.findBackfillCandidates()
-        if (candidates.isEmpty()) {
-            log.info { "BacktestBackfill: 미충전 픽 없음" }
-            return
-        }
+        if (candidates.isEmpty()) return "미충전 픽 없음"
 
         val refsByPickDay = candidates
             .map { it.pickDate.toLocalDate() }
@@ -93,12 +90,9 @@ class BacktestBackfillService(
                 (history.priceClose5d == null && ref5d <= lastClosed) ||
                 (history.priceClose20d == null && ref20d <= lastClosed)
         }
-        if (targets.isEmpty()) {
-            log.info { "BacktestBackfill: 캐치업 대상 없음 (기준일 미도래 ${candidates.size}건)" }
-            return
-        }
+        if (targets.isEmpty()) return "캐치업 대상 없음 (기준일 미도래 ${candidates.size}건)"
 
-        log.info { "BacktestBackfill 시작 — 대상 history=${targets.size} (마지막 마감 거래일=$lastClosed)" }
+        log.debug { "BacktestBackfill 시작 — 대상 history=${targets.size} (마지막 마감 거래일=$lastClosed)" }
 
         val byStock = targets.groupBy { it.stkCd }
 
@@ -107,7 +101,7 @@ class BacktestBackfillService(
             .flatten()
 
         stockPickHistoryRepository.saveAll(changed)
-        log.info { "BacktestBackfill 완료 — 채움=${changed.size} / 대상=${targets.size}" }
+        return "채움 ${changed.size} / 대상 ${targets.size} (마지막 마감 거래일=$lastClosed)"
     }
 
     private suspend fun backfillStock(

@@ -34,7 +34,7 @@ class UsStockController(
     fun searchUsStocks(
         req: UsStockSearchReq
     ): ResponseEntity<ApiResponse<List<UsStockSearchItem>>> {
-        log.info { "searchUsStocks: ${req.keyword}" }
+        log.debug { "searchUsStocks: ${req.keyword}" }
 
         return ResponseEntity(
             ApiResponse(
@@ -51,7 +51,7 @@ class UsStockController(
         @PathVariable stkCd: String,
         req: UsStockDetailReq
     ): ResponseEntity<ApiResponse<UsStockDetailRes>> {
-        log.info { "getUsStock: stkCd=$stkCd, stexTp=${req.stexTp}, chartType=${req.chartType}" }
+        log.debug { "getUsStock: stkCd=$stkCd, stexTp=${req.stexTp}, chartType=${req.chartType}" }
 
         return ResponseEntity(
             ApiResponse(

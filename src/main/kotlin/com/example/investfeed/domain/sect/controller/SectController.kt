@@ -32,7 +32,7 @@ class SectController(
     fun listSects(
         req: SectListReq
     ): ResponseEntity<ApiResponse<SectListRes>> {
-        log.info { "listSects : $req" }
+        log.debug { "listSects : $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -48,7 +48,7 @@ class SectController(
     fun streamSects(
         req: SectListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamSects : $req" }
+        log.debug { "streamSects : $req" }
 
         sectService.streamSects(req = req)
 
@@ -67,7 +67,7 @@ class SectController(
         @PathVariable indsCd: String,
         req: SectStockListReq
     ): ResponseEntity<ApiResponse<SectStockListRes>> {
-        log.info { "listStocksBySect : indsCd=$indsCd, $req" }
+        log.debug { "listStocksBySect : indsCd=$indsCd, $req" }
 
         return ResponseEntity(
             ApiResponse(

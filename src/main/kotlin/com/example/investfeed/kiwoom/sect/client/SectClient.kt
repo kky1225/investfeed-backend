@@ -87,8 +87,6 @@ class SectClient(
                     res.awaitBodyOrNull<KiwoomSectPriceNowRes>()
                 }
 
-            log.info { "sectNowPriceRes $res" }
-
             if(res?.return_code != 0) {
                 log.error { "키움 API 응답 오류: api=sectPriceNow, return_code=${res?.return_code}, return_msg=${res?.return_msg}, req=$req" }
                 throw SectPriceNowException()

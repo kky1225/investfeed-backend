@@ -31,7 +31,6 @@ class UsSectController(
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun listUsSects(): ResponseEntity<ApiResponse<UsSectListRes>> {
-        log.info { "listUsSects" }
 
         return ResponseEntity(
             ApiResponse(
@@ -47,7 +46,7 @@ class UsSectController(
     fun streamUsSectStocks(
         @RequestBody req: UsSectStockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamUsSectStocks: $req" }
+        log.debug { "streamUsSectStocks: $req" }
 
         usSectService.streamUsStocks(req)
 
@@ -66,7 +65,7 @@ class UsSectController(
         @PathVariable indsCd: String,
         req: UsSectStockListReq
     ): ResponseEntity<ApiResponse<UsSectStockListRes>> {
-        log.info { "listStocksBySect : indsCd=$indsCd, $req" }
+        log.debug { "listStocksBySect : indsCd=$indsCd, $req" }
 
         return ResponseEntity(
             ApiResponse(

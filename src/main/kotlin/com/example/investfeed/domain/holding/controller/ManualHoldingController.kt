@@ -10,7 +10,6 @@ import com.example.investfeed.domain.holding.dto.res.ManualHoldingItem
 import com.example.investfeed.domain.holding.dto.res.ManualHoldingListRes
 import com.example.investfeed.domain.holding.service.ManualHoldingService
 import jakarta.validation.Valid
-import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -24,7 +23,6 @@ import com.example.investfeed.common.security.RequiresAction
 class ManualHoldingController(
     private val manualHoldingService: ManualHoldingService
 ) {
-    private val log = KotlinLogging.logger {}
 
     @GetMapping("/{brokerId}")
     @RequiresAction(action = Actions.READ)

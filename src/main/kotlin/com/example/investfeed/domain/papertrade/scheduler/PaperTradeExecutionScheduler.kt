@@ -25,10 +25,9 @@ class PaperTradeExecutionScheduler(
 
     @Scheduled(cron = SchedulerCron.PAPER_TRADE_EXEC, scheduler = "slowScheduler")
     fun scheduledPaperTradeExec() {
-        log.info { "PaperTradeExecScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.PaperTradeExecScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "PaperTradeExecScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.PaperTradeExecScheduler, "휴일")
             return
         }
 
@@ -55,10 +54,9 @@ class PaperTradeExecutionScheduler(
 
     @Scheduled(cron = SchedulerCron.PAPER_TRADE_SECOND_BUY, scheduler = "slowScheduler")
     fun scheduledSecondPhaseBuys() {
-        log.info { "PaperTradeSecondBuyScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.PaperTradeSecondBuyScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "PaperTradeSecondBuyScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.PaperTradeSecondBuyScheduler, "휴일")
             return
         }
         paperTradeExecutionService.runSecondPhaseBuys()

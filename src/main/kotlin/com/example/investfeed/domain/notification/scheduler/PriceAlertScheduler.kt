@@ -94,11 +94,11 @@ class PriceAlertScheduler(
                 authClient.accessToken()
             } catch (e: Exception) {
                 log.failure(e) { "스케줄러 토큰 발급 실패" }
+                report("토큰 발급 실패로 중단")
                 SecurityContextHolder.clearContext()
                 return@execute
             }
 
-            val start = System.currentTimeMillis()
             val now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES)
             val holdings = memberHoldingRepository.findAll().filterNot { it.memberId in excluded }
             val holdingHits = mutableListOf<HoldingAlertHit>()
@@ -144,20 +144,20 @@ class PriceAlertScheduler(
 
             try {
                 val posted = holdingAlertService.publish(holdingHits, now)
-                if (posted > 0) log.info { "보유 종목 급등락 비서 게시: ${posted}건 (hit ${holdingHits.size})" }
+                if (posted > 0) report("보유 급등락 게시 ${posted}건 (hit ${holdingHits.size})")
             } catch (e: Exception) {
                 log.failure(e) { "보유 종목 급등락 비서 게시 실패" }
             }
 
             try {
                 val posted = priceTargetAlertService.publish(targetHits, now)
-                if (posted > 0) log.info { "목표가 도달 비서 게시: ${posted}건 (hit ${targetHits.size})" }
+                if (posted > 0) report("목표가 도달 게시 ${posted}건 (hit ${targetHits.size})")
             } catch (e: Exception) {
                 log.failure(e) { "목표가 도달 비서 게시 실패" }
             }
 
             SecurityContextHolder.clearContext()
-            log.info { "PriceAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            report("보유 ${holdings.size}건")
         }
     }
 
@@ -215,11 +215,11 @@ class PriceAlertScheduler(
         try {
             val newHighRes = runBlocking { stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "1")) }
             val newHighCodes = newHighRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
-            log.info { "250일 신고가 종목 수: ${newHighCodes.size}, 종목: ${newHighCodes.take(10)}" }
+            log.debug { "250일 신고가 종목 수: ${newHighCodes.size}, 종목: ${newHighCodes.take(10)}" }
 
             val newLowRes = runBlocking { stockClient.newHighLow(KiwoomNewHighLowReq(ntl_tp = "2")) }
             val newLowCodes = newLowRes.ntl_pric?.map { it.stk_cd }?.toSet() ?: emptySet()
-            log.info { "250일 신저가 종목 수: ${newLowCodes.size}, 종목: ${newLowCodes.take(10)}" }
+            log.debug { "250일 신저가 종목 수: ${newLowCodes.size}, 종목: ${newLowCodes.take(10)}" }
 
             for (item in memberStocks) {
                 if (item.code !in newHighCodes && item.code !in newLowCodes) continue

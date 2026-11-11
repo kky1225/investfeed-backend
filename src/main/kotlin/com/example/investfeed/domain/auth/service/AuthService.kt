@@ -304,7 +304,7 @@ class AuthService(
         member.name = req.name
         member.phone = req.phone
 
-        log.info { "프로필 수정: loginId=$loginId" }
+        log.debug { "프로필 수정: loginId=$loginId" }
     }
 
     @Transactional

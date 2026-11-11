@@ -8,7 +8,6 @@ import com.example.investfeed.kiwoom.rank.client.RankClient
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeValueListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.rank.dto.req.KiwoomSurgeTradeVolumeListReq
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -18,7 +17,6 @@ class RankService(
     private val rankClient: RankClient,
     private val stockMasterRepository: StockMasterRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listRanks(
         req: RankListReq

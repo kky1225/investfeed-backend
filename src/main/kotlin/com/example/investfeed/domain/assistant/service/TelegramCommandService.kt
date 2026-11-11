@@ -52,7 +52,7 @@ class TelegramCommandService(
             else -> if (telegramLinkService.findByChatId(chatId) == null) REPLY_NOT_LINKED else REPLY_OTHER
         }
         val result = telegramClient.sendText(chatId, reply)
-        log.info { "텔레그램 명령 처리: chat=$chatId cmd=$command result=${result::class.simpleName}" }   // 폴러(스케줄러) 경로라 성공 로그 허용. 응답 도달 여부 추적용
+        log.debug { "텔레그램 명령 처리: chat=$chatId cmd=$command result=${result::class.simpleName}" }   // 응답 도달 여부 추적용 (폴러 성공 로그는 execute 가 1건)
     }
 
     private fun start(chatId: Long, code: String): String {
@@ -60,7 +60,7 @@ class TelegramCommandService(
             return if (telegramLinkService.findByChatId(chatId) == null) REPLY_NOT_LINKED else REPLY_OTHER
         }
         return if (telegramLinkService.link(code, chatId)) {
-            log.info { "텔레그램 연결: chat=$chatId" }
+            log.debug { "텔레그램 연결: chat=$chatId" }
             REPLY_LINKED
         } else REPLY_BAD_CODE
     }

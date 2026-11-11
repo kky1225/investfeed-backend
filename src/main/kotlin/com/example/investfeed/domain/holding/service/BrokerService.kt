@@ -8,7 +8,6 @@ import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberBrokerRepository
 import com.example.investfeed.domain.holding.repository.MemberHoldingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,7 +18,6 @@ class BrokerService(
     private val memberBrokerRepository: MemberBrokerRepository,
     private val memberHoldingRepository: MemberHoldingRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listBrokers(): BrokerListRes {
         val brokers = brokerRepository.findAllByOrderByIdAsc()

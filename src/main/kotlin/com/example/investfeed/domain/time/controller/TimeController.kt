@@ -27,7 +27,7 @@ class TimeController(
     fun getCurrentTime(
         req: TimeNowReq
     ): ResponseEntity<ApiResponse<TimeNowRes>> {
-        log.info { "getCurrentTime: $req" }
+        log.debug { "getCurrentTime: $req" }
 
         return ResponseEntity(
             ApiResponse(

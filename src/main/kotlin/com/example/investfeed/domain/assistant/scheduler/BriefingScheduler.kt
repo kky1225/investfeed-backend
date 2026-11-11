@@ -7,7 +7,6 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
-import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -25,8 +24,6 @@ class BriefingScheduler(
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String,
 ) {
-    private val log = KotlinLogging.logger {}
-
     companion object {
         const val US_CLOSE_DELAY_MINUTES = 10L
     }
@@ -36,7 +33,7 @@ class BriefingScheduler(
         val now = LocalDateTime.now()
         if (briefingService.resolveTargetDate(BriefingType.KR_CLOSE, now) != now.toLocalDate()) {
             schedulerLogService.markFired(SchedulerName.BriefingKrCloseScheduler)
-            log.info { "BriefingKrCloseScheduler skipped: 오늘은 국내 거래일이 아님" }
+            schedulerLogService.skip(SchedulerName.BriefingKrCloseScheduler, "국내 거래일 아님")
             return
         }
         runWithSchedulerLog(SchedulerName.BriefingKrCloseScheduler, BriefingType.KR_CLOSE, now)
@@ -47,7 +44,7 @@ class BriefingScheduler(
         val now = LocalDateTime.now()
         if (briefingService.resolveTargetDate(BriefingType.KR_HOLDINGS, now) != now.toLocalDate()) {
             schedulerLogService.markFired(SchedulerName.BriefingKrHoldingsScheduler)
-            log.info { "BriefingKrHoldingsScheduler skipped: 오늘은 국내 거래일이 아님" }
+            schedulerLogService.skip(SchedulerName.BriefingKrHoldingsScheduler, "국내 거래일 아님")
             return
         }
         runWithSchedulerLog(SchedulerName.BriefingKrHoldingsScheduler, BriefingType.KR_HOLDINGS, now)
@@ -58,7 +55,7 @@ class BriefingScheduler(
         val now = LocalDateTime.now()
         if (briefingService.resolveTargetDate(BriefingType.KR_PRE, now) != now.toLocalDate()) {
             schedulerLogService.markFired(SchedulerName.BriefingKrPreScheduler)
-            log.info { "BriefingKrPreScheduler skipped: 오늘은 국내 거래일이 아님" }
+            schedulerLogService.skip(SchedulerName.BriefingKrPreScheduler, "국내 거래일 아님")
             return
         }
         runWithSchedulerLog(SchedulerName.BriefingKrPreScheduler, BriefingType.KR_PRE, now)
@@ -88,7 +85,7 @@ class BriefingScheduler(
             try {
                 authClient.accessToken()
                 val result = briefingService.generateAndPublish(type, now)
-                log.info { "$name 완료: date=${result.targetDate} briefingId=${result.briefingId} posted=${result.posted} skipped=${result.skipped}" }
+                report("date=${result.targetDate} briefingId=${result.briefingId} posted=${result.posted} skipped=${result.skipped}")
             } finally {
                 SecurityContextHolder.clearContext()
             }

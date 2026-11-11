@@ -86,7 +86,7 @@ class RecommendService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                runBlocking { doRecommendStock() }   // 코루틴 경계: SecurityContext 가 묶인 이 스레드에서만 실행
+                report(runBlocking { doRecommendStock() })   // 코루틴 경계: SecurityContext 가 묶인 이 스레드에서만 실행
             } catch (e: Exception) {
                 clearPicksAfterFailure(e)
                 throw e
@@ -110,17 +110,18 @@ class RecommendService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                runBlocking { doRefreshTodayDirection() }
+                report(runBlocking { doRefreshTodayDirection() })
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private suspend fun doRefreshTodayDirection() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private suspend fun doRefreshTodayDirection(): String {
         val today = DateUtil.today("yyyyMMdd")
         val picks = stockPickRepository.findAll()
-        if (picks.isEmpty()) return
+        if (picks.isEmpty()) return "추천 없음"
 
         val directions = picks.mapConcurrently(RECOMMEND_CONCURRENCY) { pick -> refreshTodayDirection(pick, today) }
         val matchCount = directions.count { it == "MATCH" }
@@ -128,7 +129,7 @@ class RecommendService(
         val nullCount = directions.size - matchCount - mismatchCount
 
         stockPickRepository.saveAll(picks)
-        log.info { "당일 매매 동향 갱신: MATCH=$matchCount, MISMATCH=$mismatchCount, NULL=$nullCount" }
+        return "당일 매매 동향 MATCH=$matchCount, MISMATCH=$mismatchCount, NULL=$nullCount"
     }
 
     private suspend fun refreshTodayDirection(pick: StockPick, today: String): String? {
@@ -182,7 +183,8 @@ class RecommendService(
         }
     }
 
-    private suspend fun doRecommendStock() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private suspend fun doRecommendStock(): String {
         val isHoliday = holidayService.isHoliday()
 
         val now = if (isHoliday) {
@@ -217,11 +219,11 @@ class RecommendService(
         val buyCandidates = extractIntersection(items, sortDesc = true)
         val sellCandidates = extractIntersection(items, sortDesc = false)
 
-        log.info {
+        log.debug {
             "BUY 후보(${buyCandidates.size}): " +
                 buyCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
         }
-        log.info {
+        log.debug {
             "SELL 후보(${sellCandidates.size}): " +
                 sellCandidates.joinToString(", ") { "${it.stk_nm}(${it.stk_cd})" }
         }
@@ -248,14 +250,9 @@ class RecommendService(
         )
 
         val counts = processed.groupingBy { it.type }.eachCount()
-        log.info {
-            "추천 분류 저장 완료 - " +
-                "STRONG_BUY: ${counts["STRONG_BUY"] ?: 0}, " +
-                "BUY: ${counts["BUY"] ?: 0}, " +
-                "HOLD: ${counts["HOLD"] ?: 0}, " +
-                "SELL: ${counts["SELL"] ?: 0}, " +
-                "STRONG_SELL: ${counts["STRONG_SELL"] ?: 0}"
-        }
+        return "후보 BUY ${buyCandidates.size}/SELL ${sellCandidates.size}, 저장 " +
+            "STRONG_BUY ${counts["STRONG_BUY"] ?: 0}, BUY ${counts["BUY"] ?: 0}, HOLD ${counts["HOLD"] ?: 0}, " +
+            "SELL ${counts["SELL"] ?: 0}, STRONG_SELL ${counts["STRONG_SELL"] ?: 0}"
     }
 
     private suspend fun processCandidate(
@@ -280,7 +277,7 @@ class RecommendService(
         val frgnrValues = window.map { it.frgnr_invsr?.toLongOrNull() ?: 0L }
 
         if (!evaluateSignal(items, position)) {
-            log.info {
+            log.debug {
                 "[$stkNm($stkCd) $position] 시그널 미달 컷 — 연기금 시계열=$penfndValues"
             }
             return null
@@ -292,7 +289,7 @@ class RecommendService(
         val frgnrOppositeK = computeK(frgnrValues, if (position == Position.BUY) Position.SELL else Position.BUY)
         // 외국인 같은방향(동조) K — 하드스톱(연기금·외국인 둘 다 강매도) 판정 + 검증 데이터.
         val frgnrSameDirK = computeK(frgnrValues, position)
-        log.info {
+        log.debug {
             "[$stkNm($stkCd) $position] 시그널 통과 — penfndK=${"%.2f".format(penfndK)}, frgnrBlocked=$frgnrBlocked, " +
                 "연기금=$penfndValues, 외국인=$frgnrValues"
         }
@@ -316,7 +313,7 @@ class RecommendService(
         val priorTrendRatio = computeDominantStrengthRatio(prior)
         val foreignerAligned = isForeignerDirectionallyAligned(items, position)
         val type = classify(penfndK, frgnrBlocked, frgnrOppositeK, effectiveRatio, position, prior, foreignerAligned, holdingMode)
-        log.info {
+        log.debug {
             "[$stkNm($stkCd) $position] 분류=$type — penfndK=${"%.2f".format(penfndK)} " +
                 "(STRONG≥$K_STRONG_OVERRIDE), frgnrSignedRatio=${"%.4f%%".format(frgnrSignedRatio * 100)}, " +
                 "effectiveRatio=${"%.4f%%".format(effectiveRatio * 100)} " +
@@ -573,7 +570,7 @@ class RecommendService(
         val marketTypeMap =
             kospi.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSPI" } +
                 kosdaq.filter { !it.code.isNullOrBlank() }.associate { it.code!! to "KOSDAQ" }
-        log.info {
+        log.debug {
             "종목 메타데이터 맵 구축 완료: kospi=${kospi.size}, kosdaq=${kosdaq.size}, " +
                 "riskDistinct=${riskMap.size}, marketTypeDistinct=${marketTypeMap.size}"
         }
@@ -729,11 +726,11 @@ class RecommendService(
             return null
         }
         if (investorRes.return_code != 0) {
-            log.info { "[$logTag] return_code=${investorRes.return_code} 컷" }
+            log.debug { "[$logTag] return_code=${investorRes.return_code} 컷" }
             return null
         }
         return investorRes.stk_invsr_orgn ?: run {
-            log.info { "[$logTag] stk_invsr_orgn null 컷" }
+            log.debug { "[$logTag] stk_invsr_orgn null 컷" }
             null
         }
     }

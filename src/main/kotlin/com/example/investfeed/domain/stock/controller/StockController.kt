@@ -32,7 +32,7 @@ class StockController(
         @PathVariable stkCd: String,
         req: StockDetailReq
     ): ResponseEntity<ApiResponse<StockDetailRes>> {
-        log.info { "getStock: stkCd=$stkCd, $req" }
+        log.debug { "getStock: stkCd=$stkCd, $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -63,7 +63,7 @@ class StockController(
     fun searchStocks(
         req: StockSearchReq
     ): ResponseEntity<ApiResponse<List<StockSearchItem>>> {
-        log.info { "searchStocks: ${req.keyword}" }
+        log.debug { "searchStocks: ${req.keyword}" }
 
         return ResponseEntity(
             ApiResponse(
@@ -93,7 +93,7 @@ class StockController(
     fun streamStocks(
         @RequestBody req: StockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamStocks: $req" }
+        log.debug { "streamStocks: $req" }
 
         stockService.streamStocks(req)
 

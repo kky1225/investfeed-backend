@@ -14,7 +14,6 @@ import com.example.investfeed.kiwoom.holding.dto.req.KiwoomHoldingReq
 import com.example.investfeed.kiwoom.order.client.MockAccountClient
 import com.example.investfeed.kiwoom.order.dto.req.KiwoomTradeFillsReq
 import com.example.investfeed.kiwoom.realizedpnl.dto.req.KiwoomRealizedPnlReq
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -25,7 +24,6 @@ class AdminPaperTradeService(
     private val holdingGradeRepository: HoldingGradeRepository,
     private val paperFillRepository: PaperFillRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     companion object {
         private val YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd")

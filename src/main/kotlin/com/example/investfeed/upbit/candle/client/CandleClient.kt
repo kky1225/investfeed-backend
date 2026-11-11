@@ -35,8 +35,6 @@ class CandleClient(
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleMinuteRes>>() {})
                 .block()
 
-            log.info { "upbit getCandlesMinutes: unit=$unit, market=$market, to=$to" }
-
             return res ?: emptyList()
         } catch (e: InvestFeedException) {
             throw e
@@ -58,8 +56,6 @@ class CandleClient(
                 .onStatus({ it.isError }, { res -> res.logHttpError("업비트"); throw UpbitApiException() })
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleDayRes>>() {})
                 .block()
-
-            log.info { "upbit getCandlesDays: market=$market" }
 
             return res ?: emptyList()
         } catch (e: InvestFeedException) {
@@ -83,8 +79,6 @@ class CandleClient(
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()
 
-            log.info { "upbit getCandlesWeeks: market=$market" }
-
             return res ?: emptyList()
         } catch (e: InvestFeedException) {
             throw e
@@ -107,8 +101,6 @@ class CandleClient(
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()
 
-            log.info { "upbit getCandlesYears: market=$market" }
-
             return res ?: emptyList()
         } catch (e: InvestFeedException) {
             throw e
@@ -130,8 +122,6 @@ class CandleClient(
                 .onStatus({ it.isError }, { res -> res.logHttpError("업비트"); throw UpbitApiException() })
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitCandleWeekMonthRes>>() {})
                 .block()
-
-            log.info { "upbit getCandlesMonths: market=$market" }
 
             return res ?: emptyList()
         } catch (e: InvestFeedException) {

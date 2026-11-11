@@ -37,8 +37,6 @@ class MarketClient(
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitMarketRes>>() {})
                 .block()
 
-            log.info { "upbit getMarketAll: ${res?.size} markets" }
-
             cachedMarkets = res ?: emptyList()
             cacheTimestamp = now
             return cachedMarkets

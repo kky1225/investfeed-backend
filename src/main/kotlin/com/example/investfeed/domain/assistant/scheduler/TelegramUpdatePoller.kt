@@ -5,6 +5,7 @@ import com.example.investfeed.domain.assistant.service.TelegramCommandService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerRun
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.telegram.client.TelegramClient
 import mu.KotlinLogging
@@ -34,13 +35,13 @@ class TelegramUpdatePoller(
     fun poll() {
         if (!telegramClient.enabled) return
         schedulerLogService.markFired(SchedulerName.TelegramUpdatePoller)
-        schedulerLogService.execute(SchedulerName.TelegramUpdatePoller) { pollOnce() }   // FAST: 성공은 scheduler_status 만, timeout 초과·예외만 scheduler_log
+        schedulerLogService.execute(SchedulerName.TelegramUpdatePoller) { pollOnce(this) }   // FAST: 성공은 scheduler_status 만, timeout 초과·예외만 scheduler_log
     }
 
-    private fun pollOnce() {
+    private fun pollOnce(run: SchedulerRun) {
         if (!commandsRegistered) {
             commandsRegistered = telegramClient.setMyCommands(TelegramCommandService.BOT_COMMANDS)
-            if (commandsRegistered) log.info { "텔레그램 봇 메뉴 등록: ${TelegramCommandService.BOT_COMMANDS.joinToString { "/" + it.command }}" }
+            if (commandsRegistered) run.report("봇 메뉴 등록: ${TelegramCommandService.BOT_COMMANDS.joinToString { "/" + it.command }}")
         }
         val offset = redisTemplate.opsForValue().get(offsetKey)?.toLongOrNull()
         val updates = try {
@@ -53,7 +54,8 @@ class TelegramUpdatePoller(
             return
         }
         if (consecutiveFailures > 0) {
-            log.info { "텔레그램 폴링 복구: ${consecutiveFailures}회 연속 실패 후 정상 (약 ${consecutiveFailures * 5}초)" }
+            // 실패(warn·error) 뒤의 복구라 같은 레벨로 남긴다 (TelegramClient 복구 로그와 같음)
+            log.warn { "텔레그램 폴링 복구: ${consecutiveFailures}회 연속 실패 후 정상 (약 ${consecutiveFailures * 5}초)" }
             consecutiveFailures = 0
         }
         updates.forEach { update ->

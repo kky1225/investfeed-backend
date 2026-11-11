@@ -14,7 +14,6 @@ import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectIndexDailyReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectInvestorReq
 import com.example.investfeed.kiwoom.sect.dto.req.KiwoomSectPriceNowReq
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -29,11 +28,8 @@ class DashboardService(
     private val investorClient: InvestorClient,
     private val priceClient: PriceClient,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun getStockDashboard(): DashboardRes? = runBlocking {
-        log.debug { "dashboard" }
-
         val rankDeferred = async {
             investorClient.investorTradeRankList(
                 req = KiwoomInvestorTradeRankListReq(

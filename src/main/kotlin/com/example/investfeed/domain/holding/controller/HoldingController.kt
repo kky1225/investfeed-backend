@@ -26,7 +26,6 @@ class HoldingController(
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun listHoldings(): ResponseEntity<ApiResponse<HoldingListRes>> {
-        log.info { "listHoldings" }
 
         return ResponseEntity(
             ApiResponse(
@@ -40,7 +39,6 @@ class HoldingController(
     @GetMapping("/toss")
     @RequiresAction(action = Actions.READ)
     fun listTossHoldings(): ResponseEntity<ApiResponse<HoldingListRes>> {
-        log.info { "listTossHoldings" }
 
         return ResponseEntity(
             ApiResponse(
@@ -56,7 +54,7 @@ class HoldingController(
     fun streamHoldings(
         @RequestBody req: HoldingStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamHoldings $req" }
+        log.debug { "streamHoldings $req" }
 
         holdingService.streamHoldings(req)
 

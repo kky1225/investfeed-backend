@@ -7,7 +7,6 @@ import com.example.investfeed.domain.holding.dto.res.BrokerListRes
 import com.example.investfeed.domain.holding.dto.res.MyBrokerItem
 import com.example.investfeed.domain.holding.dto.res.MyBrokerListRes
 import com.example.investfeed.domain.holding.service.BrokerService
-import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -21,7 +20,6 @@ import com.example.investfeed.common.security.RequiresAction
 class BrokerController(
     private val brokerService: BrokerService
 ) {
-    private val log = KotlinLogging.logger {}
 
     @GetMapping
     @RequiresAction(action = Actions.READ)

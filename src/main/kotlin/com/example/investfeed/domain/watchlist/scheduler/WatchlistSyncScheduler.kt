@@ -28,32 +28,31 @@ class WatchlistSyncScheduler(
     @Scheduled(cron = SchedulerCron.WATCHLIST_SYNC, scheduler = "slowScheduler")
     fun syncAllStkNm() {
         schedulerLogService.execute(SchedulerName.WatchlistSyncScheduler) {
-            log.info { "관심종목/수동 보유종목 stkNm 동기화 스케줄러 시작" }
-            val start = System.currentTimeMillis()
-
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
             } catch (e: Exception) {
                 log.failure(e) { "스케줄러 토큰 발급 실패" }
+                report("토큰 발급 실패로 중단")
                 SecurityContextHolder.clearContext()
                 return@execute
             }
 
             try {
-                watchlistSyncService.syncAllStkNm()
+                report(watchlistSyncService.syncAllStkNm())
             } catch (e: Exception) {
                 log.failure(e) { "관심종목 stkNm 동기화 실패" }
+                report("관심종목 실패")
             }
 
             try {
-                memberHoldingSyncService.syncAllManualStkNm()
+                report(memberHoldingSyncService.syncAllManualStkNm())
             } catch (e: Exception) {
                 log.failure(e) { "수동 보유종목 stkNm 동기화 실패" }
+                report("수동 보유 실패")
             }
 
             SecurityContextHolder.clearContext()
-            log.info { "관심종목/수동 보유종목 stkNm 동기화 스케줄러 완료: ${System.currentTimeMillis() - start}ms" }
         }
     }
 

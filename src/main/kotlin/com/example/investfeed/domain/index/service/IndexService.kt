@@ -589,7 +589,7 @@ class IndexService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                collectIndexClose()
+                report(collectIndexClose())
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -603,7 +603,7 @@ class IndexService(
      * (inds_cd, dt) 이미 있으면 skip(불변 과거값이라 갱신 불필요) → 일일 수집·과거 backfill 통합.
      * 지수 값 스케일은 키움 제공 형식 그대로 저장 — 벤치마크는 *비율* 비교라 스케일 불변.
      */
-    private fun collectIndexClose() {
+    private fun collectIndexClose(): String {
         val baseDt = LocalDate.now().format(INDEX_DAILY_CLOSE_YYYYMMDD)
         var inserted = 0
         for (indsCd in listOf(KOSPI_CD, KOSDAQ_CD)) {
@@ -630,7 +630,7 @@ class IndexService(
                 log.failure(e) { "지수 종가 수집 실패 inds_cd=$indsCd" }
             }
         }
-        log.info { "index_daily_close 수집 완료 — base_dt=$baseDt, 신규 적재=$inserted" }
+        return "base_dt=$baseDt, 신규 적재 ${inserted}건"
     }
 
     /** 키움 숫자 문자열(부호 prefix 가능) → 절대값 BigDecimal. 파싱 실패 시 null. */
@@ -653,7 +653,9 @@ class IndexService(
             } finally {
                 SecurityContextHolder.clearContext()
             }
-        }.onFailure { log.failure(it) { "index_daily_close 기동 backfill 실패 (무시)" } }
+        }
+            .onSuccess { log.debug { "index_daily_close 기동 backfill: $it" } }
+            .onFailure { log.failure(it) { "index_daily_close 기동 backfill 실패 (무시)" } }
     }
 
     private fun setSchedulerSecurityContext() {

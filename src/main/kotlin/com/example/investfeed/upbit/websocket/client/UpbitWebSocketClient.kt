@@ -4,6 +4,7 @@ import com.example.investfeed.kiwoom.config.WebSocketHandler
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import mu.KotlinLogging
 import org.java_websocket.client.WebSocketClient
+import org.java_websocket.framing.CloseFrame
 import org.java_websocket.handshake.ServerHandshake
 import java.net.URI
 import java.nio.ByteBuffer
@@ -24,9 +25,8 @@ class UpbitWebSocketClient(
     @Volatile
     private var messageErrorLogged = false
 
+    // 화면이 시세 구독을 요청할 때마다 새로 연결한다. 그 요청의 성공 로그는 RequestLogInterceptor 가 남기므로 연결·구독은 debug
     override fun onOpen(handshakedata: ServerHandshake?) {
-        log.info { "[Upbit WebSocket] 연결 성공" }
-
         val subscribeMessage = objectMapper.writeValueAsString(
             listOf(
                 mapOf("ticket" to "investfeed"),
@@ -36,7 +36,7 @@ class UpbitWebSocketClient(
         )
 
         send(subscribeMessage)
-        log.info { "[Upbit WebSocket] 구독 요청: $subscribeMessage" }
+        log.debug { "[Upbit WebSocket] 연결·구독: ${markets.size}종목" }
     }
 
     override fun onMessage(message: String?) {
@@ -91,7 +91,9 @@ class UpbitWebSocketClient(
     }
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        log.info { "[Upbit WebSocket] 연결 종료: code=$code, reason=$reason, remote=$remote" }
+        val message = "[Upbit WebSocket] 연결 종료: code=$code, reason=$reason, remote=$remote"
+        // 새 구독으로 우리가 닫은 경우는 정상. 업비트가 비정상 코드로 끊은 경우만 warn (실시간 시세가 멈춘다)
+        if (remote && code != CloseFrame.NORMAL) log.warn { message } else log.debug { message }
     }
 
     override fun onError(ex: Exception?) {

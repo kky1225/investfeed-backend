@@ -33,8 +33,6 @@ class FearGreedClient(
                 throw FearGreedResponseException()
             }
 
-            log.info { "getFearGreedIndex: limit=$limit" }
-
             return res
         } catch (e: FearGreedApiException) {
             throw e

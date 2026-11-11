@@ -108,27 +108,28 @@ class PaperTradeExecutionService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doPaperTradeExec()
+                report(doPaperTradeExec())
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private fun doPaperTradeExec() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun doPaperTradeExec(): String {
         // ① 전날 미체결 취소 (오늘 새 주문 전. 등급은 매일 재평가되므로 잔여 주문은 stale)
-        cancelPreviousUnfilled()
+        val cancelSummary = cancelPreviousUnfilled()
 
         // ②③ 계좌 재조회 + 등급 로드 → 트랜치/주문의 입력 컨텍스트
         val ctx = buildExecContext()
-        log.info {
+        log.debug {
             "PaperTradeExecScheduler ctx — NAV=${ctx.nav}, 가용현금=${ctx.availableCash}, " +
                 "보유=${ctx.holdings.size}종목, 등급=${ctx.grades.size}종목"
         }
 
         // ④ 종목별 희망 주문 산출 (+ 만석 시 전량 매도 예정분만큼의 슬롯대기 SKIP)
         val (candidates, slotWaits) = buildOrderCandidates(ctx)
-        log.info {
+        log.debug {
             "PaperTradeExecScheduler 주문후보 ${candidates.size}건" +
                 (if (slotWaits.isNotEmpty()) ", 슬롯대기 ${slotWaits.size}건" else "") + ": " +
                 candidates.joinToString { "${it.stkCd}:${it.side}:${it.qty}(${it.grade})" }
@@ -138,7 +139,7 @@ class PaperTradeExecutionService(
         val halted = fetchHaltedCodes()
         val filtered = candidates.filter { it.stkCd !in halted }
         if (filtered.size != candidates.size) {
-            log.info { "PaperTradeExecScheduler: 거래정지 ${candidates.size - filtered.size}건 제외" }
+            log.debug { "PaperTradeExecScheduler: 거래정지 ${candidates.size - filtered.size}건 제외" }
         }
 
         // ⑥ 현금 STRONG우선 배분: 매도는 전부 발행, 매수는 STRONG_BUY 우선 + 부분 매수(살 수 있는 만큼),
@@ -158,7 +159,7 @@ class PaperTradeExecutionService(
             val rest = b.qty - affordable
             if (rest >= 1L) {
                 skips += SkipCandidate(b.stkCd, rest, b.price, b.grade, b.stkCd !in ctx.holdings, b.cycleIndex)
-                log.info { "PaperTradeExecScheduler: 현금부족 스킵 ${b.stkCd}(${b.grade}) ${rest}주 left=$cashLeft" }
+                log.debug { "PaperTradeExecScheduler: 현금부족 스킵 ${b.stkCd}(${b.grade}) ${rest}주 left=$cashLeft" }
             }
         }
 
@@ -218,11 +219,8 @@ class PaperTradeExecutionService(
             )
         }
 
-        log.info {
-            "PaperTradeExecScheduler 완료 — 후보 ${candidates.size}, 발행대상 ${toOrder.size}" +
-                "(매도 ${sells.size}/회수 ${recoverySells.size}/매수 ${fundedBuys.size}), " +
-                "스킵 ${skips.size}, 성공 $ok"
-        }
+        return "$cancelSummary, 후보 ${candidates.size}, 발행대상 ${toOrder.size}" +
+            "(매도 ${sells.size}/회수 ${recoverySells.size}/매수 ${fundedBuys.size}), 스킵 ${skips.size}, 성공 $ok"
     }
 
     private fun buildExecContext(): ExecContext {
@@ -362,7 +360,7 @@ class PaperTradeExecutionService(
         }
 
         if (result.isNotEmpty()) {
-            log.info {
+            log.debug {
                 "PaperTradeExecScheduler 현금회수 매도 ${result.size}건 (등급매도대금 $gradeSellProceeds 선차감): " +
                     result.joinToString { "${it.stkCd}:${it.qty}주(${it.recoveryOrigin})" }
             }
@@ -374,13 +372,13 @@ class PaperTradeExecutionService(
         val today = LocalDate.now()
         schedulerLogService.execute(SchedulerName.PaperTradeSecondBuyScheduler) {
             if (paperFillRepository.findByFillDateAndSide(today, "SKIP").isEmpty()) {
-                log.info { "PaperTradeSecondBuyScheduler: 당일 스킵 없음 — 종료" }
+                report("당일 스킵 없음")
                 return@execute
             }
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doSecondPhaseBuys(today)
+                report(doSecondPhaseBuys(today))
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -412,12 +410,10 @@ class PaperTradeExecutionService(
             }
     }
 
-    private fun doSecondPhaseBuys(today: LocalDate) {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun doSecondPhaseBuys(today: LocalDate): String {
         var items = loadRemainingSkips(today)
-        if (items.isEmpty()) {
-            log.info { "PaperTradeSecondBuyScheduler: 스킵 전량 기발행 — 종료(멱등)" }
-            return
-        }
+        if (items.isEmpty()) return "스킵 전량 기발행 (멱등)"
         for (attempt in 1..SECOND_PHASE_ATTEMPTS) {
             if (attempt > 1) Thread.sleep(SECOND_PHASE_RETRY_MS)
             val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
@@ -431,7 +427,7 @@ class PaperTradeExecutionService(
                 .toSet()
             var slots = (MAX_CONCURRENT_HOLDINGS - heldNow.size).coerceAtLeast(0)
             // 회차별 주문가능금액 = 시가 매도 대금 반영 추적 — 모의서버 재사용금 지원 여부의 실측 근거
-            log.info { "PaperTradeSecondBuyScheduler ${attempt}회차 — 주문가능금액=$cash, 보유=${heldNow.size}종목(슬롯 $slots), 잔여후보 ${items.size}건" }
+            log.debug { "PaperTradeSecondBuyScheduler ${attempt}회차 — 주문가능금액=$cash, 보유=${heldNow.size}종목(슬롯 $slots), 잔여후보 ${items.size}건" }
             val unfilled = mutableListOf<SkipCandidate>()
             for (s in items) {
                 val needsSlot = s.newEntry && s.stkCd !in heldNow
@@ -478,10 +474,7 @@ class PaperTradeExecutionService(
             items = unfilled
             if (items.isEmpty()) break
         }
-        log.info {
-            if (items.isEmpty()) "PaperTradeSecondBuyScheduler 완료 — 스킵 전량 소화"
-            else "PaperTradeSecondBuyScheduler 완료 — 미소화 ${items.size}건 소멸(익일 정상 사이클)"
-        }
+        return if (items.isEmpty()) "스킵 전량 소화" else "미소화 ${items.size}건 소멸(익일 정상 사이클)"
     }
 
     private fun nextCycleIndex(ctx: ExecContext, stkCd: String, side: TrancheSide): Int {
@@ -637,16 +630,14 @@ class PaperTradeExecutionService(
      * 전날 잔여 미체결 전부 취소. 실패는 격리(로그 후 진행) — 일시 블립이 잡 전체를
      * 막지 않게(에러 로그는 모니터링 노출). 시장가라 미체결 자체가 드문 안전장치 단계.
      */
-    private fun cancelPreviousUnfilled() {
+    /** 결과 요약을 돌려준다 (실행 완료 로그에 붙는다) */
+    private fun cancelPreviousUnfilled(): String {
         try {
             val res = kiwoomOrderClient.pendingOrders(
                 KiwoomPendingOrderReq(all_stk_tp = "0", trde_tp = "0", stk_cd = null, stex_tp = "1")
             )
             val pending = res.oso.orEmpty()
-            if (pending.isEmpty()) {
-                log.info { "PaperTradeExecScheduler: 전날 미체결 없음" }
-                return
-            }
+            if (pending.isEmpty()) return "전날 미체결 없음"
             val today = LocalDate.now()
             var cancelled = 0
             for (o in pending) {
@@ -679,9 +670,10 @@ class PaperTradeExecutionService(
                     log.failure(e) { "미체결 취소 실패 ord_no=$ordNo stk_cd=$stkCd" }
                 }
             }
-            log.info { "PaperTradeExecScheduler: 전날 미체결 ${pending.size}건 중 $cancelled 건 취소" }
+            return "전날 미체결 ${pending.size}건 중 ${cancelled}건 취소"
         } catch (e: Exception) {
             log.failure(e) { "미체결 조회/취소 단계 실패 — 빈 것으로 간주하고 다음 단계 진행" }
+            return "미체결 확인 실패"
         }
     }
 

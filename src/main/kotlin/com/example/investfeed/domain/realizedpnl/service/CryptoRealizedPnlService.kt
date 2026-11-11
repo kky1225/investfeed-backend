@@ -10,7 +10,6 @@ import com.example.investfeed.domain.realizedpnl.entity.MemberRealizedPnl
 import com.example.investfeed.domain.realizedpnl.entity.PnlSource
 import com.example.investfeed.domain.realizedpnl.repository.MemberRealizedPnlRepository
 import com.example.investfeed.domain.security.CustomUserDetails
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,7 +20,6 @@ class CryptoRealizedPnlService(
     private val memberRealizedPnlRepository: MemberRealizedPnlRepository,
     private val memberBrokerRepository: MemberBrokerRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listCryptoRealizedPnls(year: Int?, month: Int?): RealizedPnlListRes {
         val memberId = getMemberId()

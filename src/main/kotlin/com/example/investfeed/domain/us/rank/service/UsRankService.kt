@@ -14,7 +14,6 @@ import com.example.investfeed.kiwoom.us.rank.client.UsRankClient
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeValueListReq
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsStockTradeVolumeListReq
 import com.example.investfeed.kiwoom.us.rank.dto.req.KiwoomUsSurgeTradeVolumeListReq
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
 @Service
@@ -24,7 +23,6 @@ class UsRankService(
     private val usRankClient: UsRankClient,
     private val usEtfService: UsEtfService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listUsRanks(
         req: UsRankListReq

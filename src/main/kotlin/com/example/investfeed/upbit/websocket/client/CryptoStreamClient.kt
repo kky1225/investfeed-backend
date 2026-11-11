@@ -12,7 +12,7 @@ class CryptoStreamClient(
     private var currentClient: UpbitWebSocketClient? = null
 
     fun cryptoListStream(markets: List<String>) {
-        log.info { "cryptoListStream 시작: $markets" }
+        log.debug { "cryptoListStream 시작: $markets" }
 
         currentClient?.let {
             if (it.isOpen) {

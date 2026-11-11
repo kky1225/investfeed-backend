@@ -99,8 +99,6 @@ class TossAuthClient(
         val lockKey = getLockKey(clientId)
         val redisKey = getRedisKey(clientId)
 
-        log.info { "tossRefreshToken [loginId=$loginId, redisKey=$redisKey]" }
-
         val isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(5))
         if (isLocked == false) {
             Thread.sleep(500)
@@ -121,6 +119,7 @@ class TossAuthClient(
                 ?.let { Duration.ofSeconds((it - TTL_SAFETY_SECONDS).coerceAtLeast(60)) }
                 ?: DEFAULT_TTL
             redisTemplate.opsForValue().set(redisKey, token, ttl)
+            log.info { "토스 토큰 재발급: loginId=$loginId, redisKey=$redisKey, TTL ${ttl.toMinutes()}분" }
         } catch (e: TossTokenRejectedException) {
             // body·Basic 두 방식 모두 거부 → 등록된 키가 더 이상 유효하지 않다
             log.error { "tossRefreshToken 거부 (loginId=$loginId): status=${e.status}" }

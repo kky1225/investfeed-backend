@@ -71,8 +71,6 @@ class AuthClient(
         val (appKey, _) = resolveApiKeys(loginId)
         val redisKey = getRedisKey(appKey)
 
-        log.info { "accessToken [loginId=$loginId, redisKey=$redisKey]" }
-
         try {
             val accessToken = redisTemplate.opsForValue().get(redisKey)
 
@@ -118,8 +116,6 @@ class AuthClient(
         val lockKey = getLockKey(appKey)
         val redisKey = getRedisKey(appKey)
 
-        log.info { "refreshToken [loginId=$loginId, redisKey=$redisKey]" }
-
         val isLocked = redisTemplate.opsForValue().setIfAbsent(
             lockKey,
             "1",
@@ -152,7 +148,9 @@ class AuthClient(
             }
 
             accessTokenRes.token?.let {
-                redisTemplate.opsForValue().set(redisKey, it, resolveTokenTtl(accessTokenRes.expires_dt))
+                val ttl = resolveTokenTtl(accessTokenRes.expires_dt)
+                redisTemplate.opsForValue().set(redisKey, it, ttl)
+                log.info { "키움 토큰 재발급: loginId=$loginId, redisKey=$redisKey, TTL ${ttl.toMinutes()}분 (expires_dt=${accessTokenRes.expires_dt})" }
             }
         } catch (e: KiwoomApiException) {
             throw e
@@ -180,7 +178,6 @@ class AuthClient(
             return FALLBACK_TOKEN_TTL
         }
 
-        log.debug { "키움 토큰 TTL=${ttl.toMinutes()}분 (expires_dt=$expiresDt)" }
         return ttl
     }
 
@@ -218,7 +215,6 @@ class AuthClient(
     private fun refreshTokenMock(loginId: String) {
         val lockKey = getMockLockKey()
         val redisKey = getMockRedisKey()
-        log.info { "refreshTokenMock [loginId=$loginId, redisKey=$redisKey]" }
 
         val isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(5))
         if (isLocked == false) {
@@ -251,7 +247,9 @@ class AuthClient(
             }
 
             accessTokenRes.token?.let {
-                redisTemplate.opsForValue().set(redisKey, it, resolveTokenTtl(accessTokenRes.expires_dt))
+                val ttl = resolveTokenTtl(accessTokenRes.expires_dt)
+                redisTemplate.opsForValue().set(redisKey, it, ttl)
+                log.info { "키움 모의 토큰 재발급: loginId=$loginId, TTL ${ttl.toMinutes()}분 (expires_dt=${accessTokenRes.expires_dt})" }
             }
         } catch (e: KiwoomApiException) {
             throw e

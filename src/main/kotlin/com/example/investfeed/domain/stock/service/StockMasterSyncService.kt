@@ -4,7 +4,6 @@ import com.example.investfeed.domain.stock.dto.req.StockInfoListReq
 import com.example.investfeed.domain.stock.entity.StockMaster
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.kiwoom.stock.client.StockClient
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import kotlinx.coroutines.runBlocking
@@ -14,7 +13,6 @@ class StockMasterSyncService(
     private val stockClient: StockClient,
     private val stockMasterRepository: StockMasterRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     companion object {
         // 0:코스피, 10:코스닥, 8:ETF, 60:ETN

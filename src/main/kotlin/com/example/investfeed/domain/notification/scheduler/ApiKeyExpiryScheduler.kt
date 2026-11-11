@@ -26,9 +26,9 @@ class ApiKeyExpiryScheduler(
     @Scheduled(cron = SchedulerCron.API_KEY_EXPIRY, scheduler = "slowScheduler")
     fun checkApiKeyExpiry() {
         schedulerLogService.execute(SchedulerName.ApiKeyExpiryScheduler) {
-            val start = System.currentTimeMillis()
             val today = LocalDate.now()
             val allApiKeys = memberApiKeyRepository.findAll()
+            var alerted = 0
 
             for (apiKey in allApiKeys) {
                 try {
@@ -53,11 +53,12 @@ class ApiKeyExpiryScheduler(
                         direction = direction,
                         daysLeft = daysLeft
                     )
+                    alerted++
                 } catch (e: Exception) {
                     log.failure(e) { "API Key 만료 체크 실패 (apiKeyId=${apiKey.id})" }
                 }
             }
-            log.info { "ApiKeyExpiryScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
+            report("키 ${allApiKeys.size}건, 만료 알림 ${alerted}건")
         }
     }
 }

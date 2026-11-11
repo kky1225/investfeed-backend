@@ -2,7 +2,6 @@ package com.example.investfeed.domain.assistant.service
 
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
-import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.security.KeyFactory
@@ -22,7 +21,6 @@ class AssistantTokenService(
     @param:Value("\${assistant.jwt.kid}") val kid: String,
     @param:Value("\${assistant.jwt.expiration-seconds:300}") private val expirationSeconds: Long,
 ) {
-    private val log = KotlinLogging.logger {}
 
     companion object {
         const val ISSUER = "investfeed-core"

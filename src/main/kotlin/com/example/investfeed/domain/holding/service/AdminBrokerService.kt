@@ -9,7 +9,6 @@ import com.example.investfeed.domain.holding.exception.BrokerHasMenuDependencyEx
 import com.example.investfeed.domain.holding.exception.BrokerNotFoundException
 import com.example.investfeed.domain.holding.repository.BrokerRepository
 import com.example.investfeed.domain.menu.repository.MenuBrokerPermissionRepository
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,7 +17,6 @@ class AdminBrokerService(
     private val brokerRepository: BrokerRepository,
     private val menuBrokerPermissionRepository: MenuBrokerPermissionRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listBrokers(): BrokerListRes {
         val brokers = brokerRepository.findAllByOrderByIdAsc()

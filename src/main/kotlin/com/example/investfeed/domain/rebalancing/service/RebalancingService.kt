@@ -6,7 +6,6 @@ import com.example.investfeed.domain.rebalancing.dto.res.*
 import com.example.investfeed.domain.rebalancing.entity.RebalancingSetting
 import com.example.investfeed.domain.rebalancing.repository.RebalancingSettingRepository
 import com.example.investfeed.domain.security.CustomUserDetails
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -17,7 +16,6 @@ class RebalancingService(
     private val rebalancingSettingRepository: RebalancingSettingRepository,
     private val assetDashboardService: AssetDashboardService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     @Transactional
     fun saveRebalancing(req: RebalancingSettingReq): RebalancingSettingRes {

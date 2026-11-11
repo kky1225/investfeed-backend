@@ -53,8 +53,6 @@ class EcosClient(
                 throw EcosStatisticsException()
             }
 
-            log.info { "ECOS getStatistics: tableCode=$tableCode, frequency=$frequency" }
-
             return res
         } catch (e: InvestFeedException) {
             throw e

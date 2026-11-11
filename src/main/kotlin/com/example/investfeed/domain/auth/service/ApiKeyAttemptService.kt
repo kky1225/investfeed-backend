@@ -41,6 +41,6 @@ class ApiKeyAttemptService(
         val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return
         member.apiKeyLocked = false
         member.failedApiKeyAttempts = 0
-        log.info { "API key 등록 잠금 해제: loginId=$loginId" }
+        log.debug { "API key 등록 잠금 해제: loginId=$loginId" }
     }
 }

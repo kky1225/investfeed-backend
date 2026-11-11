@@ -27,8 +27,8 @@ class CalendarSyncScheduler(
     fun initSync() {
         slowScheduler.execute {
             if (economicCalendarService.isCacheWarm()) {
-                log.info { "CalendarSync 초기 warming skip — Redis 캐시 이미 존재" }
-                detectReleases()   // 캐시가 있으면 동기화 없이 발표 감지만 (다운타임 중 발표 확인)
+                // 캐시가 있으면 동기화 없이 발표 감지만 (다운타임 중 발표 확인)
+                log.debug { "CalendarSync 초기 동기화 생략 — Redis 캐시 있음, 발표 감지만 실행: ${detectReleases()}" }
                 return@execute
             }
             syncCalendarData()
@@ -38,19 +38,14 @@ class CalendarSyncScheduler(
     @Scheduled(cron = SchedulerCron.CALENDAR_SYNC, scheduler = "slowScheduler")
     fun syncCalendarData() {
         schedulerLogService.execute(SchedulerName.CalendarSyncScheduler) {
-            val start = System.currentTimeMillis()
-            try {
-                economicCalendarService.syncCurrentData()
-            } finally {
-                log.info { "CalendarSyncScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
-            }
+            economicCalendarService.syncCurrentData()
+            report(detectReleases())
         }
-        detectReleases()
     }
 
-    private fun detectReleases() {
+    /** 발표 알림 감지. 실패해도 캘린더 동기화는 성공으로 두고 결과 문구만 돌려준다 */
+    private fun detectReleases(): String =
         runCatching { releaseAlertService.run() }
-            .onSuccess { r -> log.info { "발표 알림 감지 완료: scanned=${r.scanned} saved=${r.saved} suppressed=${r.suppressed} posted=${r.posted}${if (r.seed) " (seed)" else ""}" } }
-            .onFailure { log.failure(it) { "발표 알림 감지 실패" } }
-    }
+            .map { r -> "발표 감지 scanned=${r.scanned} saved=${r.saved} suppressed=${r.suppressed} posted=${r.posted}${if (r.seed) " (seed)" else ""}" }
+            .getOrElse { log.failure(it) { "발표 알림 감지 실패" }; "발표 감지 실패" }
 }

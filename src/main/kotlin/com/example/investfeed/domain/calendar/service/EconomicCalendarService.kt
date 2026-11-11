@@ -1111,7 +1111,7 @@ class EconomicCalendarService(
             )
         }
         calendarFreezeWriter.replaceApiEvents(year, month, entities)
-        log.info { "캘린더 이벤트 freeze 완료: $year-$month (${entities.size}건)" }
+        log.debug { "캘린더 이벤트 freeze: $year-$month (${entities.size}건)" }
     }
 
     /**

@@ -34,7 +34,7 @@ class ThemeController(
     fun listThemes(
         req: ThemeListReq
     ): ResponseEntity<ApiResponse<ThemeListRes?>> {
-        log.info { "listThemes : $req" }
+        log.debug { "listThemes : $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -51,7 +51,7 @@ class ThemeController(
         @PathVariable themaGrpCd: String,
         req: ThemeStockListReq
     ): ResponseEntity<ApiResponse<ThemeStockListRes?>> {
-        log.info { "listStocksByTheme : themaGrpCd=$themaGrpCd, $req" }
+        log.debug { "listStocksByTheme : themaGrpCd=$themaGrpCd, $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -67,7 +67,7 @@ class ThemeController(
     fun streamThemeStocks(
         @RequestBody req: ThemeStockListStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamThemeStocks : $req" }
+        log.debug { "streamThemeStocks : $req" }
 
         themeService.streamThemeStocks(req = req)
 

@@ -67,8 +67,6 @@ class PressReleaseClient(
                 throw PressReleaseResponseException()
             }
 
-            log.info { "PressRelease fetch: $label" }
-
             return res
         } catch (e: PressReleaseApiException) {
             throw e

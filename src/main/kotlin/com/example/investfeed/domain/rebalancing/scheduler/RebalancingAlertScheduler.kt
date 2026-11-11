@@ -50,12 +50,12 @@ class RebalancingAlertScheduler(
                 authClient.accessToken()
             } catch (e: Exception) {
                 log.failure(e) { "리밸런싱 스케줄러 토큰 발급 실패" }
+                report("토큰 발급 실패로 중단")
                 SecurityContextHolder.clearContext()
                 return@execute
             }
 
-            val start = System.currentTimeMillis()
-
+            var alerted = 0
             try {
             val allSettings = rebalancingSettingRepository.findAll()
 
@@ -97,6 +97,7 @@ class RebalancingAlertScheduler(
                         ))
 
                         sendWebSocket(setting.memberId, notification)
+                        alerted++
                     }
 
                     // 종목 비중 초과 알림
@@ -113,14 +114,15 @@ class RebalancingAlertScheduler(
                         ))
 
                         sendWebSocket(setting.memberId, notification)
+                        alerted++
                     }
                 } catch (e: Exception) {
                     log.failure(e) { "리밸런싱 체크 실패 (memberId=${setting.memberId})" }
                 }
             }
+            report("설정 ${allSettings.size}건, 알림 ${alerted}건")
             } finally {
                 SecurityContextHolder.clearContext()
-                log.info { "RebalancingAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
             }
         }
     }

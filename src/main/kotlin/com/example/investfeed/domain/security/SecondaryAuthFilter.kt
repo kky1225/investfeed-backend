@@ -73,7 +73,7 @@ class SecondaryAuthFilter(
                 writeLockedResponse(response)
                 return
             }
-            log.info { "2차 인증 요구: uri=$requestUri, loginId=$loginId, cookieToken=${if (token == null) "NULL" else "present"}, redisToken=${if (storedToken == null) "NULL" else "present"}, match=${storedToken == token}" }
+            log.debug { "2차 인증 요구: uri=$requestUri, loginId=$loginId, cookieToken=${if (token == null) "NULL" else "present"}, redisToken=${if (storedToken == null) "NULL" else "present"}, match=${storedToken == token}" }
             writeResponse(response, ResponseCode.AUTH_SECONDARY_REQUIRED)
             return
         }

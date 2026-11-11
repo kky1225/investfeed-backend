@@ -23,9 +23,9 @@ class WatchlistSyncService(
     }
 
     @Transactional
-    fun syncAllStkNm() {
+    fun syncAllStkNm(): String {
         val allItems = watchlistItemRepository.findAll()
-        if (allItems.isEmpty()) return
+        if (allItems.isEmpty()) return "관심종목 없음"
 
         val (usItems, krItems) = allItems.partition { it.stexTp != null }
         val distinctStkCds = krItems.map { it.stkCd }.distinct()
@@ -44,7 +44,7 @@ class WatchlistSyncService(
                     processedCount++
                     val freshStkNm = responseMap[item.stkCd]?.stk_nm
                     if (!freshStkNm.isNullOrBlank() && freshStkNm != item.stkNm) {
-                        log.info { "관심종목 stkNm 갱신: stkCd=${item.stkCd}, ${item.stkNm} -> $freshStkNm" }
+                        log.debug { "관심종목 stkNm 갱신: stkCd=${item.stkCd}, ${item.stkNm} -> $freshStkNm" }
                         item.stkNm = freshStkNm
                         updatedCount++
                     }
@@ -59,7 +59,7 @@ class WatchlistSyncService(
                 processedCount++
                 val freshStkNm = usStockInfoService.getStkNm(stexTp = item.stexTp!!, stkCd = item.stkCd)
                 if (!freshStkNm.isNullOrBlank() && freshStkNm != item.stkNm) {
-                    log.info { "미국 관심종목 stkNm 갱신: stkCd=${item.stkCd}, ${item.stkNm} -> $freshStkNm" }
+                    log.debug { "미국 관심종목 stkNm 갱신: stkCd=${item.stkCd}, ${item.stkNm} -> $freshStkNm" }
                     item.stkNm = freshStkNm
                     updatedCount++
                 }
@@ -68,6 +68,6 @@ class WatchlistSyncService(
             }
         }
 
-        log.info { "관심종목 stkNm 동기화 완료: 처리 ${processedCount}건, 갱신 ${updatedCount}건" }
+        return "관심종목 처리 ${processedCount}건, 갱신 ${updatedCount}건"
     }
 }

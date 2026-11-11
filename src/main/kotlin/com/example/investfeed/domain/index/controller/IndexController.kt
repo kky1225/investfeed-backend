@@ -30,7 +30,6 @@ class IndexController(
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun listIndexes(): ResponseEntity<ApiResponse<IndexListRes?>> {
-        log.info { "listIndexes" }
 
         return ResponseEntity(
             ApiResponse(
@@ -46,7 +45,7 @@ class IndexController(
     fun streamIndexes(
         @RequestBody req: IndexStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamIndexes: $req" }
+        log.debug { "streamIndexes: $req" }
 
         kiwoomStreamClient.register(
             StreamEntry(
@@ -71,7 +70,7 @@ class IndexController(
         @PathVariable indsCd: String,
         req: IndexDetailReq
     ): ResponseEntity<ApiResponse<IndexDetailRes>> {
-        log.info { "getIndex: indsCd=$indsCd, $req" }
+        log.debug { "getIndex: indsCd=$indsCd, $req" }
 
         return ResponseEntity(
             ApiResponse(

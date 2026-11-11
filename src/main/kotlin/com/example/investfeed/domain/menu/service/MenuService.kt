@@ -17,7 +17,6 @@ import com.example.investfeed.domain.menu.repository.MenuBrokerPermissionReposit
 import com.example.investfeed.domain.menu.repository.MenuRepository
 import com.example.investfeed.domain.permission.repository.PermissionRepository
 import com.example.investfeed.domain.permission.repository.RolePermissionRepository
-import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -30,7 +29,6 @@ class MenuService(
     private val permissionRepository: PermissionRepository,
     private val rolePermissionRepository: RolePermissionRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun getAllMenuTree(): List<MenuRes> {
         val rootMenus = menuRepository.findAllRootMenus()

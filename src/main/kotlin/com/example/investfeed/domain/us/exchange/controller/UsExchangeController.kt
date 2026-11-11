@@ -8,7 +8,6 @@ import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.calendar.dto.res.IndicatorHistoryRes
 import com.example.investfeed.domain.us.exchange.dto.res.UsExchangeRateRes
 import com.example.investfeed.domain.us.exchange.service.UsExchangeService
-import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,12 +20,10 @@ import org.springframework.web.bind.annotation.RestController
 class UsExchangeController(
     private val usExchangeService: UsExchangeService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun getExchangeRate(): ResponseEntity<ApiResponse<UsExchangeRateRes>> {
-        log.info { "getExchangeRate" }
 
         return ResponseEntity(
             ApiResponse(
@@ -40,7 +37,6 @@ class UsExchangeController(
     @GetMapping("/history")
     @RequiresAction(action = Actions.READ)
     fun getUsdKrwHistory(): ResponseEntity<ApiResponse<IndicatorHistoryRes?>> {
-        log.info { "getUsdKrwHistory" }
 
         return ResponseEntity(
             ApiResponse(

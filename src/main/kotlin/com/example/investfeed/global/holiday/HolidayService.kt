@@ -37,7 +37,7 @@ class HolidayService(
     @Scheduled(cron = SchedulerCron.HOLIDAY_REFRESH, scheduler = "slowScheduler")
     fun refreshHolidays() {
         schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
-            syncHolidays()
+            report(syncHolidays())
         }
     }
 
@@ -46,10 +46,9 @@ class HolidayService(
     fun initialLoad() {
         if (marketHolidayRepository.countByMarket(MARKET_KR) > 0L) return
 
-        log.info { "공휴일 초기 적재 시작 — market_holiday 비어 있음" }
         runCatching {
             schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
-                syncHolidays()
+                report("초기 적재 (market_holiday 비어 있음) — ${syncHolidays()}")
             }
         }.onFailure { log.failure(it) { "공휴일 초기 적재 실패" } }
     }
@@ -107,7 +106,8 @@ class HolidayService(
         }
     }
 
-    private fun syncHolidays() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun syncHolidays(): String {
         val now = LocalDate.now()
         val years = now.year - 1..now.year + 1
 
@@ -149,7 +149,7 @@ class HolidayService(
         }
 
         monthlyHolidays.clear()
-        log.info { "공휴일 동기화 완료: ${now.year - 1}~${now.year + 1}년, 신규 ${inserted}건, 삭제 ${deleted}건" }
+        return "${now.year - 1}~${now.year + 1}년, 신규 ${inserted}건, 삭제 ${deleted}건"
     }
 
     private fun monthKey(year: Int, month: Int): String = "$year${String.format("%02d", month)}"

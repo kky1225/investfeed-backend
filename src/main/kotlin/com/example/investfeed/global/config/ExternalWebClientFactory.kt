@@ -29,6 +29,10 @@ class ExternalWebClientFactory(
         private const val DEFAULT_MAX_IN_MEMORY_BYTES = 5 * 1024 * 1024
     }
 
+    /**
+     * [secrets]: 요청 경로에 들어가는 API 키·토큰의 실제 값 (ECOS 키, 텔레그램 봇 토큰).
+     * 호출 상세 debug 로그에서 경로는 남기고 이 값 자리만 가린다
+     */
     fun create(
         provider: ApiProvider,
         baseUrl: String? = null,
@@ -36,6 +40,7 @@ class ExternalWebClientFactory(
         responseTimeout: Duration? = null,
         maxInMemoryBytes: Int = DEFAULT_MAX_IN_MEMORY_BYTES,
         isFailureBody: ((ByteArray) -> Boolean)? = null,
+        secrets: List<String> = emptyList(),
         innerFilters: List<ExchangeFilterFunction> = emptyList(),
     ): WebClient {
         val httpClient = responseTimeout
@@ -53,7 +58,7 @@ class ExternalWebClientFactory(
                 Mono.just(req)
             })
             .filter(rateLimitExchangeFilter)
-            .filter(ApiCallMetricsFilter(provider, apiCallCounterService, isFailureBody))
+            .filter(ApiCallMetricsFilter(provider, apiCallCounterService, isFailureBody, secrets))
             .filters { it.addAll(innerFilters) }
             .build()
     }

@@ -9,7 +9,6 @@ import com.example.investfeed.global.holiday.HolidayService
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
-import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -26,7 +25,6 @@ class CircuitBreakerScheduler(
     @param:Value("\${scheduler.login-id:admin}")
     private val schedulerLoginId: String,
 ) {
-    private val log = KotlinLogging.logger {}
 
     private val indexStream = StreamEntry(
         market = StreamMarket.KRX,
@@ -44,7 +42,7 @@ class CircuitBreakerScheduler(
             val stats = circuitBreakerService.drainTickStats()
                 .joinToString(", ") { "${it.indexCode} ${it.ticks}건 최대간격 ${it.maxGapSec}초" }
                 .ifEmpty { "수신 없음" }
-            log.info { "CircuitBreakerSubscribeScheduler 0J $stats" }
+            report("0J $stats")
         }
     }
 

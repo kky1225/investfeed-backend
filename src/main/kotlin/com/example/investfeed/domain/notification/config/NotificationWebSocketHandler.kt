@@ -29,7 +29,7 @@ class NotificationWebSocketHandler : TextWebSocketHandler() {
         if (userSessions[memberId]?.isEmpty() == true) {
             userSessions.remove(memberId)
         }
-        log.info { "알림 WebSocket 종료: memberId=$memberId, sessionId=${session.id}" }
+        log.debug { "알림 WebSocket 종료: memberId=$memberId, sessionId=${session.id}" }
     }
 
     fun sendToUser(memberId: Long, message: String) {

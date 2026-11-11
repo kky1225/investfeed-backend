@@ -19,10 +19,9 @@ class HoldingGradeScheduler(
 
     @Scheduled(cron = SchedulerCron.HOLDING_GRADE, scheduler = "slowScheduler")
     fun scheduledHoldingGrade() {
-        log.info { "HoldingGradeScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.HoldingGradeScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "HoldingGradeScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.HoldingGradeScheduler, "휴일")
             return
         }
 

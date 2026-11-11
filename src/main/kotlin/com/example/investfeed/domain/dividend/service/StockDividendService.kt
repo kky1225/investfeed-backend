@@ -27,7 +27,8 @@ class StockDividendService(
     private val TYPE_ETF = "ETF"
     private val MARKET_CODE_ETF = "8"
 
-    fun collectDailyDividends() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    fun collectDailyDividends(): String {
         val today = today()
         val minDvdnBasDt = minDvdnBasDt()
         val existingKeys = stockDividendRepository
@@ -50,7 +51,7 @@ class StockDividendService(
             pageNo++
         }
 
-        log.info { "배당 정보 일별 수집: ${totalPages}페이지 조회, $saved 건 저장" }
+        return "${totalPages}페이지 조회, ${saved}건 저장"
     }
 
     suspend fun collectEtfDividends(stkCd: String): Int {

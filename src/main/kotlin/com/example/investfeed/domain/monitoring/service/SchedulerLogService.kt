@@ -18,6 +18,20 @@ enum class SchedulerType { FAST, SLOW }
 class SchedulerExecutionException(schedulerName: String, cause: Throwable) :
     InvestFeedException(code = "SCHEDULER_9999", message = "$schedulerName 실행 실패: ${cause.message}", cause = cause), AlreadyLogged
 
+/**
+ * 스케줄러 본문이 성공 요약을 넘기는 통로. 본문에서 report("저장 12건") 처럼 부른다.
+ * 성공 로그는 본문·서비스에서 남기지 않고 execute 가 끝날 때 이 요약을 붙여 1건만 남긴다.
+ */
+class SchedulerRun internal constructor() {
+    private val parts = mutableListOf<String>()
+
+    fun report(summary: String) {
+        parts += summary
+    }
+
+    internal fun summary(): String? = parts.takeIf { it.isNotEmpty() }?.joinToString(", ")
+}
+
 @Service
 class SchedulerLogService(
     private val schedulerStatusRepository: SchedulerStatusRepository,
@@ -30,17 +44,23 @@ class SchedulerLogService(
         const val MDC_SCHEDULER_NAME = "schedulerName"
     }
 
-    fun <T> execute(scheduler: SchedulerName, block: () -> T): T {
+    /**
+     * 스케줄러 1회 실행. 성공·실패 로그는 모두 여기서 1건만 남긴다.
+     * - 성공: SLOW 는 info, FAST(매분·매초)는 요약(report)이 있을 때만 debug — "[이름] 완료 120ms — 요약"
+     * - timeout 초과: warn / 실패: failure (error 또는 이미 기록된 실패면 warn)
+     */
+    fun <T> execute(scheduler: SchedulerName, block: SchedulerRun.() -> T): T {
         val name = scheduler.name
         val type = scheduler.type
         val startedAt = LocalDateTime.now()
+        val run = SchedulerRun()
         MDC.put(MDC_SCHEDULER_NAME, name)
         markFired(scheduler)
         runCatching { recordWriter.markStarted(scheduler, startedAt) }
             .onFailure { log.error { "scheduler_status markStarted 실패 ($name): ${it.message}" } }
 
         return try {
-            val result = block()
+            val result = run.block()
             val finishedAt = LocalDateTime.now()
             val durationMs = Duration.between(startedAt, finishedAt).toMillis()
 
@@ -59,6 +79,15 @@ class SchedulerLogService(
                 runCatching {
                     recordWriter.appendLog(scheduler, startedAt, finishedAt, durationMs, logStatus, message)
                 }.onFailure { log.error { "scheduler_log INSERT 실패 ($name): ${it.message}" } }
+            }
+
+            val summary = run.summary()
+            val message = "[$name] 완료 ${durationMs}ms" + (summary?.let { " — $it" } ?: "")
+            when {
+                timeoutExceeded -> log.warn { "$message (timeout ${timeoutSec}s 초과)" }
+                type == SchedulerType.SLOW -> log.info { message }
+                // FAST(매초·5초·매분)는 요약이 있을 때만 남긴다. 할 일이 없던 실행은 scheduler_status 만 갱신
+                summary != null -> log.debug { message }
             }
 
             result
@@ -90,6 +119,11 @@ class SchedulerLogService(
         } finally {
             MDC.remove(MDC_SCHEDULER_NAME)
         }
+    }
+
+    /** 실행 조건이 안 돼 execute 를 부르지 않고 끝낼 때 (휴일·세션 밖 등). 성공이 아니므로 debug */
+    fun skip(scheduler: SchedulerName, reason: String) {
+        log.debug { "[${scheduler.name}] 건너뜀 — $reason" }
     }
 
     fun markFired(scheduler: SchedulerName) {

@@ -4,6 +4,7 @@ import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.domain.monitoring.service.SchedulerRun
 import com.example.investfeed.domain.stock.repository.StockMasterRepository
 import com.example.investfeed.domain.stock.service.StockMasterSyncService
 import com.example.investfeed.domain.us.stock.repository.UsStockMasterRepository
@@ -34,7 +35,7 @@ class StockMasterSyncScheduler(
     @Scheduled(cron = SchedulerCron.STOCK_MASTER_SYNC, scheduler = "slowScheduler")
     fun syncStockMaster() {
         schedulerLogService.execute(SchedulerName.StockMasterSyncScheduler) {
-            sync(syncKr = true, syncUs = true)
+            sync(this, syncKr = true, syncUs = true)
         }
     }
 
@@ -47,45 +48,42 @@ class StockMasterSyncScheduler(
             return
         }
 
-        log.info { "종목 마스터 초기 적재 시작 (국내=$syncKr, 미국=$syncUs)" }
         schedulerLogService.execute(SchedulerName.StockMasterSyncScheduler) {
-            sync(syncKr = syncKr, syncUs = syncUs)
+            report("초기 적재")
+            sync(this, syncKr = syncKr, syncUs = syncUs)
         }
     }
 
-    private fun sync(syncKr: Boolean, syncUs: Boolean) {
-        log.info { "종목 마스터 동기화 시작 (국내=$syncKr, 미국=$syncUs)" }
-        val start = System.currentTimeMillis()
-
+    private fun sync(run: SchedulerRun, syncKr: Boolean, syncUs: Boolean) {
         setSchedulerSecurityContext()
         try {
             authClient.accessToken()
         } catch (e: Exception) {
             log.failure(e) { "스케줄러 토큰 발급 실패" }
+            run.report("토큰 발급 실패로 중단")
             SecurityContextHolder.clearContext()
             return
         }
 
         if (syncKr) {
             try {
-                val count = stockMasterSyncService.syncAll()
-                log.info { "국내 종목 마스터 적재 완료: ${count}건" }
+                run.report("국내 ${stockMasterSyncService.syncAll()}건")
             } catch (e: Exception) {
                 log.failure(e) { "국내 종목 마스터 적재 실패" }
+                run.report("국내 실패")
             }
         }
 
         if (syncUs) {
             try {
-                val count = usStockInfoService.syncAll()
-                log.info { "미국 종목 마스터 적재 완료: ${count}건" }
+                run.report("미국 ${usStockInfoService.syncAll()}건")
             } catch (e: Exception) {
                 log.failure(e) { "미국 종목 마스터 적재 실패" }
+                run.report("미국 실패")
             }
         }
 
         SecurityContextHolder.clearContext()
-        log.info { "종목 마스터 동기화 완료: ${System.currentTimeMillis() - start}ms" }
     }
 
     private fun setSchedulerSecurityContext() {

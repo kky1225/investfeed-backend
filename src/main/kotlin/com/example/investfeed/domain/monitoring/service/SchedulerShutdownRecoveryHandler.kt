@@ -79,7 +79,8 @@ class SchedulerShutdownRecoveryHandler(
                 )
             }.onFailure { log.failure(it) { "[shutdown-recovery] scheduler_log INSERT 실패 (${s.schedulerName})" } }
 
-            log.info { "[shutdown-recovery] ${s.schedulerName} INTERRUPTED 기록. 연결된 error_log: ${relatedError?.id}" }
+            // 종료로 끊긴 실행을 정리한 기록이라 성공이 아니다 → warn
+            log.warn { "[shutdown-recovery] ${s.schedulerName} INTERRUPTED 기록. 연결된 error_log: ${relatedError?.id}" }
         }
     }
 }

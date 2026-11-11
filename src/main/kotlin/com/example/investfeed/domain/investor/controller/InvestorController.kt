@@ -28,7 +28,7 @@ class InvestorController(
     fun listInvestors(
         req: InvestorListReq
     ): ResponseEntity<ApiResponse<InvestorListRes?>> {
-        log.info { "investorList $req" }
+        log.debug { "investorList $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -44,7 +44,7 @@ class InvestorController(
     fun streamInvestors(
         @RequestBody req: InvestorStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "stockStream $req" }
+        log.debug { "stockStream $req" }
 
         investorService.streamInvestors(req = req)
 

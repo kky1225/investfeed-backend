@@ -65,14 +65,14 @@ class MemberHoldingSyncService(
      * 일 1회 WatchlistSyncScheduler 에서 호출.
      */
     @Transactional
-    fun syncAllManualStkNm() {
+    fun syncAllManualStkNm(): String {
         val manualBrokers = brokerRepository.findAllByType(BrokerType.MANUAL)
-        if (manualBrokers.isEmpty()) return
+        if (manualBrokers.isEmpty()) return "수동 보유 없음"
 
         val allManualHoldings = manualBrokers.flatMap { broker ->
             memberHoldingRepository.findByBrokerId(broker.id)
         }
-        if (allManualHoldings.isEmpty()) return
+        if (allManualHoldings.isEmpty()) return "수동 보유 없음"
 
         val distinctStkCds = allManualHoldings.map { it.stkCd }.distinct()
         var updatedCount = 0
@@ -90,7 +90,7 @@ class MemberHoldingSyncService(
                     processedCount++
                     val freshStkNm = responseMap[holding.stkCd]?.stk_nm
                     if (!freshStkNm.isNullOrBlank() && freshStkNm != holding.stkNm) {
-                        log.info { "수동 보유종목 stkNm 갱신: stkCd=${holding.stkCd}, ${holding.stkNm} -> $freshStkNm" }
+                        log.debug { "수동 보유종목 stkNm 갱신: stkCd=${holding.stkCd}, ${holding.stkNm} -> $freshStkNm" }
                         holding.stkNm = freshStkNm
                         holding.updatedAt = LocalDateTime.now()
                         updatedCount++
@@ -101,6 +101,6 @@ class MemberHoldingSyncService(
             }
         }
 
-        log.info { "수동 보유종목 stkNm 동기화 완료: 처리 ${processedCount}건, 갱신 ${updatedCount}건" }
+        return "수동 보유 처리 ${processedCount}건, 갱신 ${updatedCount}건"
     }
 }

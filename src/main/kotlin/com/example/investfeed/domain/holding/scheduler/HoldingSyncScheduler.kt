@@ -53,7 +53,7 @@ class HoldingSyncScheduler(
     fun scheduledSyncAllHoldings() {
         schedulerLogService.markFired(SchedulerName.HoldingSyncScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "HoldingSyncScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.HoldingSyncScheduler, "휴일")
             return
         }
         syncAllHoldings()
@@ -61,19 +61,15 @@ class HoldingSyncScheduler(
 
     fun syncAllHoldings() {
         schedulerLogService.execute(SchedulerName.HoldingSyncScheduler) {
-            log.info { "보유종목 동기화 스케줄러 시작" }
-            val start = System.currentTimeMillis()
-
-            syncKiwoomHoldings()
-            syncTossHoldings()
-            syncUpbitHoldings()
-
-            log.info { "보유종목 동기화 스케줄러 완료 (${System.currentTimeMillis() - start}ms)" }
+            report(syncKiwoomHoldings())
+            report(syncTossHoldings())
+            report(syncUpbitHoldings())
         }
     }
 
-    private fun syncKiwoomHoldings() {
-        val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return
+    /** 증권사별 동기화. 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun syncKiwoomHoldings(): String {
+        val kiwoomBroker = brokerRepository.findByName("키움증권") ?: return "키움 증권사 정보 없음"
         val kiwoomApiKeys = memberApiKeyRepository.findAllByBrokerId(kiwoomBroker.id)
             .filter { it.member.role.code != "ADMIN" }
 
@@ -101,7 +97,7 @@ class HoldingSyncScheduler(
                     )
 
                     successCount++
-                    log.info { "키움 보유종목 동기화 완료: ${apiKey.member.loginId} (${holdings.size}건)" }
+                    log.debug { "키움 보유종목 동기화: ${apiKey.member.loginId} (${holdings.size}건)" }
                 }
             } catch (e: Exception) {
                 if (isAuthFailure(e)) {
@@ -116,7 +112,6 @@ class HoldingSyncScheduler(
         }
 
         val total = kiwoomApiKeys.size
-        log.info { "키움 보유종목 동기화 완료: 성공 $successCount / 인증실패 $authFailCount / 기타실패 $otherFailCount (총 $total)" }
 
         // 회원별 실패는 위에서 건별로 기록했으므로 집계는 warn
         if (total > 0 && otherFailCount.toDouble() / total >= OTHER_FAILURE_THRESHOLD) {
@@ -125,10 +120,11 @@ class HoldingSyncScheduler(
         if (total > 0 && authFailCount == total) {
             log.warn { "키움 보유종목 동기화 전원 인증 실패 ($total 명) — 키움 API 응답 확인 권장" }
         }
+        return "키움 성공 $successCount/인증실패 $authFailCount/기타실패 $otherFailCount (총 $total)"
     }
 
-    private fun syncTossHoldings() {
-        val tossBroker = brokerRepository.findByName("토스증권") ?: return
+    private fun syncTossHoldings(): String {
+        val tossBroker = brokerRepository.findByName("토스증권") ?: return "토스 증권사 정보 없음"
         val tossApiKeys = memberApiKeyRepository.findAllByBrokerId(tossBroker.id)
             .filter { it.member.role.code != "ADMIN" }
 
@@ -154,7 +150,7 @@ class HoldingSyncScheduler(
                     )
 
                     successCount++
-                    log.info { "토스 보유종목 동기화 완료: ${apiKey.member.loginId} (${holdings.size}건)" }
+                    log.debug { "토스 보유종목 동기화: ${apiKey.member.loginId} (${holdings.size}건)" }
                 }
             } catch (e: Exception) {
                 failCount++
@@ -162,20 +158,20 @@ class HoldingSyncScheduler(
             }
         }
 
-        log.info { "토스 보유종목 동기화 완료: 성공 $successCount / 실패 $failCount (총 ${tossApiKeys.size})" }
+        return "토스 성공 $successCount/실패 $failCount (총 ${tossApiKeys.size})"
     }
 
-    private fun syncUpbitHoldings() {
-        val upbitBroker = brokerRepository.findByName("업비트") ?: return
+    private fun syncUpbitHoldings(): String {
+        val upbitBroker = brokerRepository.findByName("업비트") ?: return "업비트 증권사 정보 없음"
         val upbitApiKeys = memberApiKeyRepository.findAllByBrokerId(upbitBroker.id)
             .filter { it.member.role.code != "ADMIN" }
-        if (upbitApiKeys.isEmpty()) return
+        if (upbitApiKeys.isEmpty()) return "업비트 대상 없음"
 
         val marketNames = try {
             marketClient.getKrwMarkets().associate { it.market.removePrefix("KRW-") to it.korean_name }
         } catch (e: Exception) {
             log.failure(e) { "업비트 마켓 목록 조회 실패, 코인 보유 동기화 건너뜀" }
-            return
+            return "업비트 마켓 목록 조회 실패로 건너뜀"
         }
 
         var successCount = 0
@@ -200,7 +196,7 @@ class HoldingSyncScheduler(
                 )
 
                 successCount++
-                log.info { "업비트 보유코인 동기화 완료: ${apiKey.member.loginId} (${holdings.size}건)" }
+                log.debug { "업비트 보유코인 동기화: ${apiKey.member.loginId} (${holdings.size}건)" }
             } catch (e: InvalidApiKeyException) {
                 authFailCount++
                 log.warn { "업비트 보유코인 동기화 인증 실패: loginId=${apiKey.member.loginId}, apiKeyId=${apiKey.id}" }
@@ -211,7 +207,7 @@ class HoldingSyncScheduler(
             }
         }
 
-        log.info { "업비트 보유코인 동기화 완료: 성공 $successCount / 인증실패 $authFailCount / 기타실패 $otherFailCount (총 ${upbitApiKeys.size})" }
+        return "업비트 성공 $successCount/인증실패 $authFailCount/기타실패 $otherFailCount (총 ${upbitApiKeys.size})"
     }
 
     private fun isAuthFailure(e: Throwable): Boolean {

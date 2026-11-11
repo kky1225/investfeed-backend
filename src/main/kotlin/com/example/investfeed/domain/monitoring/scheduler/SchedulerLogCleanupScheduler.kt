@@ -6,7 +6,6 @@ import com.example.investfeed.domain.monitoring.repository.SchedulerLogRepositor
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
-import mu.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -19,7 +18,6 @@ class SchedulerLogCleanupScheduler(
     private val logAckHistoryRepository: LogAckHistoryRepository,
     private val schedulerLogService: SchedulerLogService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     @Scheduled(cron = SchedulerCron.SCHEDULER_LOG_CLEANUP, scheduler = "slowScheduler")
     @Transactional
@@ -28,13 +26,12 @@ class SchedulerLogCleanupScheduler(
             val threshold = LocalDateTime.now().minusDays(90)
 
             val deletedSchedulerLogs = schedulerLogRepository.deleteByStartedAtBefore(threshold)
-            log.info { "scheduler_log 정리 완료: ${deletedSchedulerLogs}건 삭제 (기준: $threshold)" }
-
             val deletedErrorLogs = errorLogRepository.deleteByOccurredAtBefore(threshold)
-            log.info { "error_log 정리 완료: ${deletedErrorLogs}건 삭제 (기준: $threshold)" }
-
             val deletedAckHistory = logAckHistoryRepository.deleteByActedAtBefore(threshold)
-            log.info { "log_ack_history 정리 완료: ${deletedAckHistory}건 삭제 (기준: $threshold)" }
+            report(
+                "기준 $threshold 이전 삭제 — scheduler_log ${deletedSchedulerLogs}건, " +
+                    "error_log ${deletedErrorLogs}건, log_ack_history ${deletedAckHistory}건"
+            )
         }
     }
 }

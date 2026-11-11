@@ -26,7 +26,7 @@ class AdminMemberController(
     @PostMapping
     @RequiresAction(action = Actions.CREATE)
     fun createMember(@Valid @RequestBody req: CreateMemberReq): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "create member: ${req.loginId}" }
+        log.debug { "create member: ${req.loginId}" }
 
         authService.createMember(req)
 
@@ -59,7 +59,7 @@ class AdminMemberController(
         @PathVariable loginId: String,
         @RequestBody req: ChangeRoleReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "change role: $loginId -> ${req.role}" }
+        log.debug { "change role: $loginId -> ${req.role}" }
 
         authService.changeRole(loginId, req.role)
 
@@ -77,7 +77,6 @@ class AdminMemberController(
     fun resetTotp(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "reset totp: $loginId" }
 
         authService.resetTotp(loginId)
 
@@ -95,7 +94,6 @@ class AdminMemberController(
     fun lockAccount(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "lock account: $loginId" }
 
         authService.lockAccount(loginId)
 
@@ -113,7 +111,6 @@ class AdminMemberController(
     fun unlockApiKeyRegistration(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "unlock api key registration: $loginId" }
 
         authService.unlockApiKeyRegistration(loginId)
 
@@ -131,7 +128,6 @@ class AdminMemberController(
     fun unlockAccount(
         @PathVariable loginId: String
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "unlock account: $loginId" }
 
         authService.unlockAccount(loginId)
 

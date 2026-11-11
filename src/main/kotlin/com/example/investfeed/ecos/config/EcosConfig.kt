@@ -11,6 +11,8 @@ import org.springframework.web.reactive.function.client.WebClient
 class EcosConfig(
     @param:Value("\${ecos.default-url}")
     private val defaultUrl: String,
+    @param:Value("\${ecos.api-key}")
+    private val apiKey: String,
     private val externalWebClientFactory: ExternalWebClientFactory,
 ) {
 
@@ -19,5 +21,6 @@ class EcosConfig(
         provider = ApiProvider.ECOS,
         baseUrl = defaultUrl,
         headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
+        secrets = listOf(apiKey),   // 경로에 API 키 (EcosClient 와 같은 속성)
     )
 }

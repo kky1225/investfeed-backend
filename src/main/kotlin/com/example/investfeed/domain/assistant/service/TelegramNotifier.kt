@@ -25,7 +25,7 @@ class TelegramNotifier(
     fun setSendBlocked(blocked: Boolean) {
         if (blocked) redisTemplate.opsForValue().set(sendBlockedKey, LocalDateTime.now().toString())
         else redisTemplate.delete(sendBlockedKey)
-        log.info { "텔레그램 전체 발송 ${if (blocked) "차단" else "재개"} (관리자)" }
+        log.debug { "텔레그램 전체 발송 ${if (blocked) "차단" else "재개"} (관리자)" }
     }
 
     @Transactional

@@ -40,7 +40,9 @@
 - 최신 Kotlin 문법 적용 (data class, sealed class, scope function 등)
 - 실패 1건에 error 로그 1건: 처음 알아챈 곳(외부 API는 호출 클래스·공통 필터)만 log.error, 넘겨받은 catch는 log.failure(e)(AlreadyLogged 표시가 있으면 warn), 외부 API 호출 클래스의 마지막 catch는 log.apiFailure(e) + ExternalApiFailureException (common/util/ErrorLogging.kt)
 - catch는 두 가지만: 받아서 끝내고 계속 진행하는 catch는 log.failure(e), 위로 올릴 실패는 catch를 두지 않음(기록하고 다시 던지기 금지 — SchedulerLogService.execute·ExceptionAdviceController가 1건 기록)
-- 성공 로그는 스케줄러(@Scheduled) 내부에서만 남기기
+- 로그 레벨: error=실패, warn=경고(이미 기록된 실패·회원 키 문제·비정상 종료·복구), info=성공(작업 1건에 1건), debug=그 밖의 전부(시작·진행·건별 상세·호출 상세)
+- 성공 info 는 정해진 곳에서만: 스케줄러는 SchedulerLogService.execute 가 끝날 때 1건(본문은 report("요약")으로 넘김, FAST 는 요약이 있을 때만 debug, 실행 안 함은 schedulerLogService.skip), 화면·비서 요청은 RequestLogInterceptor 가 1건(변경 요청만 info, 조회는 debug), 외부 API 호출 상세는 ApiCallMetricsFilter 가 debug 1건. 그 밖에 info 를 쓰는 곳은 토큰 재발급·기동 시 1회 작업·관리자 일괄 작업 완료처럼 한 번 일어나는 사건뿐
+- 서비스·클라이언트·컨트롤러에서 "~ 완료" info 를 남기지 말 것. 건수 등 요약은 반환값으로 스케줄러에 넘겨 report 로 붙임
 - domain 패키지의 controller는 요청/응답을 DTO 타입으로 구현
 - domain 패키지 외에 외부 API 패키지에서는 상황에 맞게 DTO, parameter 타입 허용
 - suspend fun에 @Transactional 금지, Dispatchers.IO/Default 지정 금지(runBlocking 이벤트 루프에서만 실행). 페이싱은 Thread.sleep 대신 global/ratelimit 필터가 담당

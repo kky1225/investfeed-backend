@@ -69,14 +69,15 @@ class HoldingGradeService(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                doHoldingGrade()
+                report(doHoldingGrade())
             } finally {
                 SecurityContextHolder.clearContext()
             }
         }
     }
 
-    private fun doHoldingGrade() {
+    /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun doHoldingGrade(): String {
         val evalDate = if (holidayService.isHoliday()) {
             holidayService.lastTradingDay()
         } else {
@@ -84,10 +85,7 @@ class HoldingGradeService(
         }
 
         val held = fetchHeldHoldings()
-        if (held.isEmpty()) {
-            log.info { "HoldingGradeScheduler: 보유 종목 없음 — 평가 대상 0건 (eval_date=$evalDate)" }
-            return
-        }
+        if (held.isEmpty()) return "보유 종목 없음 (eval_date=$evalDate)"
 
         val targets = held.distinctBy { it.stkCd }
 
@@ -135,9 +133,7 @@ class HoldingGradeService(
                 log.failure(e) { "HoldingGradeScheduler 평가 실패 stkCd=${h.stkCd}" }
             }
         }
-        log.info {
-            "HoldingGradeScheduler 완료 — eval_date=$evalDate, 보유 distinct=${targets.size}, 저장=$saved"
-        }
+        return "eval_date=$evalDate, 보유 ${targets.size}종목, 저장 ${saved}건"
     }
 
     /** 조회 실패는 잡지 않는다 → 평가 중단(FAILED), 기록은 SchedulerLogService.execute 가 1건 남긴다 */

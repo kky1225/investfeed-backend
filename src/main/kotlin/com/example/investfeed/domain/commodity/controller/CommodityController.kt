@@ -35,7 +35,6 @@ class CommodityController(
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun listCommodities(): ResponseEntity<ApiResponse<CommodityListRes>> {
-        log.info { "listCommodities" }
 
         return ResponseEntity(
             ApiResponse(
@@ -51,7 +50,7 @@ class CommodityController(
     fun streamCommodities(
         @RequestBody req: CommodityStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamCommodities: $req" }
+        log.debug { "streamCommodities: $req" }
 
         kiwoomStreamClient.register(
             StreamEntry(
@@ -76,7 +75,7 @@ class CommodityController(
         @PathVariable stkCd: String,
         req: CommodityDetailReq
     ): ResponseEntity<ApiResponse<CommodityDetailRes>> {
-        log.info { "getCommodity: stkCd=$stkCd, $req" }
+        log.debug { "getCommodity: stkCd=$stkCd, $req" }
 
         return ResponseEntity(
             ApiResponse(

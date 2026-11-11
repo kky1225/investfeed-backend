@@ -29,7 +29,6 @@ class CryptoController(
     @GetMapping
     @RequiresAction(action = Actions.READ)
     fun listCryptos(): ResponseEntity<ApiResponse<CryptoListRes>> {
-        log.info { "listCryptos" }
 
         return ResponseEntity(
             ApiResponse(
@@ -45,7 +44,7 @@ class CryptoController(
     fun streamCryptos(
         @RequestBody req: CryptoStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamCryptos: $req" }
+        log.debug { "streamCryptos: $req" }
 
         cryptoService.streamCryptos(req.items)
 
@@ -61,7 +60,6 @@ class CryptoController(
     @GetMapping("/ranks")
     @RequiresAction(action = Actions.READ)
     fun listCryptoRanks(): ResponseEntity<ApiResponse<List<CryptoRankItem>>> {
-        log.info { "listCryptoRanks" }
 
         return ResponseEntity(
             ApiResponse(
@@ -75,7 +73,6 @@ class CryptoController(
     @GetMapping("/ranks/stream")
     @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamCryptoRanks(): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamCryptoRanks" }
 
         cryptoService.streamCryptoRanks()
 
@@ -93,7 +90,7 @@ class CryptoController(
     fun searchCryptos(
         req: CryptoSearchReq
     ): ResponseEntity<ApiResponse<List<CryptoSearchItem>>> {
-        log.info { "searchCryptos: ${req.keyword}" }
+        log.debug { "searchCryptos: ${req.keyword}" }
 
         return ResponseEntity(
             ApiResponse(
@@ -110,7 +107,7 @@ class CryptoController(
         @PathVariable market: String,
         req: CryptoDetailReq
     ): ResponseEntity<ApiResponse<CryptoDetailRes>> {
-        log.info { "getCrypto: market=$market, chartType=${req.chartType}" }
+        log.debug { "getCrypto: market=$market, chartType=${req.chartType}" }
 
         return ResponseEntity(
             ApiResponse(

@@ -28,8 +28,6 @@ class TickerClient(
                 .bodyToMono(object : ParameterizedTypeReference<List<UpbitTickerRes>>() {})
                 .block()
 
-            log.info { "upbit getTickers: $markets" }
-
             return res ?: emptyList()
         } catch (e: InvestFeedException) {
             throw e

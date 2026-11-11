@@ -36,7 +36,7 @@ class AuthController(
         @RequestBody req: LoginReq,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<PreAuthRes>> {
-        log.info { "login: ${req.loginId}" }
+        log.debug { "login: ${req.loginId}" }
 
         val result = authService.login(req)
         response.addHeader(HttpHeaders.SET_COOKIE, createPreAuthTokenCookie(result.preAuthToken))
@@ -135,7 +135,7 @@ class AuthController(
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<Nothing?>> {
         userDetails?.username?.let { username ->
-            log.info { "logout: $username" }
+            log.debug { "logout: $username" }
             authService.logout(username, accessToken)
         }
 

@@ -44,12 +44,12 @@ class GoalAlertScheduler(
                 authClient.accessToken()
             } catch (e: Exception) {
                 log.failure(e) { "목표 스케줄러 토큰 발급 실패" }
+                report("토큰 발급 실패로 중단")
                 SecurityContextHolder.clearContext()
                 return@execute
             }
 
-            val start = System.currentTimeMillis()
-
+            var achieved = 0
             try {
             val allGoals = investmentGoalRepository.findAll()
 
@@ -82,6 +82,7 @@ class GoalAlertScheduler(
                                 targetAmount = goal.targetAmount,
                                 currentAmount = currentAmount
                             )
+                            achieved++
                         } else if (currentAmount < goal.targetAmount && goal.isAchieved) {
                             val shouldReset = when (goal.type) {
                                 GoalType.MONTHLY_REALIZED_PNL -> true
@@ -98,9 +99,9 @@ class GoalAlertScheduler(
                     }
                 }
             }
+            report("목표 ${allGoals.size}건, 달성 알림 ${achieved}건")
             } finally {
                 SecurityContextHolder.clearContext()
-                log.info { "GoalAlertScheduler 실행 완료: ${System.currentTimeMillis() - start}ms" }
             }
         }
     }

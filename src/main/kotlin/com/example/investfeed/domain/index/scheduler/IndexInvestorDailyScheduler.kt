@@ -35,10 +35,9 @@ class IndexInvestorDailyScheduler(
 
     @Scheduled(cron = SchedulerCron.INDEX_INVESTOR_DAILY, scheduler = "slowScheduler")
     fun scheduledCollectDaily() {
-        log.info { "IndexInvestorDailyScheduler cron fired" }
         schedulerLogService.markFired(SchedulerName.IndexInvestorDailyScheduler)
         if (holidayService.isHoliday()) {
-            log.info { "IndexInvestorDailyScheduler skipped: today is holiday" }
+            schedulerLogService.skip(SchedulerName.IndexInvestorDailyScheduler, "휴일")
             return
         }
         collectDaily()
@@ -49,8 +48,7 @@ class IndexInvestorDailyScheduler(
             setSchedulerSecurityContext()
             try {
                 authClient.accessToken()
-                val filled = catchupMissing()
-                log.info { "지수 투자자 일별 데이터 수집 완료: ${filled}일치" }
+                report(catchupMissing())
             } finally {
                 SecurityContextHolder.clearContext()
             }
@@ -69,8 +67,7 @@ class IndexInvestorDailyScheduler(
                 setSchedulerSecurityContext()
                 try {
                     authClient.accessToken()
-                    val filled = catchupMissing()
-                    log.info { "지수 투자자 일별 데이터 보정 완료: ${filled}일치 수집" }
+                    report("기동 보정 — ${catchupMissing()}")
                 } finally {
                     SecurityContextHolder.clearContext()
                 }
@@ -78,20 +75,18 @@ class IndexInvestorDailyScheduler(
         }.onFailure { log.failure(it) { "지수 투자자 일별 데이터 보정 실패" } }
     }
 
-    private fun catchupMissing(): Int {
+    /** 빠진 날짜를 채우고 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
+    private fun catchupMissing(): String {
         val lastDtKospi = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("001")?.dt
         val lastDtKosdaq = indexInvestorDailyRepository.findFirstByIndsCdOrderByDtDesc("101")?.dt
 
-        if (lastDtKospi == null && lastDtKosdaq == null) {
-            backfillInitial(100)
-            return 0
-        }
+        if (lastDtKospi == null && lastDtKosdaq == null) return backfillInitial(100)
 
         val lastDt = listOfNotNull(lastDtKospi, lastDtKosdaq).min()
         val lastDate = LocalDate.parse(lastDt, formatter)
         val yesterday = LocalDate.now().minusDays(1)
 
-        if (!lastDate.isBefore(yesterday)) return 0
+        if (!lastDate.isBefore(yesterday)) return "빠진 날짜 없음"
 
         var current = lastDate.plusDays(1)
         var filled = 0
@@ -113,10 +108,10 @@ class IndexInvestorDailyScheduler(
             current = current.plusDays(1)
         }
 
-        return filled
+        return "${filled}일치 수집"
     }
 
-    private fun backfillInitial(tradingDays: Int) {
+    private fun backfillInitial(tradingDays: Int): String {
         var current = LocalDate.now().minusDays(1)
         var collected = 0
         var failed = 0
@@ -137,7 +132,7 @@ class IndexInvestorDailyScheduler(
             current = current.minusDays(1)
         }
 
-        log.info { "지수 투자자 일별 초기 시드 완료: ${collected}일치 수집 (실패 ${failed}건)" }
+        return "초기 시드 ${collected}일치 수집 (실패 ${failed}건)"
     }
 
     private fun setSchedulerSecurityContext() {

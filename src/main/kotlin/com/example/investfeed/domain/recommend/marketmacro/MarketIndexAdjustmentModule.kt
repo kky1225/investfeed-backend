@@ -1,7 +1,6 @@
 package com.example.investfeed.domain.recommend.marketmacro
 
 import com.example.investfeed.domain.recommend.entity.StockPick
-import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -39,7 +38,6 @@ import java.time.LocalTime
 class MarketIndexAdjustmentModule(
     private val marketMacroCacheService: MarketMacroCacheService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     companion object {
         /** 새 리포트 생성 시각 (RecommendScheduler cron 22:00) — 보정 적용 마지노선. */

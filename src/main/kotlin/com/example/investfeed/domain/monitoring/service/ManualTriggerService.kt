@@ -97,7 +97,7 @@ class ManualTriggerService(
             )
         }
         if (force && schedulerEnum?.blockedOnHoliday == true && holidayService.isHoliday()) {
-            log.info { "[manual-trigger] $schedulerName 휴일 강제 실행 (force=true) — 직전 거래일 기준 갱신" }
+            log.debug { "[manual-trigger] $schedulerName 휴일 강제 실행 (force=true) — 직전 거래일 기준 갱신" }
         }
 
         runningStatus(schedulerName)?.let { (elapsed, timeoutSec) ->
@@ -111,7 +111,7 @@ class ManualTriggerService(
             throw IllegalStateException("RecommendScheduler 실행이 끝난 후 시도하세요. (현재 실행 중)")
         }
 
-        log.info { "[manual-trigger] $schedulerName 수동 실행 요청 — 백그라운드 예약" }
+        log.debug { "[manual-trigger] $schedulerName 수동 실행 요청 — 백그라운드 예약" }
         taskScheduler.schedule(runnable, Instant.now())
     }
 

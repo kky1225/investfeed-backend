@@ -50,7 +50,7 @@ class SchedulerStatusSeeder(
                     )
                 )
                 inserted++
-                log.info { "[startup] scheduler_status 신규 등록: ${scheduler.name} (${scheduler.type.name}, timeout=${scheduler.defaultTimeoutSec}s)" }
+                log.debug { "[startup] scheduler_status 신규 등록: ${scheduler.name} (${scheduler.type.name}, timeout=${scheduler.defaultTimeoutSec}s)" }
             }
         }
         if (inserted > 0) {

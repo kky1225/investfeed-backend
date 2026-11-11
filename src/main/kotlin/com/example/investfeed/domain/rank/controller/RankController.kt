@@ -33,7 +33,7 @@ class RankController(
     fun listRanks(
         req: RankListReq
     ): ResponseEntity<ApiResponse<RankListRes>> {
-        log.info { "listRanks : $req" }
+        log.debug { "listRanks : $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -49,7 +49,7 @@ class RankController(
     fun streamRanks(
         @RequestBody req: StockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamRanks: $req" }
+        log.debug { "streamRanks: $req" }
 
         stockService.streamStocks(req)
 

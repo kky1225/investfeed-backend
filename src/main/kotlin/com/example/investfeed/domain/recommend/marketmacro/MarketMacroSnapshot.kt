@@ -1,7 +1,6 @@
 package com.example.investfeed.domain.recommend.marketmacro
 
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestor
-import mu.KotlinLogging
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
@@ -14,8 +13,6 @@ data class MarketMacroSnapshot(
     val updatedAt: LocalDateTime,
 ) {
     companion object {
-        private val log = KotlinLogging.logger {}
-
         // ka10051(KiwoomSectInvestor) 의 flu_rt 는 0.01% 단위 정수 문자열로 내려옴
         // (예 "-166" = -1.66%). SectPriceNow.flu_rt(소수 "-1.66")와 포맷이 다름.
         private val SCALE_DIVISOR = BigDecimal(100)

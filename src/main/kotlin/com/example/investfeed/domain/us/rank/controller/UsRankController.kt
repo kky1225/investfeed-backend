@@ -31,7 +31,7 @@ class UsRankController(
     fun listUsRanks(
         req: UsRankListReq
     ): ResponseEntity<ApiResponse<UsRankListRes>> {
-        log.info { "listUsRanks : $req" }
+        log.debug { "listUsRanks : $req" }
 
         return ResponseEntity(
             ApiResponse(
@@ -47,7 +47,7 @@ class UsRankController(
     fun streamUsRanks(
         @RequestBody req: UsStockStreamReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamUsRanks: $req" }
+        log.debug { "streamUsRanks: $req" }
 
         usRankService.streamUsStocks(req)
 

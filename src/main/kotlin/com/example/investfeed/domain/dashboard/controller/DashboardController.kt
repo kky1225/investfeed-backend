@@ -10,7 +10,6 @@ import com.example.investfeed.domain.dashboard.service.DashboardService
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
-import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -24,12 +23,10 @@ class DashboardController(
     private val kiwoomStreamClient: KiwoomStreamClient,
     private val dashboardService: DashboardService,
 ) {
-    private val log = KotlinLogging.logger {}
 
     @GetMapping("/dashboard")
     @RequiresAction(action = Actions.READ)
     fun getStockDashboard(): ResponseEntity<ApiResponse<DashboardRes?>> {
-        log.info { "dashboard" }
 
         return ResponseEntity(
             ApiResponse(
@@ -43,7 +40,6 @@ class DashboardController(
     @GetMapping("/dashboard/stream")
     @RequiresAction(action = Actions.SUBSCRIBE)
     fun streamDashboard(): ResponseEntity<ApiResponse<Nothing?>> {
-        log.info { "streamDashboard" }
 
         kiwoomStreamClient.register(
             StreamEntry(

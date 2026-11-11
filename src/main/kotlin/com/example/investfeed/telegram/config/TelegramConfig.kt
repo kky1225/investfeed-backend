@@ -12,6 +12,8 @@ import java.time.Duration
 class TelegramConfig(
     @param:Value("\${telegram.api-url:https://api.telegram.org}")
     private val apiUrl: String,
+    @param:Value("\${telegram.bot-token:}")
+    private val botToken: String,
     private val externalWebClientFactory: ExternalWebClientFactory,
 ) {
 
@@ -26,5 +28,6 @@ class TelegramConfig(
         baseUrl = apiUrl,
         headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
         responseTimeout = RESPONSE_TIMEOUT,
+        secrets = listOf(botToken),   // 경로에 봇 토큰 (TelegramClient 와 같은 속성, 미설정 "" 은 필터가 무시)
     )
 }

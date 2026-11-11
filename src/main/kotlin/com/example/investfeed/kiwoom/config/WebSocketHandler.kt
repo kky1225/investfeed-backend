@@ -25,7 +25,7 @@ class WebSocketHandler: TextWebSocketHandler() {
     override fun afterConnectionEstablished(
         session: WebSocketSession
     ) {
-        log.info { "afterConnectionEstablished: ${session.id}" }
+        log.debug { "실시간 세션 연결: sessionId=${session.id}, loginId=${session.loginId()}" }
         sessions.add(session)
     }
 
@@ -33,12 +33,12 @@ class WebSocketHandler: TextWebSocketHandler() {
         session: WebSocketSession,
         message: TextMessage
     ) {
-        log.info { "handleTextMessage: ${message.payload}" }
+        log.debug { "실시간 세션 메시지: sessionId=${session.id}, ${message.payload.take(200)}" }
         session.sendMessage(TextMessage("서버 응답: ${message.payload}"))
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
-        log.info { "afterConnectionClosed: ${session.id}" }
+        log.debug { "실시간 세션 종료: sessionId=${session.id}, status=${status.code}" }
         sessions.remove(session)
     }
 

@@ -12,7 +12,6 @@ import com.example.investfeed.upbit.holding.client.CryptoHoldingClient
 import com.example.investfeed.upbit.market.client.MarketClient
 import com.example.investfeed.upbit.ticker.client.TickerClient
 import com.example.investfeed.upbit.websocket.client.CryptoStreamClient
-import mu.KotlinLogging
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -28,7 +27,6 @@ class CryptoHoldingService(
     private val memberHoldingRepository: MemberHoldingRepository,
     private val memberApiKeyRepository: MemberApiKeyRepository,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun listCryptoHoldings(): HoldingListRes {
         val loginId = getLoginId() ?: throw IllegalStateException("인증 정보를 찾을 수 없습니다.")

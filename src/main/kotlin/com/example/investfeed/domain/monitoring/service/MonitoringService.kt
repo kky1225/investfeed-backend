@@ -11,7 +11,6 @@ import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.global.holiday.HolidayService
 import jakarta.persistence.EntityManager
 import jakarta.persistence.criteria.Predicate
-import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
@@ -46,7 +45,6 @@ class MonitoringService(
     @Qualifier("fastScheduler") private val fastScheduler: ThreadPoolTaskScheduler,
     @Qualifier("slowScheduler") private val slowScheduler: ThreadPoolTaskScheduler,
 ) {
-    private val log = KotlinLogging.logger {}
 
     fun getStatuses(): List<SchedulerStatusRes> {
         val now = LocalDateTime.now()
