@@ -204,6 +204,11 @@ enum class ResponseCode(
     PRICE_TARGET_LIST(message = "목표가 알림 목록 조회에 성공하셨습니다."),
     PRICE_TARGET_DELETE(message = "목표가 알림 삭제에 성공하셨습니다."),
 
+    CHART_SETTING(message = "차트 설정 조회에 성공하셨습니다."),
+    CHART_SETTING_SAVE(message = "차트 설정 저장에 성공하셨습니다."),
+    CHART_DRAWING(message = "차트에 그린 선 조회에 성공하셨습니다."),
+    CHART_DRAWING_SAVE(message = "차트에 그린 선 저장에 성공하셨습니다."),
+
     REBALANCING_SETTING_SAVE(message = "리밸런싱 설정 저장에 성공하셨습니다."),
     REBALANCING_STATUS(message = "리밸런싱 현황 조회에 성공하셨습니다."),
     REBALANCING_SETTING_DELETE(message = "리밸런싱 설정 삭제에 성공하셨습니다."),

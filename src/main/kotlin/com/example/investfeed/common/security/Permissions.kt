@@ -120,6 +120,9 @@ object Permissions {
     /** 알림 조회/설정 */
     const val NOTIFICATION = "NOTIFICATION"
 
+    /** 차트 설정·그린 선 저장 (회원별) */
+    const val CHART = "CHART"
+
     /** AI 비서 타임라인·설정·비서 토큰 */
     const val ASSISTANT = "ASSISTANT"
 
