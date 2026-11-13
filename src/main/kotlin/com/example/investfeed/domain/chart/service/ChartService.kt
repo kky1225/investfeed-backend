@@ -2,6 +2,7 @@ package com.example.investfeed.domain.chart.service
 
 import com.example.investfeed.domain.chart.dto.ChartAnchor
 import com.example.investfeed.domain.chart.dto.ChartDrawingItem
+import com.example.investfeed.domain.chart.dto.ChartIndicatorSetting
 import com.example.investfeed.domain.chart.dto.req.ChartDrawingSaveReq
 import com.example.investfeed.domain.chart.dto.req.ChartSettingReq
 import com.example.investfeed.domain.chart.dto.res.ChartDrawingRes
@@ -27,17 +28,55 @@ class ChartService(
 
     fun getSetting(memberId: Long): ChartSettingRes =
         chartSettingRepository.findByMemberId(memberId)
-            ?.let { objectMapper.readValue(it.settings, ChartSettingRes::class.java) }
+            ?.let { readSetting(it.settings) }
             ?: ChartSettingRes()
+
+    /**
+     * 저장된 설정을 읽는다. 예전 형태(끈 항목 목록 hidden, 켠 항목 목록 shown, 지표별 설정값 params 가 따로 있던 것)로
+     * 저장된 행은 지표별 묶음으로 바꿔 돌려준다. 다음에 저장할 때 새 형태로 덮어써진다.
+     */
+    private fun readSetting(json: String): ChartSettingRes {
+        val node = objectMapper.readTree(json)
+        val isLegacy = LEGACY_FIELDS.any { node.has(it) }
+        if (!isLegacy) return objectMapper.treeToValue(node, ChartSettingRes::class.java)
+
+        val hidden = node.path("hidden").mapNotNull { it.asText(null) }
+        val shown = node.path("shown").mapNotNull { it.asText(null) }
+        val params = node.path("params").properties().associate { (key, values) -> key to values.map { it.asDouble() } }
+        val indicatorKeys = (hidden + shown + params.keys).distinct() - TOOLBAR_KEY
+        return ChartSettingRes(
+            indicators = indicatorKeys.associateWith { key ->
+                ChartIndicatorSetting(
+                    on = when (key) {
+                        in hidden -> false
+                        in shown -> true
+                        else -> null
+                    },
+                    params = params[key],
+                )
+            },
+            drawingToolbar = TOOLBAR_KEY !in hidden,
+            flatByPrevClose = node.path("flatByPrevClose").asBoolean(false),
+        )
+    }
 
     @Transactional
     fun saveSetting(memberId: Long, req: ChartSettingReq): ChartSettingRes {
-        val hidden = req.hidden.distinct()
-        require(hidden.size <= MAX_HIDDEN && hidden.all { it.isNotBlank() && it.length <= MAX_KEY_LENGTH }) {
-            "차트 설정 값을 확인해주세요."
+        // 지표가 실제로 있는지, 값이 그 지표에 맞는지는 화면이 판단한다(맞지 않으면 기본값을 쓴다).
+        // 여기서는 저장할 수 있는 크기와 숫자 범위만 막는다.
+        val keysValid = req.indicators.size <= MAX_INDICATORS &&
+            req.indicators.keys.all { it.isNotBlank() && it.length <= MAX_KEY_LENGTH }
+        val paramsValid = req.indicators.values.mapNotNull { it.params }.all { values ->
+            values.size <= MAX_PARAM_VALUES && values.all { it.isFinite() && it > 0 && it <= MAX_PARAM_VALUE }
         }
+        require(keysValid && paramsValid) { "차트 설정 값을 확인해주세요." }
 
-        val res = ChartSettingRes(hidden = hidden, flatByPrevClose = req.flatByPrevClose)
+        val res = ChartSettingRes(
+            // 바꾼 것이 없는 지표는 저장하지 않는다
+            indicators = req.indicators.filterValues { it.on != null || it.params != null },
+            drawingToolbar = req.drawingToolbar,
+            flatByPrevClose = req.flatByPrevClose,
+        )
         val json = objectMapper.writeValueAsString(res)
         val existing = chartSettingRepository.findByMemberId(memberId)
         if (existing != null) {
@@ -101,7 +140,11 @@ class ChartService(
         anchor != null && anchor.time > 0 && anchor.price.isFinite()
 
     companion object {
-        private const val MAX_HIDDEN = 50
+        private const val MAX_INDICATORS = 50       // 설정을 바꿔 둘 수 있는 지표의 최대 개수
+        private val LEGACY_FIELDS = listOf("hidden", "shown", "params")     // 예전 형태에만 있는 항목
+        private const val TOOLBAR_KEY = "drawingToolbar"    // 예전 형태에서 그리기 도구 모음을 숨겼다는 표시
+        private const val MAX_PARAM_VALUES = 10     // 지표 하나의 설정값 최대 개수
+        private const val MAX_PARAM_VALUE = 1000.0
         private const val MAX_KEY_LENGTH = 30
         private const val MAX_DRAWINGS = 200
         private const val MAX_ID_LENGTH = 40
