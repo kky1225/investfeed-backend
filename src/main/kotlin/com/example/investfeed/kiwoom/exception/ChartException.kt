@@ -7,6 +7,7 @@ class StockChartDayListException(): ExternalApiException(code = "CHART_0003", me
 class StockChartWeekListException(): ExternalApiException(code = "CHART_0004", message = "주식 주봉 차트 조회에 실패하셨습니다.")
 class StockChartMonthListException(): ExternalApiException(code = "CHART_0005", message = "주식 월봉 차트 조회에 실패하셨습니다.")
 class StockChartYearListException(): ExternalApiException(code = "CHART_0006", message = "주식 년봉 차트 조회에 실패하셨습니다.")
+class StockChartPageException(): ExternalApiException(code = "CHART_0007", message = "주식 과거 차트 조회에 실패하셨습니다.")
 class StockChartInvestorException(): ExternalApiException(code = "STOCK_CHART_0006", message = "장중 투자자별 매매 차트 조회에 실패하셨습니다.")
 
 class SectChartMinuteListException(): ExternalApiException(code = "SECT_CHART_0001", message = "업종 분봉 차트 조회에 실패하셨습니다.")

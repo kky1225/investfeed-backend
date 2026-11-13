@@ -27,6 +27,7 @@ enum class ResponseCode(
     US_RANK_LIST(message = "미국 주식 순위 조회에 성공하셨습니다."),
     STOCK_DETAIL(message = "주식 상세 조회에 성공하셨습니다."),
     STOCK_DETAIL_WS(message = "실시간 주식 상세 조회에 성공하셨습니다."),
+    STOCK_CANDLES(message = "주식 과거 차트 조회에 성공하셨습니다."),
     STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
     US_STOCK_SEARCH(message = "미국 종목 검색에 성공하셨습니다."),
     US_STOCK_DETAIL(message = "미국 주식 상세 조회에 성공하셨습니다."),

@@ -4,6 +4,7 @@ import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.common.util.failure
 import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.domain.dividend.service.StockDividendService
+import com.example.investfeed.domain.stock.dto.req.StockCandleReq
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
 import com.example.investfeed.domain.stock.dto.req.StockStreamReq
 import com.example.investfeed.domain.stock.dto.res.*
@@ -255,6 +256,25 @@ class StockService(
         )
     }
 
+
+    /**
+     * 차트의 과거 구간 한 페이지. cursor 없이 부르면 가장 최근 구간, cursor 를 주면 그 이전 구간.
+     * 분봉도 당일로 자르지 않고 받은 그대로 준다(종목 상세의 분봉은 선 차트용이라 당일만 준다).
+     */
+    fun getStockCandles(stkCd: String, req: StockCandleReq): StockCandleRes = runBlocking {
+        val page = stockChartClient.chartPage(
+            chartType = req.chartType,
+            stkCd = stkCd,
+            baseDt = DateUtil.today("yyyyMMdd"),
+            nextKey = req.cursor,
+        )
+        StockCandleRes(
+            candles = page.rows.map {
+                StockChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)
+            },
+            nextCursor = page.nextKey,
+        )
+    }
 
     /** 종목 차트(차트 갱신용 경량 응답). 기본정보·종목정보·거래정보·차트 4건 동시 요청. */
     fun getStockChart(stkCd: String, req: StockDetailReq): StockChartRes = runBlocking {
