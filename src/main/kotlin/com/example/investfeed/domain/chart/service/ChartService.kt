@@ -37,7 +37,7 @@ class ChartService(
             "차트 설정 값을 확인해주세요."
         }
 
-        val res = ChartSettingRes(hidden = hidden)
+        val res = ChartSettingRes(hidden = hidden, flatByPrevClose = req.flatByPrevClose)
         val json = objectMapper.writeValueAsString(res)
         val existing = chartSettingRepository.findByMemberId(memberId)
         if (existing != null) {
