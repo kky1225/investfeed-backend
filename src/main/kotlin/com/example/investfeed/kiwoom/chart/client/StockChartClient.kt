@@ -48,6 +48,7 @@ class StockChartClient(
             return when (chartType) {
                 StockChartType.DAY -> fetchPage<KiwoomStockChartDayRes>(
                     "ka10081", KiwoomStockChartDayReq(stk_cd = stkCd, base_dt = baseDt, upd_stkpc_tp = "1"), nextKey,
+                    retryOnQuota = true,
                 ) { res -> res.stk_dt_pole_chart_qry?.map { KiwoomStockChartRow(it.dt, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.trde_prica) } }
 
                 StockChartType.WEEK -> fetchPage<KiwoomStockChartWeekRes>(
@@ -85,22 +86,30 @@ class StockChartClient(
         apiId: String,
         req: Any,
         nextKey: String?,
+        retryOnQuota: Boolean = false,  // 한도 초과 응답이면 1초 뒤 한 번 더 부른다 (chartDayList 와 같은 처리)
         toRows: (T) -> List<KiwoomStockChartRow>?,
     ): KiwoomStockChartPage {
         val accessToken = authClient.getCurrentAccessToken()
         val continued = !nextKey.isNullOrBlank()
 
-        val entity = kiwoomWebClient.post()
-            .uri("$DEFAULT_URL/api/dostk/chart")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-            .header("api-id", apiId)
-            .header("cont-yn", if (continued) "Y" else "N")
-            .header("next-key", nextKey.orEmpty())
-            .bodyValue(req)
-            .retrieve()
-            .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
-            .toEntity<T>()
-            .awaitSingleOrNull()
+        val call = suspend {
+            kiwoomWebClient.post()
+                .uri("$DEFAULT_URL/api/dostk/chart")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header("api-id", apiId)
+                .header("cont-yn", if (continued) "Y" else "N")
+                .header("next-key", nextKey.orEmpty())
+                .bodyValue(req)
+                .retrieve()
+                .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
+                .toEntity<T>()
+                .awaitSingleOrNull()
+        }
+        val entity = if (retryOnQuota) {
+            withQuotaRetry(apiId, { it.body?.return_code }, onRetry = recordQuotaRetry, block = call)
+        } else {
+            call()
+        }
 
         val body = entity?.body
         if (body?.return_code != 0) {
