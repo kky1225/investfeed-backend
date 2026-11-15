@@ -10,4 +10,5 @@ import com.fasterxml.jackson.annotation.JsonInclude
 data class ChartIndicatorSetting(
     val on: Boolean? = null,            // 켜짐 여부. null 이면 지표의 기본 상태
     val params: List<Double>? = null,   // 설정값 (기간 등). 순서는 설정 창의 칸 순서. null 이면 기본값
+    val colors: List<Int>? = null,      // 선마다의 색. 화면이 가진 선 색 목록에서의 순번. 순서는 설정 창의 선 순서. null 이면 기본 색
 )

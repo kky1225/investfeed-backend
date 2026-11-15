@@ -69,13 +69,16 @@ class ChartService(
         val paramsValid = req.indicators.values.mapNotNull { it.params }.all { values ->
             values.size <= MAX_PARAM_VALUES && values.all { it.isFinite() && it > 0 && it <= MAX_PARAM_VALUE }
         }
+        val colorsValid = req.indicators.values.mapNotNull { it.colors }.all { colors ->
+            colors.size <= MAX_PARAM_VALUES && colors.all { it in 0..MAX_COLOR_INDEX }
+        }
         val chartTypeValid = req.chartType.isNotBlank() && req.chartType.length <= MAX_KEY_LENGTH
         val magnetValid = req.magnet.isNotBlank() && req.magnet.length <= MAX_KEY_LENGTH
-        require(keysValid && paramsValid && chartTypeValid && magnetValid) { "차트 설정 값을 확인해주세요." }
+        require(keysValid && paramsValid && colorsValid && chartTypeValid && magnetValid) { "차트 설정 값을 확인해주세요." }
 
         val res = ChartSettingRes(
             // 바꾼 것이 없는 지표는 저장하지 않는다
-            indicators = req.indicators.filterValues { it.on != null || it.params != null },
+            indicators = req.indicators.filterValues { it.on != null || it.params != null || it.colors != null },
             chartType = req.chartType,
             logScale = req.logScale,
             drawingToolbar = req.drawingToolbar,
