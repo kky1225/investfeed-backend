@@ -81,6 +81,7 @@ class ChartService(
             indicators = req.indicators.filterValues { it.on != null || it.params != null || it.colors != null },
             chartType = req.chartType,
             logScale = req.logScale,
+            percentScale = req.percentScale,
             drawingToolbar = req.drawingToolbar,
             flatByPrevClose = req.flatByPrevClose,
             magnet = req.magnet,
