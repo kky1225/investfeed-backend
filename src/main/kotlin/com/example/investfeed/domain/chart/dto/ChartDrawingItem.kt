@@ -13,7 +13,8 @@ data class ChartAnchor(
 /**
  * 차트에 그린 도형 한 개. 요청·응답·저장에 같은 모양을 쓴다.
  * type 에 따라 쓰는 값이 다르다:
- * trend(추세선)·ray(반직선)·rectangle(사각형) = from·to / channel(평행 채널) = from·to·third
+ * trend(추세선)·ray(반직선)·rectangle(사각형)·fibonacci(피보나치 되돌림)·measure(가격 범위 측정) = from·to
+ * / channel(평행 채널) = from·to·third / text(글자) = from·text
  * / horizontal(수평선) = price / vertical(수직선) = time(·offset)
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -26,6 +27,7 @@ data class ChartDrawingItem(
     val price: Double? = null,
     val time: Long? = null,             // 수직선이 놓인 캔들 시각 (epoch ms)
     val offset: Int? = null,            // 수직선이 미래 구간에 있을 때, time 의 캔들에서 뒤로 몇 칸인지
+    val text: String? = null,           // 글자 도형에 적은 내용
     // 꾸미기. 없으면 화면의 기본값
     val color: Int? = null,             // 화면이 가진 선 색 목록에서의 순번
     val lineWidth: Int? = null,

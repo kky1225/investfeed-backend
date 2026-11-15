@@ -70,7 +70,8 @@ class ChartService(
             values.size <= MAX_PARAM_VALUES && values.all { it.isFinite() && it > 0 && it <= MAX_PARAM_VALUE }
         }
         val chartTypeValid = req.chartType.isNotBlank() && req.chartType.length <= MAX_KEY_LENGTH
-        require(keysValid && paramsValid && chartTypeValid) { "차트 설정 값을 확인해주세요." }
+        val magnetValid = req.magnet.isNotBlank() && req.magnet.length <= MAX_KEY_LENGTH
+        require(keysValid && paramsValid && chartTypeValid && magnetValid) { "차트 설정 값을 확인해주세요." }
 
         val res = ChartSettingRes(
             // 바꾼 것이 없는 지표는 저장하지 않는다
@@ -79,6 +80,7 @@ class ChartService(
             logScale = req.logScale,
             drawingToolbar = req.drawingToolbar,
             flatByPrevClose = req.flatByPrevClose,
+            magnet = req.magnet,
         )
         val json = objectMapper.writeValueAsString(res)
         val existing = chartSettingRepository.findByMemberId(memberId)
@@ -138,6 +140,7 @@ class ChartService(
         return when (drawing.type) {
             in TWO_POINT_TYPES -> isValid(drawing.from) && isValid(drawing.to)
             TYPE_CHANNEL -> isValid(drawing.from) && isValid(drawing.to) && isValid(drawing.third)
+            TYPE_TEXT -> isValid(drawing.from) && !drawing.text.isNullOrBlank() && drawing.text.length <= MAX_TEXT_LENGTH
             TYPE_HORIZONTAL -> drawing.price?.isFinite() == true
             TYPE_VERTICAL -> (drawing.time ?: 0) > 0 && isValidOffset(drawing.offset)
             else -> false
@@ -159,8 +162,11 @@ class ChartService(
         private const val MAX_DRAWINGS = 200
         private const val MAX_ID_LENGTH = 40
         private const val MAX_ASSET_CODE_LENGTH = 50
-        private val TWO_POINT_TYPES = setOf("trend", "ray", "rectangle")    // 두 점(from·to)으로 정해지는 도형
+        // 두 점(from·to)으로 정해지는 도형
+        private val TWO_POINT_TYPES = setOf("trend", "ray", "rectangle", "fibonacci", "measure")
         private const val TYPE_CHANNEL = "channel"
+        private const val TYPE_TEXT = "text"
+        private const val MAX_TEXT_LENGTH = 100
         private const val TYPE_HORIZONTAL = "horizontal"
         private const val TYPE_VERTICAL = "vertical"
         private const val MAX_COLOR_INDEX = 20
