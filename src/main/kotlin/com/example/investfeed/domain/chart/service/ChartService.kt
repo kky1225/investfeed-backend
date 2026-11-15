@@ -132,15 +132,22 @@ class ChartService(
 
     private fun isValid(drawing: ChartDrawingItem): Boolean {
         if (drawing.id.isBlank() || drawing.id.length > MAX_ID_LENGTH) return false
+        val styleValid = (drawing.color == null || drawing.color in 0..MAX_COLOR_INDEX) &&
+            (drawing.lineWidth == null || drawing.lineWidth in 1..MAX_LINE_WIDTH)
+        if (!styleValid) return false
         return when (drawing.type) {
-            TYPE_TREND -> isValid(drawing.from) && isValid(drawing.to)
+            in TWO_POINT_TYPES -> isValid(drawing.from) && isValid(drawing.to)
+            TYPE_CHANNEL -> isValid(drawing.from) && isValid(drawing.to) && isValid(drawing.third)
             TYPE_HORIZONTAL -> drawing.price?.isFinite() == true
+            TYPE_VERTICAL -> (drawing.time ?: 0) > 0 && isValidOffset(drawing.offset)
             else -> false
         }
     }
 
     private fun isValid(anchor: ChartAnchor?): Boolean =
-        anchor != null && anchor.time > 0 && anchor.price.isFinite()
+        anchor != null && anchor.time > 0 && anchor.price.isFinite() && isValidOffset(anchor.offset)
+
+    private fun isValidOffset(offset: Int?): Boolean = offset == null || offset in 0..MAX_FUTURE_OFFSET
 
     companion object {
         private const val MAX_INDICATORS = 50       // 설정을 바꿔 둘 수 있는 지표의 최대 개수
@@ -152,8 +159,13 @@ class ChartService(
         private const val MAX_DRAWINGS = 200
         private const val MAX_ID_LENGTH = 40
         private const val MAX_ASSET_CODE_LENGTH = 50
-        private const val TYPE_TREND = "trend"
+        private val TWO_POINT_TYPES = setOf("trend", "ray", "rectangle")    // 두 점(from·to)으로 정해지는 도형
+        private const val TYPE_CHANNEL = "channel"
         private const val TYPE_HORIZONTAL = "horizontal"
+        private const val TYPE_VERTICAL = "vertical"
+        private const val MAX_COLOR_INDEX = 20
+        private const val MAX_LINE_WIDTH = 5
+        private const val MAX_FUTURE_OFFSET = 10_000    // 미래 구간에 놓을 수 있는 최대 칸 수
         private val DRAWING_LIST_TYPE = object : TypeReference<List<ChartDrawingItem>>() {}
     }
 }
