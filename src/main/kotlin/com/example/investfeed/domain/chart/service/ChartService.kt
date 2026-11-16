@@ -93,6 +93,7 @@ class ChartService(
             drawingToolbar = req.drawingToolbar,
             flatByPrevClose = req.flatByPrevClose,
             magnet = req.magnet,
+            magnetIndicators = req.magnetIndicators,
             volumeRatio = req.volumeRatio,
             mainHeight = req.mainHeight,
         )
@@ -150,7 +151,9 @@ class ChartService(
         if (drawing.id.isBlank() || drawing.id.length > MAX_ID_LENGTH) return false
         val styleValid = (drawing.color == null || drawing.color in 0..MAX_COLOR_INDEX) &&
             (drawing.lineWidth == null || drawing.lineWidth in 1..MAX_LINE_WIDTH)
-        if (!styleValid) return false
+        val levelsValid = drawing.levels == null ||
+            (drawing.levels.size in 1..MAX_FIBONACCI_LEVELS && drawing.levels.all { it in FIBONACCI_LEVEL_RANGE })
+        if (!styleValid || !levelsValid) return false
         return when (drawing.type) {
             in TWO_POINT_TYPES -> isValid(drawing.from) && isValid(drawing.to)
             TYPE_CHANNEL -> isValid(drawing.from) && isValid(drawing.to) && isValid(drawing.third)
@@ -181,6 +184,8 @@ class ChartService(
         private const val MAX_ASSET_CODE_LENGTH = 50
         // 두 점(from·to)으로 정해지는 도형
         private val TWO_POINT_TYPES = setOf("trend", "ray", "rectangle", "fibonacci", "measure")
+        private const val MAX_FIBONACCI_LEVELS = 20         // 피보나치 되돌림 하나에 켜 둘 수 있는 비율의 수
+        private val FIBONACCI_LEVEL_RANGE = 0.0..10.0       // 비율 하나의 범위 (확장 비율 포함)
         private const val TYPE_CHANNEL = "channel"
         private const val TYPE_TEXT = "text"
         private const val MAX_TEXT_LENGTH = 100

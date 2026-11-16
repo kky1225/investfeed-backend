@@ -28,6 +28,7 @@ data class ChartDrawingItem(
     val time: Long? = null,             // 수직선이 놓인 캔들 시각 (epoch ms)
     val offset: Int? = null,            // 수직선이 미래 구간에 있을 때, time 의 캔들에서 뒤로 몇 칸인지
     val text: String? = null,           // 글자 도형에 적은 내용
+    val levels: List<Double>? = null,   // 피보나치 되돌림에서 켜 둔 비율. 없으면 화면의 기본 비율
     // 꾸미기. 없으면 화면의 기본값
     val color: Int? = null,             // 화면이 가진 선 색 목록에서의 순번
     val lineWidth: Int? = null,
