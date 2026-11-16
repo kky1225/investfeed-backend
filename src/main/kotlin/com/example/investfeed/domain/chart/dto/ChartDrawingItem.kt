@@ -32,4 +32,7 @@ data class ChartDrawingItem(
     val color: Int? = null,             // 화면이 가진 선 색 목록에서의 순번
     val lineWidth: Int? = null,
     val dashed: Boolean? = null,
+    // 상태. 없으면 풀려 있고 보이는 상태
+    val locked: Boolean? = null,        // 잠금: 화면에서 옮기거나 고칠 수 없다
+    val hidden: Boolean? = null,        // 숨김: 화면에 그리지 않는다
 )
