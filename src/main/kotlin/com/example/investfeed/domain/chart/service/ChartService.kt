@@ -74,17 +74,27 @@ class ChartService(
         }
         val chartTypeValid = req.chartType.isNotBlank() && req.chartType.length <= MAX_KEY_LENGTH
         val magnetValid = req.magnet.isNotBlank() && req.magnet.length <= MAX_KEY_LENGTH
-        require(keysValid && paramsValid && colorsValid && chartTypeValid && magnetValid) { "차트 설정 값을 확인해주세요." }
+        // 영역 높이는 화면이 끌어서 바꿀 수 있는 범위와 같다
+        val sizesValid = req.indicators.values.mapNotNull { it.height }.all { it in INDICATOR_HEIGHT_RANGE } &&
+            (req.volumeRatio == null || req.volumeRatio in VOLUME_RATIO_RANGE) &&
+            (req.mainHeight == null || req.mainHeight in MAIN_HEIGHT_RANGE)
+        require(keysValid && paramsValid && colorsValid && chartTypeValid && magnetValid && sizesValid) {
+            "차트 설정 값을 확인해주세요."
+        }
 
         val res = ChartSettingRes(
             // 바꾼 것이 없는 지표는 저장하지 않는다
-            indicators = req.indicators.filterValues { it.on != null || it.params != null || it.colors != null },
+            indicators = req.indicators.filterValues {
+                it.on != null || it.params != null || it.colors != null || it.height != null
+            },
             chartType = req.chartType,
             logScale = req.logScale,
             percentScale = req.percentScale,
             drawingToolbar = req.drawingToolbar,
             flatByPrevClose = req.flatByPrevClose,
             magnet = req.magnet,
+            volumeRatio = req.volumeRatio,
+            mainHeight = req.mainHeight,
         )
         val json = objectMapper.writeValueAsString(res)
         val existing = chartSettingRepository.findByMemberId(memberId)
@@ -163,6 +173,9 @@ class ChartService(
         private const val MAX_PARAM_VALUES = 10     // 지표 하나의 설정값 최대 개수
         private const val MAX_PARAM_VALUE = 1000.0
         private const val MAX_KEY_LENGTH = 30
+        private val INDICATOR_HEIGHT_RANGE = 50..300    // 보조지표 영역 하나의 높이(px)
+        private val VOLUME_RATIO_RANGE = 0.1..0.5       // 가격+거래량 높이 중 거래량 영역의 비율
+        private val MAIN_HEIGHT_RANGE = 250..800        // 가격+거래량 영역의 높이(px)
         private const val MAX_DRAWINGS = 200
         private const val MAX_ID_LENGTH = 40
         private const val MAX_ASSET_CODE_LENGTH = 50
