@@ -57,6 +57,9 @@ class CryptoService(
                     CryptoChartMinute(
                         tradePrice = it.trade_price,
                         candleDateTimeKst = it.candle_date_time_kst,
+                        openingPrice = it.opening_price,
+                        highPrice = it.high_price,
+                        lowPrice = it.low_price,
                     )
                 })
 

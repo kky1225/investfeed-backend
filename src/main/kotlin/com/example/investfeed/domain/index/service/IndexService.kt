@@ -91,7 +91,10 @@ class IndexService(
                     chartMinuteList = kiwoomSectChartMinuteRes.inds_min_pole_qry?.map { it ->
                         ChartMinute(
                             curPrc = it.cur_prc,
-                            cntrTm = it.cntr_tm
+                            cntrTm = it.cntr_tm,
+                            openPric = it.open_pric,
+                            highPric = it.high_pric,
+                            lowPric = it.low_pric,
                         )
                     } ?: emptyList()
                 }

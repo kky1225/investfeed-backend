@@ -55,7 +55,10 @@ class CommodityService(
                     chartMinuteList = kiwoomGoldChartMinuteRes.gds_min_chart_qry?.map {
                         ChartMinute(
                             curPrc = it.cntr_pric,
-                            cntrTm = it.cntr_tm
+                            cntrTm = it.cntr_tm,
+                            openPric = it.open_pric,
+                            highPric = it.high_pric,
+                            lowPric = it.low_pric,
                         )
                     } ?: emptyList()
                 }
