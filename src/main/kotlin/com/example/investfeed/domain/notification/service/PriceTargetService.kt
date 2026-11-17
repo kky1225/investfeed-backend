@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.notification.service
 
 import com.example.investfeed.domain.notification.dto.req.PriceTargetCreateReq
+import com.example.investfeed.domain.notification.dto.req.PriceTargetUpdateReq
 import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
 import com.example.investfeed.domain.notification.entity.PriceTarget
 import com.example.investfeed.domain.notification.repository.PriceTargetRepository
@@ -40,6 +41,22 @@ class PriceTargetService(
     fun getPriceTargets(memberId: Long): List<PriceTargetRes> {
         return priceTargetRepository.findByMemberIdOrderByCreatedAtDesc(memberId)
             .map { PriceTargetRes.from(it) }
+    }
+
+    /** 목표가와 방향을 바꾼다. 종목은 바꾸지 않는다. */
+    @Transactional
+    fun updatePriceTarget(memberId: Long, id: Long, req: PriceTargetUpdateReq): PriceTargetRes {
+        val entity = priceTargetRepository.findById(id)
+            .orElseThrow { IllegalArgumentException("목표가 알림을 찾을 수 없습니다.") }
+        if (entity.memberId != memberId) {
+            throw IllegalStateException("권한이 없습니다.")
+        }
+        if (req.targetPrice.signum() <= 0) {
+            throw IllegalArgumentException("목표가는 0보다 커야 합니다.")
+        }
+        entity.targetPrice = req.targetPrice
+        entity.direction = req.direction
+        return PriceTargetRes.from(entity)
     }
 
     @Transactional

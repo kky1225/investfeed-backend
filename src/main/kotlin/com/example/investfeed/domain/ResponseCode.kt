@@ -203,6 +203,7 @@ enum class ResponseCode(
 
     PRICE_TARGET_CREATE(message = "목표가 알림 등록에 성공하셨습니다."),
     PRICE_TARGET_LIST(message = "목표가 알림 목록 조회에 성공하셨습니다."),
+    PRICE_TARGET_UPDATE(message = "목표가 알림 수정에 성공하셨습니다."),
     PRICE_TARGET_DELETE(message = "목표가 알림 삭제에 성공하셨습니다."),
 
     CHART_SETTING(message = "차트 설정 조회에 성공하셨습니다."),

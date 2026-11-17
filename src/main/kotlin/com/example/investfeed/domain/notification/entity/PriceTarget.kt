@@ -25,11 +25,11 @@ class PriceTarget(
     val assetName: String,
 
     @Column(nullable = false, precision = 18, scale = 4)
-    val targetPrice: BigDecimal,   // 국내·코인 원, 미국 달러 (센트 단위 때문에 2026-10-27 NUMERIC)
+    var targetPrice: BigDecimal,   // 국내·코인 원, 미국 달러 (센트 단위 때문에 2026-10-27 NUMERIC)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val direction: PriceTargetDirection,
+    var direction: PriceTargetDirection,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()

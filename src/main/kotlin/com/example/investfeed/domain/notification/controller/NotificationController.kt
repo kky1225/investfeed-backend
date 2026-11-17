@@ -4,6 +4,7 @@ import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.notification.dto.req.NotificationListReq
 import com.example.investfeed.domain.notification.dto.req.NotificationSettingReq
 import com.example.investfeed.domain.notification.dto.req.PriceTargetCreateReq
+import com.example.investfeed.domain.notification.dto.req.PriceTargetUpdateReq
 import com.example.investfeed.domain.notification.dto.res.NotificationRes
 import com.example.investfeed.domain.notification.dto.res.NotificationSettingRes
 import com.example.investfeed.domain.notification.dto.res.PriceTargetRes
@@ -115,6 +116,22 @@ class NotificationController(
                 code = ResponseCode.PRICE_TARGET_LIST.code,
                 message = ResponseCode.PRICE_TARGET_LIST.message,
                 result = priceTargetService.getPriceTargets(user.member.id)
+            ), HttpStatus.OK
+        )
+    }
+
+    @PatchMapping("price-targets/{id}")
+    @RequiresAction(action = Actions.UPDATE)
+    fun updatePriceTarget(
+        @AuthenticationPrincipal user: CustomUserDetails,
+        @PathVariable id: Long,
+        @Valid @RequestBody req: PriceTargetUpdateReq
+    ): ResponseEntity<ApiResponse<PriceTargetRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.PRICE_TARGET_UPDATE.code,
+                message = ResponseCode.PRICE_TARGET_UPDATE.message,
+                result = priceTargetService.updatePriceTarget(user.member.id, id, req)
             ), HttpStatus.OK
         )
     }
