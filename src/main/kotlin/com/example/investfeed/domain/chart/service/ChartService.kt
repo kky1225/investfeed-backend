@@ -188,7 +188,7 @@ class ChartService(
         private val FIBONACCI_LEVEL_RANGE = 0.0..10.0       // 비율 하나의 범위 (확장 비율 포함)
         private const val TYPE_CHANNEL = "channel"
         private const val TYPE_TEXT = "text"
-        private const val MAX_TEXT_LENGTH = 100
+        private const val MAX_TEXT_LENGTH = 300     // 줄 바꿈 포함
         private const val TYPE_HORIZONTAL = "horizontal"
         private const val TYPE_VERTICAL = "vertical"
         private const val MAX_COLOR_INDEX = 20
