@@ -72,20 +72,31 @@ class ChartService(
         val colorsValid = req.indicators.values.mapNotNull { it.colors }.all { colors ->
             colors.size <= MAX_PARAM_VALUES && colors.all { it in 0..MAX_COLOR_INDEX }
         }
+        val strokesValid = req.indicators.values.all { setting ->
+            (setting.widths == null ||
+                (setting.widths.size <= MAX_PARAM_VALUES && setting.widths.all { it in 1..MAX_LINE_WIDTH })) &&
+                (setting.dashes == null || setting.dashes.size <= MAX_PARAM_VALUES)
+        }
+        val paneOrderValid = req.paneOrder == null ||
+            (req.paneOrder.size <= MAX_INDICATORS && req.paneOrder.all { it.isNotBlank() && it.length <= MAX_KEY_LENGTH })
         val chartTypeValid = req.chartType.isNotBlank() && req.chartType.length <= MAX_KEY_LENGTH
         val magnetValid = req.magnet.isNotBlank() && req.magnet.length <= MAX_KEY_LENGTH
         // 영역 높이는 화면이 끌어서 바꿀 수 있는 범위와 같다
         val sizesValid = req.indicators.values.mapNotNull { it.height }.all { it in INDICATOR_HEIGHT_RANGE } &&
             (req.volumeRatio == null || req.volumeRatio in VOLUME_RATIO_RANGE) &&
             (req.mainHeight == null || req.mainHeight in MAIN_HEIGHT_RANGE)
-        require(keysValid && paramsValid && colorsValid && chartTypeValid && magnetValid && sizesValid) {
+        require(
+            keysValid && paramsValid && colorsValid && strokesValid && paneOrderValid && chartTypeValid && magnetValid &&
+                sizesValid
+        ) {
             "차트 설정 값을 확인해주세요."
         }
 
         val res = ChartSettingRes(
             // 바꾼 것이 없는 지표는 저장하지 않는다
             indicators = req.indicators.filterValues {
-                it.on != null || it.params != null || it.colors != null || it.height != null
+                it.on != null || it.params != null || it.colors != null || it.widths != null || it.dashes != null ||
+                    it.height != null
             },
             chartType = req.chartType,
             logScale = req.logScale,
@@ -96,6 +107,7 @@ class ChartService(
             magnetIndicators = req.magnetIndicators,
             volumeRatio = req.volumeRatio,
             mainHeight = req.mainHeight,
+            paneOrder = req.paneOrder,
         )
         val json = objectMapper.writeValueAsString(res)
         val existing = chartSettingRepository.findByMemberId(memberId)
