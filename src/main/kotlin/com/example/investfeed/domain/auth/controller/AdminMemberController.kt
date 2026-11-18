@@ -89,6 +89,27 @@ class AdminMemberController(
         )
     }
 
+    /**
+     * 회원의 2차 비밀번호를 지운다. 회원은 다음에 2차 비밀번호를 새로 만든다.
+     * 메서드는 DELETE 지만 회원을 지우는 것이 아니라 회원의 속성을 고치는 일이라, TOTP 초기화·잠금과 같은 UPDATE 권한으로 둔다.
+     */
+    @DeleteMapping("/{loginId}/secondary-password")
+    @RequiresAction(action = Actions.UPDATE)
+    fun resetSecondaryPassword(
+        @PathVariable loginId: String
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+
+        authService.resetSecondaryPassword(loginId)
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_SECONDARY_RESET.code,
+                message = ResponseCode.AUTH_SECONDARY_RESET.message,
+                result = null
+            ), HttpStatus.OK
+        )
+    }
+
     @PatchMapping("/{loginId}/lock")
     @RequiresAction(action = Actions.UPDATE)
     fun lockAccount(

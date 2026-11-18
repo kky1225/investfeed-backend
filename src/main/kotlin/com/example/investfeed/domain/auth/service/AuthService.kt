@@ -348,6 +348,27 @@ class AuthService(
     }
 
     /**
+     * 관리자가 회원의 2차 비밀번호를 지운다(잊어버린 회원을 위한 것). 회원은 다음에 2차 비밀번호를 새로 만든다.
+     * 회원 스스로는 현재 값을 모르면 바꿀 수 없으므로 이것이 유일한 복구 수단이다.
+     * 유지 중이던 2차 인증과, 틀려서 쌓인 횟수·잠금도 함께 지운다.
+     */
+    @Transactional
+    fun resetSecondaryPassword(loginId: String) {
+        val member = memberRepository.findByLoginId(loginId)
+            .orElseThrow { MemberNotFoundException() }
+        assertHierarchyAllowed(member)
+
+        member.secondaryPassword = null
+        // 비밀번호가 실제로 지워진(커밋된) 뒤에 지운다. 먼저 지우면 그 사이 옛 비밀번호로 인증이 다시 생기거나,
+        // 커밋이 실패했는데 잠금만 풀린 상태가 될 수 있다.
+        afterCommit {
+            invalidateSecondaryAuth(loginId)
+            redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId")
+            redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId")
+        }
+    }
+
+    /**
      * 2차 비밀번호를 처음 만든다. 이미 있는 회원은 거부한다: 로그인만 한 상태로 현재 2차 비밀번호를 모른 채 덮어쓸 수 있으면
      * 2차 인증이 의미가 없어진다. 바꾸려면 changeSecondaryPassword(현재 값 확인)를 거쳐야 한다.
      */
@@ -360,6 +381,8 @@ class AuthService(
             throw SecondaryPasswordAlreadySetException()
         }
 
+        // 예전 2차 비밀번호로 받아 둔 인증이 남아 있으면 끝낸다(관리자가 초기화한 뒤 새로 만드는 경우). 새 값으로 다시 인증해야 한다.
+        invalidateSecondaryAuth(loginId)
         member.secondaryPassword = passwordEncoder.encode(req.password)
     }
 
@@ -648,7 +671,7 @@ class AuthService(
     private fun afterCommit(block: () -> Unit) {
         TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
             override fun afterCommit() {
-                runCatching(block).onFailure { log.failure(it) { "커밋 후 실시간 연결 정리 실패" } }
+                runCatching(block).onFailure { log.failure(it) { "커밋 후 정리 실패 (실시간 연결·2차 인증 상태)" } }
             }
         })
     }
