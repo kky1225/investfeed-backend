@@ -3,6 +3,8 @@ package com.example.investfeed.domain.index.controller
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.domain.index.dto.req.IndexCandleReq
+import com.example.investfeed.domain.index.dto.res.IndexCandleRes
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.req.IndexStreamReq
 import com.example.investfeed.domain.index.dto.res.IndexDetailRes
@@ -77,6 +79,21 @@ class IndexController(
                 code = ResponseCode.INDEX_DETAIL.code,
                 message = ResponseCode.INDEX_DETAIL.message,
                 result = indexService.getIndex(indsCd = indsCd, req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/{indsCd}/candles")
+    @RequiresAction(action = Actions.READ)
+    fun getIndexCandles(
+        @PathVariable indsCd: String,
+        req: IndexCandleReq
+    ): ResponseEntity<ApiResponse<IndexCandleRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.INDEX_CANDLES.code,
+                message = ResponseCode.INDEX_CANDLES.message,
+                result = indexService.getIndexCandles(indsCd = indsCd, req = req)
             ), HttpStatus.OK
         )
     }

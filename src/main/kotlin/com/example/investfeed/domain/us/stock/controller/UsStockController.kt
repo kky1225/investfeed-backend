@@ -5,7 +5,9 @@ import com.example.investfeed.common.security.Actions
 import com.example.investfeed.common.security.Permissions
 import com.example.investfeed.common.security.RequiresAction
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.us.stock.dto.req.UsStockCandleReq
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailReq
+import com.example.investfeed.domain.us.stock.dto.res.UsStockCandleRes
 import com.example.investfeed.domain.us.stock.dto.req.UsStockDetailStreamReq
 import com.example.investfeed.domain.us.stock.dto.req.UsStockSearchReq
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDetailRes
@@ -58,6 +60,21 @@ class UsStockController(
                 code = ResponseCode.US_STOCK_DETAIL.code,
                 message = ResponseCode.US_STOCK_DETAIL.message,
                 result = usStockInfoService.getUsStockDetail(stkCd, req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/{stkCd}/candles")
+    @RequiresAction(action = Actions.READ)
+    fun getUsStockCandles(
+        @PathVariable stkCd: String,
+        req: UsStockCandleReq
+    ): ResponseEntity<ApiResponse<UsStockCandleRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.US_STOCK_CANDLES.code,
+                message = ResponseCode.US_STOCK_CANDLES.message,
+                result = usStockInfoService.getUsStockCandles(stkCd, req)
             ), HttpStatus.OK
         )
     }

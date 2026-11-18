@@ -1,9 +1,11 @@
 package com.example.investfeed.domain.crypto.controller
 
 import com.example.investfeed.domain.ResponseCode
+import com.example.investfeed.domain.crypto.dto.req.CryptoCandleReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoDetailReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoSearchReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoStreamReq
+import com.example.investfeed.domain.crypto.dto.res.CryptoCandleRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoDetailRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoListRes
 import com.example.investfeed.domain.crypto.dto.res.CryptoRankItem
@@ -114,6 +116,21 @@ class CryptoController(
                 code = ResponseCode.CRYPTO_DETAIL.code,
                 message = ResponseCode.CRYPTO_DETAIL.message,
                 result = cryptoService.getCrypto(market = market, req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/{market}/candles")
+    @RequiresAction(action = Actions.READ)
+    fun getCryptoCandles(
+        @PathVariable market: String,
+        req: CryptoCandleReq
+    ): ResponseEntity<ApiResponse<CryptoCandleRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.CRYPTO_CANDLES.code,
+                message = ResponseCode.CRYPTO_CANDLES.message,
+                result = cryptoService.getCryptoCandles(market = market, req = req)
             ), HttpStatus.OK
         )
     }

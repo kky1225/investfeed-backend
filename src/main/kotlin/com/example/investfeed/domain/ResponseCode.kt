@@ -31,6 +31,7 @@ enum class ResponseCode(
     STOCK_SEARCH(message = "종목 검색에 성공하셨습니다."),
     US_STOCK_SEARCH(message = "미국 종목 검색에 성공하셨습니다."),
     US_STOCK_DETAIL(message = "미국 주식 상세 조회에 성공하셨습니다."),
+    US_STOCK_CANDLES(message = "미국 주식 과거 차트 조회에 성공하셨습니다."),
     US_STOCK_DETAIL_WS(message = "실시간 미국 주식 상세 조회에 성공하셨습니다."),
 
     US_EXCHANGE_RATE(message = "미국 환전 적용환율 조회에 성공하셨습니다."),
@@ -61,10 +62,12 @@ enum class ResponseCode(
     INDEX_LIST(message = "지수 목록 조회에 성공하셨습니다."),
     INDEX_STREAM(message = "실시간 지수 조회에 성공하셨습니다."),
     INDEX_DETAIL(message = "지수 상세 조회에 성공하셨습니다."),
+    INDEX_CANDLES(message = "지수 과거 차트 조회에 성공하셨습니다."),
 
     COMMODITY_LIST(message = "원자재 목록 조회에 성공하셨습니다."),
     COMMODITY_STREAM(message = "실시간 원자재 조회에 성공하셨습니다."),
     COMMODITY_DETAIL(message = "원자재 상세 조회에 성공하셨습니다."),
+    COMMODITY_CANDLES(message = "원자재 과거 차트 조회에 성공하셨습니다."),
 
     THEME_LIST(message = "테마 그룹별 조회에 성공하셨습니다."),
     THEME_STOCK_LIST(message = "테마 구성 종목 조회에 성공하셨습니다."),
@@ -158,6 +161,7 @@ enum class ResponseCode(
     CRYPTO_LIST(message = "암호화폐 목록 조회에 성공하셨습니다."),
     CRYPTO_LIST_STREAM(message = "실시간 암호화폐 목록 조회에 성공하셨습니다."),
     CRYPTO_DETAIL(message = "암호화폐 상세 조회에 성공하셨습니다."),
+    CRYPTO_CANDLES(message = "암호화폐 과거 차트 조회에 성공하셨습니다."),
     CRYPTO_SEARCH(message = "암호화폐 검색에 성공하셨습니다."),
     CRYPTO_RANK_LIST(message = "암호화폐 거래대금 순위 조회에 성공하셨습니다."),
     CRYPTO_RANK_STREAM(message = "실시간 암호화폐 거래대금 순위 조회에 성공하셨습니다."),

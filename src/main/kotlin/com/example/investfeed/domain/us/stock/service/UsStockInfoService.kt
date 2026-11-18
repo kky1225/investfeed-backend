@@ -17,6 +17,9 @@ import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
+import com.example.investfeed.domain.us.stock.dto.req.UsStockCandleReq
+import com.example.investfeed.domain.us.stock.dto.res.UsStockCandleRes
+import com.example.investfeed.kiwoom.us.chart.client.UsChartPeriod
 import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
 import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
 import com.example.investfeed.kiwoom.us.chart.dto.res.KiwoomUsStockChartRes
@@ -97,6 +100,23 @@ class UsStockInfoService(
                 )
             }
             .reversed()
+
+    /** 차트의 과거 구간 한 페이지. cursor 없이 부르면 가장 최근 구간, 받은 nextCursor 를 넣으면 그 이전 구간 */
+    fun getUsStockCandles(stkCd: String, req: UsStockCandleReq): UsStockCandleRes {
+        val period = when (req.chartType) {
+            UsStockChartType.DAY -> UsChartPeriod.DAY
+            UsStockChartType.WEEK -> UsChartPeriod.WEEK
+            UsStockChartType.MONTH -> UsChartPeriod.MONTH
+            UsStockChartType.YEAR -> UsChartPeriod.YEAR
+            else -> UsChartPeriod.MINUTE
+        }
+        val (chartRes, nextKey) = usStockChartClient.usStockChartPage(
+            period = period,
+            req = KiwoomUsStockChartReq(stex_tp = req.stexTp, stk_cd = stkCd, tic_scope = req.chartType.ticScope),
+            nextKey = req.cursor,
+        )
+        return UsStockCandleRes(candles = mapChartList(chartRes), nextCursor = nextKey)
+    }
 
     fun getUsStockChart(
         stkCd: String,

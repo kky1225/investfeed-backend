@@ -6,6 +6,7 @@ import com.example.investfeed.domain.circuitbreaker.service.CircuitBreakerServic
 import com.example.investfeed.kiwoom.sect.dto.res.KiwoomSectInvestorRes
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.domain.index.IndexType
+import com.example.investfeed.domain.index.dto.req.IndexCandleReq
 import com.example.investfeed.domain.index.dto.req.IndexDetailReq
 import com.example.investfeed.domain.index.dto.res.*
 import com.example.investfeed.domain.index.entity.IndexDailyClose
@@ -271,6 +272,22 @@ class IndexService(
             dfrtTrdeNetprps = null,
             ndiffproTrdeNetprps = null,
             allNetprps = null,
+        )
+    }
+
+    /** 차트의 과거 구간 한 페이지. cursor 없이 부르면 가장 최근 구간, 받은 nextCursor 를 넣으면 그 이전 구간 */
+    fun getIndexCandles(indsCd: String, req: IndexCandleReq): IndexCandleRes = runBlocking {
+        val page = sectChartClient.chartPage(
+            chartType = req.chartType,
+            indsCd = indsCd,
+            baseDt = DateUtil.today("yyyyMMdd"),
+            nextKey = req.cursor,
+        )
+        IndexCandleRes(
+            candles = page.rows.map {
+                IndexChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)
+            },
+            nextCursor = page.nextKey,
         )
     }
 

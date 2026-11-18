@@ -14,7 +14,14 @@ import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMinuteRes
 import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartMonthRes
 import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartWeekRes
 import com.example.investfeed.kiwoom.chart.dto.sect.res.KiwoomSectChartYearRes
+import com.example.investfeed.kiwoom.KiwoomRes
 import com.example.investfeed.kiwoom.auth.service.AuthClient
+import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartPage
+import com.example.investfeed.kiwoom.chart.dto.stock.res.KiwoomStockChartRow
+import com.example.investfeed.kiwoom.chart.enum.IndexChartType
+import com.example.investfeed.kiwoom.exception.SectChartPageException
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import org.springframework.web.reactive.function.client.toEntity
 import com.example.investfeed.kiwoom.exception.KiwoomApiException
 import com.example.investfeed.kiwoom.exception.SectChartDayListException
 import com.example.investfeed.kiwoom.exception.SectChartMinuteListException
@@ -217,5 +224,81 @@ class SectChartClient(
 
             throw ExternalApiFailureException(e)
         }
+    }
+
+    /**
+     * 업종 차트 한 페이지를 받는다. nextKey 를 주면 그 이전 구간을 이어 받는다(연속 조회, cont-yn·next-key).
+     * 분봉은 당일로 자르지 않고 받은 그대로 준다. 가격은 다른 업종 차트와 같이 100배로 온다.
+     */
+    @KiwoomToken
+    suspend fun chartPage(chartType: IndexChartType, indsCd: String, baseDt: String, nextKey: String?): KiwoomStockChartPage {
+        try {
+            return when (chartType) {
+                IndexChartType.DAY -> fetchPage<KiwoomSectChartDayRes>(
+                    "ka20006", SectChartDayListReq(inds_cd = indsCd, base_dt = baseDt), nextKey,
+                ) { res -> res.inds_dt_pole_qry?.map { KiwoomStockChartRow(it.dt, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.trde_prica) } }
+
+                IndexChartType.WEEK -> fetchPage<KiwoomSectChartWeekRes>(
+                    "ka20007", SectChartWeekListReq(inds_cd = indsCd, base_dt = baseDt), nextKey,
+                ) { res -> res.inds_stk_pole_qry?.map { KiwoomStockChartRow(it.dt, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.trde_prica) } }
+
+                IndexChartType.MONTH -> fetchPage<KiwoomSectChartMonthRes>(
+                    "ka20008", SectChartMonthListReq(inds_cd = indsCd, base_dt = baseDt), nextKey,
+                ) { res -> res.inds_mth_pole_qry?.map { KiwoomStockChartRow(it.dt, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.trde_prica) } }
+
+                IndexChartType.YEAR -> fetchPage<KiwoomSectChartYearRes>(
+                    "ka20019", SectChartYearListReq(inds_cd = indsCd, base_dt = baseDt), nextKey,
+                ) { res -> res.inds_yr_pole_qry?.map { KiwoomStockChartRow(it.dt, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.trde_prica) } }
+
+                else -> fetchPage<KiwoomSectChartMinuteRes>(
+                    "ka20005", SectChartMinuteListReq(inds_cd = indsCd, tic_scope = chartType.value ?: "1"), nextKey,
+                ) { res -> res.inds_min_pole_qry?.map { KiwoomStockChartRow(it.cntr_tm, it.cur_prc, it.open_pric, it.high_pric, it.low_pric, it.trde_qty, it.acc_trde_qty) } }
+            }
+        } catch (e: KiwoomApiException) {
+            throw e
+        } catch (e: SectChartPageException) {
+            throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.apiFailure(e) { "sectChartPage Error : chartType=$chartType" }
+
+            throw ExternalApiFailureException(e)
+        }
+    }
+
+    /** 응답 헤더의 cont-yn 이 Y 일 때만 next-key 를 다음 구간의 키로 돌려준다. */
+    private suspend inline fun <reified T : KiwoomRes> fetchPage(
+        apiId: String,
+        req: Any,
+        nextKey: String?,
+        toRows: (T) -> List<KiwoomStockChartRow>?,
+    ): KiwoomStockChartPage {
+        val accessToken = authClient.getCurrentAccessToken()
+        val continued = !nextKey.isNullOrBlank()
+
+        val entity = kiwoomWebClient.post()
+            .uri("$DEFAULT_URL/api/dostk/chart")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+            .header("api-id", apiId)
+            .header("cont-yn", if (continued) "Y" else "N")
+            .header("next-key", nextKey.orEmpty())
+            .bodyValue(req)
+            .retrieve()
+            .onStatus({ it.isError }, { res -> res.logHttpError("키움"); throw KiwoomApiException() })
+            .toEntity<T>()
+            .awaitSingleOrNull()
+
+        val body = entity?.body
+        if (body?.return_code != 0) {
+            log.error { "키움 API 응답 오류: api=sectChartPage, apiId=$apiId, return_code=${body?.return_code}, return_msg=${body?.return_msg}, req=$req, continued=$continued" }
+            throw SectChartPageException()
+        }
+
+        val hasMore = entity.headers.getFirst("cont-yn") == "Y"
+        return KiwoomStockChartPage(
+            rows = toRows(body).orEmpty(),
+            nextKey = entity.headers.getFirst("next-key")?.takeIf { hasMore && it.isNotBlank() },
+        )
     }
 }

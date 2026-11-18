@@ -18,6 +18,11 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.toEntity
 
+/** 미국 차트의 주기와 그 TR */
+enum class UsChartPeriod(val apiId: String) {
+    MINUTE("usa06011"), DAY("usa06012"), WEEK("usa06013"), MONTH("usa06014"), YEAR("usa06015"),
+}
+
 @Component
 class UsStockChartClient(
     @param:Value("\${kiwoom.default-url}")
@@ -51,16 +56,32 @@ class UsStockChartClient(
     fun usStockYearChart(req: KiwoomUsStockChartReq): KiwoomUsStockChartRes = usStockChart("usa06015", req)
 
     /**
+     * 차트의 과거 구간 한 묶음(최대 MAX_PAGES 번 이어 받은 것). nextKey 가 없으면 가장 최근 구간이고,
+     * 앞선 응답의 키를 주면 그 이전 구간이다. 돌려주는 키가 null 이면 더 받을 과거가 없다.
+     */
+    @KiwoomToken
+    fun usStockChartPage(period: UsChartPeriod, req: KiwoomUsStockChartReq, nextKey: String?): Pair<KiwoomUsStockChartRes, String?> =
+        usStockChartFrom(period.apiId, req, stopAt = null, maxPages = MAX_PAGES, startKey = nextKey)
+
+    /**
      * 미국 차트는 1회 100건이라 cont-yn/next-key 로 최대 MAX_PAGES 까지 이어 받는다(국내 1회 600건과 길이 맞춤).
      * 페이지는 최신→과거 순으로 오므로 이어 붙이기만 하면 된다.
      */
-    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq, stopAt: String? = null, maxPages: Int = MAX_PAGES): KiwoomUsStockChartRes {
+    private fun usStockChart(apiId: String, req: KiwoomUsStockChartReq, stopAt: String? = null, maxPages: Int = MAX_PAGES): KiwoomUsStockChartRes =
+        usStockChartFrom(apiId, req, stopAt, maxPages, startKey = null).first
+
+    /**
+     * startKey 가 있으면 그 키의 다음 구간부터 받는다. 돌려주는 두 번째 값은 그 뒤를 이어 받을 키이고, 더 없으면 null 이다.
+     */
+    private fun usStockChartFrom(
+        apiId: String, req: KiwoomUsStockChartReq, stopAt: String?, maxPages: Int, startKey: String?,
+    ): Pair<KiwoomUsStockChartRes, String?> {
         val accessToken = authClient.getCurrentAccessToken()
 
         try {
             val list = mutableListOf<KiwoomUsStockChartItem>()
-            var contYn = "N"
-            var nextKey = ""
+            var contYn = if (startKey.isNullOrBlank()) "N" else "Y"
+            var nextKey = startKey.orEmpty()
             var returnMsg = ""
 
             for (page in 1..maxPages) {
@@ -96,7 +117,7 @@ class UsStockChartClient(
                 return_code = 0,
                 return_msg = returnMsg,
                 result_list = list,
-            )
+            ) to nextKey.takeIf { contYn == "Y" && it.isNotBlank() }
         } catch (e: KiwoomApiException) {
             throw e
         } catch (e: UsStockChartException) {

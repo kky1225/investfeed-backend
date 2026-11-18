@@ -10,3 +10,4 @@ class GoldChartMinuteListException(): ExternalApiException(code = "GOLD_0004", m
 class GoldChartDayListException(): ExternalApiException(code = "GOLD_0005", message = "금현물 일봉 차트 조회에 실패하셨습니다.")
 class GoldChartWeekListException(): ExternalApiException(code = "GOLD_0006", message = "금현물 주봉 차트 조회에 실패하셨습니다.")
 class GoldChartMonthListException(): ExternalApiException(code = "GOLD_0007", message = "금현물 월봉 차트 조회에 실패하셨습니다.")
+class GoldChartPageException(): ExternalApiException(code = "GOLD_0008", message = "금현물 과거 차트 조회에 실패하셨습니다.")

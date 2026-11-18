@@ -1,6 +1,8 @@
 package com.example.investfeed.domain.commodity.service
 
 import com.example.investfeed.domain.commodity.CommodityType
+import com.example.investfeed.common.util.DateUtil
+import com.example.investfeed.domain.commodity.dto.req.CommodityCandleReq
 import com.example.investfeed.domain.commodity.dto.req.CommodityDetailReq
 import com.example.investfeed.domain.commodity.dto.res.*
 import com.example.investfeed.domain.index.dto.res.ChartMinute
@@ -135,6 +137,22 @@ class CommodityService(
         CommodityDetailRes(
             commodityInfo = commodityInfo,
             commodityChartList = chartListRes
+        )
+    }
+
+    /** 차트의 과거 구간 한 페이지. cursor 없이 부르면 가장 최근 구간, 받은 nextCursor 를 넣으면 그 이전 구간 */
+    fun getCommodityCandles(stkCd: String, req: CommodityCandleReq): CommodityCandleRes = runBlocking {
+        val page = goldChartClient.chartPage(
+            chartType = req.chartType,
+            stkCd = stkCd,
+            baseDt = DateUtil.today("yyyyMMdd"),
+            nextKey = req.cursor,
+        )
+        CommodityCandleRes(
+            candles = page.rows.map {
+                CommodityChart(dt = it.dt, curPrc = it.cur_prc, openPric = it.open_pric, highPric = it.high_pric, lowPric = it.low_pric, trdeQty = it.trde_qty, trdePrica = it.trde_prica)
+            },
+            nextCursor = page.nextKey,
         )
     }
 

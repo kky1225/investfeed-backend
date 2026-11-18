@@ -15,3 +15,4 @@ class SectChartDayListException(): ExternalApiException(code = "SECT_CHART_0002"
 class SectChartWeekListException(): ExternalApiException(code = "SECT_CHART_0003", message = "업종 주봉 차트 조회에 실패하셨습니다.")
 class SectChartMonthListException(): ExternalApiException(code = "SECT_CHART_0004", message = "업종 월봉 차트 조회에 실패하셨습니다.")
 class SectChartYearListException(): ExternalApiException(code = "SECT_CHART_0005", message = "업종 년봉 차트 조회에 실패하셨습니다.")
+class SectChartPageException(): ExternalApiException(code = "SECT_CHART_0006", message = "업종 과거 차트 조회에 실패하셨습니다.")

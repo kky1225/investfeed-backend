@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.crypto.service
 
+import com.example.investfeed.domain.crypto.dto.req.CryptoCandleReq
 import com.example.investfeed.domain.crypto.dto.req.CryptoChartType
 import com.example.investfeed.domain.crypto.dto.req.CryptoDetailReq
 import com.example.investfeed.domain.crypto.dto.res.*
@@ -271,6 +272,54 @@ class CryptoService(
             }
     }
 
+    /**
+     * 차트의 과거 구간 한 페이지(업비트 1회 최대 200개). cursor 는 앞선 페이지에서 가장 오래된 캔들의 UTC 시각이고,
+     * 업비트는 그 시각보다 앞선 캔들을 준다. cursor 가 없으면 가장 최근 구간이다.
+     */
+    fun getCryptoCandles(market: String, req: CryptoCandleReq): CryptoCandleRes {
+        val to = req.cursor?.takeIf { it.isNotBlank() }
+        require(MARKET_PATTERN.matches(market) && (to == null || CURSOR_PATTERN.matches(to))) { "차트 조회 값을 확인해주세요." }
+
+        // 최신→과거 순. 캔들마다 UTC 시각과 화면에 줄 값을 함께 둔다
+        val rows: List<Pair<String?, CryptoChart>> = when (req.chartType) {
+            CryptoChartType.DAY -> candleClient.getCandlesDays(market = market, count = CANDLE_PAGE_SIZE, to = to).map {
+                it.candle_date_time_utc to CryptoChart(
+                    dt = it.candle_date_time_kst, tradePrice = it.trade_price, openingPrice = it.opening_price,
+                    highPrice = it.high_price, lowPrice = it.low_price,
+                    candleAccTradeVolume = it.candle_acc_trade_volume, candleAccTradePrice = it.candle_acc_trade_price,
+                )
+            }
+
+            CryptoChartType.WEEK, CryptoChartType.MONTH, CryptoChartType.YEAR -> when (req.chartType) {
+                CryptoChartType.WEEK -> candleClient.getCandlesWeeks(market = market, count = CANDLE_PAGE_SIZE, to = to)
+                CryptoChartType.MONTH -> candleClient.getCandlesMonths(market = market, count = CANDLE_PAGE_SIZE, to = to)
+                else -> candleClient.getCandlesYears(market = market, count = CANDLE_PAGE_SIZE, to = to)
+            }.map {
+                it.candle_date_time_utc to CryptoChart(
+                    dt = it.candle_date_time_kst, tradePrice = it.trade_price, openingPrice = it.opening_price,
+                    highPrice = it.high_price, lowPrice = it.low_price,
+                    candleAccTradeVolume = it.candle_acc_trade_volume, candleAccTradePrice = it.candle_acc_trade_price,
+                )
+            }
+
+            else -> candleClient.getCandlesMinutes(
+                unit = req.chartType.unit ?: 1, market = market, count = CANDLE_PAGE_SIZE, to = to,
+            ).map {
+                it.candle_date_time_utc to CryptoChart(
+                    dt = it.candle_date_time_kst, tradePrice = it.trade_price, openingPrice = it.opening_price,
+                    highPrice = it.high_price, lowPrice = it.low_price,
+                    candleAccTradeVolume = it.candle_acc_trade_volume, candleAccTradePrice = it.candle_acc_trade_price,
+                )
+            }
+        }
+
+        return CryptoCandleRes(
+            candles = rows.map { it.second }.reversed(),
+            // 꽉 채워 오지 않았으면 그 앞은 없다
+            nextCursor = rows.lastOrNull()?.first?.takeIf { rows.size >= CANDLE_PAGE_SIZE },
+        )
+    }
+
     private fun fetchMinuteCandles(unit: Int, market: String, totalNeeded: Int): List<CryptoChart> {
         val allCandles = mutableListOf<CryptoChart>()
         var to: String? = null
@@ -337,5 +386,12 @@ class CryptoService(
         val krwMarkets = marketClient.getKrwMarkets()
         val markets = krwMarkets.map { it.market }
         cryptoStreamClient.cryptoListStream(markets)
+    }
+
+    companion object {
+        private const val CANDLE_PAGE_SIZE = 200    // 업비트가 한 번에 주는 캔들의 최대 개수
+        // 주소에 그대로 붙여 보내는 값이라 모양을 확인한다
+        private val MARKET_PATTERN = Regex("^[A-Z0-9]{2,6}-[A-Z0-9]{1,20}$")                // KRW-BTC
+        private val CURSOR_PATTERN = Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$")   // 2026-11-18T00:00:00
     }
 }

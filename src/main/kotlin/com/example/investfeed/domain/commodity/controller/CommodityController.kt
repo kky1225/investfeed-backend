@@ -3,6 +3,8 @@ package com.example.investfeed.domain.commodity.controller
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.kiwoom.socket.dto.StreamMarket
 import com.example.investfeed.kiwoom.socket.dto.StreamEntry
+import com.example.investfeed.domain.commodity.dto.req.CommodityCandleReq
+import com.example.investfeed.domain.commodity.dto.res.CommodityCandleRes
 import com.example.investfeed.domain.commodity.dto.req.CommodityDetailReq
 import com.example.investfeed.domain.commodity.dto.req.CommodityStreamReq
 import com.example.investfeed.domain.commodity.dto.res.CommodityDetailRes
@@ -82,6 +84,21 @@ class CommodityController(
                 code = ResponseCode.COMMODITY_DETAIL.code,
                 message = ResponseCode.COMMODITY_DETAIL.message,
                 result = commodityService.getCommodity(stkCd = stkCd, req = req)
+            ), HttpStatus.OK
+        )
+    }
+
+    @GetMapping("/{stkCd}/candles")
+    @RequiresAction(action = Actions.READ)
+    fun getCommodityCandles(
+        @PathVariable stkCd: String,
+        req: CommodityCandleReq
+    ): ResponseEntity<ApiResponse<CommodityCandleRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.COMMODITY_CANDLES.code,
+                message = ResponseCode.COMMODITY_CANDLES.message,
+                result = commodityService.getCommodityCandles(stkCd = stkCd, req = req)
             ), HttpStatus.OK
         )
     }
