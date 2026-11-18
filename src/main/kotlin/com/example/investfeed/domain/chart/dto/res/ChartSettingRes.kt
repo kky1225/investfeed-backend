@@ -13,6 +13,7 @@ data class ChartSettingRes(
     val flatByPrevClose: Boolean = false,       // 시가와 종가가 같은 캔들의 색 기준. false 면 상승색, true 면 전일 종가와 비교
     val magnet: String = "off",                 // 자석: 도형의 점을 캔들의 시가·고가·저가·종가에 붙이는 정도 (off, weak, strong). 화면이 모르는 값이면 끈 것으로 본다
     val magnetIndicators: Boolean = false,      // 자석을 가격 영역의 지표 선(이동평균선 등)에도 붙일지
+    val grid: Boolean = true,                   // 격자선(가로·세로)을 그을지
     val volumeRatio: Double? = null,           // 가격+거래량 높이 중 거래량 영역의 비율. null 이면 기본 비율
     val mainHeight: Int? = null,                // 가격+거래량 영역의 높이(px). null 이면 화면이 정한 높이
     // 차트 아래에 따로 영역을 차지하는 지표를 위에서 아래로 놓는 순서. 지표 이름의 목록. 여기 없는 지표는 화면이 그 뒤에 놓는다. null 이면 화면이 정한 순서

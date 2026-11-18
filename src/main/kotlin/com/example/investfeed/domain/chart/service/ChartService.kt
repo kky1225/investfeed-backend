@@ -105,6 +105,7 @@ class ChartService(
             flatByPrevClose = req.flatByPrevClose,
             magnet = req.magnet,
             magnetIndicators = req.magnetIndicators,
+            grid = req.grid,
             volumeRatio = req.volumeRatio,
             mainHeight = req.mainHeight,
             paneOrder = req.paneOrder,
