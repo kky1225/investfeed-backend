@@ -64,6 +64,10 @@ class AuthService(
     private val preAuthTokenTtlSetup = 610L
     private val preAuthTokenTtlVerify = 310L
     private val secondaryAuthTtl = 30L
+    // 2차 비밀번호 대조 제한: 이 시간(분) 안에 이 횟수만큼 틀리면 이 시간(분) 동안 잠근다
+    private val secondaryFailWindowMinutes = 10L
+    private val secondaryMaxAttempts = 5L
+    private val secondaryLockMinutes = 10L
     private val refreshGraceSeconds = 60L
 
     data class LoginResult(
@@ -368,9 +372,8 @@ class AuthService(
             throw SecondaryPasswordNotSetException()
         }
 
-        if (!passwordEncoder.matches(req.currentPassword, member.secondaryPassword)) {
-            throw InvalidSecondaryPasswordException()
-        }
+        // 인증과 같은 잠금·실패 횟수를 쓴다. 따로 두면 이 요청만 반복해 현재 2차 비밀번호를 끝없이 넣어 볼 수 있다.
+        checkSecondaryPassword(loginId, req.currentPassword, member.secondaryPassword)
 
         if (req.currentPassword == req.newPassword) {
             throw SameSecondaryPasswordException()
@@ -404,27 +407,8 @@ class AuthService(
             throw SecondaryPasswordNotSetException()
         }
 
-        val lockKey = "${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId"
-        val lockTtl = redisTemplate.getExpire(lockKey, TimeUnit.SECONDS)
-        if (lockTtl > 0) {
-            throw SecondaryPasswordLockedException(lockTtl)
-        }
+        checkSecondaryPassword(loginId, req.password, member.secondaryPassword)
 
-        if (!passwordEncoder.matches(req.password, member.secondaryPassword)) {
-            val failKey = "${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId"
-            val count = redisTemplate.opsForValue().increment(failKey) ?: 1
-            if (count == 1L) {
-                redisTemplate.expire(failKey, 10, TimeUnit.MINUTES)
-            }
-            if (count >= 5) {
-                redisTemplate.opsForValue().set(lockKey, "locked", 10, TimeUnit.MINUTES)
-                redisTemplate.delete(failKey)
-                throw SecondaryPasswordLockedException(600)
-            }
-            throw InvalidSecondaryPasswordException()
-        }
-
-        redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId")
         val token = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
             "${RedisKeyPrefix.SECONDARY_AUTH.prefix}$loginId",
@@ -433,6 +417,45 @@ class AuthService(
             TimeUnit.MINUTES
         )
         return token
+    }
+
+    /**
+     * 입력한 2차 비밀번호가 맞는지 확인한다. 2차 비밀번호를 대조하는 모든 요청(인증, 변경)이 이 한 곳을 거쳐 같은 제한을 받는다.
+     * 잠겨 있으면 대조하지 않고 거부한다. 틀리면 횟수가 남고 10분 안에 5번째면 10분 잠근다. 맞으면 횟수를 지운다.
+     *
+     * 시도는 대조하기 전에 먼저 센다. 대조한 뒤에 세면, 요청을 한꺼번에 여러 개 보냈을 때 잠금이 걸리기 전에
+     * 전부 대조까지 가서 5번 제한을 넘겨 넣어 볼 수 있다. 먼저 세면 한 구간에 대조하는 것은 많아야 5번이다.
+     */
+    private fun checkSecondaryPassword(loginId: String, input: String, encoded: String?) {
+        val lockKey = "${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId"
+        val lockTtl = redisTemplate.getExpire(lockKey, TimeUnit.SECONDS)
+        if (lockTtl > 0) {
+            throw SecondaryPasswordLockedException(lockTtl)
+        }
+
+        val failKey = "${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId"
+        // 세지 못하면 대조하지 않는다(세지 않은 채 대조하면 제한 없이 넣어 볼 수 있게 된다).
+        val attempt = redisTemplate.opsForValue().increment(failKey)
+            ?: throw IllegalStateException("2차 비밀번호 시도 횟수를 셀 수 없습니다.")
+        // 만료가 걸려 있지 않으면 건다(처음 셀 때, 그리고 앞선 요청이 세기만 하고 만료를 걸지 못한 채 끝났을 때).
+        if (redisTemplate.getExpire(failKey, TimeUnit.SECONDS) < 0) {
+            redisTemplate.expire(failKey, secondaryFailWindowMinutes, TimeUnit.MINUTES)
+        }
+        // 잠글 때 횟수는 지우지 않고 만료에 맡긴다. 지우면, 잠금 확인을 막 지난 다른 요청이 1부터 다시 세어 대조된다.
+        // 횟수는 첫 시도 때 만료가 걸려 잠금(그 뒤에 걸림)보다 먼저 사라지므로, 잠금이 풀린 뒤의 첫 시도는 1부터 센다.
+        val lock = {
+            redisTemplate.opsForValue().set(lockKey, "locked", secondaryLockMinutes, TimeUnit.MINUTES)
+            SecondaryPasswordLockedException(secondaryLockMinutes * 60)
+        }
+        // 한도를 넘긴 시도(동시에 들어온 요청)는 대조하지 않고 잠근다.
+        if (attempt > secondaryMaxAttempts) throw lock()
+
+        if (!passwordEncoder.matches(input, encoded)) {
+            if (attempt >= secondaryMaxAttempts) throw lock()
+            throw InvalidSecondaryPasswordException()
+        }
+
+        redisTemplate.delete(failKey)
     }
 
     fun invalidateSecondaryAuth(loginId: String) {
