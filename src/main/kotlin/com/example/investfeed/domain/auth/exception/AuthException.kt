@@ -39,6 +39,8 @@ class SecondaryPasswordNotSetException : InvestFeedException(code = "AUTH_4041",
 class InvalidSecondaryPasswordException : InvestFeedException(code = "AUTH_4042", message = "2차 비밀번호가 올바르지 않습니다.")
 class SecondaryPasswordLockedException(val remainingSeconds: Long) : AccessDeniedException("2차 비밀번호 입력이 잠금되었습니다. ${remainingSeconds / 60 + 1}분 후에 다시 시도하세요.")
 class SameSecondaryPasswordException : InvestFeedException(code = "AUTH_4043", message = "현재 2차 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
+// AUTH_4044 는 2차 비밀번호 입력 잠금(SecondaryAuthFilter·화면)이 쓴다
+class SecondaryPasswordAlreadySetException : InvestFeedException(code = "AUTH_4045", message = "2차 비밀번호가 이미 설정되어 있습니다. 변경은 현재 2차 비밀번호를 확인한 뒤에 할 수 있습니다.")
 
 // 중복
 class DuplicateLoginIdException : InvestFeedException(code = "AUTH_4090", message = "이미 사용 중인 아이디입니다.")

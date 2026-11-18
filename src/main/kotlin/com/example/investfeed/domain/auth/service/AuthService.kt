@@ -343,10 +343,18 @@ class AuthService(
         member.totpSecret = null
     }
 
+    /**
+     * 2차 비밀번호를 처음 만든다. 이미 있는 회원은 거부한다: 로그인만 한 상태로 현재 2차 비밀번호를 모른 채 덮어쓸 수 있으면
+     * 2차 인증이 의미가 없어진다. 바꾸려면 changeSecondaryPassword(현재 값 확인)를 거쳐야 한다.
+     */
     @Transactional
     fun setupSecondaryPassword(loginId: String, req: SecondaryPasswordSetupReq) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
+
+        if (member.secondaryPassword != null) {
+            throw SecondaryPasswordAlreadySetException()
+        }
 
         member.secondaryPassword = passwordEncoder.encode(req.password)
     }
