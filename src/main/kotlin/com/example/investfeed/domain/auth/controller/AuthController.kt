@@ -248,7 +248,8 @@ class AuthController(
 
     @GetMapping("/secondary-password/lock-status")
     fun getSecondaryPasswordLockStatus(
-        @AuthenticationPrincipal userDetails: CustomUserDetails
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @CookieValue(name = "secondaryAuthToken", required = false) secondaryAuthToken: String?,
     ): ResponseEntity<ApiResponse<SecondaryPasswordLockStatusRes>> {
         val remainingSeconds = authService.getSecondaryPasswordLockStatus(userDetails.username)
 
@@ -256,7 +257,29 @@ class AuthController(
             ApiResponse(
                 code = ResponseCode.AUTH_SECONDARY_LOCK_STATUS.code,
                 message = ResponseCode.AUTH_SECONDARY_LOCK_STATUS.message,
-                result = SecondaryPasswordLockStatusRes(remainingSeconds)
+                result = SecondaryPasswordLockStatusRes(
+                    remainingSeconds = remainingSeconds,
+                    authRemainingSeconds = authService.getSecondaryAuthRemainingSeconds(userDetails.username, secondaryAuthToken),
+                    passwordSet = userDetails.member.secondaryPassword != null,
+                )
+            ), HttpStatus.OK
+        )
+    }
+
+    /** 2차 인증을 지금 끝낸다 (상단 자물쇠의 "지금 잠그기"). 다시 보려면 2차 비밀번호를 입력해야 한다. */
+    @DeleteMapping("/secondary-password/session")
+    fun endSecondaryAuth(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        response: HttpServletResponse
+    ): ResponseEntity<ApiResponse<Nothing?>> {
+        authService.invalidateSecondaryAuth(userDetails.username)
+        response.addHeader(HttpHeaders.SET_COOKIE, expireSecondaryAuthCookie())
+
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.AUTH_SECONDARY_END.code,
+                message = ResponseCode.AUTH_SECONDARY_END.message,
+                result = null
             ), HttpStatus.OK
         )
     }

@@ -129,6 +129,7 @@ enum class ResponseCode(
     AUTH_SECONDARY_CHANGE(message = "2차 비밀번호가 변경되었습니다."),
     AUTH_SECONDARY_LOCK_STATUS(message = "2차 비밀번호 잠금 상태를 조회하였습니다."),
     AUTH_SECONDARY_VERIFY(message = "2차 비밀번호 인증에 성공하셨습니다."),
+    AUTH_SECONDARY_END(message = "2차 인증을 종료하였습니다."),
 
     AUTH_API_KEY_LIST(message = "API Key 목록 조회에 성공하셨습니다."),
     AUTH_API_KEY_CREATE(message = "API Key 등록에 성공하셨습니다."),
