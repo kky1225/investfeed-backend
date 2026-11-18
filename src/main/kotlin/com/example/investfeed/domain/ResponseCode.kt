@@ -42,6 +42,7 @@ enum class ResponseCode(
 
     HOLDING_LIST(message = "보유 주식 조회에 성공하셨습니다."),
     HOLDING_STREAM(message = "실시간 보유 주식 조회에 성공하셨습니다."),
+    STOCK_TRADE_LIST(message = "내 매매 조회에 성공하셨습니다."),
 
     BROKER_LIST(message = "증권사 목록 조회에 성공하셨습니다."),
     BROKER_CREATE(message = "증권사 등록에 성공하셨습니다."),

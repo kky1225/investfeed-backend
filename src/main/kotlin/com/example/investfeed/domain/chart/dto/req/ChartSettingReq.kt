@@ -13,6 +13,7 @@ data class ChartSettingReq(
     val magnet: String = "off",                 // 자석: 도형의 점을 캔들의 시가·고가·저가·종가에 붙이는 정도 (off, weak, strong)
     val magnetIndicators: Boolean = false,      // 자석을 가격 영역의 지표 선(이동평균선 등)에도 붙일지
     val grid: Boolean = true,                   // 격자선(가로·세로)을 그을지
+    val trades: Boolean = false,                // 내 매매(매수·매도 지점, 평단가 선)를 표시할지. 조회는 2차 인증을 거친다
     val volumeRatio: Double? = null,           // 가격+거래량 높이 중 거래량 영역의 비율. null 이면 기본 비율
     val mainHeight: Int? = null,                // 가격+거래량 영역의 높이(px). null 이면 화면이 정한 높이
     // 차트 아래에 따로 영역을 차지하는 지표(RSI, MACD 등)를 위에서 아래로 놓는 순서. 지표 이름의 목록. null 이면 화면이 정한 순서

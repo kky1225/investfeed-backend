@@ -106,6 +106,7 @@ class ChartService(
             magnet = req.magnet,
             magnetIndicators = req.magnetIndicators,
             grid = req.grid,
+            trades = req.trades,
             volumeRatio = req.volumeRatio,
             mainHeight = req.mainHeight,
             paneOrder = req.paneOrder,
