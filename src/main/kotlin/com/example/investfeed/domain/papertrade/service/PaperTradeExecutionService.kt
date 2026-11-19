@@ -1,5 +1,6 @@
 package com.example.investfeed.domain.papertrade.service
 
+import com.example.investfeed.common.exception.LoggedFailureException
 import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
@@ -175,6 +176,7 @@ class PaperTradeExecutionService(
         // ⑦ 시장가 주문(동시호가 창 제출) + ⑧ paper_fill 행동 로그. 거부는 격리(스킵+기록, 진행).
         val today = LocalDate.now()
         var ok = 0
+        var firstFailure: String? = null
         for ((i, c) in toOrder.withIndex()) {
             if (i > 0) Thread.sleep(ORDER_PACING_MS)
             try {
@@ -196,6 +198,7 @@ class PaperTradeExecutionService(
                 ok++
             } catch (e: Exception) {
                 log.failure(e) { "주문 실패 ${c.stkCd} ${c.side} ${c.qty}" }
+                if (firstFailure == null) firstFailure = e.message
                 paperFillRepository.save(
                     PaperFill(
                         stkCd = c.stkCd, side = "REJ", fillDate = today,
@@ -219,8 +222,13 @@ class PaperTradeExecutionService(
             )
         }
 
-        return "$cancelSummary, 후보 ${candidates.size}, 발행대상 ${toOrder.size}" +
+        val summary = "$cancelSummary, 후보 ${candidates.size}, 발행대상 ${toOrder.size}" +
             "(매도 ${sells.size}/회수 ${recoverySells.size}/매수 ${fundedBuys.size}), 스킵 ${skips.size}, 성공 $ok"
+        // 건별 실패는 격리하되, 낸 주문이 전부 실패하면 실행 자체를 실패로 남긴다 (예: 수능일 지연 개장 — 모의투자 장시작전)
+        if (toOrder.isNotEmpty() && ok == 0) {
+            throw LoggedFailureException("주문 ${toOrder.size}건 전부 실패(첫 사유: ${firstFailure?.take(150)}) — $summary")
+        }
+        return summary
     }
 
     private fun buildExecContext(): ExecContext {
@@ -414,6 +422,9 @@ class PaperTradeExecutionService(
     private fun doSecondPhaseBuys(today: LocalDate): String {
         var items = loadRemainingSkips(today)
         if (items.isEmpty()) return "스킵 전량 기발행 (멱등)"
+        var placedCount = 0
+        var rejectedCount = 0
+        var firstFailure: String? = null
         for (attempt in 1..SECOND_PHASE_ATTEMPTS) {
             if (attempt > 1) Thread.sleep(SECOND_PHASE_RETRY_MS)
             val dep = mockAccountClient.deposit(KiwoomDepositReq(qry_tp = "3"))
@@ -454,12 +465,15 @@ class PaperTradeExecutionService(
                             note = if (placed.confirmedByHistory) "$note — $CONFIRMED_BY_HISTORY_NOTE" else note,
                         )
                     )
+                    placedCount++
                     cash -= affordable * s.price
                     if (needsSlot) slots--
                     val rest = s.qty - affordable
                     if (rest >= 1L) unfilled += s.copy(qty = rest)
                 } catch (e: Exception) {
                     log.failure(e) { "2차 매수 실패 ${s.stkCd} ${affordable}주" }
+                    rejectedCount++
+                    if (firstFailure == null) firstFailure = e.message
                     paperFillRepository.save(
                         PaperFill(
                             // REJ 도 phase=2 로 기록 → 잔여 차감에 포함되어 재시작 후에도 재시도하지 않음(기존 정책 유지)
@@ -474,7 +488,12 @@ class PaperTradeExecutionService(
             items = unfilled
             if (items.isEmpty()) break
         }
-        return if (items.isEmpty()) "스킵 전량 소화" else "미소화 ${items.size}건 소멸(익일 정상 사이클)"
+        val summary = if (items.isEmpty()) "스킵 전량 소화" else "미소화 ${items.size}건 소멸(익일 정상 사이클)"
+        // 현금·슬롯 부족으로 못 낸 건 실패가 아니다. 낸 주문이 하나도 안 들어갔을 때만 실행 실패로 남긴다
+        if (rejectedCount > 0 && placedCount == 0) {
+            throw LoggedFailureException("2차 매수 ${rejectedCount}건 전부 실패(첫 사유: ${firstFailure?.take(150)}) — $summary")
+        }
+        return summary
     }
 
     private fun nextCycleIndex(ctx: ExecContext, stkCd: String, side: TrancheSide): Int {
