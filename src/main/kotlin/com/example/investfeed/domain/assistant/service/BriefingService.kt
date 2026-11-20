@@ -111,6 +111,7 @@ class BriefingService(
         val body = MessageBody(
             type = MessageType.BRIEFING, subtype = type.subtype, asOf = asOf,
             headline = pack.headline, summary = pack.rendered.summary, sections = pack.rendered.sections,
+            notice = pack.rendered.notice,
         )
         val entity = AssistantBriefing(
             briefingDate = date, type = type.subtype, version = 1, asOf = asOf,
@@ -152,6 +153,7 @@ class BriefingService(
                     headline = headline,
                     summary = rendered.summary,
                     sections = sections,
+                    notice = rendered.notice,
                     refs = mapOf("briefingId" to shared.id) + (personalEntity?.let { mapOf("personalBriefingId" to it.id) } ?: emptyMap()),
                 )
                 timelineService.postMessage(member.id, body, refBriefingId = shared.id, refPersonalBriefingId = personalEntity?.id)

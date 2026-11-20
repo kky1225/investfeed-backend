@@ -12,6 +12,7 @@ import com.example.investfeed.domain.assistant.service.TemplateFormat.monthDay
 import com.example.investfeed.domain.assistant.service.TemplateFormat.num
 import com.example.investfeed.domain.assistant.service.TemplateFormat.usd
 import com.example.investfeed.domain.assistant.service.TemplateFormat.won
+import com.example.investfeed.global.holiday.KrSession
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -20,7 +21,7 @@ object BriefingTemplateRenderer {
     private const val MAX_ROWS = 15
     private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-    data class Rendered(val summary: String, val sections: List<Section>)
+    data class Rendered(val summary: String, val sections: List<Section>, val notice: Notice? = null)
 
     fun renderKrClose(sheet: KrCloseFactSheet): Rendered {
         val sections = mutableListOf<Section>()
@@ -118,7 +119,28 @@ object BriefingTemplateRenderer {
         val sections = mutableListOf<Section>()
         if (!sheet.krHoliday) sections += recommendSection(sheet.recommend)
         sections += macroSection(sheet.macro)
-        return Rendered(summary = krPreSummary(sheet), sections = sections)
+        val notice = sheet.sessionChange?.takeIf { it.differsFromUsual() }?.let(::sessionChangeNotice)
+        return Rendered(summary = krPreSummary(sheet), sections = sections, notice = notice)
+    }
+
+    /** 장 시각 안내 띠를 붙일 만큼 평소와 다른지 — 평소와 같은 시각으로 등록된 날은 띠 없음 */
+    private fun SessionChangeFact.differsFromUsual(): Boolean =
+        open != KrSession.DEFAULT_OPEN || close != KrSession.DEFAULT_CLOSE || !preMarket
+
+    /**
+     * 장 시각 변경 안내 띠. 평소와 다른 시각만 적는다.
+     * 수능일 → "오늘은 수능일 · 10:00 개장, 16:30 마감" / "NXT 프리마켓 휴장"
+     * 새해 첫 거래일 → "오늘은 새해 첫 거래일 · 10:00 개장" / "NXT 프리마켓 휴장"
+     */
+    private fun sessionChangeNotice(s: SessionChangeFact): Notice {
+        val times = listOfNotNull(
+            "${s.open.format(HHMM)} 개장".takeIf { s.open != KrSession.DEFAULT_OPEN },
+            "${s.close.format(HHMM)} 마감".takeIf { s.close != KrSession.DEFAULT_CLOSE },
+        ).joinToString(", ")
+        return Notice(
+            title = if (times.isEmpty()) "오늘은 ${s.name}" else "오늘은 ${s.name} · $times",   // 시각은 그대로·프리마켓만 휴장인 날은 이름만
+            detail = "NXT 프리마켓 휴장".takeIf { !s.preMarket },
+        )
     }
 
     private fun recommendSection(list: List<RecommendFact>?): Section {

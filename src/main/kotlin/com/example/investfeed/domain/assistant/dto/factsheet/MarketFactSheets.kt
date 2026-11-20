@@ -2,6 +2,7 @@ package com.example.investfeed.domain.assistant.dto.factsheet
 
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 sealed interface MarketFactSheet
 
@@ -129,7 +130,16 @@ data class KrPreFactSheet(
     val krPrev: KrPrevFact?,
     val recommend: List<RecommendFact>?,
     val macro: MacroFact?,
+    val sessionChange: SessionChangeFact? = null,   // 오늘 장 시각이 평소와 다르면 (수능일·새해 첫 거래일). 평소·예전 저장분은 null
 ) : MarketFactSheet
+
+/** 장 시각이 평소(09:00~15:30, 프리마켓 운영)와 다른 날의 장 시각 — 장 전 브리핑 안내 띠용 */
+data class SessionChangeFact(
+    val name: String,       // 수능일 / 새해 첫 거래일
+    val open: LocalTime,
+    val close: LocalTime,
+    val preMarket: Boolean,
+)
 
 data class UsCloseFactSheet(
     val tradeDate: LocalDate,

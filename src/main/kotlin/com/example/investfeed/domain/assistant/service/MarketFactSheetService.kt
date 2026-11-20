@@ -13,6 +13,7 @@ import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.domain.sect.dto.req.SectListReq
 import com.example.investfeed.domain.sect.service.SectService
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.kiwoom.chart.client.SectChartClient
 import com.example.investfeed.kiwoom.chart.dto.sect.req.SectChartDayListReq
 import com.example.investfeed.kiwoom.sect.client.SectClient
@@ -38,6 +39,7 @@ class MarketFactSheetService(
     private val usTreasuryService: UsTreasuryService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val stockPickRepository: StockPickRepository,
     private val circuitBreakerService: CircuitBreakerService,
     private val krTreasuryFallbackService: KrTreasuryFallbackService,
@@ -83,15 +85,23 @@ class MarketFactSheetService(
     }
 
     fun collectKrPre(tradeDate: LocalDate, asOf: LocalDateTime): KrPreFactSheet {
+        val krHoliday = holidayService.isHoliday(asOf.toLocalDate())
         return KrPreFactSheet(
             tradeDate = tradeDate,
             asOf = asOf,
-            krHoliday = holidayService.isHoliday(asOf.toLocalDate()),
+            krHoliday = krHoliday,
             krPrev = fetchOrNull("어제 국내장") { fetchPrevIndexes(asOf) },
             recommend = fetchOrNull("오늘 추천") { fetchRecommendations() },
             macro = fetchOrNull("매크로") { fetchMacro() },
+            sessionChange = if (krHoliday) null else fetchOrNull("장 시각") { sessionChangeOf(tradeDate) },
         )
     }
+
+    /** 오늘 장 시각이 평소와 다르면(수능일·새해 첫 거래일) 그 시각, 평소면 null */
+    private fun sessionChangeOf(date: LocalDate): SessionChangeFact? =
+        krMarketSessionService.of(date).takeIf { it.isSpecial }?.let {
+            SessionChangeFact(name = it.name.orEmpty(), open = it.open, close = it.close, preMarket = it.preMarket)
+        }
 
     private fun fetchPrevIndexes(asOf: LocalDateTime): KrPrevFact {
         val prevDate = holidayService.lastTradingDay(asOf.toLocalDate().minusDays(1))

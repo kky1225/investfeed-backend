@@ -13,6 +13,13 @@ data class MessageBody(
     val cards: List<String> = emptyList(),
     val refs: Map<String, Long> = emptyMap(),
     val turnCards: List<TurnCard> = emptyList(),   // 5단계 Q&A 답변 카드
+    val notice: Notice? = null,   // 헤드라인 아래 안내 띠 (장 전 브리핑의 장 시각 변경 안내 등). 없으면 표시 안 함
+)
+
+/** 헤드라인 아래 안내 띠 — title 한 줄 + 보조 설명(detail) */
+data class Notice(
+    val title: String,
+    val detail: String? = null,
 )
 
 data class TurnCard(
