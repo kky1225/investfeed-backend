@@ -13,6 +13,7 @@ import com.example.investfeed.domain.news.service.NewsService
 import com.example.investfeed.domain.recommend.repository.StockPickHistoryRepository
 import com.example.investfeed.domain.recommend.repository.StockPickRepository
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.domain.investor.dto.req.InvestorListReq
 import com.example.investfeed.domain.investor.service.InvestorService
 import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
@@ -61,6 +62,7 @@ class DataToolService(
     private val stockPickHistoryRepository: StockPickHistoryRepository,
     private val newsService: NewsService,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val stockChartClient: StockChartClient,
     private val usStockChartClient: UsStockChartClient,
@@ -84,9 +86,7 @@ class DataToolService(
         private val YYYYMMDD: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val HH_MM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private const val MARKET_CODE_ETF = "8"   // ka10100 marketCode — 종목 상세(StockService)와 같은 판정
-        private val KR_DETAIL_TIME_FROM: LocalTime = LocalTime.of(8, 0)   // 종목 상세가 시각을 보이기 시작하는 시각 (그 전은 장마감)
-        private val KR_OPEN: LocalTime = LocalTime.of(9, 0)
-        private val KR_CLOSE: LocalTime = LocalTime.of(15, 30)
+        // 국내 개장·마감·NXT 시작(종목 상세가 시각을 보이기 시작하는 시각)은 날짜별 장 시각(KrMarketSessionService)
         private val KR_FLOW_FINAL: LocalTime = LocalTime.of(20, 0)   // 투자자 수급 확정 시각 (그 전 당일 수급은 잠정)
         private val US_OPEN_ET: LocalTime = LocalTime.of(9, 30)
         private val RECOMMEND_TIME: LocalTime = LocalTime.of(22, 0)   // 추천 산출 스케줄러 (SchedulerCron.RECOMMEND)
@@ -108,14 +108,15 @@ class DataToolService(
     fun marketSummary(market: Market?, date: LocalDate?): Any {
         val now = LocalDateTime.now()
         val today = now.toLocalDate()
-        val openToday = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(KR_OPEN)
+        val session = krMarketSessionService.of(today)
+        val openToday = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(session.open)
         val latest = if (openToday) today else holidayService.lastTradingDay(today.minusDays(1))
         val day = date ?: latest
         val md = TemplateFormat.monthDay(day)
         when {
             day.isAfter(today) -> return TextReply("${md}은 아직 장이 열리지 않았습니다.")
             holidayService.isHoliday(day) -> return TextReply("${md}은 휴장일입니다.")
-            day == today && !openToday -> return TextReply("오늘 장은 아직 열리지 않았습니다. (09:00 개장)")
+            day == today && !openToday -> return TextReply("오늘 장은 아직 열리지 않았습니다. (${session.open.format(HH_MM)} 개장)")
         }
 
         val kospi = market != Market.KOSDAQ
@@ -130,7 +131,7 @@ class DataToolService(
             }
         }
         if (sheet.kospi == null && sheet.kosdaq == null) throw ToolException("$md 국내 지수 조회에 실패했습니다")
-        val closed = !live || !now.toLocalTime().isBefore(KR_CLOSE)
+        val closed = !live || !now.toLocalTime().isBefore(session.close)
         val provisional = live && now.toLocalTime().isBefore(KR_FLOW_FINAL)
         val r = BriefingTemplateRenderer.renderKrMarketNow(sheet, kospi = kospi, kosdaq = kosdaq, provisional = provisional, flowRequired = live)
         val name = when (market) { Market.KOSPI -> "코스피"; Market.KOSDAQ -> "코스닥"; null -> "국내 시장" }
@@ -267,8 +268,9 @@ class DataToolService(
 
     private fun krSession(now: LocalDateTime = LocalDateTime.now()): Session {
         val today = now.toLocalDate()
-        val open = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(KR_OPEN)
-        return Session(if (open) today else holidayService.lastTradingDay(today.minusDays(1)), open && now.toLocalTime().isBefore(KR_CLOSE))
+        val session = krMarketSessionService.of(today)
+        val open = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(session.open)
+        return Session(if (open) today else holidayService.lastTradingDay(today.minusDays(1)), open && now.toLocalTime().isBefore(session.close))
     }
 
     private fun usSession(): Session {
@@ -285,10 +287,11 @@ class DataToolService(
         return when (market) {
             StockMarket.KR -> {
                 val today = LocalDate.now()
+                val open = krMarketSessionService.of(today).open
                 when {
                     date.isAfter(today) -> "${md}은 아직 장이 열리지 않았습니다."
                     holidayService.isHoliday(date) -> "${md}은 국내 증시 휴장일입니다."
-                    date == today && !holidayService.isHoliday(today) && LocalTime.now().isBefore(KR_OPEN) -> "오늘 국내 장은 아직 열리지 않았습니다. (09:00 개장)"
+                    date == today && !holidayService.isHoliday(today) && LocalTime.now().isBefore(open) -> "오늘 국내 장은 아직 열리지 않았습니다. (${open.format(HH_MM)} 개장)"
                     else -> null
                 }
             }
@@ -379,13 +382,13 @@ class DataToolService(
     }
 
     /**
-     * 국내 종목 상세 날짜 줄과 같은 규칙 (StockDetail.tsx): 오늘 08:00~20:00 이면 "11/11(수) 16:57",
+     * 국내 종목 상세 날짜 줄과 같은 규칙 (StockDetail.tsx): 오늘 NXT 시작(평소 08:00, 프리마켓 휴장일은 개장)~20:00 이면 "11/11(수) 16:57",
      * 그 밖(20시 이후·개장 전·휴장일)은 직전 거래일 "11/10(화) 장마감" (2026-11-11)
      */
     private fun krQuoteBasis(now: LocalDateTime = LocalDateTime.now()): String {
         val s = krSession(now)
         val t = now.toLocalTime()
-        val live = s.date == now.toLocalDate() && !t.isBefore(KR_DETAIL_TIME_FROM) && t.isBefore(KR_FLOW_FINAL)
+        val live = s.date == now.toLocalDate() && !t.isBefore(krMarketSessionService.of(s.date).nxtOpen) && t.isBefore(KR_FLOW_FINAL)
         return "${TemplateFormat.monthDay(s.date)} ${if (live) now.format(HH_MM) else "장마감"}"
     }
 

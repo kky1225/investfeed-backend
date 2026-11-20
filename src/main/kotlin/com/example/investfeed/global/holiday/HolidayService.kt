@@ -6,6 +6,7 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import mu.KotlinLogging
 import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import org.springframework.core.annotation.Order
 import org.springframework.scheduling.annotation.Scheduled
@@ -23,6 +24,7 @@ class HolidayService(
     private val marketHolidayRepository: MarketHolidayRepository,
     private val schedulerLogService: SchedulerLogService,
     private val transactionTemplate: TransactionTemplate,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val log = KotlinLogging.logger {}
     private val formatter = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -34,10 +36,18 @@ class HolidayService(
 
     private val monthlyHolidays: MutableMap<String, Set<String>> = ConcurrentHashMap()
 
+    /**
+     * 끝나면(성공·실패 모두) 장 시각을 다시 읽고 예약을 다시 계산하게 알린다 — KrSessionTaskScheduler 가 받음.
+     * 휴장일이 바뀐 경우 + DB 에 직접 넣은 장 시각 변경일(market_session_override)도 하루 한 번 반영되게
+     */
     @Scheduled(cron = SchedulerCron.HOLIDAY_REFRESH, scheduler = "slowScheduler")
     fun refreshHolidays() {
-        schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
-            report(syncHolidays())
+        try {
+            schedulerLogService.execute(SchedulerName.HolidayRefreshScheduler) {
+                report(syncHolidays())
+            }
+        } finally {
+            eventPublisher.publishEvent(MarketCalendarRefreshedEvent())
         }
     }
 
@@ -81,7 +91,8 @@ class HolidayService(
         return candidate
     }
 
-    fun lastClosedTradingDay(now: LocalDateTime = LocalDateTime.now(), closedAt: LocalTime = LocalTime.of(16, 0)): LocalDate {
+    /** closedAt 은 날짜와 무관한 기준 시각일 때만 (예: 백필 22:30). 장 마감 기준이면 KrMarketSessionService.lastClosedTradingDay (수능일 등 반영) */
+    fun lastClosedTradingDay(now: LocalDateTime = LocalDateTime.now(), closedAt: LocalTime): LocalDate {
         val today = now.toLocalDate()
         return if (!isHoliday(today) && !now.toLocalTime().isBefore(closedAt)) today else lastTradingDay(today.minusDays(1))
     }

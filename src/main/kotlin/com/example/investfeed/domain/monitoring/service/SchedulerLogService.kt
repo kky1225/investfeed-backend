@@ -148,5 +148,4 @@ class SchedulerLogService(
 
     fun lastSuccessAt(scheduler: SchedulerName): LocalDateTime? =
         schedulerStatusRepository.findById(scheduler.name).orElse(null)?.lastSuccessAt
-
 }

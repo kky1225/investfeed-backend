@@ -5,10 +5,13 @@ import com.example.investfeed.domain.ResponseCode
 import com.example.investfeed.domain.calendar.dto.req.BulkRefreshReq
 import com.example.investfeed.domain.calendar.dto.req.CalendarEventsReq
 import com.example.investfeed.domain.calendar.dto.req.ManualCalendarEventReq
+import com.example.investfeed.domain.calendar.dto.req.MarketSessionReq
 import com.example.investfeed.domain.calendar.dto.res.CalendarEvent
+import com.example.investfeed.domain.calendar.dto.res.MarketSessionRes
 import com.example.investfeed.domain.calendar.service.BulkRefreshStatus
 import com.example.investfeed.domain.calendar.service.CalendarBulkRefreshService
 import com.example.investfeed.domain.calendar.service.EconomicCalendarService
+import com.example.investfeed.domain.calendar.service.MarketSessionAdminService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -23,7 +26,61 @@ import com.example.investfeed.common.security.RequiresAction
 class AdminCalendarController(
     private val bulkRefreshService: CalendarBulkRefreshService,
     private val economicCalendarService: EconomicCalendarService,
+    private val marketSessionAdminService: MarketSessionAdminService,
 ) {
+
+    /** 국내 장 시각 변경일 (수능일 등) — 새해 첫 거래일은 코드 규칙이라 목록에 없음 */
+    @GetMapping("/sessions")
+    @RequiresAction(action = Actions.READ)
+    fun listSessions(@RequestParam year: Int): ResponseEntity<ApiResponse<List<MarketSessionRes>>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_SESSION_LIST.code,
+                message = ResponseCode.MARKET_SESSION_LIST.message,
+                result = marketSessionAdminService.list(year),
+            ), HttpStatus.OK
+        )
+    }
+
+    @PostMapping("/sessions")
+    @RequiresAction(action = Actions.CREATE)
+    fun createSession(@Valid @RequestBody req: MarketSessionReq): ResponseEntity<ApiResponse<MarketSessionRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_SESSION_CREATE.code,
+                message = ResponseCode.MARKET_SESSION_CREATE.message,
+                result = marketSessionAdminService.create(req),
+            ), HttpStatus.OK
+        )
+    }
+
+    @PutMapping("/sessions/{id}")
+    @RequiresAction(action = Actions.UPDATE)
+    fun updateSession(
+        @PathVariable id: Long,
+        @Valid @RequestBody req: MarketSessionReq,
+    ): ResponseEntity<ApiResponse<MarketSessionRes>> {
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_SESSION_UPDATE.code,
+                message = ResponseCode.MARKET_SESSION_UPDATE.message,
+                result = marketSessionAdminService.update(id, req),
+            ), HttpStatus.OK
+        )
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    @RequiresAction(action = Actions.DELETE)
+    fun deleteSession(@PathVariable id: Long): ResponseEntity<ApiResponse<Nothing?>> {
+        marketSessionAdminService.delete(id)
+        return ResponseEntity(
+            ApiResponse(
+                code = ResponseCode.MARKET_SESSION_DELETE.code,
+                message = ResponseCode.MARKET_SESSION_DELETE.message,
+                result = null,
+            ), HttpStatus.OK
+        )
+    }
 
     @PostMapping("/bulk-refresh")
     @RequiresAction(action = Actions.CREATE)

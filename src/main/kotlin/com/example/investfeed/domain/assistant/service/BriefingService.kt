@@ -19,6 +19,7 @@ import com.example.investfeed.domain.assistant.repository.AssistantBriefingRepos
 import com.example.investfeed.domain.auth.entity.Member
 import com.example.investfeed.domain.auth.repository.MemberRepository
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import org.springframework.dao.DataIntegrityViolationException
@@ -34,6 +35,7 @@ class BriefingService(
     private val personalBriefingService: PersonalBriefingService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val briefingRepository: AssistantBriefingRepository,
     private val personalRepository: AssistantBriefingPersonalRepository,
     private val assistantSettingService: AssistantSettingService,
@@ -46,14 +48,14 @@ class BriefingService(
     data class RunResult(val type: BriefingType, val targetDate: LocalDate?, val briefingId: Long?, val posted: Int, val skipped: Int)
 
     fun resolveTargetDate(type: BriefingType, now: LocalDateTime = LocalDateTime.now()): LocalDate? = when (type) {
-        BriefingType.KR_CLOSE, BriefingType.KR_HOLDINGS -> holidayService.lastClosedTradingDay(now)
+        BriefingType.KR_CLOSE, BriefingType.KR_HOLDINGS -> krMarketSessionService.lastClosedTradingDay(now)
         BriefingType.KR_PRE -> now.toLocalDate().let { if (holidayService.isHoliday(it)) holidayService.nextTradingDay(it) else it }
         BriefingType.US_CLOSE -> usMarketCalendarService.lastClosedUsTradingDay(now)
         BriefingType.COIN_DAILY -> if (now.toLocalTime().isBefore(LocalTime.of(9, 0))) now.toLocalDate().minusDays(2) else now.toLocalDate().minusDays(1)
     }
 
     fun resolveAsOf(type: BriefingType, date: LocalDate): LocalDateTime = when (type) {
-        BriefingType.KR_CLOSE -> date.atTime(16, 0)
+        BriefingType.KR_CLOSE -> date.atTime(krMarketSessionService.of(date).closeSettled)   // 평소 16:00, 수능일 17:00
         BriefingType.KR_HOLDINGS -> date.atTime(20, 5)
         BriefingType.KR_PRE -> date.atTime(7, 0)
         BriefingType.US_CLOSE -> usMarketCalendarService.closeKst(date).plusMinutes(10)

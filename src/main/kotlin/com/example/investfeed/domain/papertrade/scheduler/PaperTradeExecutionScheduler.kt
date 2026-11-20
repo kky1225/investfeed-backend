@@ -5,8 +5,10 @@ import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
 import com.example.investfeed.domain.papertrade.service.PaperTradeExecutionService
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrSessionAnchor
+import com.example.investfeed.global.holiday.KrSessionTaskScheduler
+import jakarta.annotation.PostConstruct
 import mu.KotlinLogging
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
 
@@ -14,6 +16,7 @@ import java.time.LocalDate
 class PaperTradeExecutionScheduler(
     private val paperTradeExecutionService: PaperTradeExecutionService,
     private val holidayService: HolidayService,
+    private val krSessionTaskScheduler: KrSessionTaskScheduler,
     private val schedulerLogService: SchedulerLogService,
 ) {
     private val log = KotlinLogging.logger {}
@@ -23,7 +26,17 @@ class PaperTradeExecutionScheduler(
         private const val RECOMMEND_CRON_MIN = 0
     }
 
-    @Scheduled(cron = SchedulerCron.PAPER_TRADE_EXEC, scheduler = "slowScheduler")
+    /** 평소 08:50(개장 10분 전) / 09:01(개장 1분 후). 수능일·새해 첫 거래일처럼 개장이 늦은 날은 그만큼 늦춰 실행 */
+    @PostConstruct
+    fun registerTasks() {
+        krSessionTaskScheduler.registerDaily(
+            SchedulerName.PaperTradeExecScheduler.name, SchedulerCron.PAPER_TRADE_EXEC, KrSessionAnchor.OPEN, ::scheduledPaperTradeExec,
+        )
+        krSessionTaskScheduler.registerDaily(
+            SchedulerName.PaperTradeSecondBuyScheduler.name, SchedulerCron.PAPER_TRADE_SECOND_BUY, KrSessionAnchor.OPEN, ::scheduledSecondPhaseBuys,
+        )
+    }
+
     fun scheduledPaperTradeExec() {
         schedulerLogService.markFired(SchedulerName.PaperTradeExecScheduler)
         if (holidayService.isHoliday()) {
@@ -52,7 +65,6 @@ class PaperTradeExecutionScheduler(
         paperTradeExecutionService.runPaperTradeExec()
     }
 
-    @Scheduled(cron = SchedulerCron.PAPER_TRADE_SECOND_BUY, scheduler = "slowScheduler")
     fun scheduledSecondPhaseBuys() {
         schedulerLogService.markFired(SchedulerName.PaperTradeSecondBuyScheduler)
         if (holidayService.isHoliday()) {

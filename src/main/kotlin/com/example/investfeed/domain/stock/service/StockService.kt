@@ -2,7 +2,8 @@ package com.example.investfeed.domain.stock.service
 
 import com.example.investfeed.common.util.DateUtil
 import com.example.investfeed.common.util.failure
-import com.example.investfeed.common.util.MarketTimeUtil
+import com.example.investfeed.global.holiday.KrMarketSessionService
+import java.time.LocalTime
 import com.example.investfeed.domain.dividend.service.StockDividendService
 import com.example.investfeed.domain.stock.dto.req.StockCandleReq
 import com.example.investfeed.domain.stock.dto.req.StockDetailReq
@@ -44,6 +45,7 @@ class StockService(
     private val stockDividendService: StockDividendService,
     private val stockMasterRepository: StockMasterRepository,
     private val etfClient: EtfClient,
+    private val krMarketSessionService: KrMarketSessionService,
 ) {
     private val log = KotlinLogging.logger {}
     private val MARKET_CODE_ETF = "8"
@@ -119,7 +121,7 @@ class StockService(
                 upName = kiwoomStockInfoRes.upName,
                 disptyRt = etfDisptyDeferred?.await(),
             ).apply {
-                if (MarketTimeUtil.isCallAuction()) {
+                if (krMarketSessionService.today().isCallAuction(LocalTime.now())) {
                     val pric = kiwoomStockDefaultInfoRes.exp_cntr_pric
                     if (!pric.isNullOrBlank() && pric != "0") {
                         expCntrPric = pric

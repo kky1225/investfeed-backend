@@ -6,7 +6,10 @@ import com.example.investfeed.domain.assistant.service.UsMarketCalendarService
 import com.example.investfeed.domain.monitoring.enum.SchedulerCron
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.domain.monitoring.service.SchedulerLogService
+import com.example.investfeed.global.holiday.KrSessionAnchor
+import com.example.investfeed.global.holiday.KrSessionTaskScheduler
 import com.example.investfeed.kiwoom.auth.service.AuthClient
+import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -19,6 +22,7 @@ import java.time.temporal.ChronoUnit
 class BriefingScheduler(
     private val briefingService: BriefingService,
     private val usMarketCalendarService: UsMarketCalendarService,
+    private val krSessionTaskScheduler: KrSessionTaskScheduler,
     private val schedulerLogService: SchedulerLogService,
     private val authClient: AuthClient,
     @param:Value("\${scheduler.login-id:admin}")
@@ -28,7 +32,14 @@ class BriefingScheduler(
         const val US_CLOSE_DELAY_MINUTES = 10L
     }
 
-    @Scheduled(cron = SchedulerCron.BRIEFING_KR_CLOSE, scheduler = "slowScheduler")
+    /** 평소 16:05(마감 35분 후). 수능일처럼 마감이 늦은 날은 그만큼 늦춰 실행 */
+    @PostConstruct
+    fun registerTasks() {
+        krSessionTaskScheduler.registerDaily(
+            SchedulerName.BriefingKrCloseScheduler.name, SchedulerCron.BRIEFING_KR_CLOSE, KrSessionAnchor.CLOSE, ::scheduledKrClose,
+        )
+    }
+
     fun scheduledKrClose() {
         val now = LocalDateTime.now()
         if (briefingService.resolveTargetDate(BriefingType.KR_CLOSE, now) != now.toLocalDate()) {

@@ -54,10 +54,10 @@ class PaperTradeExecutionService(
         private const val ORDER_PACING_MS = 1500L
         private const val MAX_CONCURRENT_HOLDINGS = 20
         private val CYCLE_SIDES = listOf("BUY", "SELL")
-        private const val SECOND_PHASE_ATTEMPTS = 5       // 2차 매수 시도 횟수 (09:01~03, 30초 간격)
+        private const val SECOND_PHASE_ATTEMPTS = 5       // 2차 매수 시도 횟수 (개장 1분 후부터 30초 간격 — 평소 09:01~03, 수능일 10:01~03)
         private const val SECOND_PHASE_RETRY_MS = 30_000L // 시가 단일가 임의연장(~30초) + 반영 지연 감안
-        private const val PHASE_FIRST = 1                 // paper_fill.phase — 08:50 1차
-        private const val PHASE_SECOND = 2                // paper_fill.phase — 09:01 2차 (잔여 차감 기준)
+        private const val PHASE_FIRST = 1                 // paper_fill.phase — 1차 (개장 10분 전, 평소 08:50)
+        private const val PHASE_SECOND = 2                // paper_fill.phase — 2차 (개장 1분 후, 평소 09:01. 잔여 차감 기준)
         private const val CONFIRMED_BY_HISTORY_NOTE = "응답 없음, 주문 내역으로 확인"
     }
 
@@ -610,7 +610,7 @@ class PaperTradeExecutionService(
 
     /**
      * 키움 주문에는 중복 방지 키가 없어, 오늘 같은 종목·매수/매도·수량의 원주문 중 paper_fill 에 아직 없는 주문번호를 찾는다.
-     * 동시호가 주문은 09:00 전까지 미체결이라 체결만(qry_tp=4)이 아니라 주문순(qry_tp=1)으로 조회한다.
+     * 동시호가 주문은 개장(평소 09:00) 전까지 미체결이라 체결만(qry_tp=4)이 아니라 주문순(qry_tp=1)으로 조회한다.
      */
     private fun findUnrecordedOrderNo(req: KiwoomOrderReq, side: TrancheSide, today: LocalDate): String? {
         val recorded = paperFillRepository.findByFillDate(today)

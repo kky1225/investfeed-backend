@@ -99,7 +99,7 @@ data class KrCloseFactSheet(
     val krTreasury: KrTreasuryFact? = null,
 ) : MarketFactSheet
 
-/** 한국 국채 만기별 금리 (국내 장 마감 브리핑). 값은 16:05 시점 네이버 시세, 결측 만기는 ECOS 종가 */
+/** 한국 국채 만기별 금리 (국내 장 마감 브리핑). 값은 마감 브리핑 시점(평소 16:05) 네이버 시세, 결측 만기는 ECOS 종가 */
 data class KrTreasuryFact(
     val yields: List<YieldFact>,
 )

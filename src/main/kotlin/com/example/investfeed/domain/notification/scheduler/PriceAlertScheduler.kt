@@ -1,6 +1,5 @@
 package com.example.investfeed.domain.notification.scheduler
 
-import com.example.investfeed.common.util.MarketTimeUtil
 import com.example.investfeed.common.util.failure
 import com.example.investfeed.domain.assistant.dto.factsheet.HoldingAlertHit
 import com.example.investfeed.domain.assistant.dto.factsheet.PriceTargetHit
@@ -25,6 +24,7 @@ import com.example.investfeed.domain.notification.service.PriceAlertJudge
 import com.example.investfeed.domain.notification.service.UsHoldingAlertChecker
 import com.example.investfeed.domain.notification.service.UsPriceTargetChecker
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.kiwoom.auth.service.AuthClient
 import com.example.investfeed.kiwoom.stock.client.StockClient
 import com.example.investfeed.kiwoom.stock.dto.req.KiwoomNewHighLowReq
@@ -39,6 +39,7 @@ import org.springframework.stereotype.Component
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
@@ -59,6 +60,7 @@ class PriceAlertScheduler(
     private val alertExclusionService: AlertExclusionService,
     private val priceTargetRepository: com.example.investfeed.domain.notification.repository.PriceTargetRepository,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val memberHoldingRepository: MemberHoldingRepository,
     private val holdingAlertService: HoldingAlertService,
     private val priceTargetAlertService: PriceTargetAlertService,
@@ -170,7 +172,7 @@ class PriceAlertScheduler(
             return emptyMap()
         }
 
-        if (!MarketTimeUtil.isStockAlertTime()) {
+        if (!krMarketSessionService.today().isStockAlertTime(LocalTime.now())) {
             return emptyMap()
         }
 

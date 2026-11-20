@@ -8,6 +8,7 @@ import com.example.investfeed.domain.marketevent.entity.MarketEvent
 import com.example.investfeed.domain.marketevent.entity.MarketEventDirection
 import com.example.investfeed.domain.marketevent.entity.MarketEventType
 import com.example.investfeed.domain.marketevent.repository.MarketEventRepository
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.kiwoom.socket.KiwoomSocketManager
 import com.example.investfeed.kiwoom.socket.PersistentStreamHandler
 import com.fasterxml.jackson.databind.JsonNode
@@ -27,7 +28,7 @@ import kotlin.math.abs
  *
  * 키움은 시장 단위 CB 발동 여부를 내려주지 않아(REST·실시간 모두 확인, 2026-10-15) 지수 실시간 체결(0J)로 직접 판정한다.
  * 거래소 규칙: 전일 대비 -8%/-15%/-20% 이하가 1분간 "연속" 유지되면 발동. 2·3단계는 직전 단계 발동 지수보다 1% 추가 하락 필요.
- * 단계별 하루 1회, 1·2단계는 14:50 이후 발동하지 않음. 1·2단계는 20분 정지 + 10분 단일가 후 재개, 3단계는 당일 장 종료.
+ * 단계별 하루 1회, 1·2단계는 장 종료 40분 전(평소 14:50, 수능일 15:50) 이후 발동하지 않음. 1·2단계는 20분 정지 + 10분 단일가 후 재개, 3단계는 당일 장 종료.
  * 발동 이력은 market_event(event_type=CIRCUIT_BREAKER) 에 영구 저장하고, 당일분은 메모리에 두고 판정·조회에 쓴다.
  */
 @Service
@@ -35,6 +36,7 @@ class CircuitBreakerService(
     private val repository: MarketEventRepository,
     private val socketManager: KiwoomSocketManager,
     private val eventPublisher: ApplicationEventPublisher,
+    private val krMarketSessionService: KrMarketSessionService,
 ) : PersistentStreamHandler {
     private val log = KotlinLogging.logger {}
 
@@ -46,7 +48,7 @@ class CircuitBreakerService(
         private const val EXTRA_DROP_RATIO = 0.99                 // 2·3단계: 직전 단계 발동 지수 대비 1% 추가 하락
         private val SUSTAIN: Duration = Duration.ofSeconds(60)
         private val HALT: Duration = Duration.ofMinutes(30)       // 20분 매매 정지 + 10분 단일가
-        private val LATE_CUTOFF: LocalTime = LocalTime.of(14, 50) // 1·2단계는 이후 발동 안 함
+        private val LATE_CUTOFF_BEFORE_CLOSE: Duration = Duration.ofMinutes(40) // 1·2단계는 장 종료 40분 전 이후 발동 안 함
         private val TRADE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HHmmss")
     }
 
@@ -119,7 +121,8 @@ class CircuitBreakerService(
         val stage = nextStage(code) ?: return null
         val firedAt = since.plus(SUSTAIN)
         t.belowSince = null
-        if (stage < 3 && !firedAt.toLocalTime().isBefore(LATE_CUTOFF)) return null
+        val lateCutoff = krMarketSessionService.of(firedAt.toLocalDate()).close.minus(LATE_CUTOFF_BEFORE_CLOSE)
+        if (stage < 3 && !firedAt.toLocalTime().isBefore(lateCutoff)) return null
 
         val event = runCatching {
             repository.save(

@@ -9,6 +9,7 @@ import com.example.investfeed.domain.rank.service.RankService
 import com.example.investfeed.domain.us.rank.dto.req.UsRankListReq
 import com.example.investfeed.domain.us.rank.service.UsRankService
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.kiwoom.us.chart.client.UsStockChartClient
 import com.example.investfeed.kiwoom.us.chart.dto.req.KiwoomUsStockChartReq
 import mu.KotlinLogging
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 @Service
@@ -23,6 +25,7 @@ class RankToolService(
     private val rankService: RankService,
     private val usRankService: UsRankService,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val usMarketCalendarService: UsMarketCalendarService,
     private val usStockChartClient: UsStockChartClient,
     private val cryptoService: CryptoService,
@@ -37,8 +40,7 @@ class RankToolService(
 
     companion object {
         const val MAX_RANK_STOCKS = 100   // 카드는 처음 10개만 보이고 더보기로 카드 안 스크롤 (투자자별 순위와 같음)
-        private val KR_OPEN: LocalTime = LocalTime.of(9, 0)
-        private val KR_CLOSE: LocalTime = LocalTime.of(15, 30)
+        private val HH_MM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val US_OPEN_ET: LocalTime = LocalTime.of(9, 30)
         private const val US_SESSION_TICKER = "SPY"
     }
@@ -88,8 +90,9 @@ class RankToolService(
 
     private fun krSession(now: LocalDateTime = LocalDateTime.now()): Session {
         val today = now.toLocalDate()
-        val open = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(KR_OPEN)
-        return Session(if (open) today else holidayService.lastTradingDay(today.minusDays(1)), open && now.toLocalTime().isBefore(KR_CLOSE))
+        val session = krMarketSessionService.of(today)
+        val open = !holidayService.isHoliday(today) && !now.toLocalTime().isBefore(session.open)
+        return Session(if (open) today else holidayService.lastTradingDay(today.minusDays(1)), open && now.toLocalTime().isBefore(session.close))
     }
 
     private fun usSession(): Session {
@@ -106,10 +109,11 @@ class RankToolService(
         return when (market) {
             RankMarket.KR -> {
                 val today = LocalDate.now()
+                val open = krMarketSessionService.of(today).open
                 when {
                     date.isAfter(today) -> "${md}은 아직 장이 열리지 않았습니다."
                     holidayService.isHoliday(date) -> "${md}은 국내 증시 휴장일입니다."
-                    date == today && LocalTime.now().isBefore(KR_OPEN) -> "오늘 국내 장은 아직 열리지 않았습니다. (09:00 개장)"
+                    date == today && LocalTime.now().isBefore(open) -> "오늘 국내 장은 아직 열리지 않았습니다. (${open.format(HH_MM)} 개장)"
                     date != session.date -> past
                     else -> null
                 }

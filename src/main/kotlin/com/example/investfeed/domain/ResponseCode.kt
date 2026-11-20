@@ -202,6 +202,10 @@ enum class ResponseCode(
     CALENDAR_EVENT_UPDATE(message = "일정 수정에 성공하셨습니다."),
     CALENDAR_EVENT_DELETE(message = "일정 삭제에 성공하셨습니다."),
     CALENDAR_REFRESH(message = "캘린더 데이터 갱신에 성공하셨습니다."),
+    MARKET_SESSION_LIST(message = "장 시각 변경일 목록 조회에 성공하셨습니다."),
+    MARKET_SESSION_CREATE(message = "장 시각 변경일 등록에 성공하셨습니다."),
+    MARKET_SESSION_UPDATE(message = "장 시각 변경일 수정에 성공하셨습니다."),
+    MARKET_SESSION_DELETE(message = "장 시각 변경일 삭제에 성공하셨습니다."),
     CALENDAR_BULK_REFRESH_START(message = "일괄 재생성을 시작했습니다."),
     CALENDAR_BULK_REFRESH_STATUS(message = "일괄 재생성 진행 상황을 조회하였습니다."),
 

@@ -7,6 +7,7 @@ import com.example.investfeed.domain.investor.dto.res.InvestorListItem
 import com.example.investfeed.domain.investor.dto.res.InvestorListRes
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
 import com.example.investfeed.kiwoom.price.client.PriceClient
 import com.example.investfeed.kiwoom.investor.client.InvestorClient
 import com.example.investfeed.kiwoom.investor.dto.req.KiwoomInvestorTradeDayReq
@@ -34,6 +35,7 @@ class InvestorService(
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
     private val investorClient: InvestorClient,
 ) {
     private val CACHE_PREFIX = RedisKeyPrefix.INVESTOR_CLOSE_MARKET.prefix
@@ -71,7 +73,7 @@ class InvestorService(
 
     /**
      * 투자자별 순위 (화면·비서 공용). 기준일과 잠정 여부를 함께 돌려준다.
-     * - 거래일 08:00~20:00 (NXT 프리마켓부터): 장중 ka10063 (당일 잠정치, ETF 없음). 아직 당일 목록이 비어 있으면 직전 거래일 확정치
+     * - 거래일 08:00~20:00 (NXT 프리마켓부터. 프리마켓 휴장일은 개장부터): 장중 ka10063 (당일 잠정치, ETF 없음). 아직 당일 목록이 비어 있으면 직전 거래일 확정치
      * - 그 외(20:01 이후·개장 전·주말·휴장일): 직전에 끝난 거래일 확정치 ka10058 (ETF 포함). 결과는 항상 코스피+코스닥 전체
      *   확정치가 아직 없으면(20:01 직후 등) 장중 잠정치로 대신한다
      */
@@ -79,7 +81,7 @@ class InvestorService(
         val now = LocalDateTime.now()
         val today = now.toLocalDate()
         val tradingToday = !holidayService.isHoliday(today)
-        if (tradingToday && !now.toLocalTime().isBefore(MarketTimeUtil.NXT_OPEN) && !MarketTimeUtil.isKrxTradeClose(now.toLocalTime())) {
+        if (tradingToday && !now.toLocalTime().isBefore(krMarketSessionService.of(today).nxtOpen) && !MarketTimeUtil.isKrxTradeClose(now.toLocalTime())) {
             openMarketProvisional(req, today)?.takeIf { !it.investorList.isNullOrEmpty() }?.let { return it }
             return getCloseMarketWithCache(req, holidayService.lastTradingDay(today.minusDays(1)))
         }

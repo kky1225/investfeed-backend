@@ -5,6 +5,8 @@ import com.example.investfeed.domain.monitoring.entity.SchedulerStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerFireStatus
 import com.example.investfeed.domain.monitoring.enum.SchedulerName
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
+import com.example.investfeed.global.holiday.KrSessionAnchor
 import mu.KotlinLogging
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Component
@@ -15,6 +17,7 @@ import java.time.LocalTime
 @Component
 class SchedulerCycleEvaluator(
     private val holidayService: HolidayService,
+    private val krMarketSessionService: KrMarketSessionService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -57,7 +60,13 @@ class SchedulerCycleEvaluator(
             Duration.between(startedAt, now).seconds <= status.timeoutSec
         ) return SchedulerFireStatus.NONE
 
-        val nextDue = nextAfter(expressions, cycleStart.minusNanos(1)) ?: return SchedulerFireStatus.NONE
+        val normalDue = nextAfter(expressions, cycleStart.minusNanos(1)) ?: return SchedulerFireStatus.NONE
+        // 개장·마감이 밀리는 날(수능일 등)은 실제 실행도 그만큼 늦으므로 판정 기준도 늦춘다
+        val nextDue = scheduler.krSessionAnchor?.let { anchor ->
+            normalDue.plus(krMarketSessionService.of(normalDue.toLocalDate()).let {
+                if (anchor == KrSessionAnchor.OPEN) it.openShift else it.closeShift
+            })
+        } ?: normalDue
 
         if (scheduler.blockedOnHoliday &&
             holidayService.isHoliday(nextDue.toLocalDate().plusDays(scheduler.holidayOffsetDays))

@@ -44,7 +44,7 @@ class PaperFill(
     val newEntry: Boolean? = null, // 신규진입 여부 (매수/스킵 행)
 
     @Column(name = "phase")
-    val phase: Int? = null, // 1=1차(08:50), 2=2차(09:01) — 2차 잔여 산출의 차감 기준
+    val phase: Int? = null, // 1=1차(개장 10분 전, 평소 08:50), 2=2차(개장 1분 후, 평소 09:01) — 2차 잔여 산출의 차감 기준
 
     @Column(name = "note")
     val note: String? = null, // 거부 사유/체결 메모 등

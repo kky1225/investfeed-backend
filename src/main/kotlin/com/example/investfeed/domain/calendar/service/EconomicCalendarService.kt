@@ -9,6 +9,8 @@ import com.example.investfeed.fred.client.FredClient
 import com.example.investfeed.fred.dto.res.FredObservation
 import com.example.investfeed.global.constant.RedisKeyPrefix
 import com.example.investfeed.global.holiday.HolidayService
+import com.example.investfeed.global.holiday.KrMarketSessionService
+import com.example.investfeed.global.holiday.KrSession
 import com.example.investfeed.global.holiday.MarketHolidayRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
@@ -35,6 +37,7 @@ class EconomicCalendarService(
     private val objectMapper: ObjectMapper,
     private val calendarFreezeWriter: CalendarFreezeWriter,
     private val officialReleaseService: OfficialReleaseService,
+    private val krMarketSessionService: KrMarketSessionService,
 ) {
     private val log = KotlinLogging.logger {}
     private val CACHE_PREFIX = RedisKeyPrefix.ECONOMIC_CALENDAR.prefix
@@ -662,7 +665,33 @@ class EconomicCalendarService(
     }
 
     fun listEvents(year: Int, month: Int): CalendarEventsRes =
-        loadEvents(year, month).let { res -> res.copy(events = res.events.map(::withUnpublishedNote)) }
+        loadEvents(year, month).let { res ->
+            res.copy(events = (res.events.map(::withUnpublishedNote) + sessionChangeEvents(year, month)).sortedBy { it.date })
+        }
+
+    /**
+     * 국내 장 시각이 바뀌는 날 (수능일·새해 첫 거래일). 미국 조기폐장처럼 휴장 줄에 "수능일 (10:00 개장·16:30 마감)" 으로 보인다.
+     * source=KRX: 휴장이 아니라 날짜를 빨갛게 칠하지 않는다 (캘린더 화면 규칙, 연말 휴장과 같음).
+     * 관리자 수정이 바로 보이도록 캐시·확정(freeze) 대상에 넣지 않고 조회할 때마다 붙인다
+     */
+    private fun sessionChangeEvents(year: Int, month: Int): List<CalendarEvent> {
+        val today = LocalDate.now()
+        return krMarketSessionService.specialDaysOf(year, month).map { s ->
+            CalendarEvent(
+                date = s.date.toString(), name = "${s.name} (${sessionChangeLabel(s)})", country = "KR", value = null,
+                isFuture = s.date.isAfter(today), type = "HOLIDAY", source = "KRX",
+            )
+        }
+    }
+
+    private fun sessionChangeLabel(s: KrSession): String {
+        val hhmm = DateTimeFormatter.ofPattern("HH:mm")
+        return listOfNotNull(
+            "${s.open.format(hhmm)} 개장".takeIf { s.open != KrSession.DEFAULT_OPEN },
+            "${s.close.format(hhmm)} 마감".takeIf { s.close != KrSession.DEFAULT_CLOSE },
+            "프리마켓 휴장".takeIf { !s.preMarket && s.open == KrSession.DEFAULT_OPEN },
+        ).joinToString("·").ifEmpty { "장 시각 변경" }
+    }
 
     /**
      * 공식 기관이 공표하지 않은 전년동월비에 안내를 붙인다.

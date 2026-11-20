@@ -5,7 +5,8 @@ import com.example.investfeed.kiwoom.exception.UsHoldingListException
 import com.example.investfeed.kiwoom.exception.UsDepositException
 import com.example.investfeed.kiwoom.exception.HoldingListException
 import com.example.investfeed.kiwoom.exception.DepositException
-import com.example.investfeed.common.util.MarketTimeUtil.isKrxHoldingClose
+import com.example.investfeed.global.holiday.KrMarketSessionService
+import java.time.LocalTime
 import com.example.investfeed.domain.holding.dto.req.HoldingStreamReq
 import com.example.investfeed.domain.holding.dto.res.HoldingItem
 import com.example.investfeed.domain.holding.dto.res.HoldingListRes
@@ -50,6 +51,7 @@ class HoldingService(
     private val usEtfService: UsEtfService,
     private val stockClient: StockClient,
     private val usSessionBaseService: UsSessionBaseService,
+    private val krMarketSessionService: KrMarketSessionService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -65,7 +67,7 @@ class HoldingService(
             holdingClient.holdingList(
                 req = KiwoomHoldingReq(
                     qry_tp = "1",
-                    dmst_stex_tp = if(isKrxHoldingClose()) "NXT" else "KRX"
+                    dmst_stex_tp = if (krMarketSessionService.today().isKrxHoldingClose(LocalTime.now())) "NXT" else "KRX"
                 )
             )
         }

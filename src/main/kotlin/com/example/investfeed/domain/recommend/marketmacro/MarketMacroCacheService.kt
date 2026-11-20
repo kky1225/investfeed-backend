@@ -11,7 +11,7 @@ import java.time.Duration
  *
  * - 1분 단위 [MarketMacroScheduler] 가 [saveSnapshot] 호출하여 캐시 갱신
  * - 사용자 추천 조회 시점에 [MarketIndexAdjustmentModule] 이 [getSnapshot] 호출
- * - TTL 1일 — 장 종료 후 캐시 보존, 다음 거래일 09:00 polling 까지 유지
+ * - TTL 1일 — 장 종료 후 캐시 보존, 다음 거래일 개장(평소 09:00) polling 까지 유지
  *
  * Key format: `market-macro:KOSPI`, `market-macro:KOSDAQ`
  */
