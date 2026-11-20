@@ -54,6 +54,13 @@ class Member(
 
     var secondaryPassword: String? = null,
 
+    // 2차 비밀번호를 맞히지 못한 채 연달아 틀린 횟수. 맞히면 0 이 되고, SecondaryPasswordAttemptService.MAX_ATTEMPTS 에 닿으면
+    // 2차 비밀번호가 정지된다(관리자가 초기화할 때까지). 정지 여부는 이 값 하나로 판단한다.
+    // 읽기 전용이다(updatable = false). 회원 객체를 저장할 때 이 칸은 쓰지 않고, MemberRepository 의 쿼리만 바꾼다.
+    // 회원 객체로 쓰면, 회원을 읽어 둔 다른 요청이 저장하면서 그 사이 올라간 횟수를 옛 값으로 되돌릴 수 있다.
+    @Column(nullable = false, updatable = false)
+    val failedSecondaryAttempts: Int = 0,
+
     @Column(nullable = false)
     var failedApiKeyAttempts: Int = 0,
 

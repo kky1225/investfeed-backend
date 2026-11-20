@@ -58,16 +58,13 @@ class AuthService(
     private val jwtProvider: JwtProvider,
     private val totpService: TotpService,
     private val totpAttemptService: TotpAttemptService,
+    private val secondaryPasswordAttemptService: SecondaryPasswordAttemptService,
     private val redisTemplate: StringRedisTemplate,
 ) {
     private val log = KotlinLogging.logger {}
     private val preAuthTokenTtlSetup = 610L
     private val preAuthTokenTtlVerify = 310L
     private val secondaryAuthTtl = 30L
-    // 2차 비밀번호 대조 제한: 이 시간(분) 안에 이 횟수만큼 틀리면 이 시간(분) 동안 잠근다
-    private val secondaryFailWindowMinutes = 10L
-    private val secondaryMaxAttempts = 5L
-    private val secondaryLockMinutes = 10L
     private val refreshGraceSeconds = 60L
 
     data class LoginResult(
@@ -284,6 +281,8 @@ class AuthService(
             permanentLock = isSuspended(),
             totpEnabled = totpSecret != null,
             secondaryPasswordEnabled = secondaryPassword != null,
+            failedSecondaryAttempts = failedSecondaryAttempts,
+            secondaryPasswordSuspended = SecondaryPasswordAttemptService.isSuspended(failedSecondaryAttempts),
             apiKeyLocked = apiKeyLocked,
             createdAt = createdAt,
             permissions = loadUserPermissions(role.id)
@@ -350,7 +349,7 @@ class AuthService(
     /**
      * 관리자가 회원의 2차 비밀번호를 지운다(잊어버린 회원을 위한 것). 회원은 다음에 2차 비밀번호를 새로 만든다.
      * 회원 스스로는 현재 값을 모르면 바꿀 수 없으므로 이것이 유일한 복구 수단이다.
-     * 유지 중이던 2차 인증과, 틀려서 쌓인 횟수·잠금도 함께 지운다.
+     * 틀려서 쌓인 횟수(정지 포함)도 0 으로 돌리고, 유지 중이던 2차 인증도 끝낸다. 정지를 푸는 방법은 이것뿐이다.
      */
     @Transactional
     fun resetSecondaryPassword(loginId: String) {
@@ -359,13 +358,10 @@ class AuthService(
         assertHierarchyAllowed(member)
 
         member.secondaryPassword = null
-        // 비밀번호가 실제로 지워진(커밋된) 뒤에 지운다. 먼저 지우면 그 사이 옛 비밀번호로 인증이 다시 생기거나,
-        // 커밋이 실패했는데 잠금만 풀린 상태가 될 수 있다.
-        afterCommit {
-            invalidateSecondaryAuth(loginId)
-            redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId")
-            redisTemplate.delete("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId")
-        }
+        // 횟수 칸은 회원 객체로는 쓰지 않는다(Member.failedSecondaryAttempts 참고). 같은 트랜잭션 안에서 쿼리로 0 을 만든다.
+        memberRepository.resetSecondaryAttempts(loginId)
+        // 비밀번호가 실제로 지워진(커밋된) 뒤에 끝낸다. 먼저 끝내면 그 사이 옛 비밀번호로 인증이 다시 생길 수 있다.
+        afterCommit { invalidateSecondaryAuth(loginId) }
     }
 
     /**
@@ -386,7 +382,11 @@ class AuthService(
         member.secondaryPassword = passwordEncoder.encode(req.password)
     }
 
-    @Transactional
+    /**
+     * 트랜잭션으로 묶지 않는다. 대조(checkSecondaryPassword)가 횟수를 따로 저장하느라 DB 연결을 하나 더 쓰는데,
+     * 여기서 연결을 잡은 채 부르면 요청 하나가 연결 둘을 차지한다(동시에 여러 번 보내면 연결이 바닥난다).
+     * 대조를 먼저 끝내고 새 값 저장만 save 의 짧은 트랜잭션으로 한다.
+     */
     fun changeSecondaryPassword(loginId: String, req: SecondaryPasswordChangeReq) {
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
@@ -395,20 +395,16 @@ class AuthService(
             throw SecondaryPasswordNotSetException()
         }
 
-        // 인증과 같은 잠금·실패 횟수를 쓴다. 따로 두면 이 요청만 반복해 현재 2차 비밀번호를 끝없이 넣어 볼 수 있다.
-        checkSecondaryPassword(loginId, req.currentPassword, member.secondaryPassword)
+        // 인증과 같은 횟수를 쓴다. 따로 두면 이 요청만 반복해 현재 2차 비밀번호를 끝없이 넣어 볼 수 있다.
+        checkSecondaryPassword(member, req.currentPassword)
 
         if (req.currentPassword == req.newPassword) {
             throw SameSecondaryPasswordException()
         }
 
         member.secondaryPassword = passwordEncoder.encode(req.newPassword)
+        memberRepository.save(member)
         invalidateSecondaryAuth(loginId)
-    }
-
-    fun getSecondaryPasswordLockStatus(loginId: String): Long {
-        val lockTtl = redisTemplate.getExpire("${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId", TimeUnit.SECONDS)
-        return if (lockTtl > 0) lockTtl else 0
     }
 
     /**
@@ -430,7 +426,7 @@ class AuthService(
             throw SecondaryPasswordNotSetException()
         }
 
-        checkSecondaryPassword(loginId, req.password, member.secondaryPassword)
+        checkSecondaryPassword(member, req.password)
 
         val token = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
@@ -444,41 +440,32 @@ class AuthService(
 
     /**
      * 입력한 2차 비밀번호가 맞는지 확인한다. 2차 비밀번호를 대조하는 모든 요청(인증, 변경)이 이 한 곳을 거쳐 같은 제한을 받는다.
-     * 잠겨 있으면 대조하지 않고 거부한다. 틀리면 횟수가 남고 10분 안에 5번째면 10분 잠근다. 맞으면 횟수를 지운다.
+     * 맞히지 못한 채 연달아 10번(SecondaryPasswordAttemptService.MAX_ATTEMPTS) 틀리면 2차 비밀번호가 정지되고,
+     * 관리자가 초기화할 때까지 풀리지 않는다. 그 전에는 기다리는 시간 없이 계속 넣어 볼 수 있고, 맞히면 횟수가 0 이 된다.
      *
-     * 시도는 대조하기 전에 먼저 센다. 대조한 뒤에 세면, 요청을 한꺼번에 여러 개 보냈을 때 잠금이 걸리기 전에
-     * 전부 대조까지 가서 5번 제한을 넘겨 넣어 볼 수 있다. 먼저 세면 한 구간에 대조하는 것은 많아야 5번이다.
+     * 시도는 대조하기 전에 먼저 센다(DB 의 UPDATE 한 번). 대조한 뒤에 세면, 요청을 한꺼번에 여러 개 보냈을 때
+     * 전부 대조까지 가서 한도를 넘겨 넣어 볼 수 있다.
      */
-    private fun checkSecondaryPassword(loginId: String, input: String, encoded: String?) {
-        val lockKey = "${RedisKeyPrefix.SECONDARY_AUTH_LOCK.prefix}$loginId"
-        val lockTtl = redisTemplate.getExpire(lockKey, TimeUnit.SECONDS)
-        if (lockTtl > 0) {
-            throw SecondaryPasswordLockedException(lockTtl)
+    private fun checkSecondaryPassword(member: Member, input: String) {
+        val loginId = member.loginId
+        if (SecondaryPasswordAttemptService.isSuspended(member.failedSecondaryAttempts)) {
+            throw SecondaryPasswordSuspendedException()
+        }
+        // 세지 못했으면 그 사이 한도에 닿은 것이다(동시에 들어온 요청). 대조하지 않는다.
+        val attempt = secondaryPasswordAttemptService.claim(loginId) ?: throw SecondaryPasswordSuspendedException()
+
+        if (!passwordEncoder.matches(input, member.secondaryPassword)) {
+            val remaining = SecondaryPasswordAttemptService.MAX_ATTEMPTS - attempt
+            if (remaining <= 0) {
+                // 정지되면 유지 중이던 2차 인증도 끝낸다.
+                invalidateSecondaryAuth(loginId)
+                log.warn { "2차 비밀번호 정지: loginId=$loginId, 실패횟수=$attempt" }
+                throw SecondaryPasswordSuspendedException()
+            }
+            throw InvalidSecondaryPasswordException(remaining)
         }
 
-        val failKey = "${RedisKeyPrefix.SECONDARY_AUTH_FAIL.prefix}$loginId"
-        // 세지 못하면 대조하지 않는다(세지 않은 채 대조하면 제한 없이 넣어 볼 수 있게 된다).
-        val attempt = redisTemplate.opsForValue().increment(failKey)
-            ?: throw IllegalStateException("2차 비밀번호 시도 횟수를 셀 수 없습니다.")
-        // 만료가 걸려 있지 않으면 건다(처음 셀 때, 그리고 앞선 요청이 세기만 하고 만료를 걸지 못한 채 끝났을 때).
-        if (redisTemplate.getExpire(failKey, TimeUnit.SECONDS) < 0) {
-            redisTemplate.expire(failKey, secondaryFailWindowMinutes, TimeUnit.MINUTES)
-        }
-        // 잠글 때 횟수는 지우지 않고 만료에 맡긴다. 지우면, 잠금 확인을 막 지난 다른 요청이 1부터 다시 세어 대조된다.
-        // 횟수는 첫 시도 때 만료가 걸려 잠금(그 뒤에 걸림)보다 먼저 사라지므로, 잠금이 풀린 뒤의 첫 시도는 1부터 센다.
-        val lock = {
-            redisTemplate.opsForValue().set(lockKey, "locked", secondaryLockMinutes, TimeUnit.MINUTES)
-            SecondaryPasswordLockedException(secondaryLockMinutes * 60)
-        }
-        // 한도를 넘긴 시도(동시에 들어온 요청)는 대조하지 않고 잠근다.
-        if (attempt > secondaryMaxAttempts) throw lock()
-
-        if (!passwordEncoder.matches(input, encoded)) {
-            if (attempt >= secondaryMaxAttempts) throw lock()
-            throw InvalidSecondaryPasswordException()
-        }
-
-        redisTemplate.delete(failKey)
+        secondaryPasswordAttemptService.reset(loginId)
     }
 
     fun invalidateSecondaryAuth(loginId: String) {

@@ -36,10 +36,18 @@ class PreAuthTokenInvalidException : AuthenticationException("유효하지 않�
 
 // 2차 비밀번호
 class SecondaryPasswordNotSetException : InvestFeedException(code = "AUTH_4041", message = "2차 비밀번호가 설정되지 않았습니다.")
-class InvalidSecondaryPasswordException : InvestFeedException(code = "AUTH_4042", message = "2차 비밀번호가 올바르지 않습니다.")
-class SecondaryPasswordLockedException(val remainingSeconds: Long) : AccessDeniedException("2차 비밀번호 입력이 잠금되었습니다. ${(remainingSeconds + 59) / 60}분 후에 다시 시도하세요.")
+/** remainingAttempts: 이만큼 더 틀리면 2차 비밀번호가 정지된다. 화면은 이 문구를 그대로 보여 준다 */
+class InvalidSecondaryPasswordException(val remainingAttempts: Int) : InvestFeedException(
+    code = "AUTH_4042",
+    message = "2차 비밀번호가 올바르지 않습니다. ${remainingAttempts}번 더 틀리면 정지됩니다.",
+)
+
+/** 2차 비밀번호를 여러 번 틀려 정지됐다(403 AUTH_4044). 시간이 지나도 풀리지 않고 관리자가 초기화해야 한다 */
+class SecondaryPasswordSuspendedException : AccessDeniedException(SECONDARY_PASSWORD_SUSPENDED_MESSAGE)
+
+const val SECONDARY_PASSWORD_SUSPENDED_MESSAGE = "2차 비밀번호를 여러 번 틀려 정지되었습니다. 관리자에게 문의하세요."
 class SameSecondaryPasswordException : InvestFeedException(code = "AUTH_4043", message = "현재 2차 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
-// AUTH_4044 는 2차 비밀번호 입력 잠금(SecondaryAuthFilter·화면)이 쓴다
+// AUTH_4044 는 2차 비밀번호 정지(SecondaryPasswordSuspendedException·SecondaryAuthFilter·화면)가 쓴다
 class SecondaryPasswordAlreadySetException : InvestFeedException(code = "AUTH_4045", message = "2차 비밀번호가 이미 설정되어 있습니다. 변경은 현재 2차 비밀번호를 확인한 뒤에 할 수 있습니다.")
 
 // 중복

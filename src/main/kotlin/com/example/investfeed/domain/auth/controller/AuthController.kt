@@ -6,6 +6,7 @@ import com.example.investfeed.domain.auth.dto.req.*
 import com.example.investfeed.domain.auth.dto.res.*
 import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
 import com.example.investfeed.domain.auth.service.AuthService
+import com.example.investfeed.domain.auth.service.SecondaryPasswordAttemptService
 import com.example.investfeed.domain.security.CustomUserDetails
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
@@ -251,14 +252,16 @@ class AuthController(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @CookieValue(name = "secondaryAuthToken", required = false) secondaryAuthToken: String?,
     ): ResponseEntity<ApiResponse<SecondaryPasswordLockStatusRes>> {
-        val remainingSeconds = authService.getSecondaryPasswordLockStatus(userDetails.username)
+        // 회원 정보는 요청마다 DB 에서 읽은 값이라 방금 틀린 횟수까지 들어 있다.
+        val failedAttempts = userDetails.member.failedSecondaryAttempts
 
         return ResponseEntity(
             ApiResponse(
                 code = ResponseCode.AUTH_SECONDARY_LOCK_STATUS.code,
                 message = ResponseCode.AUTH_SECONDARY_LOCK_STATUS.message,
                 result = SecondaryPasswordLockStatusRes(
-                    remainingSeconds = remainingSeconds,
+                    suspended = SecondaryPasswordAttemptService.isSuspended(failedAttempts),
+                    remainingAttempts = (SecondaryPasswordAttemptService.MAX_ATTEMPTS - failedAttempts).coerceAtLeast(0),
                     authRemainingSeconds = authService.getSecondaryAuthRemainingSeconds(userDetails.username, secondaryAuthToken),
                     passwordSet = userDetails.member.secondaryPassword != null,
                 )

@@ -17,6 +17,8 @@ data class MemberRes(
     val permanentLock: Boolean = false,
     val totpEnabled: Boolean = false,
     val secondaryPasswordEnabled: Boolean = false,
+    val failedSecondaryAttempts: Int = 0,               // 2차 비밀번호를 연달아 틀린 횟수
+    val secondaryPasswordSuspended: Boolean = false,    // 여러 번 틀려 2차 비밀번호가 정지됐는지 (관리자가 초기화해야 풀림)
     val apiKeyLocked: Boolean = false,
     val createdAt: LocalDateTime,
     val permissions: List<UserPermissionRes> = emptyList()

@@ -26,8 +26,6 @@ enum class RedisKeyPrefix(
     PRE_AUTH_TOKEN("PRE_AUTH:", "TOTP 등록 전 임시 토큰"),
     PRE_AUTH_SECRET("PRE_AUTH_SECRET:", "TOTP 등록 전 임시 secret"),
     SECONDARY_AUTH("SEC_AUTH:", "관리자 2차 인증 세션"),
-    SECONDARY_AUTH_LOCK("SEC_LOCK:", "관리자 2차 인증 실패 잠금"),
-    SECONDARY_AUTH_FAIL("SEC_FAIL:", "관리자 2차 인증 실패 카운터"),
     REFRESH_TOKEN("RT:", "JWT refresh token"),
     REFRESH_ROTATE("RTROT:", "JWT refresh token 재발급 유예 매핑"),
     BLACKLIST("BL:", "JWT access token 블랙리스트"),
