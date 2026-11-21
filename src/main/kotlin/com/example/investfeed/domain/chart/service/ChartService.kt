@@ -9,6 +9,7 @@ import com.example.investfeed.domain.chart.dto.res.ChartDrawingRes
 import com.example.investfeed.domain.chart.dto.res.ChartSettingRes
 import com.example.investfeed.domain.chart.entity.ChartDrawing
 import com.example.investfeed.domain.chart.entity.ChartSetting
+import com.example.investfeed.domain.chart.exception.ChartInvalidRequestException
 import com.example.investfeed.domain.chart.repository.ChartDrawingRepository
 import com.example.investfeed.domain.chart.repository.ChartSettingRepository
 import com.example.investfeed.domain.notification.entity.AssetType
@@ -85,7 +86,7 @@ class ChartService(
         val sizesValid = req.indicators.values.mapNotNull { it.height }.all { it in INDICATOR_HEIGHT_RANGE } &&
             (req.volumeRatio == null || req.volumeRatio in VOLUME_RATIO_RANGE) &&
             (req.mainHeight == null || req.mainHeight in MAIN_HEIGHT_RANGE)
-        require(
+        validate(
             keysValid && paramsValid && colorsValid && strokesValid && paneOrderValid && chartTypeValid && magnetValid &&
                 sizesValid
         ) {
@@ -134,8 +135,8 @@ class ChartService(
     @Transactional
     fun saveDrawings(memberId: Long, assetType: AssetType, assetCode: String, req: ChartDrawingSaveReq): ChartDrawingRes {
         validateAsset(assetType, assetCode)
-        require(req.drawings.size <= MAX_DRAWINGS) { "선은 종목당 최대 ${MAX_DRAWINGS}개까지 그릴 수 있습니다." }
-        require(req.drawings.all { isValid(it) }) { "그린 선의 값을 확인해주세요." }
+        validate(req.drawings.size <= MAX_DRAWINGS) { "선은 종목당 최대 ${MAX_DRAWINGS}개까지 그릴 수 있습니다." }
+        validate(req.drawings.all { isValid(it) }) { "그린 선의 값을 확인해주세요." }
 
         val existing = chartDrawingRepository.findByMemberIdAndAssetTypeAndAssetCode(memberId, assetType, assetCode)
         if (req.drawings.isEmpty()) {
@@ -156,9 +157,14 @@ class ChartService(
     }
 
     private fun validateAsset(assetType: AssetType, assetCode: String) {
-        require(assetType != AssetType.TOTAL && assetCode.isNotBlank() && assetCode.length <= MAX_ASSET_CODE_LENGTH) {
+        validate(assetType != AssetType.TOTAL && assetCode.isNotBlank() && assetCode.length <= MAX_ASSET_CODE_LENGTH) {
             "종목을 확인해주세요."
         }
+    }
+
+    /** 받은 값이 저장할 수 있는 것인지 확인한다. 아니면 그 이유를 화면에 보여 줄 수 있게 알린다. */
+    private inline fun validate(valid: Boolean, message: () -> String) {
+        if (!valid) throw ChartInvalidRequestException(message())
     }
 
     private fun isValid(drawing: ChartDrawingItem): Boolean {
