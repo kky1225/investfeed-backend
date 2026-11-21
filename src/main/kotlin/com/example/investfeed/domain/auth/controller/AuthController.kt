@@ -234,7 +234,7 @@ class AuthController(
     @PostMapping("/secondary-password/setup")
     fun setupSecondaryPassword(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
-        @RequestBody req: SecondaryPasswordSetupReq
+        @Valid @RequestBody req: SecondaryPasswordSetupReq
     ): ResponseEntity<ApiResponse<Nothing?>> {
         authService.setupSecondaryPassword(userDetails.username, req)
 
@@ -290,7 +290,7 @@ class AuthController(
     @PatchMapping("/secondary-password/change")
     fun changeSecondaryPassword(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
-        @RequestBody req: SecondaryPasswordChangeReq,
+        @Valid @RequestBody req: SecondaryPasswordChangeReq,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<Nothing?>> {
         authService.changeSecondaryPassword(userDetails.username, req)
