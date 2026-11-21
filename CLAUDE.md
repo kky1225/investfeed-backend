@@ -33,7 +33,10 @@
 ## DB
 - 스키마는 JPA ddl-auto: validate. DDL은 src/main/resources/sql/investfeed.sql 이 기준 (로컬 전용, 저장소에 포함하지 않음)
 - 엔티티 변경으로 스키마가 바뀌면 investfeed.sql 에 반영하고, 로컬 DB에 실행할 ALTER 문을 제시할 것
-- DDL(ALTER/DROP)과 데이터 삭제(DELETE/TRUNCATE)는 사용자 승인 후에만 실행
+- DDL(CREATE/ALTER/DROP·인덱스 변경)과 데이터 삭제(DELETE/TRUNCATE)·재시드는 사용자 승인 후에만 실행. SQL 파일 작성과 진단용 SELECT 는 자유
+- 진단용 조회는 `~/.claude/bin/pgro "SQL"` 로 실행(읽기 전용 계정 investfeed_ro, 확인 없이 실행됨. `-t` 는 값만 출력, `\d 테이블` 가능). `member_api_keys` 와 `members` 의 비밀번호·TOTP·이메일·이름·전화는 조회되지 않으며 관리자 `psql` 로 우회하지 말 것. `members` 는 `select *` 대신 컬럼을 지정
+- 새 테이블에 키·비밀번호 같은 인증 정보가 들어가면 `REVOKE SELECT ON <테이블> FROM investfeed_ro;` 를 함께 제시할 것 (계정 정의: src/main/resources/sql/investfeed_ro.sql)
+- 회원 데이터 변경(비밀번호 초기화·권한 변경·잠금 해제)도 명시 지시 전에는 진단·방안 제시까지만
 
 ## Kotlin 코드 스타일
 - 컬렉션 처리는 Kotlin 컬렉션 함수 사용 (map, filter, flatMap 등). Java Stream 사용 금지
@@ -43,7 +46,7 @@
 - 로그 레벨: error=실패, warn=경고(이미 기록된 실패·회원 키 문제·비정상 종료·복구), info=성공(작업 1건에 1건), debug=그 밖의 전부(시작·진행·건별 상세·호출 상세)
 - 성공 info 는 정해진 곳에서만: 스케줄러는 SchedulerLogService.execute 가 끝날 때 1건(본문은 report("요약")으로 넘김, FAST 는 요약이 있을 때만 debug, 실행 안 함은 schedulerLogService.skip), 화면·비서 요청은 RequestLogInterceptor 가 1건(변경 요청만 info, 조회는 debug), 외부 API 호출 상세는 ApiCallMetricsFilter 가 debug 1건. 그 밖에 info 를 쓰는 곳은 토큰 재발급·기동 시 1회 작업·관리자 일괄 작업 완료처럼 한 번 일어나는 사건뿐
 - 서비스·클라이언트·컨트롤러에서 "~ 완료" info 를 남기지 말 것. 건수 등 요약은 반환값으로 스케줄러에 넘겨 report 로 붙임
-- domain 패키지의 controller는 요청/응답을 DTO 타입으로 구현
+- domain 패키지의 controller는 요청/응답을 클라이언트용 DTO(camelCase) 타입으로 구현. kiwoom 등 외부 API 패키지의 DTO(snake_case)를 그대로 반환하지 말고 domain 서비스에서 변환
 - domain 패키지 외에 외부 API 패키지에서는 상황에 맞게 DTO, parameter 타입 허용
 - suspend fun에 @Transactional 금지, Dispatchers.IO/Default 지정 금지(runBlocking 이벤트 루프에서만 실행). 페이싱은 Thread.sleep 대신 global/ratelimit 필터가 담당
 - 외부 API 클라이언트 작성 규칙은 .claude/rules/external-api.md 참조
