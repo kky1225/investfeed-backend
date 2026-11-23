@@ -46,6 +46,23 @@ class WatchlistService(
     private val log = KotlinLogging.logger {}
 
 
+    /**
+     * 회원의 관심 그룹 가운데 이 종목이 들어 있는 그룹의 아이디. 종목 상세의 관심종목 하트가 쓴다.
+     * stexTp: 미국 거래소(ND/NY/NA), 국내는 null. 국내는 거래소 접미어(_AL 등)를 떼고 견준다.
+     * 미국 티커는 저장한 값(키움 응답)과 상세 주소의 값이 출처가 달라 대소문자·앞뒤 공백을 무시하고 견준다.
+     */
+    @Transactional(readOnly = true)
+    fun groupIdsContaining(memberId: Long, stkCd: String, stexTp: String?): List<Long> {
+        val groupIds = groupRepository.findByMemberIdOrderByDisplayOrderAsc(memberId).map { it.id }
+        if (groupIds.isEmpty()) return emptyList()
+        val keyOf = { code: String -> if (stexTp == null) code.substringBefore("_") else code.trim().uppercase() }
+        val key = keyOf(stkCd)
+        return itemRepository.findByGroupIdIn(groupIds)
+            .filter { it.stexTp == stexTp && keyOf(it.stkCd) == key }
+            .map { it.groupId }
+            .distinct()
+    }
+
     @Transactional(readOnly = true)
     fun getGroups(memberId: Long): List<WatchlistGroupRes> {
         return groupRepository.findByMemberIdOrderByDisplayOrderAsc(memberId)

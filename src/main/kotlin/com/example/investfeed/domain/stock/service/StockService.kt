@@ -31,6 +31,7 @@ import com.example.investfeed.kiwoom.stock.dto.req.*
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import kotlinx.coroutines.runBlocking
+import com.example.investfeed.domain.watchlist.service.WatchlistService
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlin.coroutines.cancellation.CancellationException
@@ -46,6 +47,7 @@ class StockService(
     private val stockMasterRepository: StockMasterRepository,
     private val etfClient: EtfClient,
     private val krMarketSessionService: KrMarketSessionService,
+    private val watchlistService: WatchlistService,
 ) {
     private val log = KotlinLogging.logger {}
     private val MARKET_CODE_ETF = "8"
@@ -60,7 +62,8 @@ class StockService(
      */
     fun getStock(
         stkCd: String,
-        req: StockDetailReq
+        req: StockDetailReq,
+        memberId: Long,
     ): StockDetailRes = runBlocking {
         val defaultInfoDeferred = async { stockClient.stockDefaultInfo(req = KiwoomDefaultStockInfoReq(stk_cd = stkCd)) }
         val infoDeferred = async {
@@ -255,7 +258,16 @@ class StockService(
             dailyPriceList = dailyPriceList,
             dividendList = dividendList,
             viList = viList,
+            watchlistGroupIds = watchlistGroupIdsOf(memberId, stkCd),
         )
+    }
+
+    /** 이 종목이 들어 있는 내 관심 그룹. 하트는 부가 정보라 조회에 실패해도 상세 전체를 실패시키지 않는다. */
+    private fun watchlistGroupIdsOf(memberId: Long, stkCd: String): List<Long> = try {
+        watchlistService.groupIdsContaining(memberId, stkCd, stexTp = null)
+    } catch (e: Exception) {
+        log.failure(e) { "관심 그룹 조회 실패 : stkCd=$stkCd" }
+        emptyList()
     }
 
 

@@ -13,9 +13,11 @@ import com.example.investfeed.domain.us.stock.dto.req.UsStockSearchReq
 import com.example.investfeed.domain.us.stock.dto.res.UsStockDetailRes
 import com.example.investfeed.domain.us.stock.dto.res.UsStockSearchItem
 import com.example.investfeed.domain.us.stock.service.UsStockInfoService
+import com.example.investfeed.domain.security.CustomUserDetails
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -51,7 +53,8 @@ class UsStockController(
     @RequiresAction(action = Actions.READ)
     fun getUsStock(
         @PathVariable stkCd: String,
-        req: UsStockDetailReq
+        req: UsStockDetailReq,
+        @AuthenticationPrincipal user: CustomUserDetails,
     ): ResponseEntity<ApiResponse<UsStockDetailRes>> {
         log.debug { "getUsStock: stkCd=$stkCd, stexTp=${req.stexTp}, chartType=${req.chartType}" }
 
@@ -59,7 +62,7 @@ class UsStockController(
             ApiResponse(
                 code = ResponseCode.US_STOCK_DETAIL.code,
                 message = ResponseCode.US_STOCK_DETAIL.message,
-                result = usStockInfoService.getUsStockDetail(stkCd, req)
+                result = usStockInfoService.getUsStockDetail(stkCd, req, user.member.id)
             ), HttpStatus.OK
         )
     }

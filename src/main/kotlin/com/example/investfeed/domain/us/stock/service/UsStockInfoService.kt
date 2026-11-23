@@ -29,6 +29,7 @@ import com.example.investfeed.kiwoom.us.stock.dto.req.KiwoomUsStockInfoReq
 import com.example.investfeed.kiwoom.us.stock.dto.res.KiwoomUsStockInfoRes
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
+import com.example.investfeed.domain.watchlist.service.WatchlistService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -41,6 +42,7 @@ class UsStockInfoService(
     private val usStockChartClient: UsStockChartClient,
     private val usStockMasterRepository: UsStockMasterRepository,
     private val usSessionBaseService: UsSessionBaseService,
+    private val watchlistService: WatchlistService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -132,7 +134,8 @@ class UsStockInfoService(
 
     fun getUsStockDetail(
         stkCd: String,
-        req: UsStockDetailReq
+        req: UsStockDetailReq,
+        memberId: Long,
     ): UsStockDetailRes {
         val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
 
@@ -176,6 +179,13 @@ class UsStockInfoService(
             chartList = chartList,
             dailyPriceList = dailyPriceList,
             sessionBase = sessionBase,
+            // 하트는 부가 정보라 조회에 실패해도 상세 전체를 실패시키지 않는다.
+            watchlistGroupIds = try {
+                watchlistService.groupIdsContaining(memberId, stkCd, req.stexTp)
+            } catch (e: Exception) {
+                log.failure(e) { "관심 그룹 조회 실패 : stkCd=$stkCd, stexTp=${req.stexTp}" }
+                emptyList()
+            },
         )
     }
 

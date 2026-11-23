@@ -15,9 +15,11 @@ import com.example.investfeed.domain.stock.dto.res.StockDetailRes
 import com.example.investfeed.domain.stock.dto.res.StockProgramChart
 import com.example.investfeed.domain.stock.dto.res.StockSearchItem
 import com.example.investfeed.domain.stock.service.StockService
+import com.example.investfeed.domain.security.CustomUserDetails
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
 @RequiresAction(permission = Permissions.STOCK_DETAIL)
@@ -32,7 +34,8 @@ class StockController(
     @RequiresAction(action = Actions.READ)
     fun getStock(
         @PathVariable stkCd: String,
-        req: StockDetailReq
+        req: StockDetailReq,
+        @AuthenticationPrincipal user: CustomUserDetails,
     ): ResponseEntity<ApiResponse<StockDetailRes>> {
         log.debug { "getStock: stkCd=$stkCd, $req" }
 
@@ -40,7 +43,7 @@ class StockController(
             ApiResponse(
                 code = ResponseCode.STOCK_DETAIL.code,
                 message = ResponseCode.STOCK_DETAIL.message,
-                result = stockService.getStock(stkCd = stkCd, req = req)
+                result = stockService.getStock(stkCd = stkCd, req = req, memberId = user.member.id)
             ), HttpStatus.OK
         )
     }
