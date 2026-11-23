@@ -64,11 +64,11 @@ class ChartService(
     @Transactional
     fun saveSetting(memberId: Long, req: ChartSettingReq): ChartSettingRes {
         // 지표가 실제로 있는지, 값이 그 지표에 맞는지는 화면이 판단한다(맞지 않으면 기본값을 쓴다).
-        // 여기서는 저장할 수 있는 크기와 숫자 범위만 막는다.
+        // 여기서는 저장할 수 있는 크기와 숫자 범위만 막는다. 0 은 선을 끄는 값으로 쓰는 지표가 있어 받는다(RSI 시그널).
         val keysValid = req.indicators.size <= MAX_INDICATORS &&
             req.indicators.keys.all { it.isNotBlank() && it.length <= MAX_KEY_LENGTH }
         val paramsValid = req.indicators.values.mapNotNull { it.params }.all { values ->
-            values.size <= MAX_PARAM_VALUES && values.all { it.isFinite() && it > 0 && it <= MAX_PARAM_VALUE }
+            values.size <= MAX_PARAM_VALUES && values.all { it.isFinite() && it >= 0 && it <= MAX_PARAM_VALUE }
         }
         val colorsValid = req.indicators.values.mapNotNull { it.colors }.all { colors ->
             colors.size <= MAX_PARAM_VALUES && colors.all { it in 0..MAX_COLOR_INDEX }
