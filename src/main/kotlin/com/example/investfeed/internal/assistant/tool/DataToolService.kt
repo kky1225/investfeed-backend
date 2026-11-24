@@ -464,10 +464,13 @@ class DataToolService(
         StockMarket.US -> {
             val r = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = s.stexTp ?: "ND", stk_cd = s.code))
             fun p(v: String?) = TemplateFormat.parse(v)?.let { abs(it) }
+            val price = p(r.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다")
+            // 토스 연동 회원은 웹과 같이 토스 기준 전일대비 (미연동이면 키움 값)
+            val change = runBlocking { usSessionBaseService.streamPriceChanges(mapOf(s.code to price)) }[s.code]
             StockQuote(
                 s.code, s.name, s.market, s.link, "USD",
-                price = p(r.cur_prc) ?: throw ToolException("${s.name} 현재가가 없습니다"),
-                changeRate = TemplateFormat.parse(r.flu_rt), changeAmount = TemplateFormat.parse(r.pred_pre), volume = p(r.acc_trde_qty),
+                price = price,
+                changeRate = TemplateFormat.parse(change?.fluRt ?: r.flu_rt), changeAmount = TemplateFormat.parse(change?.predPre ?: r.pred_pre), volume = p(r.acc_trde_qty),
                 high = p(r.high_pric), low = p(r.low_pric), high52w = p(r.wk52_hgst_pric), low52w = p(r.wk52_lwst_pric), title = s.title,
                 // 미국 상세 화면과 같은 표기: 업종 "대분류 / 소분류", 시가총액 천 USD
                 profile = StockProfile(

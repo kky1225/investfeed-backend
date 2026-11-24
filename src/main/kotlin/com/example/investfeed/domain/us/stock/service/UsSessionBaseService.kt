@@ -118,18 +118,25 @@ class UsSessionBaseService(
     /**
      * 화면 첫 시세의 전일대비를 토스 실시간과 같은 기준(streamCloses)으로 다시 계산한다. 키 = 입력 종목코드.
      * 키움 등락률은 데이·프리마켓에 직전 정규장 하루 등락률이라, 첫 체결이 오기 전까지 실시간 값과 달라 보인다.
-     * 토스 연동 회원 문맥에서만 값이 있다 (미연동·기준 종가 없음이면 빈 맵)
+     * 토스 연동 회원 문맥에서만 값이 있다 (미연동·기준 종가 없음이면 빈 맵).
+     * 부가 보정이라 실패해도 화면·비서 응답을 막지 않고 빈 맵으로 키움 값을 쓰게 한다
      */
-    suspend fun streamPriceChanges(prices: Map<String, Double?>): Map<String, PriceChange> {
-        val loginId = tossAuthClient.currentLoginIdOrNull() ?: return emptyMap()
-        if (!tossAuthClient.hasApiKey(loginId)) return emptyMap()
+    suspend fun streamPriceChanges(prices: Map<String, Double?>): Map<String, PriceChange> = try {
+        val loginId = tossAuthClient.currentLoginIdOrNull()
         val valid = prices.filterValues { it != null && it > 0 }.mapValues { it.value!! }
-        if (valid.isEmpty()) return emptyMap()
-
-        val closes = streamCloses(valid.keys.map { it.substringBefore("_").trim() })
-        return valid.mapNotNull { (stkCd, cur) ->
-            closes[stkCd.substringBefore("_").trim()]?.let { stkCd to PriceChange.of(cur, it) }
-        }.toMap()
+        if (loginId == null || valid.isEmpty() || !tossAuthClient.hasApiKey(loginId)) {
+            emptyMap()
+        } else {
+            val closes = streamCloses(valid.keys.map { it.substringBefore("_").trim() })
+            valid.mapNotNull { (stkCd, cur) ->
+                closes[stkCd.substringBefore("_").trim()]?.let { stkCd to PriceChange.of(cur, it) }
+            }.toMap()
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log.failure(e) { "미국 토스 기준 등락률 계산 실패" }
+        emptyMap()
     }
 
     private suspend fun currentSession(now: Instant = Instant.now()): CurrentSession? {

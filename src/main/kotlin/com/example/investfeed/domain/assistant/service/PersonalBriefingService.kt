@@ -14,6 +14,7 @@ import com.example.investfeed.domain.holding.service.CryptoManualHoldingService
 import com.example.investfeed.domain.holding.service.HoldingService
 import com.example.investfeed.domain.holding.service.ManualHoldingService
 import com.example.investfeed.domain.holding.service.TossHoldingService
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
 import com.example.investfeed.domain.marketindex.MarketIndexType
 import com.example.investfeed.domain.marketindex.service.MarketIndexService
 import com.example.investfeed.domain.realizedpnl.service.RealizedPnlSummaryService
@@ -26,6 +27,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import kotlin.math.abs
 
 @Service
 class PersonalBriefingService(
@@ -40,6 +42,7 @@ class PersonalBriefingService(
     private val realizedPnlSummaryService: RealizedPnlSummaryService,
     private val customUserDetailsService: CustomUserDetailsService,
     private val marketFactSheetService: MarketFactSheetService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -153,11 +156,19 @@ class PersonalBriefingService(
         res ?: return BrokerHoldingsFact(mb.broker.name, "USD", 0.0, null, null, null, emptyList(), failed = true)
         val usRows = res.holdingList.filter { it.stexTp != null }
         if (usRows.isEmpty()) return null
+        val quotes = usRows.associate { h ->
+            val ticker = h.usStkCd ?: h.stkCd.substringBefore("_")
+            ticker to runCatching { usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = h.stexTp!!, stk_cd = ticker)) }
+                .onFailure { log.failure(it) { "미국 종목 시세 조회 실패 $ticker" } }.getOrNull()
+        }
+        // 토스 연동 회원은 웹과 같이 토스 기준 등락률 (미연동이면 키움 값). 브리핑은 회원 문맥(withMember) 안에서 만든다
+        val changes = runBlocking {
+            usSessionBaseService.streamPriceChanges(quotes.mapValues { (_, q) -> TemplateFormat.parse(q?.cur_prc)?.let { abs(it) } })
+        }
         val items = usRows.map { h ->
             val ticker = h.usStkCd ?: h.stkCd.substringBefore("_")
             val evalUsd = TemplateFormat.parse(h.evltAmtUsd)
-            val dayRate = runCatching { TemplateFormat.parse(usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = h.stexTp!!, stk_cd = ticker)).flu_rt) }
-                .onFailure { log.failure(it) { "미국 종목 시세 조회 실패 $ticker" } }.getOrNull()
+            val dayRate = TemplateFormat.parse(changes[ticker]?.fluRt ?: quotes[ticker]?.flu_rt)
             val dayChange = if (dayRate != null && evalUsd != null && (1 + dayRate / 100) > 0) evalUsd - evalUsd / (1 + dayRate / 100) else null
             HoldingFact(code = ticker, name = h.stkNm.ifBlank { ticker }, link = "/us-stock/detail/${h.stexTp}/$ticker", dayRate = dayRate, dayChange = dayChange, totalRate = TemplateFormat.parse(h.prftRt), eval = evalUsd,
                 curPrc = TemplateFormat.parse(h.curPrcUsd), evalProfit = TemplateFormat.parse(h.evltvPrftUsd), qty = TemplateFormat.parse(h.rmndQty), purPrice = TemplateFormat.parse(h.purPricUsd))

@@ -5,6 +5,8 @@ import com.example.investfeed.domain.us.rank.dto.req.UsStockStreamReq
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListItem
 import com.example.investfeed.domain.us.rank.dto.res.UsRankListRes
 import com.example.investfeed.domain.us.stock.service.UsEtfService
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
+import kotlinx.coroutines.runBlocking
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
@@ -22,9 +24,23 @@ class UsRankService(
     private val tossStreamClient: TossStreamClient,
     private val usRankClient: UsRankClient,
     private val usEtfService: UsEtfService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
 
+    /** 순위는 키움 그대로. 토스 연동 회원은 실시간이 토스 기준이라 첫 등락률도 같은 기준으로 맞춘다 */
     fun listUsRanks(
+        req: UsRankListReq
+    ): UsRankListRes {
+        val res = fetchUsRanks(req)
+        val items = res.rankList.orEmpty().filter { it.stkCd != null }
+        val changes = runBlocking {
+            usSessionBaseService.streamPriceChanges(items.associate { it.stkCd!! to it.curPrc?.trimStart('+', '-')?.toDoubleOrNull() })
+        }
+        items.forEach { item -> changes[item.stkCd]?.let { item.fluRt = it.fluRt } }
+        return res
+    }
+
+    private fun fetchUsRanks(
         req: UsRankListReq
     ): UsRankListRes {
         when (req.type) {

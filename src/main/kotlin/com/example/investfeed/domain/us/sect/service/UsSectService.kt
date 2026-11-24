@@ -7,6 +7,8 @@ import com.example.investfeed.domain.us.sect.dto.res.UsSectListRes
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListItem
 import com.example.investfeed.domain.us.sect.dto.res.UsSectStockListRes
 import com.example.investfeed.domain.us.stock.service.UsEtfService
+import com.example.investfeed.domain.us.stock.service.UsSessionBaseService
+import kotlinx.coroutines.runBlocking
 import com.example.investfeed.kiwoom.socket.KiwoomStreamClient
 import com.example.investfeed.toss.socket.TossStreamClient
 import com.example.investfeed.kiwoom.socket.dto.KiwoomUsStreamItem
@@ -23,6 +25,7 @@ class UsSectService(
     private val tossStreamClient: TossStreamClient,
     private val usSectClient: UsSectClient,
     private val usEtfService: UsEtfService,
+    private val usSessionBaseService: UsSessionBaseService,
 ) {
     fun listUsSects(): UsSectListRes {
         val kiwoomUsSectPerformanceListRes = usSectClient.usSectPerformanceList(
@@ -64,15 +67,23 @@ class UsSectService(
         val rows = kiwoomUsSectStockListRes.result_list ?: emptyList()
         val etfTickers = usEtfService.etfTickers(rows.mapNotNull { it.stk_cd })
 
+        // 순서는 키움 등락률 순 그대로. 토스 연동 회원은 실시간이 토스 기준이라 첫 등락률도 같은 기준으로 맞춘다
+        val changes = runBlocking {
+            usSessionBaseService.streamPriceChanges(
+                rows.filter { it.stk_cd != null }.associate { it.stk_cd!! to it.cur_prc?.trimStart('+', '-')?.toDoubleOrNull() }
+            )
+        }
+
         return UsSectStockListRes(
             sectStockList = rows.map {
+                val change = changes[it.stk_cd]
                 UsSectStockListItem(
                     stkCd = it.stk_cd,
                     stexTp = it.stex_tp,
                     stkNm = usEtfService.displayName(it.stk_cd, it.stk_nm, etfTickers),
-                    fluRt = it.flu_rt,
+                    fluRt = change?.fluRt ?: it.flu_rt,
                     curPrc = it.cur_prc,
-                    predPreSig = it.pred_pre_sig,
+                    predPreSig = change?.predPreSig ?: it.pred_pre_sig,
                     accTrdeQty = it.acc_trde_qty,
                 )
             }
