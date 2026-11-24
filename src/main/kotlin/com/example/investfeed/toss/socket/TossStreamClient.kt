@@ -6,9 +6,7 @@ import com.example.investfeed.toss.auth.service.TossAuthClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Service
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 /**
  * 토스 미국 실시간 등록. 토스 연동 회원은 미국 실시간을 토스 체결로 받고, 미연동 회원은 키움 그대로다.
@@ -71,23 +69,15 @@ class TossStreamClient(
 
     /** 키움 실시간 체결가(FE)와 같은 모양: 10 현재가, 11 전일대비, 12 등락율, 25 전일대비기호 (부호 포함 문자열) */
     private fun tradeMessage(symbol: String, cur: Double, prevClose: Double): String {
-        val diff = cur - prevClose
-        val rate = diff / prevClose * 100
-        val sign = when {
-            diff > 0 -> "+"
-            diff < 0 -> "-"
-            else -> ""
-        }
+        val change = UsSessionBaseService.PriceChange.of(cur, prevClose)   // 화면 첫 시세와 같은 계산
         val values = mapOf(
-            "10" to sign + fmt(cur, 4),
-            "11" to sign + fmt(abs(diff), 4),
-            "12" to sign + fmt(abs(rate), 2),
-            "25" to when { diff > 0 -> "2"; diff < 0 -> "5"; else -> "3" },
+            "10" to change.curPrc,
+            "11" to change.predPre,
+            "12" to change.fluRt,
+            "25" to change.predPreSig,
         )
         return objectMapper.writeValueAsString(
             mapOf("trnm" to "REAL", "data" to listOf(mapOf("type" to TRADE_TYPE, "name" to TRADE_NAME, "item" to symbol, "values" to values)))
         )
     }
-
-    private fun fmt(v: Double, scale: Int): String = String.format(Locale.US, "%.${scale}f", v)
 }

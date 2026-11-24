@@ -127,9 +127,17 @@ class UsStockInfoService(
         val info = usStockClient.usStockInfo(KiwoomUsStockInfoReq(stex_tp = req.stexTp, stk_cd = stkCd))
 
         return UsStockChartRes(
-            usStockInfo = mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)),
+            usStockInfo = withStreamChange(mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)), stkCd),
             chartList = mapChartList(fetchChartRes(stkCd, req)),
         )
+    }
+
+    /** 토스 연동 회원은 실시간이 토스 기준이라 첫 전일대비도 같은 기준으로 맞춘다 (미연동이면 키움 값 그대로) */
+    private fun withStreamChange(info: UsStockInfo, stkCd: String): UsStockInfo {
+        val change = runBlocking {
+            usSessionBaseService.streamPriceChanges(mapOf(stkCd to info.curPrc?.trimStart('+', '-')?.toDoubleOrNull()))
+        }[stkCd] ?: return info
+        return info.copy(predPreSig = change.predPreSig, predPre = change.predPre, fluRt = change.fluRt)
     }
 
     fun getUsStockDetail(
@@ -175,7 +183,7 @@ class UsStockInfoService(
             ?.let { b -> b.closes[stkCd]?.let { UsSessionBase(sessionLabel = b.session.label, regularClose = it) } }
 
         return UsStockDetailRes(
-            usStockInfo = mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)),
+            usStockInfo = withStreamChange(mapUsStockInfo(info, resolveIsEtf(req.stexTp, stkCd)), stkCd),
             chartList = chartList,
             dailyPriceList = dailyPriceList,
             sessionBase = sessionBase,

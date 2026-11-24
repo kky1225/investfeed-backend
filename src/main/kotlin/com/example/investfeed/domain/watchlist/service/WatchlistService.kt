@@ -158,6 +158,16 @@ class WatchlistService(
         }
 
         if (usItems.isNotEmpty()) {
+            // 토스 연동 회원은 실시간이 토스 기준이라 첫 등락률도 같은 기준으로 맞춘다
+            val changes = runBlocking {
+                usSessionBaseService.streamPriceChanges(usItems.associate { it.stkCd to it.curPrc?.trimStart('+', '-')?.toDoubleOrNull() })
+            }
+            usItems.forEach { item ->
+                changes[item.stkCd]?.let {
+                    item.fluRt = it.fluRt
+                    item.preSig = it.predPreSig
+                }
+            }
             runBlocking { usSessionBaseService.currentBases(usItems.map { it.stkCd }) }?.let { b ->
                 usItems.forEach { item ->
                     item.sessionLabel = b.session.label

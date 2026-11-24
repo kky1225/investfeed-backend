@@ -18,6 +18,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.coroutines.cancellation.CancellationException
 
 @Service
@@ -33,6 +35,28 @@ class UsSessionBaseService(
     data class SessionBase(val session: ExtSession, val baseDate: LocalDate, val closes: Map<String, Double>)
 
     private data class CurrentSession(val session: ExtSession, val baseDate: LocalDate, val cacheable: Boolean)
+
+    /** 전일대비 (키움 미국 실시간 체결가 FE 와 같은 부호 포함 문자열): 현재가·전일대비·등락율·전일대비기호 */
+    data class PriceChange(val curPrc: String, val predPre: String, val fluRt: String, val predPreSig: String) {
+        companion object {
+            fun of(cur: Double, prevClose: Double): PriceChange {
+                val diff = cur - prevClose
+                val sign = when {
+                    diff > 0 -> "+"
+                    diff < 0 -> "-"
+                    else -> ""
+                }
+                return PriceChange(
+                    curPrc = sign + fmt(cur, 4),
+                    predPre = sign + fmt(abs(diff), 4),
+                    fluRt = sign + fmt(abs(diff / prevClose * 100), 2),
+                    predPreSig = when { diff > 0 -> "2"; diff < 0 -> "5"; else -> "3" },
+                )
+            }
+
+            private fun fmt(v: Double, scale: Int): String = String.format(Locale.US, "%.${scale}f", v)
+        }
+    }
 
     companion object {
         private val NY: ZoneId = ZoneId.of("America/New_York")
@@ -89,6 +113,23 @@ class UsSessionBaseService(
         return coroutineScope {
             tickers.distinct().map { t -> async { regularClose(t, baseDate, cacheable = true)?.let { t to it } } }.awaitAll()
         }.filterNotNull().toMap()
+    }
+
+    /**
+     * 화면 첫 시세의 전일대비를 토스 실시간과 같은 기준(streamCloses)으로 다시 계산한다. 키 = 입력 종목코드.
+     * 키움 등락률은 데이·프리마켓에 직전 정규장 하루 등락률이라, 첫 체결이 오기 전까지 실시간 값과 달라 보인다.
+     * 토스 연동 회원 문맥에서만 값이 있다 (미연동·기준 종가 없음이면 빈 맵)
+     */
+    suspend fun streamPriceChanges(prices: Map<String, Double?>): Map<String, PriceChange> {
+        val loginId = tossAuthClient.currentLoginIdOrNull() ?: return emptyMap()
+        if (!tossAuthClient.hasApiKey(loginId)) return emptyMap()
+        val valid = prices.filterValues { it != null && it > 0 }.mapValues { it.value!! }
+        if (valid.isEmpty()) return emptyMap()
+
+        val closes = streamCloses(valid.keys.map { it.substringBefore("_").trim() })
+        return valid.mapNotNull { (stkCd, cur) ->
+            closes[stkCd.substringBefore("_").trim()]?.let { stkCd to PriceChange.of(cur, it) }
+        }.toMap()
     }
 
     private suspend fun currentSession(now: Instant = Instant.now()): CurrentSession? {
