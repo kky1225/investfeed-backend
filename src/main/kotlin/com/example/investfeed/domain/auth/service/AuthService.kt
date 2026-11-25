@@ -532,7 +532,7 @@ class AuthService(
             redisTemplate.opsForValue().get(rotateKey) ?: run {
                 jwtProvider.deleteRefreshToken(loginId)
                 webSocketHandler.closeSessions(loginId)
-                log.error { "refresh token 재사용 감지 — 세션 폐기 (loginId=$loginId)" }
+                log.warn { "refresh token 재사용 감지 — 세션 폐기 (loginId=$loginId)" }
                 throw RefreshTokenReuseDetectedException()
             }
         }
