@@ -122,7 +122,10 @@ class DashboardService(
             curPrc = kiwoomSectIndexDailyRes.cur_prc,
             predPreSig = kiwoomSectIndexDailyRes.pred_pre_sig,
             fluRt = kiwoomSectIndexDailyRes.flu_rt,
-            tm = kiwoomSectIndexDailyRes.inds_cur_prc_daly_rept?.get(0)?.dt_n + kiwoomSectPriceNowRes.inds_cur_prc_tm?.get(0)?.tm_n,
+            // 날짜(yyyyMMdd) + 시각(HHmmss). 날짜가 없으면 null, 시각만 없으면 날짜만 ("null" 글자가 섞이지 않게)
+            tm = kiwoomSectIndexDailyRes.inds_cur_prc_daly_rept?.firstOrNull()?.dt_n?.takeIf { it.isNotBlank() }?.let { dtN ->
+                dtN + (kiwoomSectPriceNowRes.inds_cur_prc_tm?.firstOrNull()?.tm_n?.takeIf { it.isNotBlank() } ?: "")
+            },
             ind = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.ind_netprps,
             orgn = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.orgn_netprps,
             frgnr = kiwoomSectInvestorRes?.inds_netprps?.get(0)?.frgnr_netprps,
