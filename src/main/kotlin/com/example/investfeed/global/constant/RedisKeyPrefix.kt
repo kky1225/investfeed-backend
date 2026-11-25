@@ -23,6 +23,7 @@ enum class RedisKeyPrefix(
     TOSS_ACCESS_TOKEN("toss:access_token:", "토스 OAuth access token"),
     TOSS_ACCESS_TOKEN_LOCK("lock:toss:access_token:", "토스 OAuth access token 갱신 락"),
     US_REGULAR_CLOSE("us:regular_close:", "미국 종목 정규장 공식 종가 (토스 일봉, 종목·거래일별)"),
+    ETF_DIVIDEND_FETCH("etf_dividend:fetch:", "ETF 분배금 외부 수집 상태 (성공 시 그날 자정까지, 실패 시 10분 동안 다시 부르지 않음)"),
     PRE_AUTH_TOKEN("PRE_AUTH:", "TOTP 등록 전 임시 토큰"),
     PRE_AUTH_SECRET("PRE_AUTH_SECRET:", "TOTP 등록 전 임시 secret"),
     SECONDARY_AUTH("SEC_AUTH:", "관리자 2차 인증 세션"),
