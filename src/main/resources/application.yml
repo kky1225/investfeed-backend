@@ -32,7 +32,8 @@ server:
 
 jwt:
   secret: ${JWT_SECRET}
-  access-token-expiration: 30
+  # 분. 다른 곳에서 로그인했을 때 이전 쪽 화면이 이 시간 안에 끊긴다 (연장 시 거절)
+  access-token-expiration: 10
   refresh-token-expiration: 1
 
 cookie:
