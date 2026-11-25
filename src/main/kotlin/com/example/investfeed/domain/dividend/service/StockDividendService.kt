@@ -7,16 +7,22 @@ import com.example.investfeed.domain.dividend.dto.res.StockDividendRes
 import com.example.investfeed.domain.dividend.entity.StockDividend
 import com.example.investfeed.domain.dividend.repository.StockDividendRepository
 import com.example.investfeed.common.util.failure
+import com.example.investfeed.global.constant.RedisKeyPrefix
 import mu.KotlinLogging
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.coroutines.cancellation.CancellationException
 
 @Service
 class StockDividendService(
     private val stockDividendClient: StockDividendClient,
     private val etfDividendClient: EtfDividendClient,
     private val stockDividendRepository: StockDividendRepository,
+    private val redisTemplate: RedisTemplate<String, String>,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -26,6 +32,12 @@ class StockDividendService(
     private val TYPE_STOCK = "STOCK"
     private val TYPE_ETF = "ETF"
     private val MARKET_CODE_ETF = "8"
+
+    private val FETCH_RUNNING = "RUNNING"
+    private val FETCH_DONE = "DONE"
+    private val FETCH_FAILED = "FAILED"
+    private val FETCH_RUNNING_TTL: Duration = Duration.ofMinutes(1)   // 외부 응답 대기(최대 20초)보다 길게
+    private val FETCH_FAILED_TTL: Duration = Duration.ofMinutes(10)
 
     /** 결과 요약을 돌려준다 (성공 로그는 SchedulerLogService.execute 가 남김) */
     fun collectDailyDividends(): String {
@@ -54,7 +66,8 @@ class StockDividendService(
         return "${totalPages}페이지 조회, ${saved}건 저장"
     }
 
-    suspend fun collectEtfDividends(stkCd: String): Int {
+    /** 외부에서 받은 ETF 분배금 중 새 것만 저장하고, 저장에 실패한 건수를 돌려준다 */
+    private suspend fun collectEtfDividends(stkCd: String): Int {
         val today = today()
         val minDvdnBasDt = minDvdnBasDt()
         val existingDates = stockDividendRepository
@@ -62,7 +75,7 @@ class StockDividendService(
             .toMutableSet()
 
         val items = etfDividendClient.getDividendInfo(stkCd)
-        var count = 0
+        var failed = 0
 
         items.forEach { item ->
             try {
@@ -81,24 +94,20 @@ class StockDividendService(
                         stckDvdnRcdNm = "분배금",
                     )
                 )
-                count++
             } catch (e: Exception) {
+                failed++
                 log.failure(e) { "ETF 분배금 저장 실패: stkCd=$stkCd, date=${item.date}" }
             }
         }
-        return count
+        return failed
     }
 
     suspend fun getDividendList(stkCd: String, marketCode: String? = null): List<StockDividendRes> {
         val cleanStkCd = stkCd.substringBefore("_")
 
-        // marketCode가 8이면 ETF → createdDt 기준 1일 1회 수집
+        // marketCode가 8이면 ETF → 볼 때 외부에서 받아 온다 (성공은 하루 1회, 실패는 10분 뒤 재시도)
         if (marketCode == MARKET_CODE_ETF) {
-            val today = today()
-            val latest = stockDividendRepository.findFirstByStkCdAndTypeOrderByCreatedDtDesc(cleanStkCd, TYPE_ETF)
-            if (latest == null || latest.createdDt != today) {
-                collectEtfDividends(cleanStkCd)
-            }
+            refreshEtfDividendsIfDue(cleanStkCd)
         }
 
         val minDvdnBasDt = minDvdnBasDt()
@@ -168,6 +177,35 @@ class StockDividendService(
             }
         }
         return count
+    }
+
+    /**
+     * ETF 분배금을 외부에서 받아 저장한다. 새 분배금이 없어도 성공하면 그날은 다시 부르지 않고,
+     * 실패하면 10분 동안 부르지 않는다. 실패해도 화면은 막지 않고 이미 저장된 분배금으로 응답한다.
+     * 키를 먼저 잡아 같은 종목 요청이 동시에 들어와도 외부 호출은 한 번만 나간다
+     */
+    private suspend fun refreshEtfDividendsIfDue(stkCd: String) {
+        val key = "${RedisKeyPrefix.ETF_DIVIDEND_FETCH.prefix}$stkCd"
+        val ops = redisTemplate.opsForValue()
+        if (ops.setIfAbsent(key, FETCH_RUNNING, FETCH_RUNNING_TTL) != true) return
+
+        val failedSaves = try {
+            collectEtfDividends(stkCd)
+        } catch (e: CancellationException) {
+            redisTemplate.delete(key)   // 요청이 끊겨 중단된 것은 실패로 치지 않는다
+            throw e
+        } catch (e: Exception) {
+            log.failure(e) { "ETF 분배금 수집 실패, 저장된 분배금으로 응답: stkCd=$stkCd" }
+            ops.set(key, FETCH_FAILED, FETCH_FAILED_TTL)
+            return
+        }
+        // 일부라도 저장하지 못했으면 그날 다시 받을 수 있게 실패로 둔다
+        if (failedSaves > 0) ops.set(key, FETCH_FAILED, FETCH_FAILED_TTL) else ops.set(key, FETCH_DONE, untilMidnight())
+    }
+
+    private fun untilMidnight(): Duration {
+        val now = LocalDateTime.now()
+        return Duration.between(now, now.toLocalDate().plusDays(1).atStartOfDay()).coerceAtLeast(Duration.ofSeconds(1))
     }
 
     private fun today() = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))

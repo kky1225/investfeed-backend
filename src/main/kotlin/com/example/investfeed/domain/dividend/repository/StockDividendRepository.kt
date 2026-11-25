@@ -7,7 +7,6 @@ import org.springframework.data.repository.query.Param
 
 interface StockDividendRepository : JpaRepository<StockDividend, Long> {
     fun findByStkCdAndDvdnBasDtGreaterThanEqualAndStckDvdnRcdNmNotOrderByDvdnBasDtDesc(stkCd: String, dvdnBasDt: String, stckDvdnRcdNm: String): List<StockDividend>
-    fun findFirstByStkCdAndTypeOrderByCreatedDtDesc(stkCd: String, type: String): StockDividend?
 
     /**
      * 중복 저장 방지용 기존 키 조회.
