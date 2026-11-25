@@ -15,7 +15,9 @@ import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
 import com.example.investfeed.domain.auth.exception.RefreshTokenReuseDetectedException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordSuspendedException
 import com.example.investfeed.common.util.failure
+import jakarta.servlet.http.HttpServletRequest
 import mu.KotlinLogging
+import org.apache.catalina.connector.ClientAbortException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
@@ -24,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException
 
 @RestControllerAdvice
 class ExceptionAdviceController {
@@ -36,6 +39,16 @@ class ExceptionAdviceController {
         return ResponseEntity(
             ApiResponse(code = "SERVER_9999", message = "서버 에러", null), HttpStatus.INTERNAL_SERVER_ERROR
         )
+    }
+
+    /**
+     * 응답을 쓰는 도중 화면 쪽이 연결을 끊은 경우 (화면 이동·새로고침·응답을 읽지 않음).
+     * 서버 실패가 아니고 응답도 더 보낼 수 없으므로 warn 만 남기고 끝낸다
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException::class, ClientAbortException::class)
+    fun clientDisconnected(e: Exception, request: HttpServletRequest) {
+        val root = generateSequence<Throwable>(e) { it.cause }.last()
+        log.warn { "응답 중 연결 끊김: ${request.method} ${request.requestURI} (${root.javaClass.simpleName}: ${root.message})" }
     }
 
     @ExceptionHandler(RuntimeException::class)
