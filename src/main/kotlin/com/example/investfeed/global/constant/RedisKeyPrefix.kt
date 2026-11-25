@@ -29,6 +29,7 @@ enum class RedisKeyPrefix(
     SECONDARY_AUTH("SEC_AUTH:", "관리자 2차 인증 세션"),
     REFRESH_TOKEN("RT:", "JWT refresh token"),
     REFRESH_ROTATE("RTROT:", "JWT refresh token 재발급 유예 매핑"),
+    REFRESH_RETIRED("RTRET:", "로그인·로그아웃으로 폐기된 JWT refresh token (값=폐기 사유)"),
     BLACKLIST("BL:", "JWT access token 블랙리스트"),
     API_CALL("api_call:", "외부 API 일별 호출 카운터"),
     API_CALL_HEALTH("api_call_health:", "외부 API 일별 실패·재시도·응답 시간"),

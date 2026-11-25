@@ -1,5 +1,6 @@
 package com.example.investfeed.kiwoom.config
 
+import com.example.investfeed.common.util.failure
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -18,6 +19,9 @@ class WebSocketHandler: TextWebSocketHandler() {
 
         // 로그아웃·계정 잠금처럼 일부러 끊는 경우. 프론트는 이 코드일 때만 재연결하지 않는다
         private val LOGGED_OUT = CloseStatus(4001, "logged out")
+
+        // 다른 곳에서 새로 로그인한 경우. 화면은 "다른 곳에서 로그인" 안내를 띄우고 다시 붙지 않는다
+        private val REPLACED = CloseStatus(4002, "logged in elsewhere")
     }
 
     private val sessions = CopyOnWriteArraySet<WebSocketSession>()
@@ -53,13 +57,15 @@ class WebSocketHandler: TextWebSocketHandler() {
 
     fun closeSessions(loginId: String) = close(sessions.filter { it.loginId() == loginId }, LOGGED_OUT)
 
+    fun closeReplacedSessions(loginId: String) = close(sessions.filter { it.loginId() == loginId }, REPLACED)
+
     /** 키움 연결이 끊긴 계정의 세션을 닫아, 화면이 다시 등록하면서 키움 연결도 새로 맺게 한다 */
     fun requestReconnect(loginIds: Set<String>) = close(sessions.filter { it.loginId() in loginIds }, CloseStatus.SERVICE_RESTARTED)
 
     private fun close(targets: Collection<WebSocketSession>, status: CloseStatus) {
         targets.forEach { session ->
             runCatching { session.close(status) }
-                .onFailure { log.error { "실시간 세션 종료 실패 : sessionId=${session.id}, ${it.message}" } }
+                .onFailure { log.failure(it) { "실시간 세션 종료 실패 : sessionId=${session.id}" } }
             sessions.remove(session)
         }
     }

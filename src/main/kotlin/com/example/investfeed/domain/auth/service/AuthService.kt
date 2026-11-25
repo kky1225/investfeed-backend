@@ -22,6 +22,7 @@ import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -136,7 +137,8 @@ class AuthService(
     }
 
     @Transactional
-    fun totpVerify(preAuthToken: String, code: String): LoginResult {
+    /** browserRefreshToken = 로그인 요청에 함께 온 이 브라우저의 refresh 쿠키 (같은 브라우저에서 다시 로그인했는지 가린다) */
+    fun totpVerify(preAuthToken: String, code: String, browserRefreshToken: String?): LoginResult {
         val loginId = validatePreAuthToken(preAuthToken)
         val member = memberRepository.findByLoginId(loginId)
             .orElseThrow { MemberNotFoundException() }
@@ -165,9 +167,20 @@ class AuthService(
         redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_TOKEN.prefix}$preAuthToken")
         redisTemplate.delete("${RedisKeyPrefix.PRE_AUTH_SECRET.prefix}$preAuthToken")
 
-        val passwordChangeRequired = member.passwordChangedAt
-            .plusDays(passwordChangeCycle)
-            .isBefore(LocalDateTime.now())
+        val passwordChangeRequired = isPasswordChangeRequired(member)
+
+        // 계정당 한 곳만 로그인한다. 다른 브라우저·기기에서 로그인해 있던 경우에만 그쪽 연결을 끊고,
+        // 그 화면은 "다른 곳에서 로그인" 안내를 띄운다.
+        // - 이 브라우저의 쿠키가 현재 토큰이면 같은 브라우저에서 다시 로그인한 것: 다른 탭은 새 쿠키를 함께 쓰므로 끊지 않는다
+        // - 쿠키가 없으면 이 브라우저의 다른 탭도 로그인 상태일 수 없으므로 남은 연결은 모두 끊는다
+        //   (현재 토큰이 기한 만료로 사라졌는데 다른 기기 연결이 남아 있는 경우도 여기서 정리된다)
+        val previousRefreshToken = jwtProvider.getStoredRefreshToken(loginId)
+        if (browserRefreshToken == null || previousRefreshToken != browserRefreshToken) {
+            afterCommit {
+                webSocketHandler.closeReplacedSessions(loginId)
+                notificationWebSocketHandler.closeReplacedSessions(member.id)
+            }
+        }
 
         return LoginResult(
             tokenRes = TokenRes(
@@ -285,9 +298,14 @@ class AuthService(
             secondaryPasswordSuspended = SecondaryPasswordAttemptService.isSuspended(failedSecondaryAttempts),
             apiKeyLocked = apiKeyLocked,
             createdAt = createdAt,
-            permissions = loadUserPermissions(role.id)
+            permissions = loadUserPermissions(role.id),
+            passwordChangeRequired = isPasswordChangeRequired(this),
+            defaultPath = role.defaultLandingPath
         )
     }
+
+    private fun isPasswordChangeRequired(member: Member): Boolean =
+        member.passwordChangedAt.plusDays(passwordChangeCycle).isBefore(LocalDateTime.now())
 
     @Transactional
     fun updateProfile(loginId: String, req: UpdateProfileReq) {
@@ -319,10 +337,7 @@ class AuthService(
         member.lockedAt = LocalDateTime.now()
         member.lockExpiresAt = null
 
-        afterCommit {
-            logout(loginId)
-            notificationWebSocketHandler.closeSessions(member.id)
-        }
+        afterCommit { endSession(member) }
     }
 
     @Transactional
@@ -505,8 +520,9 @@ class AuthService(
 
         val loginId = jwtProvider.parseRefreshClaims(refreshToken)?.subject
             ?: throw RefreshTokenInvalidException()
+        // 회원이 없으면 쓸 수 없는 토큰이다. 인증 거절(401)로 답해야 컨트롤러가 쿠키를 지우고 화면이 로그인 화면으로 간다
         val member = memberRepository.findByLoginId(loginId)
-            .orElseThrow { MemberNotFoundException() }
+            .orElseThrow { RefreshTokenInvalidException() }
 
         // 정지 시 refresh 토큰이 지워져 있으므로 아래 재사용 감지로 빠져 탈취 의심 로그가 남기 전에 막는다
         if (member.isSuspended()) throw AccountPermanentlyLockedException()
@@ -528,10 +544,11 @@ class AuthService(
             }
         } else {
             // 2) 현재 토큰은 아니지만 직전에 회전된 토큰(grace 윈도우 내) → 같은 새 토큰 반환
-            // 3) grace 에도 없으면 폐기 토큰 재사용 = 탈취 의심 → 세션 폐기
+            // 3) 로그인·로그아웃으로 폐기된 토큰 → 이 쪽만 끝낸다 (새로 로그인한 쪽은 그대로 둔다)
+            // 4) 그 밖의 폐기 토큰 재사용 = 탈취 의심 → 세션 폐기
             redisTemplate.opsForValue().get(rotateKey) ?: run {
-                jwtProvider.deleteRefreshToken(loginId)
-                webSocketHandler.closeSessions(loginId)
+                jwtProvider.retireReasonOf(refreshToken)?.let { throw retiredTokenException(loginId, it) }
+                endSession(member)
                 log.warn { "refresh token 재사용 감지 — 세션 폐기 (loginId=$loginId)" }
                 throw RefreshTokenReuseDetectedException()
             }
@@ -550,6 +567,15 @@ class AuthService(
             refreshToken = newRefreshToken
         )
     }
+
+    /** 폐기된 refresh 토큰으로 연장하려 할 때. 다른 곳 로그인이면 화면이 "다른 곳에서 로그인" 안내를 띄운다 (AUTH_4018) */
+    private fun retiredTokenException(loginId: String, reason: JwtProvider.RetireReason): AuthenticationException =
+        if (reason == JwtProvider.RetireReason.LOGIN) {
+            log.debug { "다른 곳 로그인으로 폐기된 refresh token 연장 요청 (loginId=$loginId)" }
+            RefreshTokenReplacedException()
+        } else {
+            RefreshTokenInvalidException()
+        }
 
     @Transactional
     fun changePassword(
@@ -570,17 +596,36 @@ class AuthService(
 
         member.password = passwordEncoder.encode(req.newPassword)
         member.passwordChangedAt = LocalDateTime.now()
-        jwtProvider.deleteRefreshToken(loginId)
         accessToken?.let { jwtProvider.blacklistAccessToken(it) }
-        invalidateSecondaryAuth(loginId)
-        afterCommit { webSocketHandler.closeSessions(loginId) }
+        // 커밋 전에 끝낸다. Redis 오류면 요청 전체가 실패해, 비밀번호만 바뀌고 다른 기기 로그인이 남는 일이 없다
+        endSession(member)
     }
 
-    fun logout(loginId: String, accessToken: String? = null) {
-        jwtProvider.deleteRefreshToken(loginId)
-        accessToken?.let { jwtProvider.blacklistAccessToken(it) }
-        invalidateSecondaryAuth(loginId)
-        webSocketHandler.closeSessions(loginId)
+    /**
+     * 사용자가 누른 로그아웃. 자기 쪽 refresh 토큰이 아직 현재 토큰일 때만 세션을 끝낸다.
+     * 다른 곳 로그인으로 이미 밀려난 쪽이면 자기 접속 토큰만 막고, 새로 로그인한 쪽은 건드리지 않는다.
+     * 접속 토큰이 만료돼 로그인 정보가 없으면(authenticatedLoginId=null) refresh 토큰에서 계정을 찾는다
+     */
+    fun logout(authenticatedLoginId: String?, accessToken: String?, refreshToken: String?) {
+        // 만료된 접속 토큰은 읽을 수 없고 막을 필요도 없다
+        if (authenticatedLoginId != null) accessToken?.let { jwtProvider.blacklistAccessToken(it) }
+
+        refreshToken ?: return
+        val loginId = authenticatedLoginId ?: jwtProvider.parseRefreshClaims(refreshToken)?.subject ?: return
+        if (jwtProvider.getStoredRefreshToken(loginId) != refreshToken) return
+        val member = memberRepository.findByLoginId(loginId).orElse(null) ?: return
+        endSession(member)
+    }
+
+    /**
+     * 로그인을 끝내는 모든 경우(로그아웃·비밀번호 변경·관리자 정지·탈취 의심)가 이 한 곳을 거친다.
+     * 로그인 상태로 남는 것(refresh 토큰·2차 인증·실시간 시세·알림 연결)이 늘면 여기에만 추가한다
+     */
+    private fun endSession(member: Member) {
+        jwtProvider.deleteRefreshToken(member.loginId)
+        invalidateSecondaryAuth(member.loginId)
+        webSocketHandler.closeSessions(member.loginId)
+        notificationWebSocketHandler.closeSessions(member.id)
     }
 
     @Transactional(readOnly = true)

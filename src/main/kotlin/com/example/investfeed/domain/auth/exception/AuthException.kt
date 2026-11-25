@@ -21,6 +21,7 @@ class SamePasswordException : InvestFeedException(code = "AUTH_4016", message = 
 class RefreshTokenMissingException : AuthenticationException("리프레시 토큰이 없습니다.")
 class RefreshTokenInvalidException : AuthenticationException("유효하지 않은 리프레시 토큰입니다.")
 class RefreshTokenReuseDetectedException : AuthenticationException("리프레시 토큰 재사용이 감지되어 로그아웃되었습니다.")
+class RefreshTokenReplacedException : AuthenticationException("다른 곳에서 로그인되어 로그아웃되었습니다.")
 
 // API Key
 class ApiKeyNotFoundException : InvestFeedException(code = "AUTH_4020", message = "API Key를 찾을 수 없습니다.")

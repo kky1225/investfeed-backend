@@ -16,6 +16,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 
@@ -71,12 +72,13 @@ class AuthController(
     @PostMapping("/totp/verify")
     fun totpVerify(
         @CookieValue(name = "preAuthToken", required = false) preAuthToken: String?,
+        @CookieValue(name = "refreshToken", required = false) browserRefreshToken: String?,
         @RequestBody req: TotpVerifyReq,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<TokenRes>> {
         if (preAuthToken == null) throw PreAuthTokenMissingException()
 
-        val result = authService.totpVerify(preAuthToken, req.code)
+        val result = authService.totpVerify(preAuthToken, req.code, browserRefreshToken)
         response.addHeader(HttpHeaders.SET_COOKIE, expirePreAuthTokenCookie())
         response.addHeader(HttpHeaders.SET_COOKIE, createAccessTokenCookie(result.accessToken))
         response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(result.refreshToken))
@@ -95,7 +97,16 @@ class AuthController(
         @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<TokenRes>> {
-        val result = authService.reissue(refreshToken)
+        val result = try {
+            authService.reissue(refreshToken)
+        } catch (e: AuthenticationException) {
+            // 연장이 거절되면 남은 로그인 쿠키를 지운다. 남겨 두면 화면을 다시 불러와도 같은 거절을 받아 로그인 화면으로 갈 수 없다.
+            // 기록은 ExceptionAdviceController 가 한다. 예외 처리 중에도 여기서 붙인 헤더는 응답에 남는다 (DispatcherServlet.processHandlerException)
+            response.addHeader(HttpHeaders.SET_COOKIE, expireAccessTokenCookie())
+            response.addHeader(HttpHeaders.SET_COOKIE, expireRefreshTokenCookie())
+            response.addHeader(HttpHeaders.SET_COOKIE, expireSecondaryAuthCookie())
+            throw e
+        }
         response.addHeader(HttpHeaders.SET_COOKIE, createAccessTokenCookie(result.accessToken))
         response.addHeader(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(result.refreshToken))
 
@@ -133,12 +144,11 @@ class AuthController(
     fun logout(
         @AuthenticationPrincipal userDetails: CustomUserDetails?,
         @CookieValue(name = "accessToken", required = false) accessToken: String?,
+        @CookieValue(name = "refreshToken", required = false) refreshToken: String?,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<Nothing?>> {
-        userDetails?.username?.let { username ->
-            log.debug { "logout: $username" }
-            authService.logout(username, accessToken)
-        }
+        log.debug { "logout: ${userDetails?.username}" }
+        authService.logout(userDetails?.username, accessToken, refreshToken)
 
         response.addHeader(HttpHeaders.SET_COOKIE, expireAccessTokenCookie())
         response.addHeader(HttpHeaders.SET_COOKIE, expireRefreshTokenCookie())

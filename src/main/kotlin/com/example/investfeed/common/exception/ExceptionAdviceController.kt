@@ -12,6 +12,7 @@ import com.example.investfeed.domain.auth.exception.InvalidApiKeyException
 import com.example.investfeed.domain.auth.exception.InvalidTotpCodeException
 import com.example.investfeed.domain.auth.exception.PreAuthTokenInvalidException
 import com.example.investfeed.domain.auth.exception.PreAuthTokenMissingException
+import com.example.investfeed.domain.auth.exception.RefreshTokenReplacedException
 import com.example.investfeed.domain.auth.exception.RefreshTokenReuseDetectedException
 import com.example.investfeed.domain.auth.exception.SecondaryPasswordSuspendedException
 import com.example.investfeed.common.util.failure
@@ -69,6 +70,7 @@ class ExceptionAdviceController {
             is AccountLockedException -> "AUTH_4013" to LoginErrorRes(e.lockRemainingSeconds)
             is AccountPermanentlyLockedException -> "AUTH_4014" to null
             is RefreshTokenReuseDetectedException -> "AUTH_4017" to null
+            is RefreshTokenReplacedException -> "AUTH_4018" to null
             is InvalidTotpCodeException -> "AUTH_4031" to e.remainingAttempts?.let { TotpErrorRes(it) }
             is PreAuthTokenInvalidException, is PreAuthTokenMissingException -> "AUTH_4032" to null
             else -> "AUTH_4011" to null
