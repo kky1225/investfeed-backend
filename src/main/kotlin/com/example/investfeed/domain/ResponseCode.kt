@@ -125,6 +125,7 @@ enum class ResponseCode(
 
     AUTH_SECONDARY_REQUIRED(code = "AUTH_4040", message = "2차 비밀번호 인증이 필요합니다."),
     AUTH_SECONDARY_NOT_SET(code = "AUTH_4041", message = "2차 비밀번호가 설정되지 않았습니다."),
+    AUTH_SECONDARY_SUSPENDED(code = "AUTH_4044", message = "2차 비밀번호를 여러 번 틀려 정지되었습니다. 관리자에게 문의하세요."),
     AUTH_SECONDARY_SETUP(message = "2차 비밀번호가 설정되었습니다."),
     AUTH_SECONDARY_CHANGE(message = "2차 비밀번호가 변경되었습니다."),
     AUTH_SECONDARY_LOCK_STATUS(message = "2차 비밀번호 잠금 상태를 조회하였습니다."),

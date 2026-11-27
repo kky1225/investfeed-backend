@@ -423,7 +423,7 @@ class AuthService(
     }
 
     /**
-     * 2차 인증이 유지되는 남은 초. SecondaryAuthFilter 와 같은 기준으로 본다: 이 브라우저의 쿠키 값이 저장된 값과 같아야 인증된 것이다
+     * 2차 인증이 유지되는 남은 초. SecondaryAuthorizationManager 와 같은 기준으로 본다: 이 브라우저의 쿠키 값이 저장된 값과 같아야 인증된 것이다
      * (다른 기기에서 다시 인증하면 저장된 값이 바뀌어 이쪽은 풀린다). 인증되지 않았으면 0
      */
     fun getSecondaryAuthRemainingSeconds(loginId: String, cookieToken: String?): Long {

@@ -86,7 +86,7 @@ class ExceptionAdviceController {
         log.warn { "accessDeniedException: ${e.message}" }
 
         val code = when (e) {
-            is SecondaryPasswordSuspendedException -> "AUTH_4044"
+            is SecondaryPasswordSuspendedException -> ResponseCode.AUTH_SECONDARY_SUSPENDED.code
             else -> ResponseCode.AUTH_FORBIDDEN.code
         }
 

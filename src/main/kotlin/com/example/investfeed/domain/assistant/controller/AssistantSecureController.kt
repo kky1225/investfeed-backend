@@ -27,7 +27,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
- * AI 비서 개인 파트 (2차 인증 필요). SecondaryAuthFilter 가 "/api/assistant/secure/" 경로 전체를 보호한다.
+ * AI 비서 개인 파트 (2차 인증 필요). "/api/assistant/secure/" 경로 전체가 2차 인증 대상이다 (SecurityPaths.SECONDARY_AUTH_PATTERNS).
  * 개인정보를 다루는 비서 API 는 이 컨트롤러에 추가할 것 — 시장 파트(로그인만)는 AssistantController
  */
 @RequiresAction(permission = Permissions.ASSISTANT)

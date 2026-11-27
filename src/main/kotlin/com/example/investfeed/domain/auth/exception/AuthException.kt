@@ -1,6 +1,7 @@
 package com.example.investfeed.domain.auth.exception
 
 import com.example.investfeed.common.exception.InvestFeedException
+import com.example.investfeed.domain.ResponseCode
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
 
@@ -43,12 +44,14 @@ class InvalidSecondaryPasswordException(val remainingAttempts: Int) : InvestFeed
     message = "2차 비밀번호가 올바르지 않습니다. ${remainingAttempts}번 더 틀리면 정지됩니다.",
 )
 
-/** 2차 비밀번호를 여러 번 틀려 정지됐다(403 AUTH_4044). 시간이 지나도 풀리지 않고 관리자가 초기화해야 한다 */
-class SecondaryPasswordSuspendedException : AccessDeniedException(SECONDARY_PASSWORD_SUSPENDED_MESSAGE)
+/**
+ * 2차 비밀번호를 여러 번 틀려 정지됐다(403 ResponseCode.AUTH_SECONDARY_SUSPENDED). 시간이 지나도 풀리지 않고 관리자가 초기화해야 한다.
+ * 같은 코드·문구를 SecondaryAuthorizationManager(보호된 주소에 들어올 때)도 쓴다
+ */
+class SecondaryPasswordSuspendedException : AccessDeniedException(ResponseCode.AUTH_SECONDARY_SUSPENDED.message)
 
-const val SECONDARY_PASSWORD_SUSPENDED_MESSAGE = "2차 비밀번호를 여러 번 틀려 정지되었습니다. 관리자에게 문의하세요."
 class SameSecondaryPasswordException : InvestFeedException(code = "AUTH_4043", message = "현재 2차 비밀번호와 동일한 비밀번호로 변경할 수 없습니다.")
-// AUTH_4044 는 2차 비밀번호 정지(SecondaryPasswordSuspendedException·SecondaryAuthFilter·화면)가 쓴다
+// AUTH_4044 는 ResponseCode.AUTH_SECONDARY_SUSPENDED (2차 비밀번호 정지)
 class SecondaryPasswordAlreadySetException : InvestFeedException(code = "AUTH_4045", message = "2차 비밀번호가 이미 설정되어 있습니다. 변경은 현재 2차 비밀번호를 확인한 뒤에 할 수 있습니다.")
 
 // 중복

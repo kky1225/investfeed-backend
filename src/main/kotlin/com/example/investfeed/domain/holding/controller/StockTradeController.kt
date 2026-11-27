@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 한 종목의 내 매매. 주소가 /api/stock/holdings 아래라 보유 종목과 같이 2차 인증(SecondaryAuthFilter)을 거친다.
- * 주소를 옮기면 2차 인증 대상에서 빠지므로 SecondaryAuthFilter 의 목록을 함께 고칠 것.
+ * 한 종목의 내 매매. 주소가 /api/stock/holdings 아래라 보유 종목과 같이 2차 인증을 거친다.
+ * 주소를 옮기면 2차 인증 대상에서 빠지므로 SecurityPaths.SECONDARY_AUTH_PATTERNS 를 함께 고칠 것.
  */
 @RequiresAction(permission = Permissions.STOCK_HOLDINGS)
 @RestController
